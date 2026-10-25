@@ -1,6 +1,6 @@
 # Eisenhower Matrix
 
-A single-page task app built around the Eisenhower matrix. One HTML file (`app/index.html`), no server, no
+A single-page task app built around the Eisenhower matrix. One HTML file (`TasksDashboard.html`), no server, no
 build step and no runtime dependencies. Your tasks live in a JSON file that you choose, so they can sit in a
 synced folder or a git repository and be shared with colleagues.
 
@@ -9,7 +9,7 @@ The interface, messages and sample data are in English.
 ## Quick start
 
 ```bash
-open app/index.html     # or double-click the file in Finder / Explorer
+open TasksDashboard.html   # or double-click the file in Finder / Explorer
 ```
 
 On first start the app loads a few sample tasks and keeps everything in the browser (`localStorage`).
@@ -228,7 +228,21 @@ Rules worth knowing:
 - A broken file is rejected as a whole and nothing changes. A file with a newer `version` is refused.
 - **Older files** (a flat `{ "version": 1, "tasks": [...] }` with `status` and `importance`, or a bare array
   of tasks) are still read and are rewritten in v2 on the next write.
-- `sample/tasks.json` is a ready-made v2 example.
+- `data/` holds the task sources, ready-made v2 files (see "Task sources").
+
+### Task sources
+
+`data/` holds three sources, each a v2 file (time zone `Europe/Lisbon`) connected with **Choose file…**:
+
+| File | Use |
+|---|---|
+| `backlog-tasks.json` | the working matrix: tasks that are decided and placed |
+| `reminders-tasks.json` | tasks tied to a date |
+| `to-sort-tasks.json` | inbox: anything captured but not yet placed; move each task to the backlog when it is sorted |
+
+The app shows one source at a time. When you switch with **Change file…** and the new file differs from what is on
+screen, the conflict banner appears: choose **Take from file**. **Merge** would mix the two sources into the new
+file, and **Keep mine and overwrite the file** would replace it with the previous source's tasks.
 
 ### Sync with the file
 
@@ -297,10 +311,10 @@ node tools/events-stats.mjs events.jsonl
 ## Project structure
 
 ```
-app/index.html              the whole application; the logic is in <script id="core">, separate from the UI
-sample/tasks.json           sample data in the v2 format
+TasksDashboard.html         the whole application; the logic is in <script id="core">, separate from the UI
+data/                       the task sources: backlog-tasks.json, reminders-tasks.json, to-sort-tasks.json
 tools/events-stats.mjs      statistics over events.jsonl
-tests/app-core.test.js      logic tests, read straight from index.html (no browser)
+tests/app-core.test.js      logic tests, read straight from TasksDashboard.html (no browser)
 tests/events-stats.test.js  tests for the statistics tool
 tests/ui/                   UI tests in real Chrome via playwright-core; helpers.js is the shared harness
 PLAN.md, STATUS.md          working plan and current status
