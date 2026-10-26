@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "theme": "auto",
+  "view": "matrix",
+  "list": "all",
+  "listOrder": [
+    "../../references/Family-Tasks/backlog-tasks.json",
+    "../../references/Family-Tasks/reminders-tasks.json",
+    "../../references/Family-Tasks/OtherTasks.json"
+  ],
+  "tagOrder": [],
+  "axes": {
+    "fx": 0.5407,
+    "fy": 0.1354
+  },
+  "menuCollapsed": [],
+  "cards": {
+    "mode": "collapsed",
+    "flipped": []
+  }
+}

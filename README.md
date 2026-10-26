@@ -77,7 +77,7 @@ window.TD_CONFIG = {
 
 ## Preferences
 
-`config/<id>.prefs.json` is written 1 s after a change (`PREFS_DELAY_MS`), and only when its content differs from the last write. It is never written in `?demo`.
+`config/<id>.prefs.json` is written 1 s after a change (`PREFS_DELAY_MS`), and only when its content differs from the last write. It is never written in `?demo`. The files are committed with the app repo, so both machines share them through git.
 
 | Key | Default | Holds |
 |---|---|---|
@@ -85,11 +85,31 @@ window.TD_CONFIG = {
 | `theme` | `auto` | `auto` (system), `light`, `dark` |
 | `view` | `matrix` | `matrix`, `archive`, `timeline` |
 | `list` | `all` | `all` or a list key |
-| `listOrder` | `[]` | list keys in chip order |
-| `tagOrder` | `[]` | tag order in the task window |
-| `axes` | `{ fx: 0.5, fy: 0.5 }` | matrix split (each 0-1) |
+| `listOrder` | `[]` (file-name order) | list keys in chip order |
+| `tagOrder` | `[]` | tag order in the task window; filled once a task window is opened |
+| `axes` | `{ fx: 0.5, fy: 0.5 }` | matrix split: `fx` = width share of the not-urgent column, `fy` = height share of the important row; clamped to the window when applied |
 | `menuCollapsed` | `[]` | collapsed side-menu groups `A`..`D` |
 | `cards` | `{ mode: 'collapsed', flipped: [] }` | card mode and the task ids shown the other way |
+
+Example (`config/maksym.prefs.json`):
+
+```json
+{
+  "version": 1,
+  "theme": "auto",
+  "view": "matrix",
+  "list": "../../references/Family-Tasks/backlog-tasks.json",
+  "listOrder": [
+    "../../references/Family-Tasks/backlog-tasks.json",
+    "../../references/Family-Tasks/reminders-tasks.json",
+    "../../references/Family-Tasks/OtherTasks.json"
+  ],
+  "tagOrder": [],
+  "axes": { "fx": 0.5, "fy": 0.1354 },
+  "menuCollapsed": [],
+  "cards": { "mode": "collapsed", "flipped": [] }
+}
+```
 
 - Unknown keys are dropped, and a value of the wrong type takes its default.
 - A broken file loads the defaults and is rewritten on the next change.
