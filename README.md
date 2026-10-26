@@ -1,89 +1,69 @@
 # TasksDashboard
 
-Eisenhower matrix task app. One file, `TasksDashboard.html`: no server, no build, no dependencies. Tasks live in a JSON data file kept outside this repository.
+Eisenhower matrix task view, **UI prototype 4-5 "Aurora instrument"** (made in `UIPrototypes/uupm` with the UI UX Pro Max skill). One file, `TasksDashboard.html`: no server, no build, no dependencies, nothing loaded from the network.
+
+This version is a design prototype, not the data-file app it replaced (that app is in git history before this commit). It shows built-in example data and does not read or write a task file.
 
 ## Open
 
-Double-click `TasksDashboard.html`. Chrome or Edge for writing to a data file (File System Access API); Firefox and Safari keep data in the browser only (load a file, download a copy).
+Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intended fonts: Segoe UI Variable, Bahnschrift, Sitka, Cascadia Mono).
 
 ## Model
 
 | Quadrant | Row | Column | Title | Colour |
 |---|---|---|---|---|
-| A | important | urgent | DO IT NOW! | red |
-| B | important | not urgent | PLAN IT! | green |
-| C | not important | urgent | DELEGATE IT! | yellow |
-| D | not important | not urgent | ELIMINATE IT! | grey |
+| A | important | urgent | Do | red |
+| B | important | not urgent | Plan | green |
+| C | not important | urgent | Delegate | yellow |
+| D | not important | not urgent | Eliminate | grey |
 
-- Importance = quadrant row; changed only by dragging to the other row.
-- Urgency of A/B = share of the urgency window elapsed (raised by effort) >= threshold. Urgency of C/D = manual (`urgentPin`). A pin on A/B overrides the dates.
-- Dragging never changes dates. Done = archive (`completedAt`); delete exists only in the Archive tab.
+- Grid order: B Plan, A Do on top; D Eliminate, C Delegate below.
+- Today is fixed at `2026-10-26T10:00` (`TODAY`) so overdue and due-soon states match the example data.
+- Done = archive (`doneAt`); restore and delete exist in the Archive view.
 
-## Data file
+## Data
 
-```json
-{
-  "version": 2,
-  "timeZone": "Europe/Lisbon",
-  "backlog": { "A": [], "B": [ { "id": "t1", "num": 1, "title": "Report", "deadline": "2026-10-08T18:00" } ], "C": [], "D": [] },
-  "archive": { "A": [], "B": [], "C": [], "D": [] }
-}
-```
+- Built in: three lists (`backlog`, `reminders`, `other`) in the version 2 format: `backlog` / `archive`, each with quadrants `A`..`D` as card arrays (`id`, `num`, `title`, `deadline`, `tags`, `notes`, `urgentPin`, `completedAt`). 57 open, 3 archived.
+- Edits (move, add, done, tags, lists) live in memory only and are lost on reload.
 
-- `backlog` = open, `archive` = done; each holds quadrants `A`..`D` as arrays of cards. Array order = display order.
-- No `status` or `importance` field: both are derived from section and quadrant.
-- `timeZone` (IANA) is stored in the file and wins over the device; default `Europe/London`.
-- Invalid file: refused as a whole, nothing changes. Newer `version`: refused. Version 1 (`{ "tasks": [...] }` or a bare array) is read and rewritten as v2.
-
-| Card field | Type / rule |
-|---|---|
-| `title` | required |
-| `id` | string, never changes; duplicates re-issued on load |
-| `num` | integer >= 1; missing or duplicate assigned on load (max + 1) |
-| `start`, `deadline` | optional; `2026-10-08T18:00` (file zone) or with `Z`/offset; deadline >= start; legacy `end` = `deadline` |
-| `effortHours` | number >= 0 |
-| `tags` | string array, no `#`, case-insensitive unique |
-| `notes` | string |
-| `repeat` | `{ "unit": "day\|weekday\|week\|month", "every": 1..365 }`; needs `deadline` |
-| `dependsOn` | id array |
-| `parentId` | id; subtask deadline <= parent's; cycles rejected |
-| `urgentPin` | boolean |
-| `seriesId`, `spawned` | repeat bookkeeping |
-| `updatedAt` | ISO, set on every change, used by merge |
-| `completedAt` | archive only |
-
-## Storage and sync
+## Storage
 
 | What | Where |
 |---|---|
-| tasks | the connected data file; autosave after every change |
-| tasks cache / before a file is chosen | `localStorage` `eisenhower_tasks_v2` (legacy `eisenhower_tasks_v1`; corrupt copy `eisenhower_tasks_corrupt_backup`) |
-| preferences (theme, style, urgency settings) | `localStorage` `eisenhower_prefs_v1` |
-| file handles | IndexedDB `eisenhower_matrix` / `handles` (`tasksFile`, `eventsFile`) |
-| event log | `events.jsonl` (separate file, Chrome/Edge); browser keeps the last 3000 in `eisenhower_events_v1` |
+| matrix axis split (`fx`, `fy`) | `localStorage` `td.axes` |
+| side menu width and hidden state | `localStorage` `td.rail` |
+| list order | `localStorage` `td.lists` |
 
-- External changes: file mtime checked every 15 s, on focus and before each write. No local edits: reload. Both changed: conflict banner with **Take from file**, **Merge** (newer `updatedAt` wins; deletions not carried over), **Keep mine and overwrite the file**.
-- Switching data files: always **Take from file**. Merge mixes two files; Keep mine overwrites the new file with the previous one's tasks.
+Tasks, tags and settings are not stored.
 
-## Settings
+## Settings (in memory)
 
-| Setting | Default | Range |
-|---|---|---|
-| Urgency threshold | 50% | 10-90 |
-| Urgency window | 7 days | 1-30 |
-| Working days only | off | Mon-Fri, no holidays |
-| "Do it now" limit | 5 | 0 = none |
-| Working hours per day (timeline load) | 8 | |
-| Time zone | `Europe/London` | stored in the data file |
+| Setting | Default |
+|---|---|
+| Urgency threshold | 50% |
+| Urgency window | 7 days |
+| Working days only | off |
+| "Do" limit | 5 |
+| Working hours per day | 8 |
 
 ## Features
 
-Search (title, notes, tags, `#num`), tag filter, Today, Show as of; compact list; quadrant expand; weekly review; timeline with load row; `.ics` export; browser reminders (open tab only); themes Auto/Light/Dark; undo (8 s toast, Ctrl/Cmd+Z) for move, done, restore, delete.
+- **Top bar:** Priority fan logo; list chips (All fixed first, five chips including All, the rest behind `+N`; drag or Alt+arrows to reorder; a selected list from `+N` shows sixth); profile menu; light/dark toggle.
+- **Search:** search with Due, Tag, Mine filters; results grouped by quadrant; `/` focuses, arrows and Enter open.
+- **Side menu:**
+  - views (Matrix, Archive, Timeline) and the open items by quadrant;
+  - drag its edge to resize (256 px to start, 128-560 px); drag below 128 px, double-click or Enter on the edge to hide;
+  - a slim tab brings it back.
+- **Matrix:**
+  - drag cards between and inside quadrants; `+` and double-click to add; expand one quadrant;
+  - movable axes (drag the lines or the centre knob; arrows, Home or double-click to reset) with a minimum of one ~50-character title per column and one card per row;
+  - list-to-card and card-to-list highlights in the quadrant colour.
+- **Task window:** title and description with bold, italic and lists; list; quadrant; end date; tags with delete (corner cross or Delete, with a yes/no question that counts dependent items), drag or Alt+arrows to reorder, and double-click or F2 to rename (applies to every task).
+- **Other views:** archive (sort, restore, delete); timeline with weekends, today and load row; weekly review; undo toast (Ctrl/Cmd+Z).
 
 ## Limits
 
-- Merge does not propagate deletions; parallel adds can collide on `num` (re-issued on merge).
-- No authentication: the profile name is a label.
-- Monthly repeat drifts at month ends (31st -> 28th); holidays ignored.
-- Reminders need an open tab and may not fire from `file://`.
-- Touch and small screens untested.
+- No task file: no load, save, sync or merge; the gate screens (`#first-run`, `#restore`, `#wrong-folder`, `#unsupported`) are placeholders.
+- No `<script id="core">`; the logic is not separated for Node.
+- Example data only; no repeat, subtasks, effort, reminders or `.ics` export.
+- The End field uses the browser's date-time control, so its format follows the system locale.
