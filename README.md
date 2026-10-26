@@ -140,7 +140,7 @@ Tasks, tags and settings are not stored.
 
 ## Features
 
-- **Top bar:** Priority fan logo, a button: a click, Enter or Space plays the animated logo once (`ADV_LOGO`, `LOGO_PLAY_MS` 3600 ms: intro, then one glow cycle) and then shows the still logo again; a click while it plays does nothing, a re-render during it keeps its place, colours follow the app theme, and with reduced motion the click does nothing; list chips (All fixed first, five chips including All, the rest behind `+N`; drag or Alt+arrows to reorder; a selected list from `+N` shows sixth); profile menu (profiles, weekly review, settings, card mode); theme button (Auto until the first click, then Light or Dark).
+- **Top bar:** Priority fan logo (`ADV_LOGO`), a button: at rest it shows the last frame of its animation; a click, Enter or Space plays the animation once (`.play` for `LOGO_PLAY_MS` 3600 ms: intro, then one glow cycle); a click while it plays does nothing, a re-render during it keeps its place, and with reduced motion the click does nothing. Tile and colours follow the app theme (`--td-*` on `.td-adv`): white tile with the deeper palette on light, black tile with the lifted palette on dark; list chips (All fixed first, five chips including All, the rest behind `+N`; drag or Alt+arrows to reorder; a selected list from `+N` shows sixth); profile menu (profiles, weekly review, settings, card mode); theme button (Auto until the first click, then Light or Dark).
 - **Search:** search with Due, Tag, Mine filters; results grouped by quadrant; `/` focuses, arrows and Enter open.
 - **Side menu:**
   - views (Matrix, Archive, Timeline) and the open items by quadrant;
