@@ -20,7 +20,7 @@ Snapshot 2026-10-25, Telegram section 2026-10-26. A map, not a source of truth: 
 
 | Project | Path |
 |---|---|
-| Valheim mods | `references/ValheimModWork/backlog-plan.md`, `backlog-analysis.md`, `valheim-work-plan.md` |
+| Valheim mods | `references/ValheimCustomMods/GameplayEnhancements/docs/HomeCheat-plugin/README.md` (command index with statuses), open items in `references/ValheimCustomMods/docs/homecheat-architecture.md` |
 | LinkedIn | `references/LinkedinManagement/maksym/plan.md`, `posts/backlog.md` |
 | Weekly references review build | `references/homeos/weekly-references-review-design.md` (task tracker section) |
 | Parked features | `Future ideas/` (HUB Feature) |
