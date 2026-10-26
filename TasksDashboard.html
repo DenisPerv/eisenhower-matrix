@@ -694,6 +694,39 @@ html.axes-moving .q{--aura:26%}
 :root[data-theme="dark"] .td-logo{--td-a:#E0644F;--td-adeep:#A8402F;--td-b:#46A57F;--td-c:#E3B551;--td-d:#96928B;--td-ink:#EEEAE1;--td-ink2:#A9A59C}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .td-logo{--td-a:#E0644F;--td-adeep:#A8402F;--td-b:#46A57F;--td-c:#E3B551;--td-d:#96928B;--td-ink:#EEEAE1;--td-ink2:#A9A59C}}
 
+/* round 5: the logo is a button; a click plays the "advanced_logo" (logo session, round 4b) once, same box, coloured by the app theme; the cycle runs once instead of infinite */
+button.logo,button.logo:hover{min-height:0;background:none;border:0;box-shadow:none;transition:none}
+.logo .td-adv{display:block;width:96.6px;height:37.6px;overflow:visible}
+.td-adv{--td-ink:#17181B;--td-ink2:#5C5953;--td-rim:#141518}
+:root[data-theme="dark"] .td-adv{--td-ink:#EEEAE1;--td-ink2:#A9A59C;--td-rim:#3A3D43}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .td-adv{--td-ink:#EEEAE1;--td-ink2:#A9A59C;--td-rim:#3A3D43}}
+.td-adv .w,.td-adv .core{transform-box:view-box;transform-origin:7.56px 24.44px}
+@media (prefers-reduced-motion:no-preference){
+  .td-adv .ax{stroke-dasharray:1;animation:tdaf-draw .55s cubic-bezier(.4,0,.2,1) .05s both}
+  .td-adv .core{animation:tdaf-grow .35s cubic-bezier(.2,.8,.2,1) .3s both}
+  .td-adv .wc{animation:tdaf-c .5s cubic-bezier(.2,.8,.2,1) .45s both}
+  .td-adv .wa{animation:tdaf-a .7s cubic-bezier(.2,.8,.2,1) .55s both}
+  .td-adv .wb{animation:tdaf-b .85s cubic-bezier(.2,.8,.2,1) .55s both}
+  .td-adv .fa{animation:tdaf-ignite .45s ease-out 1.3s both}
+  .td-adv .bl{animation:tdaf-bloom .6s ease-out 1.35s both,tdaf-pa 4.8s 2s 1}
+  .td-adv .edge{animation:tdaf-ge 4.8s linear 2s 1 both}
+  .td-adv .fc,.td-adv .fb{animation:tdaf-pf 4.8s 2s 1}
+  .td-adv .wm{animation:tdaf-word .6s cubic-bezier(.2,.8,.2,1) 1.1s both}
+  .td-logo.back{animation:td-logo-back .3s ease-out both}
+  @keyframes tdaf-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+  @keyframes tdaf-grow{from{transform:scale(0);opacity:0}to{transform:none;opacity:1}}
+  @keyframes tdaf-c{from{transform:scale(.5);opacity:0}to{transform:none;opacity:1}}
+  @keyframes tdaf-a{from{transform:rotate(30deg) scale(.85);opacity:0}30%{opacity:1}to{transform:none;opacity:1}}
+  @keyframes tdaf-b{from{transform:rotate(60deg) scale(.85);opacity:0}30%{opacity:1}to{transform:none;opacity:1}}
+  @keyframes tdaf-ignite{from{fill-opacity:.18;stroke:#E0644F;stroke-width:1.11px}to{fill-opacity:1;stroke:#FF9A85;stroke-width:.59px}}
+  @keyframes tdaf-bloom{from{opacity:0}to{opacity:.55}}
+  @keyframes tdaf-ge{0%{opacity:0;transform:none}3%{transform:translate(0.90px,-0.63px);opacity:1}4%{transform:translate(-0.76px,0.67px)}5%{transform:translate(0.63px,0.71px)}6%{transform:translate(-0.73px,-0.44px)}7%{transform:translate(0.47px,-0.60px)}8%{transform:translate(-0.49px,0.43px)}9%{transform:translate(0.50px,0.28px)}10%{transform:translate(-0.30px,-0.45px)}11%{transform:translate(0.35px,-0.18px)}12%{transform:translate(-0.19px,0.30px)}13%{transform:translate(0.19px,0.19px)}14%{transform:translate(-0.11px,-0.13px)}15%{transform:translate(0.06px,-0.06px)}16%{transform:translate(-0.03px,0.03px)}17%{transform:none;opacity:1}25%{opacity:0}100%{opacity:0;transform:none}}
+  @keyframes tdaf-pf{0%,26%,100%{fill-opacity:.18}5%,15%{fill-opacity:.38}}
+  @keyframes tdaf-pa{0%,28%,100%{opacity:.55}5%,15%{opacity:1}}
+  @keyframes tdaf-word{from{opacity:0;transform:translateX(-3px)}to{opacity:1;transform:none}}
+  @keyframes td-logo-back{from{opacity:0}}
+}
+
 /* round 4: tag management in the task window: a corner cross to delete, drag to reorder, double-click to rename */
 .tagwrap{position:relative;display:inline-flex;cursor:grab}
 .tagwrap:active{cursor:grabbing}
@@ -1208,6 +1241,26 @@ function confirmDelete(text, onYes) {
 }
 
 const LOGO = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 72 28\" role=\"img\" aria-label=\"TasksDashboard\" class=\"td-logo\"><title>TasksDashboard<\/title><g transform=\"translate(0 3) scale(0.6875)\"><clipPath id=\"td-fan-f\"><path d=\"M4.6 27.4V18.8A8.6 8.6 0 0 1 13.2 27.4Z\"/><\/clipPath><path d=\"M1.6 1.6V30.4H30.4\" fill=\"none\" style=\"stroke:var(--td-ink,#17181B)\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M4.6 27.4V18.8A8.6 8.6 0 0 1 13.2 27.4Z\" fill=\"none\" style=\"stroke:var(--td-d,#8E8A84)\" stroke-width=\"3.6\" clip-path=\"url(#td-fan-f)\"/><path d=\"M15.6 27.17L29.99 26.87A25.4 25.4 0 0 0 26.86 15.16L14.24 22.1A11 11 0 0 1 15.6 27.17Z\" style=\"fill:var(--td-c,#C2922A)\"/><path d=\"M14.01 21.7L26.33 14.24A25.4 25.4 0 0 0 17.76 5.67L10.3 17.99A11 11 0 0 1 14.01 21.7Z\" style=\"fill:var(--td-a,#B5392C)\"/><path d=\"M9.9 17.76L16.84 5.14A25.4 25.4 0 0 0 5.13 2.01L4.83 16.4A11 11 0 0 1 9.9 17.76Z\" style=\"fill:var(--td-b,#1F6B4F)\"/><\/g><text x=\"26\" y=\"13\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"12\" font-weight=\"650\" letter-spacing=\"-0.2\" style=\"fill:var(--td-ink,#17181B)\">Tasks<\/text><text x=\"26\" y=\"24\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"9\" font-weight=\"400\" style=\"fill:var(--td-ink2,#5C5953)\" textLength=\"45.6\" lengthAdjust=\"spacingAndGlyphs\">Dashboard<\/text><\/svg>";
+// round 5: the animated "advanced_logo" (logo session, round 4b), played once by a click on the logo; its CSS sits in the round 5 block of <style>
+const ADV_LOGO = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 72 28\" role=\"img\" aria-label=\"TasksDashboard\" class=\"td-adv\"><title>TasksDashboard<\/title><svg x=\"0\" y=\"3\" width=\"22\" height=\"22\" viewBox=\"0 0 32 32\"><defs><radialGradient id=\"tdaf-g\" cx=\"0.62\" cy=\"0.38\" r=\"0.8\"><stop offset=\"0\" stop-color=\"#1E2024\"/><stop offset=\"1\" stop-color=\"#141518\"/><\/radialGradient><filter id=\"tdaf-bloom\" filterUnits=\"userSpaceOnUse\" x=\"-8\" y=\"-8\" width=\"48\" height=\"48\"><feGaussianBlur stdDeviation=\"1.6\"/><\/filter><clipPath id=\"tdaf-core\"><path d=\"M7.56 24.44V18.08A6.36 6.36 0 0 1 13.92 24.44Z\"/><\/clipPath><filter id=\"tdaf-glow\" filterUnits=\"userSpaceOnUse\" x=\"-8\" y=\"-8\" width=\"48\" height=\"48\"><feGaussianBlur stdDeviation=\".9\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/><\/feMerge><\/filter><clipPath id=\"tdaf-tile\"><rect width=\"32\" height=\"32\" rx=\"7.5\"/><\/clipPath><\/defs><rect width=\"32\" height=\"32\" rx=\"7.5\" fill=\"url(#tdaf-g)\"/><g clip-path=\"url(#tdaf-tile)\"><path class=\"bl\" d=\"M14.52 20.22L23.64 14.7A18.8 18.8 0 0 0 17.3 8.36L11.78 17.48A8.14 8.14 0 0 1 14.52 20.22Z\" fill=\"#E0644F\" opacity=\".55\" filter=\"url(#tdaf-bloom)\"/><\/g><path class=\"ax\" d=\"M5.34 5.34V26.66H26.66\" pathLength=\"1\" fill=\"none\" stroke=\"#77736B\" stroke-width=\"1.11\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g class=\"core\"><path class=\"fd\" d=\"M7.56 24.44V18.08A6.36 6.36 0 0 1 13.92 24.44Z\" fill=\"none\" stroke=\"#96928B\" stroke-width=\"2.66\" clip-path=\"url(#tdaf-core)\"/><\/g><g class=\"w wc\"><path class=\"fc\" d=\"M15.7 24.27L26.35 24.05A18.8 18.8 0 0 0 24.03 15.38L14.69 20.52A8.14 8.14 0 0 1 15.7 24.27Z\" fill=\"#E3B551\" fill-opacity=\".18\" stroke=\"#E3B551\" stroke-width=\"1.11\" stroke-linejoin=\"round\"/><\/g><g class=\"w wb\"><path class=\"fb\" d=\"M11.48 17.31L16.62 7.97A18.8 18.8 0 0 0 7.95 5.65L7.73 16.3A8.14 8.14 0 0 1 11.48 17.31Z\" fill=\"#46A57F\" fill-opacity=\".18\" stroke=\"#46A57F\" stroke-width=\"1.11\" stroke-linejoin=\"round\"/><\/g><g class=\"w wa\"><path class=\"fa\" d=\"M14.52 20.22L23.64 14.7A18.8 18.8 0 0 0 17.3 8.36L11.78 17.48A8.14 8.14 0 0 1 14.52 20.22Z\" fill=\"#E0644F\" stroke=\"#FF9A85\" stroke-width=\".59\" stroke-linejoin=\"round\"/><\/g><g class=\"edge\" opacity=\"0\" fill=\"none\" stroke-width=\"1.3\" stroke-linejoin=\"round\" filter=\"url(#tdaf-glow)\"><path d=\"M15.7 24.27L26.35 24.05A18.8 18.8 0 0 0 24.03 15.38L14.69 20.52A8.14 8.14 0 0 1 15.7 24.27Z\" stroke=\"#F5D58A\"/><path d=\"M11.48 17.31L16.62 7.97A18.8 18.8 0 0 0 7.95 5.65L7.73 16.3A8.14 8.14 0 0 1 11.48 17.31Z\" stroke=\"#7FD3AE\"/><path d=\"M14.52 20.22L23.64 14.7A18.8 18.8 0 0 0 17.3 8.36L11.78 17.48A8.14 8.14 0 0 1 14.52 20.22Z\" stroke=\"#FFB3A3\"/><path d=\"M7.56 24.44V18.08A6.36 6.36 0 0 1 13.92 24.44Z\" stroke=\"#D8D4CC\" stroke-width=\"2.2\" clip-path=\"url(#tdaf-core)\"/><\/g><rect x=\".4\" y=\".4\" width=\"31.2\" height=\"31.2\" rx=\"7.1\" fill=\"none\" style=\"stroke:var(--td-rim,#141518)\" stroke-width=\".8\"/><\/svg><g class=\"wm\"><text x=\"26\" y=\"13\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"12\" font-weight=\"650\" letter-spacing=\"-0.2\" style=\"fill:var(--td-ink,#17181B)\">Tasks<\/text><text x=\"26\" y=\"24\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"9\" font-weight=\"400\" style=\"fill:var(--td-ink2,#5C5953)\" textLength=\"45.6\" lengthAdjust=\"spacingAndGlyphs\">Dashboard<\/text><\/g><\/svg>";
+// one play at a time: a click while it plays does nothing. The play start lives here, not in the HTML: a render() during the play
+// inserts ADV_LOGO again and moves its animations to the elapsed time, so the play is neither restarted nor cut
+const LOGO_PLAY_MS = 3600; // intro about 1.9 s, then one glow cycle from 2 s, back to rest by about 3.35 s
+let logoT0 = 0;
+function playLogo() {
+  if (logoT0 || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  logoT0 = performance.now();
+  document.querySelector('.logo').innerHTML = ADV_LOGO;
+  setTimeout(() => {
+    logoT0 = 0;
+    const b = document.querySelector('.logo'); if (b) b.innerHTML = LOGO.replace('class="td-logo"', 'class="td-logo back"');
+  }, LOGO_PLAY_MS);
+}
+function bindLogo() {
+  const b = document.querySelector('.logo'); if (!b) return;
+  b.onclick = playLogo;
+  if (logoT0) { const t = performance.now() - logoT0; b.getAnimations({ subtree: true }).forEach(a => { a.currentTime = t; }); }
+}
 
 // list order: All stays first; the other lists keep the order the user dragged them into (saved in the profile's preferences)
 const moveList = (l, to) => {
@@ -1310,7 +1363,7 @@ function render() {
   const pop = st.pop && pops[st.pop] ? '<div class="menu-pop" id="pop" role="menu" data-for="' + st.pop + '">' + pops[st.pop]() + '</div>' : '';
   const matrix = st.expanded ? '<div class="matrix one">' + quad(st.expanded) + '</div>' : '<div class="matrix">' + quad('B') + quad('A') + quad('D') + quad('C') + '</div>';
   document.getElementById('app').innerHTML =
-    '<header class="top"><div class="bar"><div class="logo">' + LOGO + '</div><div class="lists" role="toolbar" aria-label="Lists">' + visible.map(chip).join('') +
+    '<header class="top"><div class="bar"><button type="button" class="logo" aria-label="TasksDashboard">' + (logoT0 ? ADV_LOGO : LOGO) + '</button><div class="lists" role="toolbar" aria-label="Lists">' + visible.map(chip).join('') +
     (rest.length ? '<span class="chip"><button id="more" aria-label="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '" aria-expanded="' + (st.pop === 'more') + '" title="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '">+' + rest.length + '</button></span>' : '') +
     Object.keys(BAD).map(k => '<span class="chip bad"><button disabled title="' + esc(BAD[k].error) + '">' + esc(BAD[k].label) + '</button></span>').join('') +
     '<span class="chip"><button id="newlist">New list</button></span></div>' +
@@ -1585,6 +1638,7 @@ function openSettings() {
 
 function bind() {
   const app = document.getElementById('app');
+  bindLogo();
   app.querySelectorAll('[data-list]').forEach(b => b.onclick = () => { st.list = b.dataset.list; st.pop = null; st.expanded = null; render(); });
   bindListDrag(app);
   const more = document.getElementById('more'); if (more) more.onclick = e => { e.stopPropagation(); st.pop = st.pop === 'more' ? null : 'more'; render(); };
