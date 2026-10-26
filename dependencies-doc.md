@@ -14,7 +14,7 @@ Snapshot 2026-10-25, Telegram section 2026-10-26. A map, not a source of truth: 
 | S6 | Wishes | `memory/wishes/*.md` + `references/wishes/*.md` | record + research note | none | 3 |
 | S7 | Document renewals | `records-index.md` | table: Name, Category, Owner, Where, Expires, Renew by, Keep until, Notes | SessionStart hook lists items expiring within 60 days | passport flagged |
 | S8 | Decisions to revisit | `decisions/log.md` | append-only entries with Why, Revisit, Owner | revisit date | 16 entries |
-| S9 | Task app sources | `references/Family-Tasks/{backlog,reminders,to-sort}-tasks.json` | Eisenhower app v2 JSON | edited by `Views/TasksDashboard/TasksDashboard.html` | empty |
+| S9 | Task app sources | `references/Family-Tasks/{backlog-tasks,reminders-tasks,OtherTasks}.json` | Eisenhower app v2 JSON | read by `Views/TasksDashboard/TasksDashboard.html` (folders from its `config/tasksdashboard.config.js`); it writes only new list files | empty |
 
 ## 2. Project task lists (inside their own documents)
 
@@ -103,7 +103,7 @@ Never-write lists (M) also name S7/S8: `/references`, `/refresh-onboard`, `/skil
 | TelegramBasics | Telegram delivery | `scripts/reminders/daily-telegram.js` uses the bot to send the S2 digest |
 | TalkToLocalLLM | indirect | callers list HomeOS budget guard and ingest; `decision/pilot/homeos-cases.jsonl` holds test cases, no live reads of the stores |
 | CarsSearch, EventBoard, CV, LogsViewer, InteriorDesignCLI, BrandBook | none | no reference to any store |
-| TasksDashboard (eisenhower-matrix) | S9 only | no code path to HomeOS; the person picks the file |
+| TasksDashboard (eisenhower-matrix) | S9 only | relative paths in `config/tasksdashboard.config.js`; the person grants each folder once in the browser |
 
 Gaps found:
 - The Telegram deny rule matches the file name exactly: a copy of `records-index.md` under another name inside `references/` would be readable by the bot.

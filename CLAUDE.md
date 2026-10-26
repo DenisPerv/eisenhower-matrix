@@ -1,6 +1,6 @@
 # TasksDashboard: rules for Claude
 
-Eisenhower matrix task app: `TasksDashboard.html` (the whole app) and `README.md` (its documentation). Nothing else belongs here.
+Eisenhower matrix task app: `TasksDashboard.html` (the whole app), `README.md` (its documentation), `config/` (`tasksdashboard.config.js`, `profiles.js`, and the `<id>.prefs.json` files the page writes) and `dependencies-doc.md`. Nothing else belongs here.
 
 ## README is the view documentation: update it with every change
 

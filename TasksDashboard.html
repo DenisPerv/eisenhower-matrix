@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TasksDashboard</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22 width=%2232%22 height=%2232%22 role=%22img%22 aria-label=%22TasksDashboard%22 class=%22td-logo%22%3E%3Ctitle%3ETasksDashboard%3C/title%3E%3Cstyle%3E.td-logo%7B--td-a:%23B5392C;--td-adeep:%237F2318;--td-b:%231F6B4F;--td-c:%23C2922A;--td-d:%238E8A84;--td-ink:%2317181B;--td-ink2:%235C5953;--td-paper:%23F6F3EC;--td-ona:%23FBF8F2%7D%40media (prefers-color-scheme:dark)%7B.td-logo%7B--td-a:%23E0644F;--td-adeep:%23A8402F;--td-b:%2346A57F;--td-c:%23E3B551;--td-d:%2396928B;--td-ink:%23EEEAE1;--td-ink2:%23A9A59C;--td-paper:%23141518;--td-ona:%23FBF8F2%7D%7D%3C/style%3E%3CclipPath id=%22td-fan-m%22%3E%3Cpath d=%22M4.6 27.4V18.8A8.6 8.6 0 0 1 13.2 27.4Z%22/%3E%3C/clipPath%3E%3Cpath d=%22M1.6 1.6V30.4H30.4%22 fill=%22none%22 style=%22stroke:var(--td-ink,%2317181B)%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M4.6 27.4V18.8A8.6 8.6 0 0 1 13.2 27.4Z%22 fill=%22none%22 style=%22stroke:var(--td-d,%238E8A84)%22 stroke-width=%223.6%22 clip-path=%22url(%23td-fan-m)%22/%3E%3Cpath d=%22M15.6 27.17L29.99 26.87A25.4 25.4 0 0 0 26.86 15.16L14.24 22.1A11 11 0 0 1 15.6 27.17Z%22 style=%22fill:var(--td-c,%23C2922A)%22/%3E%3Cpath d=%22M14.01 21.7L26.33 14.24A25.4 25.4 0 0 0 17.76 5.67L10.3 17.99A11 11 0 0 1 14.01 21.7Z%22 style=%22fill:var(--td-a,%23B5392C)%22/%3E%3Cpath d=%22M9.9 17.76L16.84 5.14A25.4 25.4 0 0 0 5.13 2.01L4.83 16.4A11 11 0 0 1 9.9 17.76Z%22 style=%22fill:var(--td-b,%231F6B4F)%22/%3E%3C/svg%3E">
+<script>try { const t = localStorage.getItem('td.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <style>
 /* TasksDashboard UI 4-4 "Aurora glass": Aurora UI + Spatial glass (UI UX Pro Max, variance 7, motion 6).
    A slow aurora behind frosted glass panels; each quadrant glows in its own colour; serif display titles. Tokens first, then components. */
@@ -741,13 +742,119 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
   .mrow.overdue::after{left:7px}
 }
 @media (min-width:701px){.rail{padding-left:10px;padding-right:10px}}
+
+/* gates: one Allow button per configured folder without a grant; config errors as a list; a list file that can't be read shows disabled */
+.gate .row{display:flex;flex-wrap:wrap;gap:var(--s4);justify-content:center}
+.gate .allow{min-height:44px;padding:0 24px;border-radius:var(--r);border-color:transparent;background:var(--accent);color:#FFFFFF;font:600 15px var(--ui);box-shadow:0 10px 24px -14px var(--glow)}
+.gate .allow:hover{background:var(--accent);filter:brightness(1.08)}
+.gate .errs{margin:0;padding:0;list-style:none;display:grid;gap:var(--s3);color:var(--danger-ink);font:500 14px var(--mono);text-align:left}
+.lists .chip.bad button{border:1px dashed var(--hair2);color:var(--ink3);text-decoration:line-through}
 </style>
 </head>
 <body>
 <div id="app"></div>
+<script src="config/tasksdashboard.config.js"></script>
+<script src="config/profiles.js"></script>
+<script id="core">
+// pure rules: config, list files, profiles, preferences. No DOM, no clock; loads in Node with require() through vm.
+(function (root, factory) { const m = factory(); if (typeof module === 'object' && module.exports) module.exports = m; else root.TDCore = m; })(typeof self !== 'undefined' ? self : this, function () {
+  const QS = ['A', 'B', 'C', 'D'];
+  const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
+  const strs = a => Array.isArray(a) && a.every(x => typeof x === 'string');
+  const normPath = p => String(p).replace(/\\/g, '/').replace(/\/+$/, '');
+  const isAbsolute = p => /^([a-z]:)?[\\/]/i.test(p) || /^[a-z][a-z0-9+.-]*:/i.test(p);
+  const folderName = p => normPath(p).split('/').pop();
+  // every folder the page needs a grant for, once each: the read folders, the create folder, the preferences folder
+  const folderSet = (cfg, prefsFolder) => [...new Set(cfg.readFolders.concat([cfg.createFolder, prefsFolder]).map(normPath))];
+
+  function readConfig(raw, prefsFolder) {
+    if (!isObj(raw)) return { config: null, errors: ['config/tasksdashboard.config.js is missing or does not set window.TD_CONFIG'] };
+    const errors = [];
+    const read = Array.isArray(raw.readFolders) ? raw.readFolders : [];
+    if (!read.length) errors.push('readFolders: list at least one folder');
+    read.concat([raw.createFolder]).forEach(p => {
+      if (typeof p !== 'string' || !p.trim()) errors.push('Folder paths must be non-empty strings (readFolders, createFolder)');
+      else if (isAbsolute(p)) errors.push('Absolute path not allowed: ' + p);
+    });
+    if (errors.length) return { config: null, errors: [...new Set(errors)] };
+    const config = { readFolders: [...new Set(read.map(normPath))], createFolder: normPath(raw.createFolder) };
+    const names = {};
+    folderSet(config, prefsFolder).forEach(p => { const n = folderName(p).toLowerCase(); if (names[n]) errors.push('Two folders share the name "' + folderName(p) + '": ' + names[n] + ', ' + p); names[n] = p; });
+    return errors.length ? { config: null, errors } : { config, errors: [] };
+  }
+
+  // a list is any *.json file; its label is the file name without "-tasks.json" (or ".json"), first letter capitalised
+  const listKey = (folder, file) => normPath(folder) + '/' + file;
+  function listLabel(file) {
+    if (typeof file !== 'string' || file.startsWith('.') || !/\.json$/i.test(file)) return null;
+    const base = file.replace(/-tasks\.json$/i, '').replace(/\.json$/i, '');
+    return base ? base[0].toUpperCase() + base.slice(1) : null;
+  }
+  // New list: letters, digits and dashes, saved as <name>-tasks.json
+  const newListFile = name => /^[a-z0-9][a-z0-9-]*$/i.test(String(name).trim()) ? String(name).trim().toLowerCase() + '-tasks.json' : null;
+  const newListDoc = timeZone => ({ version: 2, timeZone, backlog: { A: [], B: [], C: [], D: [] }, archive: { A: [], B: [], C: [], D: [] } });
+
+  // data file format version 2: { version, timeZone, backlog: { A..D: [cards] }, archive: { A..D: [cards] } }
+  function readList(text) {
+    let d;
+    try { d = JSON.parse(text); } catch (e) { return { error: 'Not JSON: ' + e.message }; }
+    if (!isObj(d)) return { error: 'Not a task list' };
+    if (d.version !== 2) return { error: 'Format version ' + d.version + ' is not supported (2 is)' };
+    const doc = { version: 2, timeZone: typeof d.timeZone === 'string' ? d.timeZone : null };
+    for (const part of ['backlog', 'archive']) {
+      if (d[part] !== undefined && !isObj(d[part])) return { error: '"' + part + '" must be an object of quadrants A-D' };
+      doc[part] = {};
+      for (const q of QS) {
+        const cards = (d[part] || {})[q] || [];
+        if (!Array.isArray(cards)) return { error: part + '.' + q + ' must be a list' };
+        const bad = cards.findIndex(c => !isObj(c) || typeof c.title !== 'string');
+        if (bad >= 0) return { error: part + '.' + q + '[' + bad + '] has no title' };
+        doc[part][q] = cards;
+      }
+    }
+    return { doc };
+  }
+
+  function readProfiles(raw) {
+    const seen = new Set();
+    return (Array.isArray(raw) ? raw : []).filter(p => {
+      if (!isObj(p) || typeof p.id !== 'string' || !/^[a-z0-9-]+$/.test(p.id) || seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    }).map(p => ({ id: p.id, name: typeof p.name === 'string' && p.name.trim() ? p.name : p.id, tags: strs(p.tags) ? p.tags.slice() : [] }));
+  }
+  // ?profile=<id> first, then the last profile used in this browser, then the first one in the file
+  const pickProfile = ({ param, remembered, ids }) => ids.includes(param) ? param : ids.includes(remembered) ? remembered : ids[0] || null;
+
+  const PREFS_DEFAULTS = { version: 1, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] } };
+  // unknown keys are dropped; a value of the wrong type falls back to its default
+  function readPrefs(raw) {
+    const p = JSON.parse(JSON.stringify(PREFS_DEFAULTS));
+    if (!isObj(raw)) return p;
+    const frac = v => typeof v === 'number' && v > 0 && v < 1;
+    if (['auto', 'light', 'dark'].includes(raw.theme)) p.theme = raw.theme;
+    if (['matrix', 'archive', 'timeline'].includes(raw.view)) p.view = raw.view;
+    if (typeof raw.list === 'string' && raw.list) p.list = raw.list;
+    if (strs(raw.listOrder)) p.listOrder = raw.listOrder.slice();
+    if (strs(raw.tagOrder)) p.tagOrder = raw.tagOrder.slice();
+    if (isObj(raw.axes) && frac(raw.axes.fx) && frac(raw.axes.fy)) p.axes = { fx: raw.axes.fx, fy: raw.axes.fy };
+    if (strs(raw.menuCollapsed)) p.menuCollapsed = QS.filter(q => raw.menuCollapsed.includes(q));
+    if (isObj(raw.cards)) {
+      if (['collapsed', 'expanded'].includes(raw.cards.mode)) p.cards.mode = raw.cards.mode;
+      if (strs(raw.cards.flipped)) p.cards.flipped = raw.cards.flipped.slice();
+    }
+    return p;
+  }
+
+  return { QS, normPath, isAbsolute, folderName, folderSet, readConfig, listKey, listLabel, newListFile, newListDoc, readList, readProfiles, pickProfile, PREFS_DEFAULTS, readPrefs };
+});
+</script>
 <script>
 (() => {
-const TODAY = new Date('2026-10-26T10:00');
+const { folderName, folderSet, readConfig, listKey, listLabel, newListFile, newListDoc, readList, readProfiles, pickProfile, readPrefs } = TDCore;
+const DEMO = new URLSearchParams(location.search).has('demo');
+// real lists use the clock at page load; ?demo keeps the date its example data was written for
+const TODAY = DEMO ? new Date('2026-10-26T10:00') : new Date();
 const DAY = 864e5;
 const QN = { A: 'Do', B: 'Plan', C: 'Delegate', D: 'Eliminate' };
 // line icons, 24-unit grid, stroke = currentColor (drawn for this file; no glyphs as icons)
@@ -769,26 +876,58 @@ const I = {
   ol: svg('<path d="M10 6h10M10 12h10M10 18h10M4 5h1v4M4 9h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>'),
 };
 const URGENT = { A: true, B: false, C: true, D: false };
-const PROFILES = [{ id: 'maksym', name: 'Maksym', tags: ['maksym', 'shared'] }, { id: 'anastasiia', name: 'Anastasiia', tags: ['anastasiia', 'shared'] }];
-let profile = PROFILES[0];
+// config/ beside the page: folder paths (config), profiles, and each profile's preferences file (written by the page)
+const PREFS_FOLDER = 'config';
+const PREFS_DELAY_MS = 1000;
+const NEW_LIST_TZ = 'Europe/Lisbon';
+const boot = { gate: 'loading', errors: [], wrong: '' };
+const cfgRead = readConfig(window.TD_CONFIG, PREFS_FOLDER);
+const cfg = cfgRead.config;
+const PROFILES = readProfiles(window.TD_PROFILES);
+if (DEMO && !PROFILES.length) PROFILES.push({ id: 'demo', name: 'Demo', tags: [] });
+if (!DEMO) {
+  boot.errors = cfgRead.errors.slice();
+  if (!PROFILES.length) boot.errors.push('config/profiles.js is missing or lists no valid profile');
+}
+let profile = null;
 const settings = { threshold: 50, windowDays: 7, workingDays: false, doLimit: 5, hoursPerDay: 8, timeline: false };
 const d = (s) => s ? new Date(s) : null;
 const ymd = (x) => x ? new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 16).replace('T', ' ') : '';
 let seq = 100;
 const T = (list, num, q, title, deadline, tags, extra) => Object.assign({ id: 't' + (seq++), list, num, q, title, deadline: d(deadline), tags }, extra || {});
-// the household's lists, embedded from example-data/*.json (format version 2); the quadrant key is where a card sits
-const DATA = {"backlog":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[],"B":[{"id":"tbd-18","num":18,"title":"Voice samples","tags":["tbd","content-review","shared"],"notes":"people/maksym/maksym-voice.md and people/anastasiia/anastasiia-voice.md: two pieces each, written for a human, pasted verbatim. Maksym's 3 current samples are prompts to Claude; replace them with an email, Telegram message or work update. Source: TBD.md #18."},{"id":"tbd-21","num":21,"title":"Records index first entries","tags":["tbd","content-review","shared"],"notes":"records-index.md: 5 to 10 rows (passport, insurance, contract, warranties, medical) with where the file lives, expiry, renew-by. Source: TBD.md #21."},{"id":"tbd-25","num":25,"title":"Home search context","tags":["tbd","content-review","shared"],"notes":"people/home-search-context.md. Left: confirm time zone Europe/Lisbon, stack we own (phones, car, smart home, streaming, bank), sites to skip. Source: TBD.md #25."},{"id":"tbd-26","num":26,"title":"Household facts","tags":["tbd","content-review","shared"],"notes":"people/household.md. Left: Anastasiia's host name, others to know, home details, vehicles, recurring dates, subscriptions. Source: TBD.md #26."},{"id":"tbd-27","num":27,"title":"Personal search contexts","tags":["tbd","content-review","shared"],"notes":"Maksym's search-context.md needs his sign-off; Anastasiia's is an empty template. Each owner does their own. Source: TBD.md #27."},{"id":"tbd-31","num":31,"title":"Built-in auto memory","tags":["tbd","structure","shared"],"notes":"Off in .claude/settings.json (no silent writes). Option: redirect to memory/candidates/ via autoMemoryDirectory. Proposed: off for the first month; revisit after the first retrospective. Source: TBD.md #31."},{"id":"tbd-34","num":34,"title":"Maksym profile read-through","tags":["tbd","content-review","maksym"],"notes":"people/maksym/maksym-profile.md About: no placeholders left; drafted from the old OS, needs a read-through of role, languages, priorities. Source: TBD.md #34."},{"id":"tbd-36","num":36,"title":"Manual boundaries","tags":["tbd","content-review","shared"],"notes":"AGENTS.md Boundaries (always / ask first / never) and the ask list in .claude/settings.json: agree they match how you both want to work. Source: TBD.md #36."},{"id":"tbd-37","num":37,"title":"Decisions revisit dates","tags":["tbd","content-review","shared"],"notes":"decisions/log.md: each 2026-09 entry has a proposed Revisit date; confirm or change. Source: TBD.md #37."},{"id":"tbd-38","num":38,"title":"Anastasiia onboarding","tags":["tbd","content-review","anastasiia"],"notes":"Clone the repo on her machine, run /onboard, paste voice samples, fill search-context.md. She does it herself. Source: TBD.md #38."},{"id":"tbd-41","num":41,"title":"Stock analysis and the no-finance-advice rule","tags":["tbd","structure","proposed","maksym"],"notes":"/stock-chart-analysis gives a trade setup labelled not financial advice; AGENTS.md forbids finance advice. Proposed: keep the reframing; log it as a decision. Source: TBD.md #41."},{"id":"tbd-42","num":42,"title":"Calendar and Email connections","tags":["tbd","content-review","shared"],"notes":"connections.md rows 5 and 7 are [none chosen]. Pick a system for each or mark them out of scope. Source: TBD.md #42."},{"id":"tbd-43","num":43,"title":"ID data in repo: Anastasiia to agree and fill her profile","tags":["tbd","content-review","anastasiia"],"notes":"Decision 2026-09-29: profile cards with ID numbers and ScansStorage/ scans are committed to the repo. Anastasiia agrees and fills people/anastasiia/anastasiia-profile.md. Source: TBD.md #43."}],"C":[],"D":[{"id":"tbd-39","num":39,"title":"Voice file name in AGENTS.md","tags":["tbd","structure","proposed","maksym"],"notes":"AGENTS.md says people/<name>/voice.md; the files use <name>-voice.md. Proposed: fix the line in AGENTS.md. Source: TBD.md #39."},{"id":"tbd-40","num":40,"title":"IBKR tool reference","tags":["tbd","content-review","maksym"],"notes":"references/tools/ibkr.md: allowed read-only tools, forbidden order/alert/account tools, what /stock-chart-analysis calls. Source: TBD.md #40."},{"id":"tbd-44","num":44,"title":"AI solution design questions","tags":["tbd","structure","maksym"],"notes":"AISystems notes in references/Learning/Architecture/ point at an agent project intake checklist and a HomeOS gap map; neither exists. Parked 2026-10-09. Source: TBD.md #44."},{"id":"tbd-45","num":45,"title":"Facebook reel to analyse","tags":["tbd","content-review","maksym"],"notes":"https://www.facebook.com/reel/921326843740504, saved 2026-10-09; content not yet reviewed. Source: TBD.md #45."},{"id":"tbd-46","num":46,"title":"GIR design notes: the missing Aspect 5","tags":["tbd","content-review","anastasiia"],"notes":"OtherGameDesignAspects.md numbers aspects 1-4 and 6-11. Ask Anastasiia; if it was co-op architecture, add DA-12. Source: TBD.md #46."}]},"archive":{"A":[],"B":[{"id":"tbd-13","num":13,"title":"Day-1 routines","tags":["tbd","routines","maksym"],"notes":"Done: the four rituals run as Desktop tasks since 2026-09-29; hub-inbox-poll is parked in Future ideas/HUB Feature/. Source: TBD.md #13.","completedAt":"2026-09-29T12:00:00.000Z"},{"id":"tbd-30","num":30,"title":"Install the schedulers","tags":["tbd","routines","maksym"],"notes":"Done: rituals installed on MDENYSIUK-PERS 2026-09-29 (services.md); weekly-audit runs locally on Saturday instead of in the cloud. Source: TBD.md #30.","completedAt":"2026-09-29T12:00:00.000Z"}],"C":[],"D":[]}},"reminders":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[],"B":[{"id":"rem-2026-10-20--22-15","num":11,"title":"Renaissance Porto Lapa Hotel, Friday 13 Nov 20:30","deadline":"2026-11-13T20:30","tags":["reminder","event","maksym"],"notes":"R. de Cervantes 169, 4050-289 Porto. Purpose not stated. Source: references/reminders/2026-10-20--22-15_reminder.md."},{"id":"rem-2026-10-12--11-19","num":4,"title":"Candlelight Coldplay & Imagine Dragons concert, Palácio da Bolsa","deadline":"2026-11-21T17:00","tags":["reminder","event","shared"],"notes":"Saturday 2026-11-21 at 19:30 (moved from 2026-10-31), 2 tickets, Zona A, Fever booking. Arrive by 19:00, no late entry; use the re-issued tickets in the Fever app. Source: references/reminders/2026-10-12--11-19_reminder.md."},{"id":"rem-2026-10-08--18-35","num":1,"title":"Maksym residence permit: prepare documents","deadline":"2027-02-17T09:00","tags":["reminder","residence-permit","maksym"],"notes":"Renewal window opens 2027-02-21 (permit expires 2027-05-22). Prepare: permit card and valid passport; IRS return and recibos verdes, last 12 months; proof of accommodation; Finanças and Segurança Social no-debt proof; NISS linked in AIMA; account on portal-renovacoes.aima.gov.pt. Source: references/reminders/2026-10-08--18-35_reminder.md."},{"id":"rem-2026-10-08--18-36","num":2,"title":"Maksym residence permit: apply window opens","deadline":"2027-02-21T09:00","tags":["reminder","residence-permit","maksym"],"notes":"First day to file the renewal at portal-renovacoes.aima.gov.pt; deadline 2027-04-22. Keep the receipt with QR code with the card. If the portal does not accept a May 2027 expiry yet, retry weekly. Source: references/reminders/2026-10-08--18-36_reminder.md.","dependsOn":["rem-2026-10-08--18-35"]},{"id":"rem-2026-10-08--18-37","num":3,"title":"Maksym residence permit: deadline check","deadline":"2027-04-01T09:00","tags":["reminder","residence-permit","maksym"],"notes":"Official filing deadline is 2027-04-22 (30 days before expiry). If not filed yet, file now. Source: references/reminders/2026-10-08--18-37_reminder.md."}],"C":[{"id":"rem-2026-10-16--02-32","num":5,"title":"References review: add the recipe text for Shashlik","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: the file is a Wikipedia overview with no amounts or method. Paste the recipe text or a recipe link into references/CookingRecipes/Meat/2026-10-13_shashlik-history-etymology-and-preparation-of.md, or delete it. Source: references/reminders/2026-10-16--02-32_reminder.md."},{"id":"rem-2026-10-16--02-33","num":6,"title":"References review: add the recipe text for Potato pancakes (deruny)","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/2026-10-15_potato-pancakes-deruny-latkes-boxty-overview.md, or delete it. Source: references/reminders/2026-10-16--02-33_reminder.md."},{"id":"rem-2026-10-16--02-34","num":7,"title":"References review: add the recipe text for Syrniki","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/2026-10-15_syrniki-traditional-eastern-european-curd-cheese.md, or delete it. Source: references/reminders/2026-10-16--02-34_reminder.md."},{"id":"rem-2026-10-16--02-35","num":8,"title":"References review: add the recipe text for Cabbage rolls","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/Meat/2026-10-15_cabbage-rolls-global-variations-and-traditional.md, or delete it. Source: references/reminders/2026-10-16--02-35_reminder.md."},{"id":"rem-2026-10-16--02-36","num":9,"title":"References review: add the recipe text for Chicken Kiev","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/Meat/2026-10-15_chicken-kiev-history-and-preparation.md, or delete it. Source: references/reminders/2026-10-16--02-36_reminder.md."},{"id":"rem-2026-10-17--05-08","num":10,"title":"References review: decide how the Package template folder is indexed","deadline":"2026-10-17T05:07","urgentPin":true,"tags":["reminder","references-review","anastasiia"],"notes":"needs-person: Package/README.md description is a template placeholder, so its row in templates/README.md is flagged stale every run. Keep the row and tell the review to skip template READMEs, or give Package/ a separate index line. Ref: references/GameIndustryResearch/GameDesign/templates/Package/. Source: references/reminders/2026-10-17--05-08_reminder.md."},{"id":"rem-2026-10-24--05-08","num":12,"title":"References review: add the content for the Facebook reel captured 2026-10-20","deadline":"2026-10-24T05:07","urgentPin":true,"tags":["reminder","references-review","shared"],"notes":"needs-source: the capture holds only a reel link; nothing to place. Paste what the reel is about into references/Unrecognized/2026-10-20_no-content-provided-for-summarization.md, or delete the file. Source: references/reminders/2026-10-24--05-08_reminder.md."}],"D":[]},"archive":{"A":[],"B":[{"id":"rem-2026-10-24--23-53","num":13,"title":"Gmail cleanup: 7-day watch and follow-up decisions","deadline":"2026-10-31T10:00","tags":["reminder","gmail","maksym"],"notes":"Check new mail since 2026-10-24 landed in Government/Banks/Household labels and nothing important went to Trash (restore before about 2026-11-23). Ref: references/gmail-cleanup/design.md. Source: references/reminders/2026-10-24--23-53_reminder.md.","completedAt":"2026-10-25T12:00:00.000Z"}],"C":[],"D":[]}},"other":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[{"id":"plan-passport-renewal-maksym","num":1,"title":"Renew Maksym's Ukrainian travel passport","urgentPin":true,"tags":["plan","documents","maksym"],"notes":"Expired 2026-04-21, renewal pending. Visas and many applications need a passport valid 3 to 6 months beyond the trip; the residence card does not cover travel. Source: memory/plans/shortterm/passport-renewal-maksym.md."}],"B":[{"id":"dec-2026-10-24-gmail-cleanup","num":4,"title":"Revisit decision: Gmail cleanup runs on Gmail's own filters (Route C)","deadline":"2026-10-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-24. Source: decisions/log.md."},{"id":"dec-2026-09-29-homeos-build","num":5,"title":"Revisit decision: HomeOS build: manual, memory contract, artifacts, delivery","deadline":"2026-11-30T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Owner: Maksym (implementation), both (rules). Source: decisions/log.md."},{"id":"plan-q4-2026-priority","num":2,"title":"Q4 priority: a working self-maintaining memory loop","deadline":"2026-12-31T18:00","tags":["plan","homeos","maksym"],"notes":"By end of 2026: facts captured during tasks with a yes, a monthly retrospective, a monthly tidy, and the captured-vs-candidates ratio tracked. Why: the previous OS saved 9 records where a retrospective found 40 candidates. Source: memory/plans/shortterm/q4-2026-priority.md."},{"id":"dec-2026-09-28-memory-model","num":6,"title":"Revisit decision: HomeOS memory model","deadline":"2026-12-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-28-routines-hub","num":7,"title":"Revisit decision: HomeOS routines and hub","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-28-search-context","num":8,"title":"Revisit decision: HomeOS search context","deadline":"2026-12-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-29-memory-settings","num":9,"title":"Revisit decision: HomeOS memory settings","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Source: decisions/log.md."},{"id":"dec-2026-09-29-autostart","num":10,"title":"Revisit decision: autostart for the local LLM and Telegram servers","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Source: decisions/log.md."},{"id":"dec-2026-10-10-learning-notes","num":11,"title":"Revisit decision: Telegram-ingested Learning notes placed at once, verified weekly","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-10. Source: decisions/log.md."},{"id":"dec-2026-10-15-cloud-push-main","num":12,"title":"Revisit decision: cloud routines may push straight to main","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-15. Source: decisions/log.md."},{"id":"dec-2026-10-16-learning-verification","num":13,"title":"Revisit decision: Learning verification runs inside the weekly references review","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-16; no separate learning-verify routine. Source: decisions/log.md."},{"id":"dec-2026-09-28-usage-sync-privacy","num":14,"title":"Revisit decision: HomeOS usage, sync and privacy basics","deadline":"2027-03-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-29-profile-cards-scans","num":15,"title":"Revisit decision: profile cards and document scans live in the repo","deadline":"2027-03-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Anastasiia to confirm (TBD #43). Source: decisions/log.md."},{"id":"dec-2026-10-10-telegram-family-context","num":16,"title":"Revisit decision: Telegram bot gives HomeOS context only to Family users","deadline":"2027-03-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-10. Source: decisions/log.md."},{"id":"plan-residence-card-old-address","num":3,"title":"Update Maksym's residence card address with AIMA","tags":["plan","documents","maksym"],"notes":"The título de residência (issued 2025-05-22) shows the old Oeiras address; the household lives in Vila Nova de Gaia. Whether AIMA was told is not confirmed. A stale address can cause trouble at renewal and with official mail. Source: memory/plans/shortterm/residence-card-old-address.md."},{"id":"dec-2026-10-25-homecheat-traps","num":17,"title":"Revisit decision: HomeCheat traps, one trap command","tags":["decision","valheim","maksym"],"notes":"Decided 2026-10-25. Revisit after Maksym's first in-game test of W3-mines. Source: decisions/log.md."}],"C":[],"D":[{"id":"cand-retro-2026-09-29-explicit-2e2cad-1","num":18,"title":"Review memory candidate: \"yes, remember it, and run the routine now\"","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment from the 2026-09-29 retrospective. Promote or drop with /remember (review candidates). Source: memory/candidates/retro-2026-09-29-explicit-2e2cad-1.md."},{"id":"cand-retro-2026-09-29-explicit-2e2cad-2","num":19,"title":"Review memory candidate: pasted /remember skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-explicit-2e2cad-2.md."},{"id":"cand-retro-2026-09-29-explicit-e6a8cf-0","num":20,"title":"Review memory candidate: partner rename and removing nssm records","tags":["candidate","memory","shared"],"notes":"Asks to rename the partner to Anastasiia Khrystina (Curly) and remove any record about nssm. The household-members record already holds the names. Source: memory/candidates/retro-2026-09-29-explicit-e6a8cf-0.md."},{"id":"cand-retro-2026-09-29-rule-2e2cad-6","num":21,"title":"Review memory candidate: pasted cloud-agent scheduling skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-2e2cad-6.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-3","num":22,"title":"Review memory candidate: pasted /onboard skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-3.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-4","num":23,"title":"Review memory candidate: pasted send-telegram-message skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-4.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-5","num":24,"title":"Review memory candidate: \"never ask for approval for sending message to telegram\"","tags":["candidate","memory","shared"],"notes":"Conflicts with the house rule that messages to third parties are ask-first; decide its scope (own chat only?) before promoting. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-5.md."},{"id":"wish-bambu-lab-printer","num":25,"title":"Wish: Bambu Lab 3D printer","tags":["wish","maksym"],"notes":"New only, from eu.store.bambulab.com or the official Amazon.es storefront. Realistic stacked savings 15-25% on current models; big sale window late October to early December. Sources: memory/wishes/bambu-lab-printer.md, references/wishes/bambu-lab-printer.md."},{"id":"wish-massage-chair","num":26,"title":"Wish: full-body massage chair up to EUR 1,500","tags":["wish","shared"],"notes":"Must fit 183 and 160 cm; EU retailer shipping to mainland Portugal. Top pick VEVOR SL-track 3D (eur.vevor.com, Worten.pt); test at Sleep8, Leça da Palmeira, first. Sources: memory/wishes/massage-chair.md, references/wishes/massage-chair.md."},{"id":"wish-vocal-training","num":27,"title":"Wish: in-person vocal training in Gaia or Porto","tags":["wish","maksym"],"notes":"Teacher or school, offline only, ideally Vila Nova de Gaia, English-friendly. Shortlist found 2026-10-20, none verified by contact. Sources: memory/wishes/vocal-training.md, references/wishes/vocal-training.md."}]},"archive":{"A":[],"B":[],"C":[],"D":[]}}};
-const LISTS = ['backlog', 'reminders', 'other'];
-let tasks = LISTS.flatMap(list => ['backlog', 'archive'].flatMap(part => ['A', 'B', 'C', 'D'].flatMap(q => (DATA[list][part][q] || []).map(c => {
-  const extra = {};
-  if (c.notes) extra.notes = c.notes;
-  if (c.urgentPin !== undefined) extra.pin = c.urgentPin;
-  if (c.completedAt) extra.doneAt = d(c.completedAt);
-  return T(list, c.num, q, c.title, c.deadline || null, c.tags || [], extra);
-}))));
-const label = n => n[0].toUpperCase() + n.slice(1);
-const initial = n => n[0].toUpperCase();
-const st = { list: 'backlog', q: '', due: 'any', tags: new Set(), mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
+// example lists for ?demo, embedded from example-data/*.json (format version 2); the quadrant key is where a card sits
+const DATA ={"backlog":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[],"B":[{"id":"tbd-18","num":18,"title":"Voice samples","tags":["tbd","content-review","shared"],"notes":"people/maksym/maksym-voice.md and people/anastasiia/anastasiia-voice.md: two pieces each, written for a human, pasted verbatim. Maksym's 3 current samples are prompts to Claude; replace them with an email, Telegram message or work update. Source: TBD.md #18."},{"id":"tbd-21","num":21,"title":"Records index first entries","tags":["tbd","content-review","shared"],"notes":"records-index.md: 5 to 10 rows (passport, insurance, contract, warranties, medical) with where the file lives, expiry, renew-by. Source: TBD.md #21."},{"id":"tbd-25","num":25,"title":"Home search context","tags":["tbd","content-review","shared"],"notes":"people/home-search-context.md. Left: confirm time zone Europe/Lisbon, stack we own (phones, car, smart home, streaming, bank), sites to skip. Source: TBD.md #25."},{"id":"tbd-26","num":26,"title":"Household facts","tags":["tbd","content-review","shared"],"notes":"people/household.md. Left: Anastasiia's host name, others to know, home details, vehicles, recurring dates, subscriptions. Source: TBD.md #26."},{"id":"tbd-27","num":27,"title":"Personal search contexts","tags":["tbd","content-review","shared"],"notes":"Maksym's search-context.md needs his sign-off; Anastasiia's is an empty template. Each owner does their own. Source: TBD.md #27."},{"id":"tbd-31","num":31,"title":"Built-in auto memory","tags":["tbd","structure","shared"],"notes":"Off in .claude/settings.json (no silent writes). Option: redirect to memory/candidates/ via autoMemoryDirectory. Proposed: off for the first month; revisit after the first retrospective. Source: TBD.md #31."},{"id":"tbd-34","num":34,"title":"Maksym profile read-through","tags":["tbd","content-review","maksym"],"notes":"people/maksym/maksym-profile.md About: no placeholders left; drafted from the old OS, needs a read-through of role, languages, priorities. Source: TBD.md #34."},{"id":"tbd-36","num":36,"title":"Manual boundaries","tags":["tbd","content-review","shared"],"notes":"AGENTS.md Boundaries (always / ask first / never) and the ask list in .claude/settings.json: agree they match how you both want to work. Source: TBD.md #36."},{"id":"tbd-37","num":37,"title":"Decisions revisit dates","tags":["tbd","content-review","shared"],"notes":"decisions/log.md: each 2026-09 entry has a proposed Revisit date; confirm or change. Source: TBD.md #37."},{"id":"tbd-38","num":38,"title":"Anastasiia onboarding","tags":["tbd","content-review","anastasiia"],"notes":"Clone the repo on her machine, run /onboard, paste voice samples, fill search-context.md. She does it herself. Source: TBD.md #38."},{"id":"tbd-41","num":41,"title":"Stock analysis and the no-finance-advice rule","tags":["tbd","structure","proposed","maksym"],"notes":"/stock-chart-analysis gives a trade setup labelled not financial advice; AGENTS.md forbids finance advice. Proposed: keep the reframing; log it as a decision. Source: TBD.md #41."},{"id":"tbd-42","num":42,"title":"Calendar and Email connections","tags":["tbd","content-review","shared"],"notes":"connections.md rows 5 and 7 are [none chosen]. Pick a system for each or mark them out of scope. Source: TBD.md #42."},{"id":"tbd-43","num":43,"title":"ID data in repo: Anastasiia to agree and fill her profile","tags":["tbd","content-review","anastasiia"],"notes":"Decision 2026-09-29: profile cards with ID numbers and ScansStorage/ scans are committed to the repo. Anastasiia agrees and fills people/anastasiia/anastasiia-profile.md. Source: TBD.md #43."}],"C":[],"D":[{"id":"tbd-39","num":39,"title":"Voice file name in AGENTS.md","tags":["tbd","structure","proposed","maksym"],"notes":"AGENTS.md says people/<name>/voice.md; the files use <name>-voice.md. Proposed: fix the line in AGENTS.md. Source: TBD.md #39."},{"id":"tbd-40","num":40,"title":"IBKR tool reference","tags":["tbd","content-review","maksym"],"notes":"references/tools/ibkr.md: allowed read-only tools, forbidden order/alert/account tools, what /stock-chart-analysis calls. Source: TBD.md #40."},{"id":"tbd-44","num":44,"title":"AI solution design questions","tags":["tbd","structure","maksym"],"notes":"AISystems notes in references/Learning/Architecture/ point at an agent project intake checklist and a HomeOS gap map; neither exists. Parked 2026-10-09. Source: TBD.md #44."},{"id":"tbd-45","num":45,"title":"Facebook reel to analyse","tags":["tbd","content-review","maksym"],"notes":"https://www.facebook.com/reel/921326843740504, saved 2026-10-09; content not yet reviewed. Source: TBD.md #45."},{"id":"tbd-46","num":46,"title":"GIR design notes: the missing Aspect 5","tags":["tbd","content-review","anastasiia"],"notes":"OtherGameDesignAspects.md numbers aspects 1-4 and 6-11. Ask Anastasiia; if it was co-op architecture, add DA-12. Source: TBD.md #46."}]},"archive":{"A":[],"B":[{"id":"tbd-13","num":13,"title":"Day-1 routines","tags":["tbd","routines","maksym"],"notes":"Done: the four rituals run as Desktop tasks since 2026-09-29; hub-inbox-poll is parked in Future ideas/HUB Feature/. Source: TBD.md #13.","completedAt":"2026-09-29T12:00:00.000Z"},{"id":"tbd-30","num":30,"title":"Install the schedulers","tags":["tbd","routines","maksym"],"notes":"Done: rituals installed on MDENYSIUK-PERS 2026-09-29 (services.md); weekly-audit runs locally on Saturday instead of in the cloud. Source: TBD.md #30.","completedAt":"2026-09-29T12:00:00.000Z"}],"C":[],"D":[]}},"reminders":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[],"B":[{"id":"rem-2026-10-20--22-15","num":11,"title":"Renaissance Porto Lapa Hotel, Friday 13 Nov 20:30","deadline":"2026-11-13T20:30","tags":["reminder","event","maksym"],"notes":"R. de Cervantes 169, 4050-289 Porto. Purpose not stated. Source: references/reminders/2026-10-20--22-15_reminder.md."},{"id":"rem-2026-10-12--11-19","num":4,"title":"Candlelight Coldplay & Imagine Dragons concert, Palácio da Bolsa","deadline":"2026-11-21T17:00","tags":["reminder","event","shared"],"notes":"Saturday 2026-11-21 at 19:30 (moved from 2026-10-31), 2 tickets, Zona A, Fever booking. Arrive by 19:00, no late entry; use the re-issued tickets in the Fever app. Source: references/reminders/2026-10-12--11-19_reminder.md."},{"id":"rem-2026-10-08--18-35","num":1,"title":"Maksym residence permit: prepare documents","deadline":"2027-02-17T09:00","tags":["reminder","residence-permit","maksym"],"notes":"Renewal window opens 2027-02-21 (permit expires 2027-05-22). Prepare: permit card and valid passport; IRS return and recibos verdes, last 12 months; proof of accommodation; Finanças and Segurança Social no-debt proof; NISS linked in AIMA; account on portal-renovacoes.aima.gov.pt. Source: references/reminders/2026-10-08--18-35_reminder.md."},{"id":"rem-2026-10-08--18-36","num":2,"title":"Maksym residence permit: apply window opens","deadline":"2027-02-21T09:00","tags":["reminder","residence-permit","maksym"],"notes":"First day to file the renewal at portal-renovacoes.aima.gov.pt; deadline 2027-04-22. Keep the receipt with QR code with the card. If the portal does not accept a May 2027 expiry yet, retry weekly. Source: references/reminders/2026-10-08--18-36_reminder.md.","dependsOn":["rem-2026-10-08--18-35"]},{"id":"rem-2026-10-08--18-37","num":3,"title":"Maksym residence permit: deadline check","deadline":"2027-04-01T09:00","tags":["reminder","residence-permit","maksym"],"notes":"Official filing deadline is 2027-04-22 (30 days before expiry). If not filed yet, file now. Source: references/reminders/2026-10-08--18-37_reminder.md."}],"C":[{"id":"rem-2026-10-16--02-32","num":5,"title":"References review: add the recipe text for Shashlik","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: the file is a Wikipedia overview with no amounts or method. Paste the recipe text or a recipe link into references/CookingRecipes/Meat/2026-10-13_shashlik-history-etymology-and-preparation-of.md, or delete it. Source: references/reminders/2026-10-16--02-32_reminder.md."},{"id":"rem-2026-10-16--02-33","num":6,"title":"References review: add the recipe text for Potato pancakes (deruny)","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/2026-10-15_potato-pancakes-deruny-latkes-boxty-overview.md, or delete it. Source: references/reminders/2026-10-16--02-33_reminder.md."},{"id":"rem-2026-10-16--02-34","num":7,"title":"References review: add the recipe text for Syrniki","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/2026-10-15_syrniki-traditional-eastern-european-curd-cheese.md, or delete it. Source: references/reminders/2026-10-16--02-34_reminder.md."},{"id":"rem-2026-10-16--02-35","num":8,"title":"References review: add the recipe text for Cabbage rolls","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/Meat/2026-10-15_cabbage-rolls-global-variations-and-traditional.md, or delete it. Source: references/reminders/2026-10-16--02-35_reminder.md."},{"id":"rem-2026-10-16--02-36","num":9,"title":"References review: add the recipe text for Chicken Kiev","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/Meat/2026-10-15_chicken-kiev-history-and-preparation.md, or delete it. Source: references/reminders/2026-10-16--02-36_reminder.md."},{"id":"rem-2026-10-17--05-08","num":10,"title":"References review: decide how the Package template folder is indexed","deadline":"2026-10-17T05:07","urgentPin":true,"tags":["reminder","references-review","anastasiia"],"notes":"needs-person: Package/README.md description is a template placeholder, so its row in templates/README.md is flagged stale every run. Keep the row and tell the review to skip template READMEs, or give Package/ a separate index line. Ref: references/GameIndustryResearch/GameDesign/templates/Package/. Source: references/reminders/2026-10-17--05-08_reminder.md."},{"id":"rem-2026-10-24--05-08","num":12,"title":"References review: add the content for the Facebook reel captured 2026-10-20","deadline":"2026-10-24T05:07","urgentPin":true,"tags":["reminder","references-review","shared"],"notes":"needs-source: the capture holds only a reel link; nothing to place. Paste what the reel is about into references/Unrecognized/2026-10-20_no-content-provided-for-summarization.md, or delete the file. Source: references/reminders/2026-10-24--05-08_reminder.md."}],"D":[]},"archive":{"A":[],"B":[{"id":"rem-2026-10-24--23-53","num":13,"title":"Gmail cleanup: 7-day watch and follow-up decisions","deadline":"2026-10-31T10:00","tags":["reminder","gmail","maksym"],"notes":"Check new mail since 2026-10-24 landed in Government/Banks/Household labels and nothing important went to Trash (restore before about 2026-11-23). Ref: references/gmail-cleanup/design.md. Source: references/reminders/2026-10-24--23-53_reminder.md.","completedAt":"2026-10-25T12:00:00.000Z"}],"C":[],"D":[]}},"other":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[{"id":"plan-passport-renewal-maksym","num":1,"title":"Renew Maksym's Ukrainian travel passport","urgentPin":true,"tags":["plan","documents","maksym"],"notes":"Expired 2026-04-21, renewal pending. Visas and many applications need a passport valid 3 to 6 months beyond the trip; the residence card does not cover travel. Source: memory/plans/shortterm/passport-renewal-maksym.md."}],"B":[{"id":"dec-2026-10-24-gmail-cleanup","num":4,"title":"Revisit decision: Gmail cleanup runs on Gmail's own filters (Route C)","deadline":"2026-10-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-24. Source: decisions/log.md."},{"id":"dec-2026-09-29-homeos-build","num":5,"title":"Revisit decision: HomeOS build: manual, memory contract, artifacts, delivery","deadline":"2026-11-30T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Owner: Maksym (implementation), both (rules). Source: decisions/log.md."},{"id":"plan-q4-2026-priority","num":2,"title":"Q4 priority: a working self-maintaining memory loop","deadline":"2026-12-31T18:00","tags":["plan","homeos","maksym"],"notes":"By end of 2026: facts captured during tasks with a yes, a monthly retrospective, a monthly tidy, and the captured-vs-candidates ratio tracked. Why: the previous OS saved 9 records where a retrospective found 40 candidates. Source: memory/plans/shortterm/q4-2026-priority.md."},{"id":"dec-2026-09-28-memory-model","num":6,"title":"Revisit decision: HomeOS memory model","deadline":"2026-12-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-28-routines-hub","num":7,"title":"Revisit decision: HomeOS routines and hub","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-28-search-context","num":8,"title":"Revisit decision: HomeOS search context","deadline":"2026-12-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-29-memory-settings","num":9,"title":"Revisit decision: HomeOS memory settings","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Source: decisions/log.md."},{"id":"dec-2026-09-29-autostart","num":10,"title":"Revisit decision: autostart for the local LLM and Telegram servers","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Source: decisions/log.md."},{"id":"dec-2026-10-10-learning-notes","num":11,"title":"Revisit decision: Telegram-ingested Learning notes placed at once, verified weekly","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-10. Source: decisions/log.md."},{"id":"dec-2026-10-15-cloud-push-main","num":12,"title":"Revisit decision: cloud routines may push straight to main","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-15. Source: decisions/log.md."},{"id":"dec-2026-10-16-learning-verification","num":13,"title":"Revisit decision: Learning verification runs inside the weekly references review","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-16; no separate learning-verify routine. Source: decisions/log.md."},{"id":"dec-2026-09-28-usage-sync-privacy","num":14,"title":"Revisit decision: HomeOS usage, sync and privacy basics","deadline":"2027-03-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-29-profile-cards-scans","num":15,"title":"Revisit decision: profile cards and document scans live in the repo","deadline":"2027-03-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Anastasiia to confirm (TBD #43). Source: decisions/log.md."},{"id":"dec-2026-10-10-telegram-family-context","num":16,"title":"Revisit decision: Telegram bot gives HomeOS context only to Family users","deadline":"2027-03-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-10. Source: decisions/log.md."},{"id":"plan-residence-card-old-address","num":3,"title":"Update Maksym's residence card address with AIMA","tags":["plan","documents","maksym"],"notes":"The título de residência (issued 2025-05-22) shows the old Oeiras address; the household lives in Vila Nova de Gaia. Whether AIMA was told is not confirmed. A stale address can cause trouble at renewal and with official mail. Source: memory/plans/shortterm/residence-card-old-address.md."},{"id":"dec-2026-10-25-homecheat-traps","num":17,"title":"Revisit decision: HomeCheat traps, one trap command","tags":["decision","valheim","maksym"],"notes":"Decided 2026-10-25. Revisit after Maksym's first in-game test of W3-mines. Source: decisions/log.md."}],"C":[],"D":[{"id":"cand-retro-2026-09-29-explicit-2e2cad-1","num":18,"title":"Review memory candidate: \"yes, remember it, and run the routine now\"","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment from the 2026-09-29 retrospective. Promote or drop with /remember (review candidates). Source: memory/candidates/retro-2026-09-29-explicit-2e2cad-1.md."},{"id":"cand-retro-2026-09-29-explicit-2e2cad-2","num":19,"title":"Review memory candidate: pasted /remember skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-explicit-2e2cad-2.md."},{"id":"cand-retro-2026-09-29-explicit-e6a8cf-0","num":20,"title":"Review memory candidate: partner rename and removing nssm records","tags":["candidate","memory","shared"],"notes":"Asks to rename the partner to Anastasiia Khrystina (Curly) and remove any record about nssm. The household-members record already holds the names. Source: memory/candidates/retro-2026-09-29-explicit-e6a8cf-0.md."},{"id":"cand-retro-2026-09-29-rule-2e2cad-6","num":21,"title":"Review memory candidate: pasted cloud-agent scheduling skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-2e2cad-6.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-3","num":22,"title":"Review memory candidate: pasted /onboard skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-3.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-4","num":23,"title":"Review memory candidate: pasted send-telegram-message skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-4.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-5","num":24,"title":"Review memory candidate: \"never ask for approval for sending message to telegram\"","tags":["candidate","memory","shared"],"notes":"Conflicts with the house rule that messages to third parties are ask-first; decide its scope (own chat only?) before promoting. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-5.md."},{"id":"wish-bambu-lab-printer","num":25,"title":"Wish: Bambu Lab 3D printer","tags":["wish","maksym"],"notes":"New only, from eu.store.bambulab.com or the official Amazon.es storefront. Realistic stacked savings 15-25% on current models; big sale window late October to early December. Sources: memory/wishes/bambu-lab-printer.md, references/wishes/bambu-lab-printer.md."},{"id":"wish-massage-chair","num":26,"title":"Wish: full-body massage chair up to EUR 1,500","tags":["wish","shared"],"notes":"Must fit 183 and 160 cm; EU retailer shipping to mainland Portugal. Top pick VEVOR SL-track 3D (eur.vevor.com, Worten.pt); test at Sleep8, Leça da Palmeira, first. Sources: memory/wishes/massage-chair.md, references/wishes/massage-chair.md."},{"id":"wish-vocal-training","num":27,"title":"Wish: in-person vocal training in Gaia or Porto","tags":["wish","maksym"],"notes":"Teacher or school, offline only, ideally Vila Nova de Gaia, English-friendly. Shortlist found 2026-10-20, none verified by contact. Sources: memory/wishes/vocal-training.md, references/wishes/vocal-training.md."}]},"archive":{"A":[],"B":[],"C":[],"D":[]}}};
+// lists are keyed "<folder>/<file>"; LIST_LABEL holds what a chip shows, BAD the files that could not be read (shown disabled)
+let LISTS = [], tasks = [];
+const LIST_LABEL = {}, BAD = {};
+// a task keeps its id from the file, so per-card preferences survive a reload; an id seen in an earlier list gets "~2", "~3"
+function setLists(lists) {
+  LISTS = []; tasks = [];
+  const seen = new Set(), named = {};
+  lists.forEach(l => { const n = listLabel(l.file); named[n] = (named[n] || 0) + 1; });
+  lists.forEach(l => {
+    const n = listLabel(l.file);
+    const shown = named[n] > 1 && l.folder ? n + ' (' + folderName(l.folder) + ')' : n;
+    if (l.error) { BAD[l.key] = { label: shown, error: l.error }; return; }
+    LIST_LABEL[l.key] = shown;
+    LISTS.push(l.key);
+    ['backlog', 'archive'].forEach(part => ['A', 'B', 'C', 'D'].forEach(q => (l.doc[part][q] || []).forEach(c => {
+      const extra = {};
+      if (c.notes) extra.notes = c.notes;
+      if (c.urgentPin !== undefined) extra.pin = c.urgentPin;
+      if (c.completedAt) extra.doneAt = d(c.completedAt);
+      const t = T(l.key, c.num, q, c.title, c.deadline || null, c.tags || [], extra);
+      let id = typeof c.id === 'string' && c.id ? c.id : t.id, k = 1;
+      while (seen.has(k > 1 ? id + '~' + k : id)) k++;
+      t.id = k > 1 ? id + '~' + k : id;
+      seen.add(t.id);
+      tasks.push(t);
+    })));
+  });
+}
+const label = l => LIST_LABEL[l] || (BAD[l] && BAD[l].label) || l[0].toUpperCase() + l.slice(1);
+const initial = l => label(l)[0].toUpperCase();
+const st = { list: 'all', q: '', due: 'any', tags: new Set(), mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
 const THEMES = ['light', 'dark'];
 let toastTimer = null, lastUndo = null, dragId = null;
 const overdue = t => t.deadline && t.deadline < TODAY;
@@ -846,16 +985,165 @@ const hl = (title, q) => { q = q.trim(); if (!q || /^#?[a-z]?\d+$/i.test(q)) ret
 const VISIBLE = 5;
 const snapshot = () => tasks.map(x => Object.assign({}, x, { tags: [...x.tags] }));
 
+// ---- folders: a file:// page reads a folder only after the person picks it once; the handle is kept in IndexedDB ----
+const folders = cfg ? folderSet(cfg, PREFS_FOLDER).map(path => ({ path, name: folderName(path), handle: null, stored: null })) : [];
+const dirOf = path => folders.find(f => f.path === path).handle;
+const idb = (mode, fn) => new Promise(res => {
+  try {
+    const r = indexedDB.open('td', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('handles');
+    r.onerror = () => res(null);
+    r.onsuccess = () => { try { const q = fn(r.result.transaction('handles', mode).objectStore('handles')); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } };
+  } catch (e) { res(null); }
+});
+const permission = async (h, ask) => {
+  try { let p = await h.queryPermission({ mode: 'readwrite' }); if (p !== 'granted' && ask) p = await h.requestPermission({ mode: 'readwrite' }); return p; } catch (e) { return 'denied'; }
+};
+// one Allow button per folder without a grant: a remembered folder asks the browser again, a new one opens the system dialog
+async function allowFolder(f) {
+  if (f.stored && await permission(f.stored, true) === 'granted') f.handle = f.stored;
+  else {
+    let h;
+    try { h = await window.showDirectoryPicker({ id: ('td-' + f.name).replace(/[^a-z0-9_-]/gi, '').slice(0, 32), mode: 'readwrite' }); } catch (e) { return; }
+    if (h.name !== f.name) { boot.wrong = f.name; showGate('wrong-folder'); return; }
+    f.handle = h;
+    await idb('readwrite', s => s.put(h, f.path));
+  }
+  boot.wrong = '';
+  start();
+}
+const showGate = kind => { boot.gate = kind; render(); };
 function gate(kind) {
-  const ghost = '<div class="ghost">' + LISTS.slice(0, 4).map(l => '<span class="chip"><button disabled>' + label(l) + '</button></span>').join('') + '</div>';
+  const allow = '<div class="row">' + folders.filter(f => !f.handle).map(f => '<button class="allow" data-allow="' + esc(f.path) + '">Allow ' + esc(f.name) + '</button>').join('') + '</div>';
   const html = {
-    'first-run': '<button id="g">Open Family-Tasks</button>',
-    'restore': ghost + '<button id="g">Restore access</button>',
-    'wrong-folder': '<p>Wrong folder: expected Family-Tasks.</p><button id="g">Open Family-Tasks</button>',
-    'unsupported': '<p>This browser can\'t open a folder. Use Chrome or Edge.</p>',
+    loading: '',
+    config: '<ul class="errs">' + boot.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>',
+    grant: allow,
+    'wrong-folder': '<p>Wrong folder: expected ' + esc(boot.wrong) + '.</p>' + allow,
+    unsupported: '<p>This browser can\'t open a folder. Use Chrome or Edge.</p>',
   }[kind];
   document.getElementById('app').innerHTML = '<main class="gate">' + html + '</main>';
-  const g = document.getElementById('g'); if (g) g.onclick = () => { location.hash = ''; render(); };
+  document.querySelectorAll('[data-allow]').forEach(b => b.onclick = () => allowFolder(folders.find(f => f.path === b.dataset.allow)));
+}
+
+// every *.json at the root of each read folder, in folder order, then by file name
+async function readFolders() {
+  const out = [];
+  for (const path of cfg.readFolders) {
+    const files = [];
+    for await (const h of dirOf(path).values()) if (h.kind === 'file' && listLabel(h.name)) files.push(h);
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    for (const h of files) {
+      let r;
+      try { r = readList(await (await h.getFile()).text()); } catch (e) { r = { error: String(e.message || e) }; }
+      out.push(Object.assign({ key: listKey(path, h.name), file: h.name, folder: path }, r));
+    }
+  }
+  return out;
+}
+const demoLists = () => Object.keys(DATA).map(name => ({ key: name, file: name + '-tasks.json', folder: null, doc: DATA[name] }));
+
+// ---- preferences: config/<profile id>.prefs.json, written 1 s after a change (never in ?demo) ----
+let themePref = 'auto', lastWritten = null, prefsTimer = 0;
+function applyTheme() {
+  st.theme = (themePref === 'auto' ? matchMedia('(prefers-color-scheme: dark)').matches : themePref === 'dark') ? 1 : 0;
+  document.documentElement.dataset.theme = THEMES[st.theme];
+  try { localStorage.setItem('td.theme', themePref); } catch (e) {}
+}
+const collectPrefs = () => ({
+  version: 1, theme: themePref, view: st.view, list: st.list, listOrder: LISTS.slice(), tagOrder: tagOrder.slice(),
+  axes: window.tdAxes && window.tdAxes.get ? window.tdAxes.get() : { fx: 0.5, fy: 0.5 },
+  menuCollapsed: ['A', 'B', 'C', 'D'].filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] },
+});
+const prefsText = () => JSON.stringify(collectPrefs(), null, 2) + '\n';
+async function loadPrefs(id) {
+  if (DEMO) return { prefs: readPrefs(null), found: true };
+  try {
+    const fh = await dirOf(PREFS_FOLDER).getFileHandle(id + '.prefs.json');
+    let raw = null;
+    try { raw = JSON.parse(await (await fh.getFile()).text()); } catch (e) {} // broken file: defaults, rewritten on the next change
+    return { prefs: readPrefs(raw), found: true };
+  } catch (e) { return { prefs: readPrefs(null), found: false }; }
+}
+// the side-menu width stays in this browser (td.rail); the old td.axes and td.lists values move into the first prefs file once
+function migrateOld(p) {
+  try {
+    const axes = JSON.parse(localStorage.getItem('td.axes') || 'null');
+    if (axes && axes.fx > 0 && axes.fx < 1 && axes.fy > 0 && axes.fy < 1) p.axes = { fx: axes.fx, fy: axes.fy };
+    const names = JSON.parse(localStorage.getItem('td.lists') || '[]');
+    if (Array.isArray(names)) p.listOrder = names.map(n => LISTS.find(k => label(k).toLowerCase() === String(n).toLowerCase())).filter(Boolean);
+    localStorage.removeItem('td.axes'); localStorage.removeItem('td.lists');
+  } catch (e) {}
+  return p;
+}
+// stale entries (a list, task or tag that no longer exists) are dropped
+function applyPrefs(p) {
+  themePref = p.theme; applyTheme();
+  st.view = p.view;
+  LISTS.sort((a, b) => (p.listOrder.indexOf(a) + 1 || 1e6) - (p.listOrder.indexOf(b) + 1 || 1e6));
+  st.list = p.list === 'all' || LISTS.includes(p.list) ? p.list : 'all';
+  const known = new Set(tasks.flatMap(t => t.tags));
+  tagOrder = p.tagOrder.filter(x => known.has(x));
+  st.collapsed = new Set(p.menuCollapsed);
+  st.cardMode = p.cards.mode;
+  st.flip = new Set(p.cards.flipped.filter(id => tasks.some(t => t.id === id)));
+  if (window.tdAxes && window.tdAxes.set) window.tdAxes.set(p.axes.fx, p.axes.fy);
+}
+function savePrefsSoon() {
+  if (DEMO || !profile || boot.gate) return;
+  clearTimeout(prefsTimer);
+  prefsTimer = setTimeout(writePrefs, PREFS_DELAY_MS);
+}
+async function writePrefs() {
+  clearTimeout(prefsTimer);
+  if (DEMO || !profile || boot.gate) return;
+  const text = prefsText();
+  if (text === lastWritten) return;
+  try {
+    const w = await (await dirOf(PREFS_FOLDER).getFileHandle(profile.id + '.prefs.json', { create: true })).createWritable();
+    await w.write(text); await w.close();
+    lastWritten = text;
+  } catch (e) { toast('Preferences not saved: ' + (e.message || e)); }
+}
+async function useProfile(id, fresh) {
+  if (!fresh) await writePrefs();
+  profile = PROFILES.find(p => p.id === id);
+  try { localStorage.setItem('td.profile', id); } catch (e) {}
+  const { prefs, found } = await loadPrefs(id);
+  applyPrefs(found ? prefs : migrateOld(prefs));
+  boot.gate = null;
+  render();
+  // the axes clamp to the window on the first render, so "unchanged" is measured after it; a migrated file is written at once
+  lastWritten = found ? prefsText() : null;
+  if (!found) savePrefsSoon();
+}
+
+async function start() {
+  try {
+    let lists;
+    if (DEMO) lists = demoLists();
+    else {
+      if (boot.errors.length) return showGate('config');
+      if (typeof window.showDirectoryPicker !== 'function') return showGate('unsupported');
+      for (const f of folders) {
+        if (f.handle) continue;
+        f.stored = await idb('readonly', s => s.get(f.path));
+        if (f.stored && await permission(f.stored, false) === 'granted') f.handle = f.stored;
+      }
+      if (folders.some(f => !f.handle)) return showGate('grant');
+      lists = await readFolders();
+    }
+    setLists(lists);
+    const ids = PROFILES.map(p => p.id);
+    let remembered = null;
+    try { remembered = localStorage.getItem('td.profile'); } catch (e) {}
+    await useProfile(pickProfile({ param: new URLSearchParams(location.search).get('profile'), remembered, ids }), true);
+  } catch (e) {
+    // a grant dropped while reading: ask again
+    console.error(e);
+    folders.forEach(f => { f.stored = f.handle || f.stored; f.handle = null; });
+    showGate('grant');
+  }
 }
 
 function cardHtml(t, q) {
@@ -921,14 +1209,10 @@ function confirmDelete(text, onYes) {
 
 const LOGO = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 72 28\" role=\"img\" aria-label=\"TasksDashboard\" class=\"td-logo\"><title>TasksDashboard<\/title><g transform=\"translate(0 3) scale(0.6875)\"><clipPath id=\"td-fan-f\"><path d=\"M4.6 27.4V18.8A8.6 8.6 0 0 1 13.2 27.4Z\"/><\/clipPath><path d=\"M1.6 1.6V30.4H30.4\" fill=\"none\" style=\"stroke:var(--td-ink,#17181B)\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M4.6 27.4V18.8A8.6 8.6 0 0 1 13.2 27.4Z\" fill=\"none\" style=\"stroke:var(--td-d,#8E8A84)\" stroke-width=\"3.6\" clip-path=\"url(#td-fan-f)\"/><path d=\"M15.6 27.17L29.99 26.87A25.4 25.4 0 0 0 26.86 15.16L14.24 22.1A11 11 0 0 1 15.6 27.17Z\" style=\"fill:var(--td-c,#C2922A)\"/><path d=\"M14.01 21.7L26.33 14.24A25.4 25.4 0 0 0 17.76 5.67L10.3 17.99A11 11 0 0 1 14.01 21.7Z\" style=\"fill:var(--td-a,#B5392C)\"/><path d=\"M9.9 17.76L16.84 5.14A25.4 25.4 0 0 0 5.13 2.01L4.83 16.4A11 11 0 0 1 9.9 17.76Z\" style=\"fill:var(--td-b,#1F6B4F)\"/><\/g><text x=\"26\" y=\"13\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"12\" font-weight=\"650\" letter-spacing=\"-0.2\" style=\"fill:var(--td-ink,#17181B)\">Tasks<\/text><text x=\"26\" y=\"24\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"9\" font-weight=\"400\" style=\"fill:var(--td-ink2,#5C5953)\" textLength=\"45.6\" lengthAdjust=\"spacingAndGlyphs\">Dashboard<\/text><\/svg>";
 
-// list order: All stays first; the other lists keep the order the user dragged them into (saved where storage exists)
-const LIST_KEY = 'td.lists';
-try { const saved = JSON.parse(localStorage.getItem(LIST_KEY) || '[]'); LISTS.sort((a, b) => (saved.indexOf(a) + 1 || 1e3) - (saved.indexOf(b) + 1 || 1e3)); } catch (e) {}
-const saveListOrder = () => { try { localStorage.setItem(LIST_KEY, JSON.stringify(LISTS)); } catch (e) {} };
+// list order: All stays first; the other lists keep the order the user dragged them into (saved in the profile's preferences)
 const moveList = (l, to) => {
   LISTS.splice(LISTS.indexOf(l), 1);
   LISTS.splice(Math.max(0, Math.min(LISTS.length, to)), 0, l);
-  saveListOrder();
 };
 // drag a list chip (from the bar or the … menu) before or after another; dropping on All puts it first. Alt+arrows move a focused chip.
 let dragList = null;
@@ -967,7 +1251,6 @@ function bindListDrag(app) {
       dragList = null;
       LISTS.splice(LISTS.indexOf(moving), 1);
       LISTS.splice(l === 'all' ? 0 : LISTS.indexOf(l) + (before ? 0 : 1), 0, moving);
-      saveListOrder();
       st.pop = null;
       render();
     };
@@ -975,8 +1258,7 @@ function bindListDrag(app) {
 }
 
 function render() {
-  const h = location.hash.slice(1);
-  if (['first-run', 'restore', 'wrong-folder', 'unsupported'].includes(h)) return gate(h);
+  if (boot.gate) return gate(boot.gate);
   const open = tasks.filter(t => !t.doneAt);
   const shown = open.filter(t => inList(t) && passFilters(t));
   const chips = ['all'].concat(LISTS);
@@ -984,7 +1266,7 @@ function render() {
   if (rest.includes(st.list)) { visible = visible.concat(st.list); rest = rest.filter(c => c !== st.list); } // shown sixth, ready to be dragged into the first five
   const count = l => open.filter(t => l === 'all' || t.list === l).length;
   const od = l => open.filter(t => (l === 'all' || t.list === l) && overdue(t)).length;
-  const chip = l => '<span class="chip' + (chips.indexOf(l) >= VISIBLE ? ' stray' : '') + '"><button data-list="' + l + '" aria-pressed="' + (st.list === l) + '">' + (l === 'all' ? 'All' : label(l)) + ' <span class="n">' + count(l) + '</span>' + (od(l) ? ' <span class="badge" aria-label="' + od(l) + ' overdue">' + od(l) + '</span>' : '') + '</button></span>';
+  const chip = l => '<span class="chip' + (chips.indexOf(l) >= VISIBLE ? ' stray' : '') + '"><button data-list="' + esc(l) + '" aria-pressed="' + (st.list === l) + '">' + (l === 'all' ? 'All' : esc(label(l))) + ' <span class="n">' + count(l) + '</span>' + (od(l) ? ' <span class="badge" aria-label="' + od(l) + ' overdue">' + od(l) + '</span>' : '') + '</button></span>';
   const allTags = [...new Set(open.filter(inList).flatMap(t => t.tags))].sort();
   const anyFilter = st.q || st.due !== 'any' || st.tags.size || st.mine || st.quads.size;
   const dueLabel = { any: 'Due', overdue: 'Overdue', today: 'Today', week: 'Next 7 days', none: 'No date' }[st.due];
@@ -1014,14 +1296,14 @@ function render() {
     const archived = tasks.filter(t => t.doneAt && inList(t) && matchQ(t, st.q)).length;
     let html = '', last = '';
     const row = (t, i, key, ln) => '<div class="r" role="option" id="opt' + i + '" aria-selected="' + (st.sel === i) + '" data-open="' + t.id + '"><span class="k">' + key + '</span><span class="tt">' + hl(plain(t.title), st.q) + (ln ? ' <span class="ln">' + ln + '</span>' : '') + '</span><span class="due' + (overdue(t) ? ' late' : '') + '">' + (t.deadline ? rel(t) : '') + '</span><span class="tg">' + t.tags.slice(0, 2).join(', ') + '</span></div>';
-    rows.forEach((t, i) => { if (t.q !== last) { html += '<div class="h" data-q="' + t.q + '">' + t.q + ' ' + QN[t.q] + '</div>'; last = t.q; } html += row(t, i, ref(t), st.list === 'all' ? label(t.list) : ''); });
+    rows.forEach((t, i) => { if (t.q !== last) { html += '<div class="h" data-q="' + t.q + '">' + t.q + ' ' + QN[t.q] + '</div>'; last = t.q; } html += row(t, i, ref(t), st.list === 'all' ? esc(label(t.list)) : ''); });
     if (!rows.length) html += '<div class="h">No matches</div>';
     if (archived) html += '<button class="h link" data-view="archive">' + archived + ' in archive</button>';
     dd = '<div class="dd" role="listbox" id="dd">' + html + '</div>';
   } else st.rows = [];
   const pops = {
-    profile: () => '<button data-menu="review">Weekly review</button><button data-menu="settings">Urgency settings</button><button data-cards>' + (st.cardMode === 'collapsed' ? 'Always collapsed cards' : 'Always expanded cards') + '</button>',
-    more: () => rest.map(l => '<button data-list="' + l + '">' + label(l) + ' ' + count(l) + '</button>').join(''),
+    profile: () => PROFILES.map(p => '<button data-switch="' + esc(p.id) + '" aria-pressed="' + (p === profile) + '">' + esc(p.name) + '</button>').join('') + '<hr><button data-menu="review">Weekly review</button><button data-menu="settings">Urgency settings</button><button data-cards>' + (st.cardMode === 'collapsed' ? 'Always collapsed cards' : 'Always expanded cards') + '</button>',
+    more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
     due: () => ['any:Any', 'overdue:Overdue', 'today:Today', 'week:Next 7 days', 'none:No date'].map(x => '<button data-due="' + x.split(':')[0] + '" aria-pressed="' + (st.due === x.split(':')[0]) + '">' + x.split(':')[1] + '</button>').join('') + '<button disabled>As of…</button>',
     tag: () => allTags.map(x => '<button data-tag="' + esc(x) + '" aria-pressed="' + st.tags.has(x) + '">' + esc(x) + '</button>').join(''),
   };
@@ -1030,6 +1312,7 @@ function render() {
   document.getElementById('app').innerHTML =
     '<header class="top"><div class="bar"><div class="logo">' + LOGO + '</div><div class="lists" role="toolbar" aria-label="Lists">' + visible.map(chip).join('') +
     (rest.length ? '<span class="chip"><button id="more" aria-label="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '" aria-expanded="' + (st.pop === 'more') + '" title="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '">+' + rest.length + '</button></span>' : '') +
+    Object.keys(BAD).map(k => '<span class="chip bad"><button disabled title="' + esc(BAD[k].error) + '">' + esc(BAD[k].label) + '</button></span>').join('') +
     '<span class="chip"><button id="newlist">New list</button></span></div>' +
     '<div class="who"><button id="profile" aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '">' + profile.name + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + label(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
     '<div class="searchrow"><div class="line"><span class="si" aria-hidden="true">' + I.search + '</span><input id="q" placeholder="Search" aria-label="Search tasks" role="combobox" aria-expanded="' + !!st.q.trim() + '" aria-controls="dd" value="' + esc(st.q) + '">' +
@@ -1041,12 +1324,13 @@ function render() {
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
     [['matrix', '▦'], ['archive', '▤'], ['timeline', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + label(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
     '</div><nav class="groups" aria-label="Items by quadrant">' + menuGroups + '</nav></aside>' +
-    '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : label(st.list)) + '</h1>' +
+    '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : esc(label(st.list))) + '</h1>' +
     (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : matrix) + '</main></div>';
   bind();
   anchorPop();
   const qi = document.getElementById('q'); if (st.focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); st.focusQ = false; }
   if (st.sel >= 0) qi.setAttribute('aria-activedescendant', 'opt' + st.sel);
+  savePrefsSoon(); // every stored value changes through a render; the write is skipped when nothing changed
 }
 
 // a menu opens directly under the button that opened it, kept inside the window
@@ -1103,7 +1387,7 @@ function openTask(id, quad) {
   const opener = id ? '[data-card="' + id + '"]' : (quad ? '[data-add="' + quad + '"]' : null);
   const start = t ? t.start || null : new Date(TODAY); // a new task's start is the moment it is created, fixed
   const listDefault = t ? t.list : (st.list === 'all' ? '' : st.list);
-  const listSel = (listDefault === '' ? '<option value="" selected>—</option>' : '') + LISTS.map(l => '<option value="' + l + '"' + (listDefault === l ? ' selected' : '') + '>' + label(l) + '</option>').join('');
+  const listSel = (listDefault === '' ? '<option value="" selected>—</option>' : '') + LISTS.map(l => '<option value="' + esc(l) + '"' + (listDefault === l ? ' selected' : '') + '>' + esc(label(l)) + '</option>').join('');
   const chosen = new Set(t ? t.tags : [profile.id]);
   const known = orderTags([...new Set(tasks.flatMap(x => x.tags).concat([...chosen]))]);
   const dlg = document.createElement('dialog');
@@ -1304,8 +1588,26 @@ function bind() {
   app.querySelectorAll('[data-list]').forEach(b => b.onclick = () => { st.list = b.dataset.list; st.pop = null; st.expanded = null; render(); });
   bindListDrag(app);
   const more = document.getElementById('more'); if (more) more.onclick = e => { e.stopPropagation(); st.pop = st.pop === 'more' ? null : 'more'; render(); };
-  document.getElementById('newlist').onclick = () => { const n = prompt('List name'); if (n && /^[a-z0-9-]+$/i.test(n) && !LISTS.includes(n.toLowerCase())) { LISTS.push(n.toLowerCase()); st.list = n.toLowerCase(); render(); } };
-  document.getElementById('theme').onclick = () => { st.theme = 1 - st.theme; document.documentElement.dataset.theme = THEMES[st.theme]; render(); document.getElementById('theme').focus(); };
+  // New list writes an empty <name>-tasks.json into the create folder (memory only in ?demo)
+  document.getElementById('newlist').onclick = async () => {
+    const n = prompt('List name'); if (n === null) return;
+    const file = newListFile(n);
+    if (!file) { toast('Letters, digits and dashes only'); return; }
+    const key = DEMO ? file.replace(/-tasks\.json$/, '') : listKey(cfg.createFolder, file);
+    if (LISTS.includes(key) || BAD[key]) { toast('List exists: ' + label(key)); return; }
+    if (!DEMO) {
+      try {
+        const dir = dirOf(cfg.createFolder);
+        if (await dir.getFileHandle(file).then(() => true, () => false)) { toast('File exists: ' + file); return; }
+        const w = await (await dir.getFileHandle(file, { create: true })).createWritable();
+        await w.write(JSON.stringify(newListDoc(NEW_LIST_TZ), null, 2) + '\n'); await w.close();
+      } catch (e) { toast('List not created: ' + (e.message || e)); return; }
+    }
+    LIST_LABEL[key] = listLabel(file);
+    LISTS.push(key); st.list = key; render();
+  };
+  // the theme starts as Auto (follows the system); a click sets Light or Dark
+  document.getElementById('theme').onclick = () => { themePref = st.theme ? 'light' : 'dark'; applyTheme(); render(); document.getElementById('theme').focus(); };
   const qi = document.getElementById('q');
   qi.oninput = () => { st.keep.clear(); st.q = qi.value; st.sel = -1; st.focusQ = true; render(); };
   qi.onkeydown = e => {
@@ -1323,7 +1625,7 @@ function bind() {
   app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); b.dataset.menu === 'review' ? openReview() : openSettings(); });
   app.querySelectorAll('[data-flip]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.flip; st.flip.has(id) ? st.flip.delete(id) : st.flip.add(id); render(); document.querySelector('[data-flip="' + id + '"]')?.focus(); });
   app.querySelectorAll('[data-cards]').forEach(b => b.onclick = e => { e.stopPropagation(); st.cardMode = st.cardMode === 'collapsed' ? 'expanded' : 'collapsed'; st.flip.clear(); render(); document.querySelector('[data-cards]')?.focus(); });
-  app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); profile = PROFILES.find(x => x.id === b.dataset.switch); st.pop = null; render(); toast('Profile: ' + profile.name); });
+  app.querySelectorAll('[data-switch]').forEach(b => b.onclick = async e => { e.stopPropagation(); st.pop = null; await useProfile(b.dataset.switch); toast('Profile: ' + profile.name); });
   document.getElementById('mine').onclick = () => { st.mine = !st.mine; render(); };
   app.querySelectorAll('[data-quad]').forEach(b => b.onclick = () => { const q = b.dataset.quad; st.quads.has(q) ? st.quads.delete(q) : st.quads.add(q); render(); });
   const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', mine: false, sel: -1 }); st.tags.clear(); st.quads.clear(); render(); };
@@ -1380,9 +1682,10 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('click', e => { if (st.pop && !e.target.closest('#pop')) { st.pop = null; render(); } });
 window.addEventListener('resize', anchorPop);
-window.addEventListener('hashchange', render);
-document.documentElement.dataset.theme = THEMES[st.theme];
+window.tdAxes = { onSave: savePrefsSoon }; // the axes layer below adds get and set
 render();
+// both inline scripts have run by now, so the axes layer is ready when the preferences are applied
+document.addEventListener('DOMContentLoaded', start);
 })();
 </script>
 <script>
@@ -1391,7 +1694,6 @@ render();
   const root = document.documentElement;
   const GAP = 16;          // .matrix gap, px
   const MIN_ROW = 150;     // quadrant height that shows one card whole and the next one fading
-  const KEY = 'td.axes';
 
   // glow under the pointer on the quadrant background; it fades out when the pointer leaves the quadrant
   document.addEventListener('pointermove', e => {
@@ -1418,8 +1720,8 @@ render();
   });
 
   // movable axes: the y axis splits not urgent | urgent, the x axis splits important / not important
+  // the split is kept in the profile's preferences file: the main script sets it through window.tdAxes and is told when it changes
   let fx = 0.5, fy = 0.5;
-  try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s) { fx = +s.fx || 0.5; fy = +s.fy || 0.5; } } catch (_) {}
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   let minCol = 0;
   const measureMinCol = () => {
@@ -1446,8 +1748,12 @@ render();
     }
     root.style.setProperty('--fx', fx.toFixed(4));
     root.style.setProperty('--fy', fy.toFixed(4));
-    if (save) try { localStorage.setItem(KEY, JSON.stringify({ fx, fy })); } catch (_) {}
+    if (save && window.tdAxes && window.tdAxes.onSave) window.tdAxes.onSave();
   };
+  window.tdAxes = Object.assign(window.tdAxes || {}, {
+    get: () => ({ fx: +fx.toFixed(4), fy: +fy.toFixed(4) }),
+    set: (x, y) => { fx = x; fy = y; apply(false); },
+  });
   const handle = (cls, label, orient) => {
     const h = document.createElement('div');
     h.className = 'axis ' + cls;
