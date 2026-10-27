@@ -1,6 +1,6 @@
 # TasksDashboard
 
-Eisenhower matrix task view, **UI prototype 4-5 "Aurora instrument"** (made in `UIPrototypes/uupm` with the UI UX Pro Max skill). `TasksDashboard.html` plus `config/`: no server, no build, no dependencies, nothing loaded from the network.
+Eisenhower matrix task view, **UI prototype 4-5 "Aurora instrument"** (made with the UI UX Pro Max skill). `TasksDashboard.html` plus `config/`: no server, no build, no dependencies, nothing loaded from the network.
 
 It reads task lists from the folders named in the config and writes new list files and per-profile preferences. Task edits stay in memory (see Limits).
 
