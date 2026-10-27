@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
 // node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|smoke] [--page <html>]
+//   [--url <https origin> [--access-env <file>]]
+// Without --url the page is the local file (file://). With --url it is <origin>/, and sessions are seeded on <origin>/version.json
+// (same origin, same storage); --access-env adds the Cloudflare Access service-token headers to requests for that origin only.
 // No dependencies. Real sessions come from a REST sign-in in Node, seeded into the page's td.auth; the form itself is only fed
 // dummy credentials while Fetch interception answers it, so no real password is ever typed into the page. Writes stay in the
 // _selftest list (and one Cyrillic-named test list it creates and archives). The transport never logs CDP parameters.
@@ -9,10 +12,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readEnv, missingEnv, connect, loadCore, APP_HTML } from '../cli/lib.mjs';
+import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin, accessCreds, accessHeaders, strayHosts } from '../cli/lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const args = Object.fromEntries(process.argv.slice(2).reduce((a, x, i, all) => { if (x.startsWith('--')) a.push([x.slice(2), all[i + 1] && !all[i + 1].startsWith('--') ? all[i + 1] : true]); return a; }, []));
+const args = e2eArgs(process.argv.slice(2));
+let ORIGIN = null, ACCESS = null; // --url and --access-env, set in main
 const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 const OUT = path.resolve(args.out || path.join(os.tmpdir(), 'td-e2e-' + Date.now()));
@@ -68,9 +72,18 @@ async function tab(B, ctxId, opts = {}) {
     if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') T.errors.push(msg.params.args.map(a => a.value || a.description || '').join(' '));
     if (msg.method === 'Network.requestWillBeSent') { const u = msg.params.request.url; if (/^https?:/.test(u)) { T.hosts.add(new URL(u).host); T.requests.push(u); } }
     if (msg.method === 'Page.javascriptDialogOpening') s('Page.handleJavaScriptDialog', { accept: true }).catch(() => {});
-    if (msg.method === 'Fetch.requestPaused' && T.paused) T.paused(msg.params);
+    // CSP violations and other security messages count as console errors
+    if (msg.method === 'Log.entryAdded' && msg.params.entry.source === 'security') T.errors.push('security: ' + msg.params.entry.text);
+    if (msg.method === 'Fetch.requestPaused') {
+      // the page origin first: the CF-Access headers are added to its requests only (accessHeaders is null for any other origin)
+      const h = ACCESS && accessHeaders(msg.params.request, ORIGIN, ACCESS);
+      if (h) s('Fetch.continueRequest', { requestId: msg.params.requestId, headers: h }).catch(() => {});
+      else if (T.paused) T.paused(msg.params);
+      else s('Fetch.continueRequest', { requestId: msg.params.requestId }).catch(() => {});
+    }
   });
-  await s('Page.enable'); await s('Runtime.enable'); await s('Network.enable');
+  await s('Page.enable'); await s('Runtime.enable'); await s('Network.enable'); await s('Log.enable');
+  if (ACCESS) await s('Fetch.enable', { patterns: fetchPatterns() });
   T.send = s;
   T.ev = async expr => {
     const r = await s('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
@@ -93,17 +106,24 @@ async function tab(B, ctxId, opts = {}) {
   return T;
 }
 const ctx = async B => (await B.send('Target.createBrowserContext', { disposeOnDetach: true })).browserContextId;
-const pageUrl = (q = '') => pathToFileURL(PAGE).href + q;
-const seedUrl = () => pathToFileURL(path.join(OUT, 'seed.html')).href;
-// a session made in Node, written into the page's own storage (same file:// origin) before the app loads
+const pageUrl = (q = '') => (ORIGIN ? ORIGIN + '/' : pathToFileURL(PAGE).href) + q;
+// a page on the app's origin that runs no app code: seed.html beside the report, or the hosted version.json
+const seedUrl = () => ORIGIN ? ORIGIN + '/version.json' : pathToFileURL(path.join(OUT, 'seed.html')).href;
+const where = () => ORIGIN || 'file://';
+const onlyHosts = () => ORIGIN ? 'only the Supabase host and the page origin are contacted' : 'only the Supabase host is contacted';
+// a session made in Node, written into the page's own storage (same origin) before the app loads
 async function seed(T, session, kind = 'local') {
   await T.go(seedUrl());
   await T.ev(`(()=>{localStorage.removeItem('td.auth');sessionStorage.removeItem('td.auth');${kind === 'local' ? 'localStorage' : 'sessionStorage'}.setItem('td.auth',${JSON.stringify(JSON.stringify({ refresh_token: session.refresh_token }))});return true})()`);
 }
 async function open(T, session, kind) { if (session) await seed(T, session, kind); await T.go(pageUrl()); return T.ready(); }
+// Fetch patterns of a tab: the page origin while --access-env is on (headers added), plus a test's own pattern
+function fetchPatterns(pattern) {
+  return (ACCESS ? [{ urlPattern: ORIGIN + '/*', requestStage: 'Request' }] : []).concat(pattern ? [{ urlPattern: pattern, requestStage: 'Request' }] : []);
+}
 // answer the next requests matching a URL pattern: fn(params) returns { status, body } or null to let it through
 async function intercept(T, pattern, fn) {
-  await T.send('Fetch.enable', { patterns: [{ urlPattern: pattern, requestStage: 'Request' }] });
+  await T.send('Fetch.enable', { patterns: fetchPatterns(pattern) });
   T.paused = async p => {
     // the CORS preflight is answered here, so an intercepted request never reaches the network at all
     if (p.request.method === 'OPTIONS') return T.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 204, body: '', responseHeaders: [
@@ -115,15 +135,24 @@ async function intercept(T, pattern, fn) {
       body: Buffer.from(JSON.stringify(r.body)).toString('base64') }).catch(() => {});
   };
 }
-const unintercept = async T => { T.paused = null; await T.send('Fetch.disable').catch(() => {}); };
+const unintercept = async T => { T.paused = null; await (ACCESS ? T.send('Fetch.enable', { patterns: fetchPatterns() }) : T.send('Fetch.disable')).catch(() => {}); };
 
 // ---- main ----
-if (typeof args.env !== 'string') { console.error('usage: node test/e2e.mjs --env <file> --out <dir> [--group …] [--smoke]'); process.exit(2); }
+const usage = 'usage: node test/e2e.mjs --env <file> --out <dir> [--group …] [--smoke] [--url <https origin> [--access-env <file>]]';
+if (typeof args.env !== 'string') { console.error(usage); process.exit(2); }
+if (args.url !== undefined) { try { ORIGIN = hostedOrigin(args.url); } catch (e) { console.error(e.message); process.exit(2); } }
+if (args['access-env'] !== undefined) {
+  if (!ORIGIN || typeof args['access-env'] !== 'string') { console.error('--access-env <file> needs --url <https origin>\n' + usage); process.exit(2); }
+  let a;
+  try { a = accessCreds(args['access-env']); } catch (e) { console.error('--access-env: cannot read the file'); process.exit(2); }
+  if (a.missing.length) { console.error('access env missing: ' + a.missing.join(', ')); process.exit(2); }
+  ACCESS = a;
+}
 const env = readEnv(args.env);
 const miss = missingEnv(env, 'maksym').concat(missingEnv(env, 'anastasiia'), missingEnv(env, 'homeos-agent')).filter((x, i, a) => a.indexOf(x) === i);
 if (miss.length) { console.error('env missing: ' + miss.join(', ')); process.exit(2); }
 fs.mkdirSync(OUT, { recursive: true });
-fs.writeFileSync(path.join(OUT, 'seed.html'), '<!doctype html><title>seed</title>');
+if (!ORIGIN) fs.writeFileSync(path.join(OUT, 'seed.html'), '<!doctype html><title>seed</title>');
 const core = loadCore(PAGE);
 const SUPA = new URL(env.TASKSDB_URL).host;
 const cli = (...a) => spawnSync(process.execPath, [path.join(HERE, '..', 'cli', 'tasks.mjs'), ...a, '--env', args.env, '--run-id', RUN], { encoding: 'utf8' });
@@ -205,7 +234,7 @@ async function gAuth() {
   check(G, 'a 429 shows the wait message', await T.wait('/Too many attempts/.test(document.getElementById("si-msg").textContent)'));
   next = 'grant';
   await T.ev('document.getElementById("signin").requestSubmit()');
-  check(G, 'a granted submit (Stay signed in) loads the board from file://', await T.ready());
+  check(G, `a granted submit (Stay signed in) loads the board from ${where()}`, await T.ready());
   await unintercept(T);
   check(G, 'td.auth is kept in localStorage', await T.ev('!!localStorage.getItem("td.auth") && !sessionStorage.getItem("td.auth")'));
   await T.reload();
@@ -508,7 +537,7 @@ async function gUi() {
     check(G, `${who}: chip counts equal REST counts`, !bad.length && chips.all === items.filter(i => lists.some(l => l.id === i.list_id)).length, bad.join(', '));
     for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(600); await T.shot(`ui-${who}-${w}x${h}-${theme}`); }
     await T.size(1440, 900);
-    check(G, `${who}: only the Supabase host is contacted`, [...T.hosts].every(h => h === SUPA), [...T.hosts].join(', '));
+    check(G, `${who}: ${onlyHosts()}`, !strayHosts(T.hosts, SUPA, ORIGIN).length, [...T.hosts].join(', '));
     check(G, `${who}: no console errors`, !T.errors.length, T.errors.slice(0, 2).join(' / '));
     await T.close();
   }
@@ -536,14 +565,14 @@ async function gUi() {
 
 async function gSmoke() {
   const G = 'smoke', T = await tab(B, await ctx(B));
-  check(G, 'opens signed in from ' + path.basename(path.dirname(PAGE)), await open(T, await grantFor('maksym')));
+  check(G, 'opens signed in from ' + (ORIGIN || path.basename(path.dirname(PAGE))), await open(T, await grantFor('maksym')));
   const lists = (await MK.rest('GET', 'lists?select=id,name&archived_at=is.null')).json;
   const items = (await MK.getAll('items?select=list_id&deleted_at=is.null&status=not.in.(done,cancelled)')).json;
   const chips = await T.ev(`Object.fromEntries([...document.querySelectorAll('.lists [data-list]')].map(b=>[b.dataset.list,+b.querySelector('.n').textContent]))`);
   check(G, 'chip counts equal REST counts', lists.every(l => chips[l.id] === undefined || chips[l.id] === items.filter(i => i.list_id === l.id).length), JSON.stringify(Object.values(chips)));
   check(G, 'four quadrants render', await T.ev('document.querySelectorAll("section.q").length===4'));
   await T.shot('smoke-maksym-1440x900');
-  check(G, 'only the Supabase host is contacted', [...T.hosts].every(h => h === SUPA), [...T.hosts].join(', '));
+  check(G, onlyHosts(), !strayHosts(T.hosts, SUPA, ORIGIN).length, [...T.hosts].join(', '));
   check(G, 'no console errors', !T.errors.length, T.errors.slice(0, 2).join(' / '));
   await T.close();
 }
@@ -564,7 +593,7 @@ try {
   try { await cleanup(); } catch (e) { leftovers.push('cleanup failed: ' + e.message); }
   if (B) B.close();
   for (const c of clients.reverse()) await c.close();
-  const report = ['# TasksDashboard e2e', '', `Run \`${RUN}\`, ${new Date().toISOString()}, ${Math.round((Date.now() - t0) / 1000)} s. Page \`${PAGE}\`. Groups: ${want.join(', ')}. Logins from the env file; no values printed.`, '',
+  const report = ['# TasksDashboard e2e', '', `Run \`${RUN}\`, ${new Date().toISOString()}, ${Math.round((Date.now() - t0) / 1000)} s. Page \`${ORIGIN ? ORIGIN + '/' + (ACCESS ? '` (Access service token)' : '`') : PAGE + '`'}. Groups: ${want.join(', ')}. Logins from the env file; no values printed.`, '',
     `**${pass} of ${pass + fail} passed.**`, '', '| Group | Check | Result | Note |', '|---|---|---|---|', ...rows, '', '## Leftovers', '', ...(leftovers.length ? leftovers.map(x => '- ' + x) : ['- none']), '',
     'Screenshots: the `*.png` files next to this report.'].join('\n');
   fs.writeFileSync(path.join(OUT, 'e2e-report.md'), report + '\n');

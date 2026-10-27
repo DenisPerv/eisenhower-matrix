@@ -11,13 +11,14 @@ Before every deploy: compare what is live with what `release_maxden` holds, and 
 ## Steps
 
 1. **Release side.** `git -C <repo> fetch origin`, then `git -C <repo> rev-parse origin/release_maxden`. This is the wanted version.
-2. **Hosted side.** Through the HomeOS script: `node scripts/tasksdb/deploy-pages.js --status`. By hand: `GET https://<project>.pages.dev/version.json` with the headers `CF-Access-Client-Id` and `CF-Access-Client-Secret` from the env. The Access gate answers anything without them with a redirect to `*.cloudflareaccess.com`.
+2. **Hosted side.** Through the HomeOS script: `node scripts/tasksdb/deploy-pages.js --status [--timeout <ms>]` (default 10000 ms; it fetches `origin/release_maxden` first). By hand: `GET https://<project>.pages.dev/version.json` with the headers `CF-Access-Client-Id` and `CF-Access-Client-Secret` from the env. The Access gate answers anything without them with a redirect to `*.cloudflareaccess.com`.
 
    | `--status` exit | Means |
    |---|---|
    | 0 | current: hosted sha = `origin/release_maxden` |
    | 10 | behind: hosted sha differs |
-   | 6 | unreachable, or the gate refused the service token |
+   | 6 | unreachable, timed out, or the gate refused the service token (a redirect) |
+   | 2 | usage error, or `TASKSDB_PAGES_PROJECT` (or `TASKSDB_PAGES_URL`) missing |
 
 3. **What changed.** `git -C <repo> log --oneline <hosted sha>..origin/release_maxden -- TasksDashboard.html config/tasksdashboard.config.js`. Only these two files reach the hosted page; other commits (db, cli, tests, docs) change nothing there.
 4. **Decide.**

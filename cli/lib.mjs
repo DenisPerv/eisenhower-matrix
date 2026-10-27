@@ -121,3 +121,33 @@ export function localStamp(d, timeZone = 'Europe/Lisbon') {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(d).map(x => [x.type, x.value]));
   return { day: `${p.year}-${p.month}-${p.day}`, minute: `${p.year}-${p.month}-${p.day}--${p.hour}-${p.minute}`, wall: `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}` };
 }
+
+// ---- e2e runner: arguments, the hosted page (--url) and the Access service token (--access-env) ----
+// --name value pairs and bare --flags (true); a value never starts with --
+export const e2eArgs = argv => Object.fromEntries(argv.reduce((a, x, i, all) => { if (x.startsWith('--')) a.push([x.slice(2), all[i + 1] && !all[i + 1].startsWith('--') ? all[i + 1] : true]); return a; }, []));
+// --url takes an https origin only: no path, query, fragment or user info
+export function hostedOrigin(s) {
+  let u;
+  try { u = new URL(String(s)); } catch (e) { throw new Error('--url: not a URL'); }
+  if (u.protocol !== 'https:') throw new Error('--url: must be https');
+  if (u.username || u.password || u.pathname !== '/' || u.search || u.hash) throw new Error('--url: an origin only (https://host[:port])');
+  return u.origin;
+}
+// CF_ACCESS_CLIENT_ID / _SECRET from a KEY=value file; names of missing keys only, never a value
+export function accessCreds(file) {
+  const env = readEnv(file);
+  const missing = ['CF_ACCESS_CLIENT_ID', 'CF_ACCESS_CLIENT_SECRET'].filter(k => !env[k]);
+  return missing.length ? { missing } : { missing, id: env.CF_ACCESS_CLIENT_ID, secret: env.CF_ACCESS_CLIENT_SECRET };
+}
+// headers for Fetch.continueRequest: the request's own plus the two CF-Access headers, only when the request's origin is the
+// page origin; null for every other host (Supabase never gets them)
+export function accessHeaders(request, origin, creds) {
+  if (!creds || !creds.id || !creds.secret || !origin) return null;
+  let o;
+  try { o = new URL(request.url).origin; } catch (e) { return null; }
+  if (o !== origin) return null;
+  return Object.entries(request.headers || {}).filter(([k]) => !/^cf-access-client-(id|secret)$/i.test(k)).map(([name, value]) => ({ name, value: String(value) }))
+    .concat([{ name: 'CF-Access-Client-Id', value: creds.id }, { name: 'CF-Access-Client-Secret', value: creds.secret }]);
+}
+// hosts a page contacted besides the Supabase host and (hosted) the page origin's host
+export const strayHosts = (hosts, supabaseHost, origin) => [...hosts].filter(h => h !== supabaseHost && !(origin && h === new URL(origin).host));

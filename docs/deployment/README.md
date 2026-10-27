@@ -10,11 +10,7 @@ How the AI deploys TasksDashboard to its hosted copy on Cloudflare Pages when th
 
 ## Status
 
-**Planned, not live yet.** It works only after:
-- the person steps (Cloudflare account, Pages project, Access, tokens), and
-- the build run of the household plan `references/homeos/tasksdb/hosting-plan.md` in HomeOS (the deploy script, the `e2e.mjs --url` option).
-
-Until then, stop at step 1 and say that hosting is not set up.
+**Live:** `https://homeos-tasksboard.pages.dev`, behind Cloudflare Access. Set up by the household plan `references/homeos/tasksdb/hosting-plan.md` in HomeOS (the person steps, the deploy script `scripts/tasksdb/deploy-pages.js`, the `e2e.mjs --url` option).
 
 ## Rules
 
@@ -32,7 +28,7 @@ Until then, stop at step 1 and say that hosting is not set up.
 | Host | Cloudflare Pages, Direct Upload project (it can never switch to Git integration) |
 | URL | `https://<project>.pages.dev` (household: `homeos-tasksboard.pages.dev`) |
 | Gate | Cloudflare Access, one-time PIN by email, the household's emails only; a service token for the AI's checks |
-| Tool | Wrangler, pinned version, run with `npx --yes wrangler@<version>` |
-| Env names | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (Pages: Edit), `TASKSDB_PAGES_PROJECT`, `TASKSDB_PAGES_BRANCH` (the project's production branch), `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` |
+| Tool | Wrangler, pinned: `npx --yes wrangler@4.150.0` (the pin lives in `deploy-pages.js`) |
+| Env names | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (Pages: Edit), `TASKSDB_PAGES_PROJECT`, `TASKSDB_PAGES_BRANCH` (the project's production branch, default `main`), `TASKSDB_PAGES_URL` (optional, default `https://<project>.pages.dev`), `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` |
 
 The household's choices, the person steps and the verified Cloudflare facts are in HomeOS `references/homeos/tasksdb/hosting-plan.md`.

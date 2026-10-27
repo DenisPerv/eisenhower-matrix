@@ -1,6 +1,6 @@
 # TasksDashboard
 
-Eisenhower matrix task app, UI 4-5 "Aurora instrument", on a Supabase database (TasksDashboardDB). `TasksDashboard.html` plus `config/tasksdashboard.config.js`: no server, no build, no dependencies. The page opens from `file://` and talks only to the Supabase project in its config. A small CLI in `cli/` reads and writes the same database.
+Eisenhower matrix task app, UI 4-5 "Aurora instrument", on a Supabase database (TasksDashboardDB). `TasksDashboard.html` plus `config/tasksdashboard.config.js`: no server, no build, no dependencies. The page opens from `file://` (or a static host, see Hosting) and talks only to the Supabase project in its config. A small CLI in `cli/` reads and writes the same database.
 
 The household's own setup lives in HomeOS (`references/homeos/tasksdb/`); this README is enough to set the app up for another household.
 
@@ -164,23 +164,36 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
 
 | Command | What | Network |
 |---|---|---|
-| `node --test "test/*.test.js"` | `core.test.js` (the core rules) and `cli.test.js` (arguments, keys, dates, output, exit codes) | none |
-| `node test/e2e.mjs --env <file> --out <dir> [--group auth,data,sync,archive,errors,ui] [--smoke] [--page <html>]` | the page against the live database in headless Chrome or Edge (or Playwright's chromium) over DevTools; report `e2e-report.md` and screenshots in `<dir>` | live, Node 22+ |
+| `node --test "test/*.test.js"` | `core.test.js` (the core rules) and `cli.test.js` (arguments, keys, dates, output, exit codes, the e2e `--url` / `--access-env` helpers) | none |
+| `node test/e2e.mjs --env <file> --out <dir> [--group auth,data,sync,archive,errors,ui] [--smoke] [--page <html>] [--url <https origin> [--access-env <file>]]` | the page against the live database in headless Chrome or Edge (or Playwright's chromium) over DevTools; report `e2e-report.md` and screenshots in `<dir>` | live, Node 22+ |
 
 - The e2e runner signs in over REST in Node and seeds `td.auth`; the form is only fed dummy credentials while Fetch interception answers it, so no real password is typed into the page.
 - Writes stay in the `_selftest` list and one Cyrillic-named test list; it soft-deletes its items, archives both lists and puts both people's preferences back at the end. Leftovers are listed in the report.
 - Every session the run made is logged out at the end.
 - `--smoke` is read only: the board opens signed in, chip counts equal the database, only the Supabase host is contacted, no console errors.
+- Console errors include security messages from the browser (a CSP violation counts as an error).
+- **`--url <https origin>`** (a hosted copy, e.g. `https://homeos-tasksboard.pages.dev`): the page is `<origin>/` instead of the local file, and sessions are seeded on `<origin>/version.json` (same origin, so the same `td.auth`). An origin only: https, no path. The host checks then allow exactly the Supabase host and the page origin. The core rules still load from the local `TasksDashboard.html` (or `--page`). Without `--url` everything runs from `file://`.
+- **`--access-env <file>`** (with `--url`): reads `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` (KEY=value lines; never printed) and adds the `CF-Access-Client-Id` and `CF-Access-Client-Secret` headers through DevTools Fetch interception to requests whose origin equals the page origin only: never to Supabase or any other host. Missing keys: exit 2 with the names.
 
 ## Code
 
 - `<script id="core">` (global `TDCore`): config, headers, sessions, `restError`, row ↔ task, preferences v2, `deriveQuadrant`, card order, `mergePoll`, `inverseOf`, paging, `overdueItems`, `topDo`, role rules. No DOM, no clock.
 - The UI script holds the session, the write queue, polling and rendering. The 4-5 layer script (axes, side-menu width) exposes `window.tdAxes` (`get`, `set`, `onSave`).
 
+## Hosting
+
+The same two files can be served by any static host over https; nothing in the app changes.
+
+- **Allow-list:** `TasksDashboard.html` published as `index.html`, plus `config/tasksdashboard.config.js` at the same relative path. Nothing else: not `db/`, `cli/`, `test/`, `docs/`, `config/profiles.js`, `config/*.prefs.json` or the Markdown files. A `version.json` with the commit sha helps a version check.
+- **CSP** (a response header): `script-src 'self'` plus `'sha256-<base64>'` of the body of each inline `<script>` (line endings as LF), `connect-src` = the `supabaseUrl` from the config, `default-src 'none'`, `style-src 'unsafe-inline'` (the timeline writes `style` attributes), `img-src 'self' data:`, `base-uri 'none'`, `form-action 'none'`, `frame-ancestors 'none'`, `object-src 'none'`. A new inline script, external script or network host changes the hashes or the policy.
+- The full header set, the cache rules and the household's Cloudflare Pages deploy: `docs/deployment/2-deploy.md`.
+- Storage is per origin: a hosted copy has its own `td.auth`, `td.emails`, `td.theme` and `td.rail`. Sign in once on each; signing out of one leaves the other signed in.
+- Supabase needs no change for a password-only sign-in (CORS allows any origin). Email links (reset, magic link) would need the hosted URL as Site URL and Redirect URL.
+
 ## Limits
 
-- Local only (`file://`) today. Supabase's free plan cannot serve the page as HTML. A hosted copy on Cloudflare Pages behind Cloudflare Access is planned, with the version check, the deploy and the post-deployment check in `docs/deployment/`.
-- `file://` storage is shared by every local page in the same browser profile: they can read `td.auth` (a refresh token), `td.emails` (email addresses) and the `td.auth` BroadcastChannel (new token pairs). Open only files you trust in that browser profile; sign out on a shared computer.
+- Local (`file://`), or hosted: see `docs/deployment/` and, in HomeOS, `references/homeos/tasksdb/hosting-plan.md`. The household copy is on Cloudflare Pages behind Cloudflare Access. Supabase's free plan cannot serve the page as HTML.
+- `file://` storage is shared by every local page in the same browser profile: they can read `td.auth` (a refresh token), `td.emails` (email addresses) and the `td.auth` BroadcastChannel (new token pairs). Open only files you trust in that browser profile; sign out on a shared computer. A hosted copy's storage is readable only by its own origin.
 - On the free plan a session never times out; Sign out (or revoking sessions in the dashboard) ends it.
 - No trash view: a deleted item is recoverable only by admin SQL after the 8 s Undo.
 - No sign-up and no password reset in the app.

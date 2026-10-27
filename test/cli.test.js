@@ -76,3 +76,30 @@ test('errorExit maps database errors to CLI exit codes', () => {
   assert.equal(L.errorExit(C.restError(0)), 6);
   assert.equal(L.errorExit(C.restError(400, { error_code: 'invalid_credentials' })), 7);
 });
+
+test('e2e --url and --access-env: arguments, https origin only, CF-Access headers only for the page origin, hosts allowed', () => {
+  assert.deepEqual(L.e2eArgs(['--env', 'e', '--url', 'https://p.pages.dev', '--smoke', '--access-env', 'a']), { env: 'e', url: 'https://p.pages.dev', smoke: true, 'access-env': 'a' });
+  assert.equal(L.e2eArgs(['--url', '--smoke']).url, true);
+  assert.equal(L.hostedOrigin('https://p.pages.dev'), 'https://p.pages.dev');
+  assert.equal(L.hostedOrigin('https://p.pages.dev/'), 'https://p.pages.dev');
+  assert.equal(L.hostedOrigin('https://p.pages.dev:443'), 'https://p.pages.dev');
+  for (const bad of ['http://p.pages.dev', 'file:///x.html', 'https://p.pages.dev/index.html', 'https://p.pages.dev/?a=1', 'https://u:p@p.pages.dev', 'p.pages.dev', true]) assert.throws(() => L.hostedOrigin(bad), /--url/);
+  const creds = { id: 'id-value', secret: 'secret-value' }, O = 'https://p.pages.dev';
+  const h = L.accessHeaders({ url: O + '/version.json', headers: { Accept: '*/*', 'cf-access-client-id': 'old' } }, O, creds);
+  assert.deepEqual(h, [{ name: 'Accept', value: '*/*' }, { name: 'CF-Access-Client-Id', value: 'id-value' }, { name: 'CF-Access-Client-Secret', value: 'secret-value' }]);
+  assert.ok(L.accessHeaders({ url: O + '/', headers: {} }, O, creds));
+  for (const url of ['https://x.supabase.co/rest/v1/items', 'https://p.pages.dev.evil.example/', 'https://abc123.p.pages.dev/', 'http://p.pages.dev/', 'https://x.cloudflareaccess.com/cdn-cgi/access/login', 'data:text/plain,x', 'not a url'])
+    assert.equal(L.accessHeaders({ url, headers: {} }, O, creds), null, url);
+  assert.equal(L.accessHeaders({ url: O + '/', headers: {} }, O, null), null);
+  assert.equal(L.accessHeaders({ url: O + '/', headers: {} }, null, creds), null);
+  assert.deepEqual(L.strayHosts(new Set(['x.supabase.co', 'p.pages.dev']), 'x.supabase.co', O), []);
+  assert.deepEqual(L.strayHosts(new Set(['x.supabase.co', 'p.pages.dev', 'x.cloudflareaccess.com']), 'x.supabase.co', O), ['x.cloudflareaccess.com']);
+  assert.deepEqual(L.strayHosts(new Set(['x.supabase.co', 'p.pages.dev']), 'x.supabase.co', null), ['p.pages.dev']);
+  const f = path.join(os.tmpdir(), `td-access-${process.pid}.env`);
+  try {
+    fs.writeFileSync(f, 'CF_ACCESS_CLIENT_ID=abc\n');
+    assert.deepEqual(L.accessCreds(f), { missing: ['CF_ACCESS_CLIENT_SECRET'] });
+    fs.writeFileSync(f, 'CF_ACCESS_CLIENT_ID=abc\nCF_ACCESS_CLIENT_SECRET="def"\n');
+    assert.deepEqual(L.accessCreds(f), { missing: [], id: 'abc', secret: 'def' });
+  } finally { fs.unlinkSync(f); }
+});

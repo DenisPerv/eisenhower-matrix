@@ -17,7 +17,7 @@ Right after every deploy or rollback. Any failed check: roll back to the previou
 - Never type a real password into the hosted page. Signed-in checks use sessions made over REST and seeded into the page's storage (`test/e2e.mjs`), as for `file://`.
 - Never send the service-token headers to Supabase: they are not in its CORS allow-list and must not leave for another host.
 - Check 2 failing means Access does not cover the address: report it at once. The page is public until a person fixes the Access application.
-- Checks 5-6 need the `e2e.mjs --url` option from the hosting build run. Until it exists, check 5 with Playwright only, and say that check 6 was not run.
+- Status checks 5-6 now use `e2e.mjs --url`: check 6 as in the table, and for check 5 `--group ui` (screenshots at 1440×900 and 390×844, console errors including CSP violations, the two hosts) next to Playwright. `--access-env` adds the service-token headers to the pages.dev origin only.
 
 ## Report
 
