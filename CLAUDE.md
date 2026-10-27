@@ -10,8 +10,18 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
 | `test/core.test.js`, `test/cli.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
 | `README.md`, `CLAUDE.md`, `dependencies-doc.md` | documentation |
+| `docs/deployment/` | deployment of the hosted copy (Cloudflare Pages): `README.md`, `1-version-check.md`, `2-deploy.md`, `3-post-deploy-check.md` |
 
 `config/profiles.js` and `config/<id>.prefs.json` belong to the file-based app (`release_maxden_filesbased`); this app does not read them. Nothing else belongs here.
+
+## Deployment: use `docs/deployment/` whenever the person asks for one
+
+When the person asks to deploy, publish, update or roll back the hosted page, or asks whether it is up to date, read `docs/deployment/README.md` first. Then follow its three steps in order: the version check, the deploy, the post-deployment check.
+
+- Deploy only on the person's request in chat, only `origin/release_maxden` (or an older commit of it for a rollback), and only the files the docs list.
+- A failed post-deployment check means a rollback and a report.
+- Until hosting is set up (status in `docs/deployment/README.md`), say so and stop after the version check.
+- A change that adds an inline script, an external script or a network host to `TasksDashboard.html` also updates the `_headers` template in `docs/deployment/2-deploy.md`, in the same commit.
 
 ## README is the documentation: update it with every change
 

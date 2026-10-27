@@ -178,7 +178,7 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
 
 ## Limits
 
-- Local only (`file://`). Supabase's free plan cannot serve the page as HTML; hosting is a later choice.
+- Local only (`file://`) today. Supabase's free plan cannot serve the page as HTML. A hosted copy on Cloudflare Pages behind Cloudflare Access is planned, with the version check, the deploy and the post-deployment check in `docs/deployment/`.
 - `file://` storage is shared by every local page in the same browser profile: they can read `td.auth` (a refresh token), `td.emails` (email addresses) and the `td.auth` BroadcastChannel (new token pairs). Open only files you trust in that browser profile; sign out on a shared computer.
 - On the free plan a session never times out; Sign out (or revoking sessions in the dashboard) ends it.
 - No trash view: a deleted item is recoverable only by admin SQL after the 8 s Undo.
