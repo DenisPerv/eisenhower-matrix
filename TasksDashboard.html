@@ -611,9 +611,11 @@ dialog input,dialog select,.rt{border-radius:var(--r)}
 dialog input.tag-new{border-radius:var(--r-sm)}
 .actions button{border-radius:var(--r);font:500 15px var(--ui)}
 #fs,#s-save,#g{background:var(--accent);box-shadow:0 10px 24px -14px var(--glow)}
-/* the dark accent is light: dark ink on it keeps the Save labels above 4.5:1, as on #si-go */
-:root[data-theme="dark"] #fs,:root[data-theme="dark"] #s-save{color:var(--solid)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #fs,:root:not([data-theme="light"]) #s-save{color:var(--solid)}}
+/* the dark accent is light: dark ink on every label set on it keeps it above 4.5:1, as on #si-go */
+:root[data-theme="dark"] :is(#fs,#s-save,#g,.toast button,.tagchip[aria-pressed="true"],.fmt [aria-pressed="true"]:not(:hover),.tl-d.td){color:var(--solid)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(#fs,#s-save,#g,.toast button,.tagchip[aria-pressed="true"],.fmt [aria-pressed="true"]:not(:hover),.tl-d.td){color:var(--solid)}}
+/* a pressed format button loses the accent fill on hover (.fmt button:hover): its label takes the ink */
+.fmt [aria-pressed="true"]:hover{color:var(--ink)}
 #cf-ok{box-shadow:none}
 
 /* toast: a squared bar with an accent edge */
