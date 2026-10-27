@@ -21,7 +21,8 @@ The household's own setup lives in HomeOS (`references/homeos/tasksdb/`); this R
    | `db/005_item_order.sql` | `items.sort_key`, the shared card order |
    | `db/006_archived_lists.sql` | archived lists are frozen: no update of their items except by admin SQL |
    | `db/007_renewal.sql` | category `renewal` (default list Reminders; `details`: `renew_by` and the records-index row name, dates only) |
-   | `db/003_rls.sql` again | grants for what 005 to 007 added |
+   | `db/008_telegram_editor.sql` | `telegram-bot` becomes an editor on Reminders and OtherTasks (was contributor): the Telegram bot may change any open item there; agents still never delete or restore |
+   | `db/003_rls.sql` again | grants for what 005 to 008 added |
    | `db/900_selftest.sql` | the RLS selftest; it ends with an error whose text must read `SELFTEST 57 of 57 passed (rolled back). Failures: none` |
 
    Every file is re-runnable. Later changes come only as new `db/NNN_*.sql` files, followed by `003` and `900`.
