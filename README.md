@@ -1,50 +1,62 @@
 # TasksDashboard
 
-Eisenhower matrix task view, **UI prototype 4-5 "Aurora instrument"** (made with the UI UX Pro Max skill). `TasksDashboard.html` plus `config/`: no server, no build, no dependencies, nothing loaded from the network.
+Eisenhower matrix task app, UI 4-5 "Aurora instrument", on a Supabase database (TasksDashboardDB). `TasksDashboard.html` plus `config/tasksdashboard.config.js`: no server, no build, no dependencies. The page opens from `file://` and talks only to the Supabase project in its config. A small CLI in `cli/` reads and writes the same database.
 
-It reads task lists from the folders named in the config and writes new list files and per-profile preferences. Task edits stay in memory (see Limits).
+The household's own setup lives in HomeOS (`references/homeos/tasksdb/`); this README is enough to set the app up for another household.
 
-## Open
+## Set up (Phase 0, once)
 
-Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intended fonts: Segoe UI Variable, Bahnschrift, Sitka, Cascadia Mono).
+1. **Supabase project.** supabase.com → New project (free plan). Note the project URL (`https://<ref>.supabase.co`).
+2. **Auth settings.** Authentication → Sign In / Providers: turn off "Allow new users to sign up", "Allow manual linking" and "Allow anonymous sign-ins"; Email provider on, "Confirm email" off.
+3. **Logins.** Authentication → Users → Add user → Create new user, one per person and per agent (email + password, "Auto Confirm User" on). The seed expects four: two people (`maksym`, `anastasiia` in `004_seed.sql`; change the handles for your household) and two agents (`homeos-agent`, `telegram-bot`).
+4. **Data API.** Project Settings → Data API: `public` exposed, "Automatically expose new tables" off. Never click a table in the Data API page: it would replace the explicit grants with defaults that include `anon` (if it happens, re-run `003_rls.sql`).
+5. **Database.** SQL editor, in this order, each file pasted whole:
 
-| URL | Effect |
-|---|---|
-| `TasksDashboard.html` | real lists from the configured folders |
-| `?profile=<id>` | start as that profile |
-| `?demo` | built-in example lists, `Today` fixed at `2026-10-26T10:00`; nothing is written |
+   | File | What |
+   |---|---|
+   | `db/001_schema.sql` | tables and indexes (`profiles`, `preferences`, `categories`, `lists`, `list_members`, `items`, `item_links`, `item_refs`, `item_events`, `notification_deliveries`, `ops.keepalive`) |
+   | `db/002_functions.sql` | helpers and triggers: protected columns, per-list numbers, audit events, sensitive-data screen, `create_list`, `keepalive` |
+   | `db/003_rls.sql` | row level security, grants, policies |
+   | `db/004_seed.sql` | profiles, 7 categories, 3 lists, members. Replace `{{MAKSYM_EMAIL}}`, `{{ANASTASIIA_EMAIL}}`, `{{AGENT_EMAIL}}`, `{{TELEGRAM_EMAIL}}` with the login emails by hand in the editor (never commit them) |
+   | `db/005_item_order.sql` | `items.sort_key`, the shared card order |
+   | `db/006_archived_lists.sql` | archived lists are frozen: no update of their items except by admin SQL |
+   | `db/003_rls.sql` again | grants for what 005 and 006 added |
+   | `db/900_selftest.sql` | the RLS selftest; it ends with an error whose text must read `SELFTEST 57 of 57 passed (rolled back). Failures: none` |
 
-## Files
-
-| File | Written by | Holds |
-|---|---|---|
-| `config/tasksdashboard.config.js` | hand | `window.TD_CONFIG`: `readFolders`, `createFolder` |
-| `config/profiles.js` | hand | `window.TD_PROFILES`: `[{ id, name, tags }]` |
-| `config/<id>.prefs.json` | the page | that profile's preferences |
-
-The config files are `.js` because a `file://` page can load a script beside it but cannot read a `.json` file.
+   Every file is re-runnable. Later changes come only as new `db/NNN_*.sql` files, followed by `003` and `900`.
+6. **Config.** Project Settings → API Keys: copy the **publishable** key (`sb_publishable_…`) into `config/tasksdashboard.config.js` (below). Never the secret or service key.
 
 ## Config
 
 ```js
 window.TD_CONFIG = {
-  readFolders: ['../../references/Family-Tasks'],   // every *.json at each folder's root is a list
-  createFolder: '../../references/Family-Tasks',    // New list writes <name>-tasks.json here
+  supabaseUrl: 'https://<ref>.supabase.co',
+  publishableKey: 'sb_publishable_…',
+  pollMs: 30000,
 };
 ```
 
-- Paths are relative to `TasksDashboard.html`. Absolute paths (`D:\…`, `/…`, `file:…`) are refused.
-- Every folder needs a different last segment (the page checks folders by name), and none may be named `config`.
-- A missing config, an empty `readFolders` or a refused path shows the errors and nothing else.
-- `createFolder` should also be in `readFolders`; otherwise a new list is not read after a reload.
+- Public values only; the lock is RLS plus closed sign-ups.
+- A missing file, a URL that is not https (or `http://localhost`), an empty key, a secret key, or `pollMs` outside 5000-600000 shows "The page is not set up yet." with the errors.
+- The config is a `.js` file because a `file://` page can load a script beside it but cannot read a `.json` file.
 
-## Folder access
+## Open and sign in
 
-- A `file://` page cannot open a folder by path. Each configured folder, plus `config/` for preferences, is picked once in the system dialog.
-- First run, or a grant Chrome dropped: the page shows only `Allow <folder name>` buttons, one per folder without a grant.
-- The picked folder's name must equal the last segment of its path. Otherwise the page shows `Wrong folder: expected <name>.`
-- The handles are kept in IndexedDB `td` (store `handles`, key = the path). A later restore is one click with no dialog.
-- Browsers without `showDirectoryPicker`: `This browser can't open a folder. Use Chrome or Edge.`
+Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intended fonts: Segoe UI Variable, Bahnschrift, Sitka, Cascadia Mono).
+
+| Situation | What shows |
+|---|---|
+| no saved session | the sign-in form: Email, Password, "Stay signed in on this computer" (ticked) |
+| saved session | the board, after a silent token refresh |
+| the database can't be reached | "Can't reach the database." with Retry (a free project pauses after a week without use; restore it in the dashboard) |
+| a login without a profile row | "This login can't open the board." with Sign out |
+| `?profile=<handle>` | only prefills the form's email, when this browser has seen that person sign in |
+
+- **Sign in:** Enter submits. A wrong password shows "Email or password is wrong."; 429 shows "Too many attempts. Wait a minute, then try again." The message takes focus. No automatic retry, no sign-up, no password reset (logins and passwords are managed in the Supabase dashboard).
+- **Stay signed in:** ticked keeps the refresh token in `localStorage` `td.auth`; unticked keeps it in `sessionStorage` (this tab only; a new tab asks again). The access token stays in memory. `td.auth` also holds the login's id: a tab reads its own `sessionStorage` first and never takes another person's token.
+- **Several tabs:** a refresh runs under the Web Lock `td.refresh`, and the BroadcastChannel `td.auth` hands the new token pair to the person's other tabs (refresh tokens rotate; reusing an old one ends the session). Parallel 401s cause one refresh, not one each.
+- **401:** one silent refresh and a retry; if that fails, the form shows "Session ended. Sign in again." and the waiting changes are sent after the next sign-in.
+- **Menu (the name):** "Switch to <other person>" (sign out, then the form with their email when this browser knows it), "Sign out" (`/auth/v1/logout?scope=local` with a fresh token: this browser only; other devices stay signed in; with changes still waiting it sends them first, and if they can't be sent it says so and signs out on the second click), Weekly review, Settings, card mode, Archived lists.
 
 ## Model
 
@@ -56,114 +68,120 @@ window.TD_CONFIG = {
 | D | not important | not urgent | Eliminate | grey |
 
 - Grid order: B Plan, A Do on top; D Eliminate, C Delegate below.
-- Today = the clock at page load (`?demo`: `2026-10-26T10:00`).
-- Done = archive (`doneAt`); restore and delete exist in the Archive view.
+- **Quadrant:** `items.quadrant`. An item without one (from the CLI without `--q` or another project) is shown where `deriveQuadrant` puts it, and nothing is written back: important = `priority` ≥ 3 or category `reminder`, `tbd` or `decision`; urgent = the pin (`urgent_pin`), else the deadline inside the urgency window (Settings).
+- **Card number:** `<first letter of the list><num>`; `num` is set by the database per list (a moved item takes the next number of its new list).
+- **Now** is recomputed on every render and poll. Dates show and are entered in the browser's time zone and are stored as `timestamptz`.
+- **Statuses:** `done` and `cancelled` go to the Archive (cancelled with a mark). `inbox`, `in_progress`, `waiting`, `proposed`, `agreed` show as a small badge. Restore puts back the status from before completion (from `item_events`), `open` if unknown.
+- **Badges on a card:** "check" (an assistant added it with low confidence: `review_state = needs_review`; the tooltip gives `ai_confidence`), the status, the category (except `task`).
 
-## Data
+## Data and sync
 
-- **List file:** any `*.json` at the root of a read folder, sorted by file name per folder. A leading `.` is ignored, as are subfolders and other files.
-- **Label:** the file name without `-tasks.json` (else without `.json`), first letter capitalised: `backlog-tasks.json` → Backlog, `OtherTasks.json` → OtherTasks. When two folders hold the same label, the folder name is added.
-- **List key:** `<folder path>/<file name>`, used in preferences.
-- **Format version 2:** `{ version: 2, timeZone, backlog: { A..D: [cards] }, archive: { A..D: [cards] } }`. Card fields read: `id`, `num`, `title` (required), `deadline`, `tags`, `notes`, `urgentPin`, `completedAt`; others are ignored.
-- **A file that fails to read** (not JSON, another version, a card without a title) shows as a disabled, struck-through chip with the error as its tooltip.
-- **Task id:** the card's `id`. An id already seen in an earlier list gets `~2`, `~3` in memory.
-- **New list:** letters, digits and dashes; it writes an empty version 2 file `<name>-tasks.json` (time zone `Europe/Lisbon`) into `createFolder`. An existing file name is refused.
+- **Load:** lists (`archived_at=is.null`), my `list_members` rows, categories, people (`profiles` with an explicit column list; `email` is not readable), my preferences, then every live item. Every load pages with `order=id&limit=1000&offset=…` until a short page.
+- **Roles** (`list_members.role`): viewer reads only; contributor adds and edits only items they created, never deletes; owner and editor do everything. The page hides what the role can't do; the database enforces it.
+- **Saving:** every change is shown at once and queued: one serial queue per item, changes to the same item merged. Each PATCH carries `version=eq.<the version the last response returned>` and `x-homeos-via: app`. A new item is sent with a client `crypto.randomUUID()` as `id`; a retry that gets 409 / 23505 counts as saved.
+- **Conflicts (0 rows updated):** the page reads the item. Someone else saved first and changed other fields: mine are re-applied on the new version. They changed the same field: their version stays, and an edit from the task window reopens it with my text and a note saying what changed. The same version: "You can't edit this item here", and the item goes back.
+- **Task window:** Save sends only the fields changed in the window. If the item changed while the window was open (a poll updates it in place) and someone else changed one of those same fields, the window reopens with the person's text and a note instead of overwriting it.
+- **Errors** (`restError`): 22023 the database's text (card, IBAN or ID number; the window stays open); 42501 / 403 "Not allowed for your role on this list." or "This list is archived. Restore it first."; 23514 "The title is over 300 characters."; 23505 on a list "A list with this name exists."; 401 refresh once; 429 wait.
+- **Offline:** a network error, a 5xx or a 429 keeps the change in the queue ("Offline: N changes waiting", or "The database is busy" for 429); it is sent on `online`, on the next poll or on focus. Leaving the page with changes waiting asks first.
+- **Poll:** every `pollMs` while the page is visible, and on focus: items with `updated_at` ≥ the newest seen minus 120 s (`POLL_OVERLAP_MS`), deleted ones included; versions dedupe; items with waiting changes are skipped. On focus, or when an item shows up on an unknown list, lists, roles and categories load again.
+- **Card order:** the shared `items.sort_key` (`db/005`), ascending; cards without one go last. A dropped card takes the midpoint of its new neighbours (±1024 at the ends); a quadrant with missing keys or a gap under 1e-6 is renumbered with spacing 1024 first. New cards go on top.
+- **Undo** (toast, 8 s, or Ctrl/Cmd+Z): sends the inverse as a new versioned write: add → soft delete (no Undo where the role can't delete), delete → restore, done / cancel → the earlier status, move or edit → the old fields.
+- **Delete** is a soft delete (`deleted_at`). There is no trash view: after the 8 s Undo, only admin SQL brings an item back.
+- **Archived lists:** an owner archives a list from its `…` chip menu (with a question). It leaves the chips, All and search; its items are never shown or edited, and the database refuses any update of them (`db/006`). Archived lists (menu) shows each with Restore for owners.
+- **New list:** `rpc/create_list` with a Shared toggle (shared adds the other people and `homeos-agent` as editors). A name without ASCII letters gets the slug `list-<6 random>`.
+- **Sources:** the task window lists the item's `item_refs` (read only; links are shown as text).
 
-## Profiles
+## Preferences and Settings
 
-- `config/profiles.js`: `id` (`[a-z0-9-]`, also the preferences file name), `name`, `tags`. Tasks with any of the profile's tags count as **Mine**. Duplicate and invalid entries are dropped.
-- Start profile: `?profile=<id>`, then the last one used in this browser (`localStorage` `td.profile`), then the first in the file.
-- The profile menu lists every profile; switching saves the current profile's preferences, then loads the other's.
-
-## Preferences
-
-`config/<id>.prefs.json` is written 1 s after a change (`PREFS_DELAY_MS`), and only when its content differs from the last write. It is never written in `?demo`. The files are committed with the app repo, so both machines share them through git.
+One row per person in `preferences` (`app = tasksdashboard`), upserted on `profile_id,app` 1 s after a change (`PREFS_DELAY_MS`) when it differs from the last write.
 
 | Key | Default | Holds |
 |---|---|---|
-| `version` | `1` | format |
+| `version` | `2` | format |
 | `theme` | `auto` | `auto` (system), `light`, `dark` |
 | `view` | `matrix` | `matrix`, `archive`, `timeline` |
-| `list` | `all` | `all` or a list key |
-| `listOrder` | `[]` (file-name order) | list keys in chip order |
-| `tagOrder` | `[]` | tag order in the task window; filled once a task window is opened |
-| `axes` | `{ fx: 0.5, fy: 0.5 }` | matrix split: `fx` = width share of the not-urgent column, `fy` = height share of the important row; clamped to the window when applied |
+| `list` | `all` | `all` or a list id |
+| `listOrder` | `[]` | list ids in chip order |
+| `tagOrder` | `[]` | tag order in the task window |
+| `axes` | `{ fx: 0.5, fy: 0.5 }` | matrix split: `fx` = width share of the not-urgent column, `fy` = height share of the important row; clamped to the window |
 | `menuCollapsed` | `[]` | collapsed side-menu groups `A`..`D` |
-| `cards` | `{ mode: 'collapsed', flipped: [] }` | card mode and the task ids shown the other way |
+| `cards` | `{ mode: 'collapsed', flipped: [] }` | card mode and the item ids shown the other way |
+| `settings` | below | the Settings dialog |
 
-Example (`config/maksym.prefs.json`):
+Unknown keys, version 1 path keys and ids that no longer exist are dropped; a value of the wrong type takes its default.
 
-```json
-{
-  "version": 1,
-  "theme": "auto",
-  "view": "matrix",
-  "list": "../../references/Family-Tasks/backlog-tasks.json",
-  "listOrder": [
-    "../../references/Family-Tasks/backlog-tasks.json",
-    "../../references/Family-Tasks/reminders-tasks.json",
-    "../../references/Family-Tasks/OtherTasks.json"
-  ],
-  "tagOrder": [],
-  "axes": { "fx": 0.5, "fy": 0.1354 },
-  "menuCollapsed": [],
-  "cards": { "mode": "collapsed", "flipped": [] }
-}
-```
+| Setting | Default | Range |
+|---|---|---|
+| `threshold` (urgency threshold, %) | 50 | 10-90 |
+| `windowDays` (urgency window) | 7 | 1-30 |
+| `workingDays` | false | |
+| `doLimit` ("Do" limit; the A count turns red above it; the CLI's `do`) | 5 | 0-50 |
+| `hoursPerDay` | 8 | 1-24 |
 
-- Unknown keys are dropped, and a value of the wrong type takes its default.
-- A broken file loads the defaults and is rewritten on the next change.
-- A list, task or tag that no longer exists is dropped; `list` then falls back to `all`.
-- First run with no preferences file: the old `td.axes` and `td.lists` values are copied in once, then removed.
+## Storage in the browser
 
-## Storage
+| Key | Where | Holds |
+|---|---|---|
+| `td.auth` | `localStorage` (Stay signed in) or `sessionStorage` | `{ refresh_token, uid }` |
+| `td.emails` | `localStorage` | `{ handle: email }` of people who signed in here (prefills the form) |
+| `td.theme` | `localStorage` | the theme before the data loads (no flash) |
+| `td.rail` | `localStorage` | side menu width and hidden state |
 
-| What | Where |
-|---|---|
-| preferences | `config/<id>.prefs.json` |
-| folder handles | IndexedDB `td`, store `handles` |
-| last profile | `localStorage` `td.profile` |
-| theme before the folders load (no flash) | `localStorage` `td.theme` |
-| side menu width and hidden state | `localStorage` `td.rail` |
-
-Tasks, tags and settings are not stored.
-
-## Settings (in memory)
-
-| Setting | Default |
-|---|---|
-| Urgency threshold | 50% |
-| Urgency window | 7 days |
-| Working days only | off |
-| "Do" limit | 5 |
-| Working hours per day | 8 |
+The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are removed once. Its IndexedDB `td` stays (the frozen file-based app on `release_maxden_filesbased` uses it).
 
 ## Features
 
-- **Top bar:** Priority fan logo (`ADV_LOGO`), a button: at rest it shows the last frame of its animation; a click, Enter or Space plays the animation once (`.play` for `LOGO_PLAY_MS` 3600 ms: intro, then one glow cycle); a click while it plays does nothing, a re-render during it keeps its place, and with reduced motion the click does nothing. Tile and colours follow the app theme (`--td-*` on `.td-adv`): white tile with the deeper palette on light, black tile with the lifted palette on dark; list chips (All fixed first, five chips including All, the rest behind `+N`; drag or Alt+arrows to reorder; a selected list from `+N` shows sixth); profile menu (profiles, weekly review, settings, card mode); theme button (Auto until the first click, then Light or Dark).
-- **Search:** search with Due, Tag, Mine filters; results grouped by quadrant; `/` focuses, arrows and Enter open.
-- **Side menu:**
-  - views (Matrix, Archive, Timeline) and the open items by quadrant;
-  - drag its edge to resize (256 px to start, 128-560 px); drag below 128 px, double-click or Enter on the edge to hide;
-  - a slim tab brings it back.
-- **Matrix:**
-  - drag cards between and inside quadrants; `+` and double-click to add; expand one quadrant;
-  - movable axes (drag the lines or the centre knob; arrows, Home or double-click to reset) with a minimum of one ~50-character title per column and one card per row;
-  - list-to-card and card-to-list highlights in the quadrant colour.
-- **Task window:** title and description with bold, italic and lists; list; quadrant; end date; tags with delete (corner cross or Delete, with a yes/no question that counts dependent items), drag or Alt+arrows to reorder, and double-click or F2 to rename (applies to every task).
-- **Other views:** archive (sort, restore, delete); timeline with weekends, today and load row; weekly review; undo toast (Ctrl/Cmd+Z).
+- **Top bar:** Priority fan logo (`ADV_LOGO`), a button that plays its animation once (`LOGO_PLAY_MS` 3600 ms; nothing with reduced motion); list chips (All first, five chips, the rest behind `+N`; drag or Alt+arrows to reorder; a selected list from `+N` shows sixth); `…` list menu on a selected list (Archive, Archived lists); New list (people only); the person's menu; theme button (Auto until the first click).
+- **Search:** Due, Tag, Category, "To check" (low confidence) and Mine filters; results grouped by quadrant; `/` focuses, arrows and Enter open. Mine = items carrying one of the person's `mine_tags`.
+- **Side menu:** views (Matrix, Archive, Timeline) and the open items by quadrant; drag its edge to resize (256 px to start, 128-560 px), drag below 128 px, double-click or Enter on the edge to hide; a slim tab brings it back.
+- **Matrix:** drag cards between and inside quadrants (the row sets importance, the column sets urgency by hand); `+` and double-click to add; expand one quadrant; movable axes (drag, arrows, Home or double-click to reset).
+- **Task window:** title and description with bold, italic and lists; list; quadrant; end; tags (delete, reorder, rename across every item, one queued write per item); Sources; Mark cancelled; Delete. Read only for a viewer.
+- **Other views:** Archive (sort, Restore, Delete, Clear with a question); Timeline with weekends, today and a load row; Weekly review.
+
+## CLI
+
+`node cli/tasks.mjs <command> [options]`, Node 18+, no dependencies. Each run signs in, does one command and logs its session out (local scope). It loads the page's `<script id="core">`, so the rules are the same.
+
+| Command | Options | Does |
+|---|---|---|
+| `add-task` | `--title` (required) `--list <slug>` `--q A\|B\|C\|D` `--due <when>` `--tags a,b` `--body <md>` `--priority 0-5` `--confidence 0-1` `--needs-review` | adds a task; default list = the `task` category's default list; `dedup_key = task:<sha1(lower(title) + due day + list slug)[0:12]>`; `sort_key` on top of its quadrant |
+| `add-reminder` | `--title --due` (required) `--list <slug>` `--notify 09:00,18:00` `--body` | adds to `--list`, else the `reminder` category's default list; `dedup_key = reminder:<creation yyyy-mm-dd--hh-mm>`; `details.notify` |
+| `overdue` | `--limit 10` `--list <slug>` | open items with `due_at` before now, the most recent first |
+| `do` | `--list <slug>` `--limit N` | per list, quadrant A (stored or derived) in card order, up to the login's own `settings.doLimit` (5 for agents) |
+| `restore-list` | `--list <slug>` | un-archives a list (people only: `--as maksym` or `anastasiia`) |
+
+- **Common options:** `--env <file>` (KEY=value lines; `TASKSDB_*` variables from the environment fill gaps), `--as <handle>` (default `homeos-agent`; reads `TASKSDB_<HANDLE>_EMAIL` / `_PASSWORD`, with `AGENT` and `TELEGRAM` for the two agents), `--for <handle>` (`on_behalf_of`, a person), `--via <channel>` (`created_via` and `x-homeos-via`, default `script:tasks-cli`), `--run-id`, `--json`, `--dry-run` (reads, sends no write).
+- **When:** `YYYY-MM-DD` (09:00) or `YYYY-MM-DD HH:mm` in Europe/Lisbon, or ISO with an offset.
+- **Env:** `TASKSDB_URL`, `TASKSDB_ANON_KEY` (the publishable key), and the login pairs. The URL and key get the page's config checks (https or localhost, never a secret key); a failure is exit 2.
+- **List status:** every write reads its list first; an archived list is exit 8 and nothing is sent. `overdue` and `do` skip archived lists.
+- **Output:** one line per item, `<initial><num> · title · due · list`, or `--json`.
+- **Exit codes** (`EXIT`): 0 ok, 1 error (including not allowed), 2 env missing, 3 conflict, 4 duplicate, 5 sensitive data, 6 unreachable, 7 auth failed, 8 list archived (or, for `restore-list`, not archived or not found).
+- It never prints an env value, a token or a password.
+
+## Tests
+
+| Command | What | Network |
+|---|---|---|
+| `node --test "test/*.test.js"` | `core.test.js` (the core rules) and `cli.test.js` (arguments, keys, dates, output, exit codes) | none |
+| `node test/e2e.mjs --env <file> --out <dir> [--group auth,data,sync,archive,errors,ui] [--smoke] [--page <html>]` | the page against the live database in headless Chrome or Edge (or Playwright's chromium) over DevTools; report `e2e-report.md` and screenshots in `<dir>` | live, Node 22+ |
+
+- The e2e runner signs in over REST in Node and seeds `td.auth`; the form is only fed dummy credentials while Fetch interception answers it, so no real password is typed into the page.
+- Writes stay in the `_selftest` list and one Cyrillic-named test list; it soft-deletes its items, archives both lists and puts both people's preferences back at the end. Leftovers are listed in the report.
+- Every session the run made is logged out at the end.
+- `--smoke` is read only: the board opens signed in, chip counts equal the database, only the Supabase host is contacted, no console errors.
 
 ## Code
 
-- `<script id="core">` (global `TDCore`, `module.exports` in Node): config, folder, list-file, profile and preferences rules; no DOM, no clock.
-- The UI script and the 4-5 layer script (axes, side-menu width) hold the rest. The axes layer exposes `window.tdAxes` (`get`, `set`, `onSave`).
+- `<script id="core">` (global `TDCore`): config, headers, sessions, `restError`, row ↔ task, preferences v2, `deriveQuadrant`, card order, `mergePoll`, `inverseOf`, paging, `overdueItems`, `topDo`, role rules. No DOM, no clock.
+- The UI script holds the session, the write queue, polling and rendering. The 4-5 layer script (axes, side-menu width) exposes `window.tdAxes` (`get`, `set`, `onSave`).
 
 ## Limits
 
-- Task edits (move, add, done, tags, list) are not saved to the files and are lost on reload. A new list file is created, but tasks added to it are lost too.
-- Lists are read once at page load; a file added or changed outside the page shows after a reload.
-- Chrome may drop a grant after a restart: one `Allow` click restores it. Whether Chrome's "allow on every visit" works for `file://` is untested.
-- Only the folder name is checked, not its location: a different folder with the same name is accepted.
-- Two open tabs write the same preferences file: the last write wins.
-- No repeat, subtasks, effort, reminders or `.ics` export.
+- Local only (`file://`). Supabase's free plan cannot serve the page as HTML; hosting is a later choice.
+- `file://` storage is shared by every local page in the same browser profile: they can read `td.auth` (a refresh token), `td.emails` (email addresses) and the `td.auth` BroadcastChannel (new token pairs). Open only files you trust in that browser profile; sign out on a shared computer.
+- On the free plan a session never times out; Sign out (or revoking sessions in the dashboard) ends it.
+- No trash view: a deleted item is recoverable only by admin SQL after the 8 s Undo.
+- No sign-up and no password reset in the app.
+- Links in descriptions and sources are shown as text.
+- No repeat, subtasks, effort, reminders delivery or `.ics` export in the app.
 - The End field uses the browser's date-time control, so its format follows the system locale.

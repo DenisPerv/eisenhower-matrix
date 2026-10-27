@@ -1,7 +1,7 @@
-// TasksDashboard config. Paths are relative to TasksDashboard.html; absolute paths are refused.
-// readFolders: every *.json at the root of each folder is shown as a list.
-// createFolder: where New list writes <name>-tasks.json.
+// TasksDashboard config: the Supabase project URL, its publishable key and the poll interval (ms).
+// Public values only: never a password, a token, or the secret / service key. RLS and closed sign-ups are the lock.
 window.TD_CONFIG = {
-  readFolders: ['../../references/Family-Tasks'],
-  createFolder: '../../references/Family-Tasks',
+  supabaseUrl: "https://ierpwgycqgqlmabeaino.supabase.co",
+  publishableKey: "sb_publishable_OLbRdN4Fuaemkf5IstAmVA_Xr8l79wz",
+  pollMs: 30000,
 };

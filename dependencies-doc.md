@@ -1,6 +1,6 @@
 # Where HomeOS keeps tasks, reminders and to-dos
 
-Snapshot 2026-10-25, Telegram section 2026-10-26. A map, not a source of truth: every store below is the source of its own data. Paths are relative to the HomeOS root (`D:\Claude\Personal\HomeOS`), where this app is mounted at `Views/TasksDashboard/`. Placed here by Maksym's choice (2026-10-26), an exception to this repo's `CLAUDE.md` rule that only `TasksDashboard.html` and `README.md` belong here.
+Snapshot 2026-10-25, Telegram section 2026-10-26, S9 2026-10-27 (the app moved to TasksDashboardDB). A map, not a source of truth: every store below is the source of its own data. Paths are relative to the HomeOS root (`D:\Claude\Personal\HomeOS`), where this app is mounted at `Views/TasksDashboard/`. Placed here by Maksym's choice (2026-10-26), an exception to this repo's `CLAUDE.md` rule that only `TasksDashboard.html` and `README.md` belong here.
 
 ## 1. Stores
 
@@ -14,7 +14,7 @@ Snapshot 2026-10-25, Telegram section 2026-10-26. A map, not a source of truth: 
 | S6 | Wishes | `memory/wishes/*.md` + `references/wishes/*.md` | record + research note | none | 3 |
 | S7 | Document renewals | `records-index.md` | table: Name, Category, Owner, Where, Expires, Renew by, Keep until, Notes | SessionStart hook lists items expiring within 60 days | passport flagged |
 | S8 | Decisions to revisit | `decisions/log.md` | append-only entries with Why, Revisit, Owner | revisit date | 16 entries |
-| S9 | Task app sources | `references/Family-Tasks/{backlog-tasks,reminders-tasks,OtherTasks}.json` | Eisenhower app v2 JSON | read by `Views/TasksDashboard/TasksDashboard.html` (folders from its `config/tasksdashboard.config.js`); it writes only new list files | empty |
+| S9 | TasksDashboardDB | Supabase project (URL and publishable key in `config/tasksdashboard.config.js`; schema in `db/`) | Postgres: `items`, `lists`, `list_members`, `categories`, `preferences`, `item_refs`, `item_events` with RLS | soft delete only (`deleted_at`); archived lists frozen (`db/006`); every write versioned and audited | 60 migrated 2026-10-27 (was `references/Family-Tasks/*.json`, migrated by HomeOS step-1 B10) |
 
 ## 2. Project task lists (inside their own documents)
 
@@ -75,7 +75,8 @@ R = reads, W = writes, G = guards or validates, M = mentions only (rule text, "n
 | | `/audit` | R: entries past Revisit |
 | | `.claude/settings.json` | G: ask-first edit |
 | | `scripts/sync/resolve-conflicts.md` | G: append-only merge |
-| S9 `references/Family-Tasks/` | `Views/TasksDashboard/TasksDashboard.html` | R/W: the connected file |
+| S9 TasksDashboardDB | `Views/TasksDashboard/TasksDashboard.html` | R/W: items, lists (create, archive, restore), own preferences, as the signed-in person |
+| | `Views/TasksDashboard/cli/tasks.mjs` | W: `add-task`, `add-reminder`, `restore-list`; R: `overdue`, `do` (any login from the env file; default homeos-agent) |
 
 Never-write lists (M) also name S7/S8: `/references`, `/refresh-onboard`, `/skill-security-review` checklist, weekly routines.
 
@@ -103,7 +104,7 @@ Never-write lists (M) also name S7/S8: `/references`, `/refresh-onboard`, `/skil
 | TelegramBasics | Telegram delivery | `scripts/reminders/daily-telegram.js` uses the bot to send the S2 digest |
 | TalkToLocalLLM | indirect | callers list HomeOS budget guard and ingest; `decision/pilot/homeos-cases.jsonl` holds test cases, no live reads of the stores |
 | CarsSearch, EventBoard, CV, LogsViewer, InteriorDesignCLI, BrandBook | none | no reference to any store |
-| TasksDashboard (eisenhower-matrix) | S9 only | relative paths in `config/tasksdashboard.config.js`; the person grants each folder once in the browser |
+| TasksDashboard (eisenhower-matrix) | S9 only | the page signs in to TasksDashboardDB (form, Stay signed in); the CLI signs in with the logins in an env file |
 
 Gaps found:
 - The Telegram deny rule matches the file name exactly: a copy of `records-index.md` under another name inside `references/` would be readable by the bot.

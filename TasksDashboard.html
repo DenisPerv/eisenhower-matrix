@@ -781,119 +781,284 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 }
 @media (min-width:701px){.rail{padding-left:10px;padding-right:10px}}
 
-/* gates: one Allow button per configured folder without a grant; config errors as a list; a list file that can't be read shows disabled */
-.gate .row{display:flex;flex-wrap:wrap;gap:var(--s4);justify-content:center}
-.gate .allow{min-height:44px;padding:0 24px;border-radius:var(--r);border-color:transparent;background:var(--accent);color:#FFFFFF;font:600 15px var(--ui);box-shadow:0 10px 24px -14px var(--glow)}
-.gate .allow:hover{background:var(--accent);filter:brightness(1.08)}
+/* round 8: the database. Gates, and the sign-in panel: the board's corner brackets in the four quadrant colours, placed as on the
+   matrix (B A over D C). Everything else stays in the 4-5 tokens. */
 .gate .errs{margin:0;padding:0;list-style:none;display:grid;gap:var(--s3);color:var(--danger-ink);font:500 14px var(--mono);text-align:left}
-.lists .chip.bad button{border:1px dashed var(--hair2);color:var(--ink3);text-decoration:line-through}
+.gate .gate-sub{margin:0;max-width:52ch;color:var(--ink2);font:400 14px/1.5 var(--font)}
+.signin{position:relative;width:min(380px,100%);display:grid;gap:6px;text-align:left;padding:30px 30px 24px;background:var(--solid);border:1px solid var(--hair2);border-radius:var(--r-xl);box-shadow:var(--depth),0 40px 90px -40px var(--glow)}
+.signin::before{content:"";position:absolute;inset:6px;pointer-events:none;
+  background:
+    linear-gradient(var(--qb),var(--qb)) left top/14px 2px no-repeat,linear-gradient(var(--qb),var(--qb)) left top/2px 14px no-repeat,
+    linear-gradient(var(--qa),var(--qa)) right top/14px 2px no-repeat,linear-gradient(var(--qa),var(--qa)) right top/2px 14px no-repeat,
+    linear-gradient(var(--qd),var(--qd)) left bottom/14px 2px no-repeat,linear-gradient(var(--qd),var(--qd)) left bottom/2px 14px no-repeat,
+    linear-gradient(var(--qc),var(--qc)) right bottom/14px 2px no-repeat,linear-gradient(var(--qc),var(--qc)) right bottom/2px 14px no-repeat}
+.si-logo{margin-bottom:12px}
+.si-logo .td-adv{display:block;width:96.6px;height:37.6px;overflow:visible}
+.signin h1{margin:0 0 6px;font:500 30px/1.1 var(--serif);letter-spacing:-.005em}
+.signin label{margin-top:10px;color:var(--ink2);font:500 13px var(--ui);letter-spacing:.01em}
+.signin input[type=email],.signin input[type=password]{width:100%;min-height:40px;padding:0 12px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--glass2);font:400 15px var(--font);color:var(--ink)}
+.signin input[type=email]:focus,.signin input[type=password]:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+.signin label.cb{display:flex;gap:8px;align-items:center;margin-top:14px;color:var(--ink);font:400 14px var(--font);letter-spacing:0}
+.signin label.cb input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
+.signin .si-msg{margin:4px 0 0;padding:8px 10px;border-left:3px solid var(--danger);background:var(--danger-bg);color:var(--danger-ink);font:600 13px/1.4 var(--font);max-width:none}
+.signin .si-msg:empty{display:none}
+#si-go{margin-top:18px;min-height:42px;border:0;border-radius:var(--r);background:var(--accent);color:#FFFFFF;font:600 15px var(--ui)}
+#si-go:hover{background:var(--accent);filter:brightness(1.08)}
+#si-go:disabled{opacity:.6;filter:none}
+/* the dark accent is light: dark ink on it keeps the label above 4.5:1 */
+:root[data-theme="dark"] #si-go{color:#14152B}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #si-go{color:#14152B}}
+.signin .si-hint{margin:14px 0 0;color:var(--ink3);font:400 12.5px/1.45 var(--font);max-width:none}
+@media (max-width:700px){.signin{padding:24px 20px 20px}.signin input[type=email],.signin input[type=password]{font-size:16px;min-height:44px}#si-go{min-height:46px}}
+
+/* cards: status, category and "check" badges; the low-confidence marker uses the Delegate yellow */
+.card.compact{grid-template-columns:minmax(0,1fr) auto auto auto auto}
+.card.full{grid-template-columns:auto minmax(0,1fr) auto auto auto auto auto}
+.tbs{display:inline-flex;gap:4px;align-items:center}
+.tb{display:inline-flex;align-items:center;min-height:18px;padding:0 6px;border:1px solid var(--hair2);border-radius:var(--r-sm);font:500 11.5px/1 var(--ui);color:var(--ink2);white-space:nowrap;letter-spacing:.01em}
+.tb.ai{border-color:color-mix(in srgb,var(--qc) 75%,transparent);background:color-mix(in srgb,var(--qc) 18%,transparent);color:var(--ink)}
+#listmenu{width:32px;padding:0;color:var(--ink3)}
+.who-am{padding:6px 10px 8px;color:var(--ink3);font:500 12px var(--ui)}
+/* dialogs: notices, sources, the quieter actions on the left */
+.note{margin:10px 0 0;padding:8px 10px;border-left:3px solid var(--qc);background:color-mix(in srgb,var(--qc) 10%,transparent);font:400 13px/1.45 var(--font);color:var(--ink)}
+.srcs{display:grid;gap:4px;margin-top:6px;font-size:12.5px;overflow-wrap:anywhere}
+.actions .sp{flex:1}
+.actions .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
+.actions .danger{color:var(--danger-ink)}
+.actions .danger:hover{background:var(--danger-bg);border-color:var(--danger)}
+.al{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--hair)}
+@media (max-width:700px){.actions{flex-wrap:wrap}.actions .sp{flex-basis:100%;height:0}}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script src="config/tasksdashboard.config.js"></script>
-<script src="config/profiles.js"></script>
 <script id="core">
-// pure rules: config, list files, profiles, preferences. No DOM, no clock; loads in Node with require() through vm.
+// pure rules: config, REST headers and errors, rows <-> tasks, preferences v2, quadrants, card order, polling, undo.
+// No DOM, no clock (time is a parameter); the CLI and the tests load this block in Node through vm.
 (function (root, factory) { const m = factory(); if (typeof module === 'object' && module.exports) module.exports = m; else root.TDCore = m; })(typeof self !== 'undefined' ? self : this, function () {
   const QS = ['A', 'B', 'C', 'D'];
+  const URGENT = { A: true, B: false, C: true, D: false };
+  const IMPORTANT = { A: true, B: true, C: false, D: false };
+  const DAY = 864e5;
+  const STATUSES = ['inbox', 'open', 'in_progress', 'waiting', 'proposed', 'agreed', 'done', 'cancelled'];
+  const CLOSED = ['done', 'cancelled'];
+  const IMPORTANT_CATEGORIES = ['reminder', 'tbd', 'decision'];
   const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
   const strs = a => Array.isArray(a) && a.every(x => typeof x === 'string');
-  const normPath = p => String(p).replace(/\\/g, '/').replace(/\/+$/, '');
-  const isAbsolute = p => /^([a-z]:)?[\\/]/i.test(p) || /^[a-z][a-z0-9+.-]*:/i.test(p);
-  const folderName = p => normPath(p).split('/').pop();
-  // every folder the page needs a grant for, once each: the read folders, the create folder, the preferences folder
-  const folderSet = (cfg, prefsFolder) => [...new Set(cfg.readFolders.concat([cfg.createFolder, prefsFolder]).map(normPath))];
 
-  function readConfig(raw, prefsFolder) {
-    if (!isObj(raw)) return { config: null, errors: ['config/tasksdashboard.config.js is missing or does not set window.TD_CONFIG'] };
+  // config/tasksdashboard.config.js: window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }. Public values only.
+  function readAppConfig(raw) {
+    const name = 'config/tasksdashboard.config.js';
+    if (!isObj(raw)) return { config: null, errors: [name + ' is missing or does not set window.TD_CONFIG'] };
     const errors = [];
-    const read = Array.isArray(raw.readFolders) ? raw.readFolders : [];
-    if (!read.length) errors.push('readFolders: list at least one folder');
-    read.concat([raw.createFolder]).forEach(p => {
-      if (typeof p !== 'string' || !p.trim()) errors.push('Folder paths must be non-empty strings (readFolders, createFolder)');
-      else if (isAbsolute(p)) errors.push('Absolute path not allowed: ' + p);
+    let url = typeof raw.supabaseUrl === 'string' ? raw.supabaseUrl.trim().replace(/\/+$/, '') : '';
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(url)) errors.push('supabaseUrl: the project URL, https://<ref>.supabase.co');
+    const key = typeof raw.publishableKey === 'string' ? raw.publishableKey.trim() : '';
+    if (!key) errors.push('publishableKey: the publishable (anon) key from Project Settings > API Keys');
+    else if (/^sb_secret_/.test(key) || /service_role/.test(jwtPayloadText(key))) errors.push('publishableKey: this is a secret key; use the publishable one and rotate the secret');
+    const pollMs = raw.pollMs === undefined ? 30000 : raw.pollMs;
+    if (typeof pollMs !== 'number' || !(pollMs >= 5000 && pollMs <= 600000)) errors.push('pollMs: milliseconds between 5000 and 600000');
+    return errors.length ? { config: null, errors } : { config: { supabaseUrl: url, publishableKey: key, pollMs }, errors: [] };
+  }
+  function jwtPayloadText(k) {
+    const p = String(k).split('.');
+    if (p.length !== 3) return '';
+    try { return typeof atob === 'function' ? atob(p[1].replace(/-/g, '+').replace(/_/g, '/')) : Buffer.from(p[1], 'base64').toString(); } catch (e) { return ''; }
+  }
+
+  // apikey always; Authorization only with a session token (the publishable key is not a JWT)
+  function headers(key, session, extra) {
+    const h = { apikey: key, 'Content-Type': 'application/json' };
+    if (session && session.access_token) h.Authorization = 'Bearer ' + session.access_token;
+    return Object.assign(h, extra || {});
+  }
+  function sessionFromGrant(g, now) {
+    if (!isObj(g) || !g.access_token || !g.refresh_token) return null;
+    const exp = typeof g.expires_at === 'number' ? g.expires_at * 1000 : now + (Number(g.expires_in) || 3600) * 1000;
+    return { access_token: g.access_token, refresh_token: g.refresh_token, expires_at: exp, user: { id: g.user && g.user.id, email: g.user && g.user.email } };
+  }
+  const needsRefresh = (s, now, skewMs) => !s || !s.access_token || s.expires_at - (skewMs === undefined ? 60000 : skewMs) <= now;
+
+  // one message per failure; retry = worth queueing and sending again, refresh = refresh the session and retry once
+  function restError(status, body) {
+    const b = isObj(body) ? body : {};
+    const code = String(b.code || b.error_code || b.error || '');
+    const msg = String(b.message || b.msg || b.error_description || '');
+    const e = (kind, message, more) => Object.assign({ kind, status, code, message, retry: false, refresh: false }, more || {});
+    if (!status) return e('network', 'Can\'t reach the database. Check the connection; changes wait and are sent again.', { retry: true });
+    if (status === 429 || code === 'over_request_rate_limit') return e('rate', 'Too many attempts. Wait a minute, then try again.', { retry: true });
+    if (code === 'invalid_credentials' || (status === 400 && /invalid login credentials/i.test(msg))) return e('credentials', 'Email or password is wrong.');
+    if (code === 'refresh_token_not_found' || code === 'refresh_token_already_used' || code === 'session_not_found' || code === 'session_expired') return e('session', 'Session ended. Sign in again.');
+    if (status === 401 || code === 'PGRST301' || code === 'PGRST303') return e('auth', 'Session ended. Sign in again.', { refresh: true });
+    if (code === '22023') return e('sensitive', msg ? msg.replace(/^sensitive data: /, 'Not saved: this ') + '. Remove it and save again.' : 'Not saved: sensitive data.');
+    if (code === '42501' || status === 403) return e('denied', /archived/i.test(msg) ? 'This list is archived. Restore it first.' : 'Not allowed for your role on this list.');
+    if (code === '23514') return e('invalid', /title/i.test(msg) ? 'The title is over 300 characters.' : 'A value is out of range: ' + msg);
+    if (code === '23505') return e('duplicate', /lists_slug|slug/i.test(msg) ? 'A list with this name exists.' : 'Already saved.');
+    if (status >= 500) return e('server', 'The database had an error (' + status + '); changes wait and are sent again.', { retry: true });
+    return e('other', msg || 'Request failed (' + status + ').');
+  }
+
+  const PROFILE_COLUMNS = 'id,handle,display_name,kind,timezone,locale,mine_tags,reminder_channel';
+  const iso = d => d ? new Date(d).toISOString() : null;
+  const date = s => s ? new Date(s) : null;
+
+  // a DB row -> the app's task. q is the stored quadrant; the display quadrant is derived when it is null.
+  function rowToTask(r) {
+    const closed = CLOSED.includes(r.status);
+    return {
+      id: r.id, list: r.list_id, num: r.num, qStored: r.quadrant || null, q: r.quadrant || null,
+      title: r.title, notes: r.body_md || '', tags: Array.isArray(r.tags) ? r.tags.slice() : [],
+      deadline: date(r.due_at), start: date(r.start_at), status: r.status || 'open',
+      doneAt: closed ? date(r.completed_at || r.updated_at) : null,
+      pin: r.urgent_pin === null || r.urgent_pin === undefined ? undefined : !!r.urgent_pin,
+      sortKey: typeof r.sort_key === 'number' ? r.sort_key : null, category: r.category || 'task',
+      priority: typeof r.priority === 'number' ? r.priority : null, reviewState: r.review_state || 'none',
+      aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
+      createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
+    };
+  }
+  // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
+  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at' };
+  function taskToPatch(t, fields, nowIso) {
+    const p = {};
+    (fields || Object.keys(FIELD_COLUMNS)).forEach(f => {
+      if (f === 'title') p.title = String(t.title || '');
+      else if (f === 'notes') p.body_md = String(t.notes || '');
+      else if (f === 'tags') p.tags = Array.isArray(t.tags) ? t.tags.slice() : [];
+      else if (f === 'q') p.quadrant = QS.includes(t.qStored) ? t.qStored : null;
+      else if (f === 'pin') p.urgent_pin = t.pin === undefined ? null : !!t.pin;
+      else if (f === 'deadline') p.due_at = iso(t.deadline);
+      else if (f === 'start') p.start_at = iso(t.start);
+      else if (f === 'status') p.status = STATUSES.includes(t.status) ? t.status : 'open';
+      else if (f === 'sortKey') p.sort_key = typeof t.sortKey === 'number' ? t.sortKey : null;
+      else if (f === 'list') p.list_id = t.list;
+      else if (f === 'deleted') p.deleted_at = t.deleted ? (nowIso || iso(Date.now())) : null;
     });
-    if (errors.length) return { config: null, errors: [...new Set(errors)] };
-    const config = { readFolders: [...new Set(read.map(normPath))], createFolder: normPath(raw.createFolder) };
-    const names = {};
-    folderSet(config, prefsFolder).forEach(p => { const n = folderName(p).toLowerCase(); if (names[n]) errors.push('Two folders share the name "' + folderName(p) + '": ' + names[n] + ', ' + p); names[n] = p; });
-    return errors.length ? { config: null, errors } : { config, errors: [] };
+    return p;
+  }
+  // the inverse of an action, sent as a new versioned PATCH
+  function inverseOf(action, before, fields, nowIso) {
+    if (action === 'create') return { deleted_at: nowIso };
+    if (action === 'delete') return { deleted_at: null };
+    if (action === 'done' || action === 'cancel' || action === 'restore') return { status: before.status };
+    return taskToPatch(before, fields, nowIso);
   }
 
-  // a list is any *.json file; its label is the file name without "-tasks.json" (or ".json"), first letter capitalised
-  const listKey = (folder, file) => normPath(folder) + '/' + file;
-  function listLabel(file) {
-    if (typeof file !== 'string' || file.startsWith('.') || !/\.json$/i.test(file)) return null;
-    const base = file.replace(/-tasks\.json$/i, '').replace(/\.json$/i, '');
-    return base ? base[0].toUpperCase() + base.slice(1) : null;
+  // preferences v2, one row per person and app. List keys are list ids; flipped holds item ids.
+  const SETTINGS_DEFAULTS = { threshold: 50, windowDays: 7, workingDays: false, doLimit: 5, hoursPerDay: 8 };
+  const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS };
+  const clone = o => JSON.parse(JSON.stringify(o));
+  function readSettings(raw) {
+    const s = clone(SETTINGS_DEFAULTS);
+    if (!isObj(raw)) return s;
+    const num = (k, lo, hi) => { if (typeof raw[k] === 'number' && raw[k] >= lo && raw[k] <= hi) s[k] = raw[k]; };
+    num('threshold', 10, 90); num('windowDays', 1, 30); num('doLimit', 0, 50); num('hoursPerDay', 1, 24);
+    if (typeof raw.workingDays === 'boolean') s.workingDays = raw.workingDays;
+    return s;
   }
-  // New list: letters, digits and dashes, saved as <name>-tasks.json
-  const newListFile = name => /^[a-z0-9][a-z0-9-]*$/i.test(String(name).trim()) ? String(name).trim().toLowerCase() + '-tasks.json' : null;
-  const newListDoc = timeZone => ({ version: 2, timeZone, backlog: { A: [], B: [], C: [], D: [] }, archive: { A: [], B: [], C: [], D: [] } });
-
-  // data file format version 2: { version, timeZone, backlog: { A..D: [cards] }, archive: { A..D: [cards] } }
-  function readList(text) {
-    let d;
-    try { d = JSON.parse(text); } catch (e) { return { error: 'Not JSON: ' + e.message }; }
-    if (!isObj(d)) return { error: 'Not a task list' };
-    if (d.version !== 2) return { error: 'Format version ' + d.version + ' is not supported (2 is)' };
-    const doc = { version: 2, timeZone: typeof d.timeZone === 'string' ? d.timeZone : null };
-    for (const part of ['backlog', 'archive']) {
-      if (d[part] !== undefined && !isObj(d[part])) return { error: '"' + part + '" must be an object of quadrants A-D' };
-      doc[part] = {};
-      for (const q of QS) {
-        const cards = (d[part] || {})[q] || [];
-        if (!Array.isArray(cards)) return { error: part + '.' + q + ' must be a list' };
-        const bad = cards.findIndex(c => !isObj(c) || typeof c.title !== 'string');
-        if (bad >= 0) return { error: part + '.' + q + '[' + bad + '] has no title' };
-        doc[part][q] = cards;
-      }
-    }
-    return { doc };
-  }
-
-  function readProfiles(raw) {
-    const seen = new Set();
-    return (Array.isArray(raw) ? raw : []).filter(p => {
-      if (!isObj(p) || typeof p.id !== 'string' || !/^[a-z0-9-]+$/.test(p.id) || seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).map(p => ({ id: p.id, name: typeof p.name === 'string' && p.name.trim() ? p.name : p.id, tags: strs(p.tags) ? p.tags.slice() : [] }));
-  }
-  // ?profile=<id> first, then the last profile used in this browser, then the first one in the file
-  const pickProfile = ({ param, remembered, ids }) => ids.includes(param) ? param : ids.includes(remembered) ? remembered : ids[0] || null;
-
-  const PREFS_DEFAULTS = { version: 1, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] } };
-  // unknown keys are dropped; a value of the wrong type falls back to its default
-  function readPrefs(raw) {
-    const p = JSON.parse(JSON.stringify(PREFS_DEFAULTS));
+  // unknown keys, v1 path keys and stale ids are dropped; a value of the wrong type falls back to its default
+  function prefsFromRow(raw, known) {
+    const p = clone(PREFS_DEFAULTS);
     if (!isObj(raw)) return p;
+    const lists = known && known.listIds ? new Set(known.listIds) : null, items = known && known.itemIds ? new Set(known.itemIds) : null;
+    const listOk = x => typeof x === 'string' && !x.includes('/') && (!lists || lists.has(x));
     const frac = v => typeof v === 'number' && v > 0 && v < 1;
     if (['auto', 'light', 'dark'].includes(raw.theme)) p.theme = raw.theme;
     if (['matrix', 'archive', 'timeline'].includes(raw.view)) p.view = raw.view;
-    if (typeof raw.list === 'string' && raw.list) p.list = raw.list;
-    if (strs(raw.listOrder)) p.listOrder = raw.listOrder.slice();
+    if (raw.list === 'all' || listOk(raw.list)) p.list = raw.list;
+    if (strs(raw.listOrder)) p.listOrder = raw.listOrder.filter(listOk);
     if (strs(raw.tagOrder)) p.tagOrder = raw.tagOrder.slice();
     if (isObj(raw.axes) && frac(raw.axes.fx) && frac(raw.axes.fy)) p.axes = { fx: raw.axes.fx, fy: raw.axes.fy };
     if (strs(raw.menuCollapsed)) p.menuCollapsed = QS.filter(q => raw.menuCollapsed.includes(q));
     if (isObj(raw.cards)) {
       if (['collapsed', 'expanded'].includes(raw.cards.mode)) p.cards.mode = raw.cards.mode;
-      if (strs(raw.cards.flipped)) p.cards.flipped = raw.cards.flipped.slice();
+      if (strs(raw.cards.flipped)) p.cards.flipped = raw.cards.flipped.filter(id => !items || items.has(id));
     }
+    p.settings = readSettings(raw.settings);
     return p;
   }
+  const rowFromPrefs = (profileId, prefs) => ({ profile_id: profileId, app: 'tasksdashboard', prefs: Object.assign(clone(prefs), { version: 2 }) });
 
-  return { QS, normPath, isAbsolute, folderName, folderSet, readConfig, listKey, listLabel, newListFile, newListDoc, readList, readProfiles, pickProfile, PREFS_DEFAULTS, readPrefs };
+  // display quadrant for an item without one (CLI without --q, other projects); never written back
+  function deriveQuadrant(t, settings, now) {
+    if (QS.includes(t.qStored)) return t.qStored;
+    const s = settings || SETTINGS_DEFAULTS;
+    const important = (typeof t.priority === 'number' && t.priority >= 3) || IMPORTANT_CATEGORIES.includes(t.category);
+    const urgent = t.pin !== undefined && t.pin !== null ? !!t.pin : !!(t.deadline && t.deadline.getTime() - now <= s.windowDays * DAY);
+    return important ? (urgent ? 'A' : 'B') : (urgent ? 'C' : 'D');
+  }
+
+  // card order: ascending sort_key; a card without one goes after those with one, by number
+  const byOrder = (a, b) => (a.sortKey === null) - (b.sortKey === null) || (a.sortKey === null ? 0 : a.sortKey - b.sortKey) || a.num - b.num;
+  const SPACING = 1024;
+  function sortBetween(prev, next) {
+    if (prev === null || prev === undefined) return next === null || next === undefined ? 0 : next - SPACING;
+    if (next === null || next === undefined) return prev + SPACING;
+    return (prev + next) / 2;
+  }
+  const gapTooSmall = (prev, next) => prev !== null && prev !== undefined && next !== null && next !== undefined && Math.abs(next - prev) < 1e-6;
+  const renumber = ids => ids.map((id, i) => ({ id, sortKey: (i + 1) * SPACING }));
+
+  // polling: rows changed since the last poll (deleted ones included) merged into the tasks; items with writes waiting are skipped
+  function mergePoll(tasks, rows, opts) {
+    const o = opts || {};
+    const pending = o.pending || new Set(), lists = o.knownLists ? new Set(o.knownLists) : null;
+    const byId = new Map(tasks.map(t => [t.id, t]));
+    const unknownLists = new Set();
+    let changed = 0;
+    rows.forEach(r => {
+      if (pending.has(r.id)) return;
+      const cur = byId.get(r.id);
+      if (cur && cur.version >= r.version) return;
+      if (lists && !lists.has(r.list_id)) { unknownLists.add(r.list_id); if (cur) { byId.delete(r.id); changed++; } return; }
+      if (r.deleted_at) { if (cur) { byId.delete(r.id); changed++; } return; }
+      // the same object is updated, so an open task window and an undo still point at the item the page shows
+      if (cur) Object.assign(cur, rowToTask(r)); else byId.set(r.id, rowToTask(r));
+      changed++;
+    });
+    return { tasks: [...byId.values()], changed, unknownLists: [...unknownLists] };
+  }
+  const POLL_OVERLAP_MS = 120000;
+  const pollFilter = maxSeen => 'updated_at=gte.' + encodeURIComponent(new Date(maxSeen - POLL_OVERLAP_MS).toISOString());
+  const PAGE = 1000;
+  const pageParams = offset => 'order=id&limit=' + PAGE + '&offset=' + (offset || 0);
+
+  // CLI views: overdue = open with a deadline in the past, the most recent first; top Do = quadrant A in card order
+  const isOpen = t => !t.deleted && !CLOSED.includes(t.status);
+  function overdueItems(tasks, now, opts) {
+    const o = opts || {};
+    return tasks.filter(t => isOpen(t) && t.deadline && t.deadline.getTime() < now && (!o.list || t.list === o.list))
+      .sort((a, b) => b.deadline - a.deadline).slice(0, o.limit || 10);
+  }
+  function topDo(tasks, opts) {
+    const o = opts || {};
+    const out = {};
+    tasks.filter(t => isOpen(t) && (!o.list || t.list === o.list) && deriveQuadrant(t, o.settings, o.now) === 'A')
+      .sort(byOrder).forEach(t => { (out[t.list] = out[t.list] || []).push(t); });
+    Object.keys(out).forEach(l => { out[l] = out[l].slice(0, o.limit === undefined ? (o.settings || SETTINGS_DEFAULTS).doLimit : o.limit); });
+    return out;
+  }
+
+  // what a role may do with an item (list_members.role; contributors only their own, people delete and restore)
+  function can(role, action, t, uid) {
+    if (!role || role === 'viewer') return false;
+    if (role === 'owner' || role === 'editor') return true;
+    if (action === 'add') return true;
+    if (action === 'delete' || action === 'undelete') return false;
+    return !!t && t.createdBy === uid;
+  }
+
+  return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
+    deriveQuadrant, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
+    isOpen, overdueItems, topDo, can };
 });
 </script>
 <script>
 (() => {
-const { folderName, folderSet, readConfig, listKey, listLabel, newListFile, newListDoc, readList, readProfiles, pickProfile, readPrefs } = TDCore;
-const DEMO = new URLSearchParams(location.search).has('demo');
-// real lists use the clock at page load; ?demo keeps the date its example data was written for
-const TODAY = DEMO ? new Date('2026-10-26T10:00') : new Date();
-const DAY = 864e5;
+const C = TDCore;
+const { QS, URGENT, DAY } = C;
 const QN = { A: 'Do', B: 'Plan', C: 'Delegate', D: 'Eliminate' };
 // line icons, 24-unit grid, stroke = currentColor (drawn for this file; no glyphs as icons)
 const svg = p => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + p + '</svg>';
@@ -910,72 +1075,47 @@ const I = {
   undo: svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
   left: svg('<path d="M19 12H5M12 19l-7-7 7-7"/>'),
   right: svg('<path d="M5 12h14M12 5l7 7-7 7"/>'),
+  dots: svg('<circle class="f" cx="5" cy="12" r="1.6"/><circle class="f" cx="12" cy="12" r="1.6"/><circle class="f" cx="19" cy="12" r="1.6"/>'),
   ul: svg('<path d="M9 6h11M9 12h11M9 18h11"/><circle class="f" cx="4.5" cy="6" r="1.4"/><circle class="f" cx="4.5" cy="12" r="1.4"/><circle class="f" cx="4.5" cy="18" r="1.4"/>'),
   ol: svg('<path d="M10 6h10M10 12h10M10 18h10M4 5h1v4M4 9h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>'),
 };
-const URGENT = { A: true, B: false, C: true, D: false };
-// config/ beside the page: folder paths (config), profiles, and each profile's preferences file (written by the page)
-const PREFS_FOLDER = 'config';
-const PREFS_DELAY_MS = 1000;
-const NEW_LIST_TZ = 'Europe/Lisbon';
-const boot = { gate: 'loading', errors: [], wrong: '' };
-const cfgRead = readConfig(window.TD_CONFIG, PREFS_FOLDER);
-const cfg = cfgRead.config;
-const PROFILES = readProfiles(window.TD_PROFILES);
-if (DEMO && !PROFILES.length) PROFILES.push({ id: 'demo', name: 'Demo', tags: [] });
-if (!DEMO) {
-  boot.errors = cfgRead.errors.slice();
-  if (!PROFILES.length) boot.errors.push('config/profiles.js is missing or lists no valid profile');
-}
-let profile = null;
-const settings = { threshold: 50, windowDays: 7, workingDays: false, doLimit: 5, hoursPerDay: 8, timeline: false };
-const d = (s) => s ? new Date(s) : null;
+// config/tasksdashboard.config.js: the project URL, the publishable key and the poll interval (public values, no passwords)
+const cfgRead = C.readAppConfig(window.TD_CONFIG);
+const CFG = cfgRead.config;
+const PREFS_DELAY_MS = 1000, UNDO_MS = 8000;
+const VIA = { 'x-homeos-via': 'app' };
+// browser storage: only td.auth (refresh token), td.emails (handle -> email, prefill), td.theme and td.rail; every access may throw
+const store = s => ({ get: k => { try { return s().getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { s().setItem(k, v); } catch (e) {} }, del: k => { try { s().removeItem(k); } catch (e) {} } });
+const ls = store(() => localStorage), ss = store(() => sessionStorage);
+['td.profile', 'td.axes', 'td.lists'].forEach(ls.del); // keys of the file-based app, removed once
+const AUTH_KEY = 'td.auth', EMAILS_KEY = 'td.emails';
+const boot = { gate: 'loading', errors: cfgRead.errors, msg: '', prefill: '' };
+let TODAY = new Date();
+let session = null, storeKind = null, me = null;
+let PROFILES = [], LISTS = [], LIST = {}, ROLE = {}, CATS = {};
+let tasks = [], maxSeen = 0;
+let settings = C.readSettings(null);
 const ymd = (x) => x ? new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 16).replace('T', ' ') : '';
-let seq = 100;
-const T = (list, num, q, title, deadline, tags, extra) => Object.assign({ id: 't' + (seq++), list, num, q, title, deadline: d(deadline), tags }, extra || {});
-// example lists for ?demo, embedded from example-data/*.json (format version 2); the quadrant key is where a card sits
-const DATA ={"backlog":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[],"B":[{"id":"tbd-18","num":18,"title":"Voice samples","tags":["tbd","content-review","shared"],"notes":"people/maksym/maksym-voice.md and people/anastasiia/anastasiia-voice.md: two pieces each, written for a human, pasted verbatim. Maksym's 3 current samples are prompts to Claude; replace them with an email, Telegram message or work update. Source: TBD.md #18."},{"id":"tbd-21","num":21,"title":"Records index first entries","tags":["tbd","content-review","shared"],"notes":"records-index.md: 5 to 10 rows (passport, insurance, contract, warranties, medical) with where the file lives, expiry, renew-by. Source: TBD.md #21."},{"id":"tbd-25","num":25,"title":"Home search context","tags":["tbd","content-review","shared"],"notes":"people/home-search-context.md. Left: confirm time zone Europe/Lisbon, stack we own (phones, car, smart home, streaming, bank), sites to skip. Source: TBD.md #25."},{"id":"tbd-26","num":26,"title":"Household facts","tags":["tbd","content-review","shared"],"notes":"people/household.md. Left: Anastasiia's host name, others to know, home details, vehicles, recurring dates, subscriptions. Source: TBD.md #26."},{"id":"tbd-27","num":27,"title":"Personal search contexts","tags":["tbd","content-review","shared"],"notes":"Maksym's search-context.md needs his sign-off; Anastasiia's is an empty template. Each owner does their own. Source: TBD.md #27."},{"id":"tbd-31","num":31,"title":"Built-in auto memory","tags":["tbd","structure","shared"],"notes":"Off in .claude/settings.json (no silent writes). Option: redirect to memory/candidates/ via autoMemoryDirectory. Proposed: off for the first month; revisit after the first retrospective. Source: TBD.md #31."},{"id":"tbd-34","num":34,"title":"Maksym profile read-through","tags":["tbd","content-review","maksym"],"notes":"people/maksym/maksym-profile.md About: no placeholders left; drafted from the old OS, needs a read-through of role, languages, priorities. Source: TBD.md #34."},{"id":"tbd-36","num":36,"title":"Manual boundaries","tags":["tbd","content-review","shared"],"notes":"AGENTS.md Boundaries (always / ask first / never) and the ask list in .claude/settings.json: agree they match how you both want to work. Source: TBD.md #36."},{"id":"tbd-37","num":37,"title":"Decisions revisit dates","tags":["tbd","content-review","shared"],"notes":"decisions/log.md: each 2026-09 entry has a proposed Revisit date; confirm or change. Source: TBD.md #37."},{"id":"tbd-38","num":38,"title":"Anastasiia onboarding","tags":["tbd","content-review","anastasiia"],"notes":"Clone the repo on her machine, run /onboard, paste voice samples, fill search-context.md. She does it herself. Source: TBD.md #38."},{"id":"tbd-41","num":41,"title":"Stock analysis and the no-finance-advice rule","tags":["tbd","structure","proposed","maksym"],"notes":"/stock-chart-analysis gives a trade setup labelled not financial advice; AGENTS.md forbids finance advice. Proposed: keep the reframing; log it as a decision. Source: TBD.md #41."},{"id":"tbd-42","num":42,"title":"Calendar and Email connections","tags":["tbd","content-review","shared"],"notes":"connections.md rows 5 and 7 are [none chosen]. Pick a system for each or mark them out of scope. Source: TBD.md #42."},{"id":"tbd-43","num":43,"title":"ID data in repo: Anastasiia to agree and fill her profile","tags":["tbd","content-review","anastasiia"],"notes":"Decision 2026-09-29: profile cards with ID numbers and ScansStorage/ scans are committed to the repo. Anastasiia agrees and fills people/anastasiia/anastasiia-profile.md. Source: TBD.md #43."}],"C":[],"D":[{"id":"tbd-39","num":39,"title":"Voice file name in AGENTS.md","tags":["tbd","structure","proposed","maksym"],"notes":"AGENTS.md says people/<name>/voice.md; the files use <name>-voice.md. Proposed: fix the line in AGENTS.md. Source: TBD.md #39."},{"id":"tbd-40","num":40,"title":"IBKR tool reference","tags":["tbd","content-review","maksym"],"notes":"references/tools/ibkr.md: allowed read-only tools, forbidden order/alert/account tools, what /stock-chart-analysis calls. Source: TBD.md #40."},{"id":"tbd-44","num":44,"title":"AI solution design questions","tags":["tbd","structure","maksym"],"notes":"AISystems notes in references/Learning/Architecture/ point at an agent project intake checklist and a HomeOS gap map; neither exists. Parked 2026-10-09. Source: TBD.md #44."},{"id":"tbd-45","num":45,"title":"Facebook reel to analyse","tags":["tbd","content-review","maksym"],"notes":"https://www.facebook.com/reel/921326843740504, saved 2026-10-09; content not yet reviewed. Source: TBD.md #45."},{"id":"tbd-46","num":46,"title":"GIR design notes: the missing Aspect 5","tags":["tbd","content-review","anastasiia"],"notes":"OtherGameDesignAspects.md numbers aspects 1-4 and 6-11. Ask Anastasiia; if it was co-op architecture, add DA-12. Source: TBD.md #46."}]},"archive":{"A":[],"B":[{"id":"tbd-13","num":13,"title":"Day-1 routines","tags":["tbd","routines","maksym"],"notes":"Done: the four rituals run as Desktop tasks since 2026-09-29; hub-inbox-poll is parked in Future ideas/HUB Feature/. Source: TBD.md #13.","completedAt":"2026-09-29T12:00:00.000Z"},{"id":"tbd-30","num":30,"title":"Install the schedulers","tags":["tbd","routines","maksym"],"notes":"Done: rituals installed on MDENYSIUK-PERS 2026-09-29 (services.md); weekly-audit runs locally on Saturday instead of in the cloud. Source: TBD.md #30.","completedAt":"2026-09-29T12:00:00.000Z"}],"C":[],"D":[]}},"reminders":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[],"B":[{"id":"rem-2026-10-20--22-15","num":11,"title":"Renaissance Porto Lapa Hotel, Friday 13 Nov 20:30","deadline":"2026-11-13T20:30","tags":["reminder","event","maksym"],"notes":"R. de Cervantes 169, 4050-289 Porto. Purpose not stated. Source: references/reminders/2026-10-20--22-15_reminder.md."},{"id":"rem-2026-10-12--11-19","num":4,"title":"Candlelight Coldplay & Imagine Dragons concert, Palácio da Bolsa","deadline":"2026-11-21T17:00","tags":["reminder","event","shared"],"notes":"Saturday 2026-11-21 at 19:30 (moved from 2026-10-31), 2 tickets, Zona A, Fever booking. Arrive by 19:00, no late entry; use the re-issued tickets in the Fever app. Source: references/reminders/2026-10-12--11-19_reminder.md."},{"id":"rem-2026-10-08--18-35","num":1,"title":"Maksym residence permit: prepare documents","deadline":"2027-02-17T09:00","tags":["reminder","residence-permit","maksym"],"notes":"Renewal window opens 2027-02-21 (permit expires 2027-05-22). Prepare: permit card and valid passport; IRS return and recibos verdes, last 12 months; proof of accommodation; Finanças and Segurança Social no-debt proof; NISS linked in AIMA; account on portal-renovacoes.aima.gov.pt. Source: references/reminders/2026-10-08--18-35_reminder.md."},{"id":"rem-2026-10-08--18-36","num":2,"title":"Maksym residence permit: apply window opens","deadline":"2027-02-21T09:00","tags":["reminder","residence-permit","maksym"],"notes":"First day to file the renewal at portal-renovacoes.aima.gov.pt; deadline 2027-04-22. Keep the receipt with QR code with the card. If the portal does not accept a May 2027 expiry yet, retry weekly. Source: references/reminders/2026-10-08--18-36_reminder.md.","dependsOn":["rem-2026-10-08--18-35"]},{"id":"rem-2026-10-08--18-37","num":3,"title":"Maksym residence permit: deadline check","deadline":"2027-04-01T09:00","tags":["reminder","residence-permit","maksym"],"notes":"Official filing deadline is 2027-04-22 (30 days before expiry). If not filed yet, file now. Source: references/reminders/2026-10-08--18-37_reminder.md."}],"C":[{"id":"rem-2026-10-16--02-32","num":5,"title":"References review: add the recipe text for Shashlik","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: the file is a Wikipedia overview with no amounts or method. Paste the recipe text or a recipe link into references/CookingRecipes/Meat/2026-10-13_shashlik-history-etymology-and-preparation-of.md, or delete it. Source: references/reminders/2026-10-16--02-32_reminder.md."},{"id":"rem-2026-10-16--02-33","num":6,"title":"References review: add the recipe text for Potato pancakes (deruny)","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/2026-10-15_potato-pancakes-deruny-latkes-boxty-overview.md, or delete it. Source: references/reminders/2026-10-16--02-33_reminder.md."},{"id":"rem-2026-10-16--02-34","num":7,"title":"References review: add the recipe text for Syrniki","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/2026-10-15_syrniki-traditional-eastern-european-curd-cheese.md, or delete it. Source: references/reminders/2026-10-16--02-34_reminder.md."},{"id":"rem-2026-10-16--02-35","num":8,"title":"References review: add the recipe text for Cabbage rolls","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/Meat/2026-10-15_cabbage-rolls-global-variations-and-traditional.md, or delete it. Source: references/reminders/2026-10-16--02-35_reminder.md."},{"id":"rem-2026-10-16--02-36","num":9,"title":"References review: add the recipe text for Chicken Kiev","deadline":"2026-10-16T02:31","urgentPin":true,"tags":["reminder","references-review","recipes","shared"],"notes":"needs-source: Wikipedia overview, no amounts or method. Paste the recipe text or a link into references/CookingRecipes/Meat/2026-10-15_chicken-kiev-history-and-preparation.md, or delete it. Source: references/reminders/2026-10-16--02-36_reminder.md."},{"id":"rem-2026-10-17--05-08","num":10,"title":"References review: decide how the Package template folder is indexed","deadline":"2026-10-17T05:07","urgentPin":true,"tags":["reminder","references-review","anastasiia"],"notes":"needs-person: Package/README.md description is a template placeholder, so its row in templates/README.md is flagged stale every run. Keep the row and tell the review to skip template READMEs, or give Package/ a separate index line. Ref: references/GameIndustryResearch/GameDesign/templates/Package/. Source: references/reminders/2026-10-17--05-08_reminder.md."},{"id":"rem-2026-10-24--05-08","num":12,"title":"References review: add the content for the Facebook reel captured 2026-10-20","deadline":"2026-10-24T05:07","urgentPin":true,"tags":["reminder","references-review","shared"],"notes":"needs-source: the capture holds only a reel link; nothing to place. Paste what the reel is about into references/Unrecognized/2026-10-20_no-content-provided-for-summarization.md, or delete the file. Source: references/reminders/2026-10-24--05-08_reminder.md."}],"D":[]},"archive":{"A":[],"B":[{"id":"rem-2026-10-24--23-53","num":13,"title":"Gmail cleanup: 7-day watch and follow-up decisions","deadline":"2026-10-31T10:00","tags":["reminder","gmail","maksym"],"notes":"Check new mail since 2026-10-24 landed in Government/Banks/Household labels and nothing important went to Trash (restore before about 2026-11-23). Ref: references/gmail-cleanup/design.md. Source: references/reminders/2026-10-24--23-53_reminder.md.","completedAt":"2026-10-25T12:00:00.000Z"}],"C":[],"D":[]}},"other":{"version":2,"timeZone":"Europe/Lisbon","backlog":{"A":[{"id":"plan-passport-renewal-maksym","num":1,"title":"Renew Maksym's Ukrainian travel passport","urgentPin":true,"tags":["plan","documents","maksym"],"notes":"Expired 2026-04-21, renewal pending. Visas and many applications need a passport valid 3 to 6 months beyond the trip; the residence card does not cover travel. Source: memory/plans/shortterm/passport-renewal-maksym.md."}],"B":[{"id":"dec-2026-10-24-gmail-cleanup","num":4,"title":"Revisit decision: Gmail cleanup runs on Gmail's own filters (Route C)","deadline":"2026-10-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-24. Source: decisions/log.md."},{"id":"dec-2026-09-29-homeos-build","num":5,"title":"Revisit decision: HomeOS build: manual, memory contract, artifacts, delivery","deadline":"2026-11-30T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Owner: Maksym (implementation), both (rules). Source: decisions/log.md."},{"id":"plan-q4-2026-priority","num":2,"title":"Q4 priority: a working self-maintaining memory loop","deadline":"2026-12-31T18:00","tags":["plan","homeos","maksym"],"notes":"By end of 2026: facts captured during tasks with a yes, a monthly retrospective, a monthly tidy, and the captured-vs-candidates ratio tracked. Why: the previous OS saved 9 records where a retrospective found 40 candidates. Source: memory/plans/shortterm/q4-2026-priority.md."},{"id":"dec-2026-09-28-memory-model","num":6,"title":"Revisit decision: HomeOS memory model","deadline":"2026-12-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-28-routines-hub","num":7,"title":"Revisit decision: HomeOS routines and hub","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-28-search-context","num":8,"title":"Revisit decision: HomeOS search context","deadline":"2026-12-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-29-memory-settings","num":9,"title":"Revisit decision: HomeOS memory settings","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Source: decisions/log.md."},{"id":"dec-2026-09-29-autostart","num":10,"title":"Revisit decision: autostart for the local LLM and Telegram servers","deadline":"2026-12-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Source: decisions/log.md."},{"id":"dec-2026-10-10-learning-notes","num":11,"title":"Revisit decision: Telegram-ingested Learning notes placed at once, verified weekly","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-10. Source: decisions/log.md."},{"id":"dec-2026-10-15-cloud-push-main","num":12,"title":"Revisit decision: cloud routines may push straight to main","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-15. Source: decisions/log.md."},{"id":"dec-2026-10-16-learning-verification","num":13,"title":"Revisit decision: Learning verification runs inside the weekly references review","deadline":"2027-01-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-16; no separate learning-verify routine. Source: decisions/log.md."},{"id":"dec-2026-09-28-usage-sync-privacy","num":14,"title":"Revisit decision: HomeOS usage, sync and privacy basics","deadline":"2027-03-31T18:00","tags":["decision","shared"],"notes":"Decided 2026-09-28. Source: decisions/log.md."},{"id":"dec-2026-09-29-profile-cards-scans","num":15,"title":"Revisit decision: profile cards and document scans live in the repo","deadline":"2027-03-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-09-29. Anastasiia to confirm (TBD #43). Source: decisions/log.md."},{"id":"dec-2026-10-10-telegram-family-context","num":16,"title":"Revisit decision: Telegram bot gives HomeOS context only to Family users","deadline":"2027-03-31T18:00","tags":["decision","maksym"],"notes":"Decided 2026-10-10. Source: decisions/log.md."},{"id":"plan-residence-card-old-address","num":3,"title":"Update Maksym's residence card address with AIMA","tags":["plan","documents","maksym"],"notes":"The título de residência (issued 2025-05-22) shows the old Oeiras address; the household lives in Vila Nova de Gaia. Whether AIMA was told is not confirmed. A stale address can cause trouble at renewal and with official mail. Source: memory/plans/shortterm/residence-card-old-address.md."},{"id":"dec-2026-10-25-homecheat-traps","num":17,"title":"Revisit decision: HomeCheat traps, one trap command","tags":["decision","valheim","maksym"],"notes":"Decided 2026-10-25. Revisit after Maksym's first in-game test of W3-mines. Source: decisions/log.md."}],"C":[],"D":[{"id":"cand-retro-2026-09-29-explicit-2e2cad-1","num":18,"title":"Review memory candidate: \"yes, remember it, and run the routine now\"","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment from the 2026-09-29 retrospective. Promote or drop with /remember (review candidates). Source: memory/candidates/retro-2026-09-29-explicit-2e2cad-1.md."},{"id":"cand-retro-2026-09-29-explicit-2e2cad-2","num":19,"title":"Review memory candidate: pasted /remember skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-explicit-2e2cad-2.md."},{"id":"cand-retro-2026-09-29-explicit-e6a8cf-0","num":20,"title":"Review memory candidate: partner rename and removing nssm records","tags":["candidate","memory","shared"],"notes":"Asks to rename the partner to Anastasiia Khrystina (Curly) and remove any record about nssm. The household-members record already holds the names. Source: memory/candidates/retro-2026-09-29-explicit-e6a8cf-0.md."},{"id":"cand-retro-2026-09-29-rule-2e2cad-6","num":21,"title":"Review memory candidate: pasted cloud-agent scheduling skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-2e2cad-6.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-3","num":22,"title":"Review memory candidate: pasted /onboard skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-3.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-4","num":23,"title":"Review memory candidate: pasted send-telegram-message skill text","tags":["candidate","memory","shared"],"notes":"Raw transcript fragment (skill text, not a fact). Likely drop. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-4.md."},{"id":"cand-retro-2026-09-29-rule-e6a8cf-5","num":24,"title":"Review memory candidate: \"never ask for approval for sending message to telegram\"","tags":["candidate","memory","shared"],"notes":"Conflicts with the house rule that messages to third parties are ask-first; decide its scope (own chat only?) before promoting. Source: memory/candidates/retro-2026-09-29-rule-e6a8cf-5.md."},{"id":"wish-bambu-lab-printer","num":25,"title":"Wish: Bambu Lab 3D printer","tags":["wish","maksym"],"notes":"New only, from eu.store.bambulab.com or the official Amazon.es storefront. Realistic stacked savings 15-25% on current models; big sale window late October to early December. Sources: memory/wishes/bambu-lab-printer.md, references/wishes/bambu-lab-printer.md."},{"id":"wish-massage-chair","num":26,"title":"Wish: full-body massage chair up to EUR 1,500","tags":["wish","shared"],"notes":"Must fit 183 and 160 cm; EU retailer shipping to mainland Portugal. Top pick VEVOR SL-track 3D (eur.vevor.com, Worten.pt); test at Sleep8, Leça da Palmeira, first. Sources: memory/wishes/massage-chair.md, references/wishes/massage-chair.md."},{"id":"wish-vocal-training","num":27,"title":"Wish: in-person vocal training in Gaia or Porto","tags":["wish","maksym"],"notes":"Teacher or school, offline only, ideally Vila Nova de Gaia, English-friendly. Shortlist found 2026-10-20, none verified by contact. Sources: memory/wishes/vocal-training.md, references/wishes/vocal-training.md."}]},"archive":{"A":[],"B":[],"C":[],"D":[]}}};
-// lists are keyed "<folder>/<file>"; LIST_LABEL holds what a chip shows, BAD the files that could not be read (shown disabled)
-let LISTS = [], tasks = [];
-const LIST_LABEL = {}, BAD = {};
-// a task keeps its id from the file, so per-card preferences survive a reload; an id seen in an earlier list gets "~2", "~3"
-function setLists(lists) {
-  LISTS = []; tasks = [];
-  const seen = new Set(), named = {};
-  lists.forEach(l => { const n = listLabel(l.file); named[n] = (named[n] || 0) + 1; });
-  lists.forEach(l => {
-    const n = listLabel(l.file);
-    const shown = named[n] > 1 && l.folder ? n + ' (' + folderName(l.folder) + ')' : n;
-    if (l.error) { BAD[l.key] = { label: shown, error: l.error }; return; }
-    LIST_LABEL[l.key] = shown;
-    LISTS.push(l.key);
-    ['backlog', 'archive'].forEach(part => ['A', 'B', 'C', 'D'].forEach(q => (l.doc[part][q] || []).forEach(c => {
-      const extra = {};
-      if (c.notes) extra.notes = c.notes;
-      if (c.urgentPin !== undefined) extra.pin = c.urgentPin;
-      if (c.completedAt) extra.doneAt = d(c.completedAt);
-      const t = T(l.key, c.num, q, c.title, c.deadline || null, c.tags || [], extra);
-      let id = typeof c.id === 'string' && c.id ? c.id : t.id, k = 1;
-      while (seen.has(k > 1 ? id + '~' + k : id)) k++;
-      t.id = k > 1 ? id + '~' + k : id;
-      seen.add(t.id);
-      tasks.push(t);
-    })));
-  });
-}
-const label = l => LIST_LABEL[l] || (BAD[l] && BAD[l].label) || l[0].toUpperCase() + l.slice(1);
-const initial = l => label(l)[0].toUpperCase();
-const st = { list: 'all', q: '', due: 'any', tags: new Set(), mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
+const label = l => LIST[l] ? LIST[l].name : '?';
+const initial = l => (label(l)[0] || '?').toUpperCase();
+const all = () => tasks.filter(t => !t.deleted && LIST[t.list]);
+const find = id => tasks.find(t => t.id === id);
+const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
 const THEMES = ['light', 'dark'];
 let toastTimer = null, lastUndo = null, dragId = null;
 const overdue = t => t.deadline && t.deadline < TODAY;
 const upcoming = t => t.start && t.start > TODAY;
 const inList = t => st.list === 'all' || t.list === st.list;
-const ref = t => (st.list === 'all' ? initial(t.list) : '') + t.num;
+const refText = t => initial(t.list) + t.num;
+const ref = t => esc(refText(t)); // escaped: the initial comes from a list name
 const rel = t => { if (!t.deadline) return 'no date'; const n = Math.round((t.deadline - TODAY) / DAY); return n < 0 ? (-n) + ' d overdue' : n === 0 ? 'due today' : 'due in ' + n + ' d'; };
-const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// the role on a list (list_members) decides which controls a card shows; the database enforces the same rules
+const canDo = (action, t, list) => C.can(ROLE[t ? t.list : list], action, t, me && me.id);
+const canAddSomewhere = () => st.list === 'all' ? LISTS.some(l => canDo('add', null, l)) : canDo('add', null, st.list);
 
-// markdown subset: **bold**, *italic*, "- " bullets, "1. " numbers. Text is escaped first, so no HTML from a file reaches the page.
+// markdown subset: **bold**, *italic*, "- " bullets, "1. " numbers. Text is escaped first, so no HTML from the database reaches the page.
 const plain = s => String(s || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(?!\s)(.+?)\*/g, '$1').replace(/^\s*(?:[-*]|\d+[.)])\s+/gm, '');
 const mdInline = s => esc(String(s || '')).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(?!\s)(.+?)\*/g, '<em>$1</em>');
 const mdToHtml = md => {
@@ -991,7 +1131,7 @@ const mdToHtml = md => {
 };
 const htmlToMd = root => {
   const walk = n => {
-    if (n.nodeType === 3) return n.textContent.replace(/\u00a0/g, ' ');
+    if (n.nodeType === 3) return n.textContent.replace(/ /g, ' ');
     if (n.nodeType !== 1) return '';
     const inner = () => [...n.childNodes].map(walk).join('');
     switch (n.tagName) {
@@ -1006,12 +1146,15 @@ const htmlToMd = root => {
   };
   return [...root.childNodes].map(walk).join('').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '').split('\n').map(l => l.replace(/\s+$/, '')).join('\n');
 };
-const matchQ = (t, q) => { q = q.trim().toLowerCase(); if (!q) return true; const r = q.replace(/^#/, ''); if (/^[a-z]?\d+$/.test(r)) { const m = r.match(/^([a-z]?)(\d+)$/); if (String(t.num) === m[2] && (!m[1] || initial(t.list).toLowerCase() === m[1])) return true; } return (plain(t.title) + ' ' + plain(t.notes) + ' ' + t.tags.join(' ')).toLowerCase().includes(q); };
+const matchQ = (t, q) => { q = q.trim().toLowerCase(); if (!q) return true; const r = q.replace(/^#/, ''); if (/^\p{L}?\d+$/u.test(r)) { const m = r.match(/^(\p{L}?)(\d+)$/u); if (String(t.num) === m[2] && (!m[1] || initial(t.list).toLowerCase() === m[1])) return true; } return (plain(t.title) + ' ' + plain(t.notes) + ' ' + t.tags.join(' ')).toLowerCase().includes(q); };
+const lowConf = t => t.reviewState === 'needs_review';
 const passFilters = t => {
   if (st.keep.has(t.id)) return true;
   if (!matchQ(t, st.q)) return false;
-  if (st.mine && !t.tags.some(x => profile.tags.includes(x))) return false;
+  if (st.mine && !t.tags.some(x => me.mine_tags.includes(x))) return false;
   if (st.tags.size && !t.tags.some(x => st.tags.has(x))) return false;
+  if (st.cats.size && !st.cats.has(t.category)) return false;
+  if (st.lowc && !lowConf(t)) return false;
   if (st.quads.size && !st.quads.has(t.q)) return false;
   if (st.due === 'overdue' && !overdue(t)) return false;
   if (st.due === 'today' && !(t.deadline && t.deadline <= new Date(TODAY.getTime() + DAY))) return false;
@@ -1019,202 +1162,479 @@ const passFilters = t => {
   if (st.due === 'none' && t.deadline) return false;
   return true;
 };
-const hl = (title, q) => { q = q.trim(); if (!q || /^#?[a-z]?\d+$/i.test(q)) return esc(title); const i = title.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(title) : esc(title.slice(0, i)) + '<mark>' + esc(title.slice(i, i + q.length)) + '</mark>' + esc(title.slice(i + q.length)); };
+const hl = (title, q) => { q = q.trim(); if (!q || /^#?\p{L}?\d+$/iu.test(q)) return esc(title); const i = title.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(title) : esc(title.slice(0, i)) + '<mark>' + esc(title.slice(i, i + q.length)) + '</mark>' + esc(title.slice(i + q.length)); };
 const VISIBLE = 5;
-const snapshot = () => tasks.map(x => Object.assign({}, x, { tags: [...x.tags] }));
 
-// ---- folders: a file:// page reads a folder only after the person picks it once; the handle is kept in IndexedDB ----
-const folders = cfg ? folderSet(cfg, PREFS_FOLDER).map(path => ({ path, name: folderName(path), handle: null, stored: null })) : [];
-const dirOf = path => folders.find(f => f.path === path).handle;
-const idb = (mode, fn) => new Promise(res => {
-  try {
-    const r = indexedDB.open('td', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('handles');
-    r.onerror = () => res(null);
-    r.onsuccess = () => { try { const q = fn(r.result.transaction('handles', mode).objectStore('handles')); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } };
-  } catch (e) { res(null); }
-});
-const permission = async (h, ask) => {
-  try { let p = await h.queryPermission({ mode: 'readwrite' }); if (p !== 'granted' && ask) p = await h.requestPermission({ mode: 'readwrite' }); return p; } catch (e) { return 'denied'; }
-};
-// one Allow button per folder without a grant: a remembered folder asks the browser again, a new one opens the system dialog
-async function allowFolder(f) {
-  if (f.stored && await permission(f.stored, true) === 'granted') f.handle = f.stored;
-  else {
-    let h;
-    try { h = await window.showDirectoryPicker({ id: ('td-' + f.name).replace(/[^a-z0-9_-]/gi, '').slice(0, 32), mode: 'readwrite' }); } catch (e) { return; }
-    if (h.name !== f.name) { boot.wrong = f.name; showGate('wrong-folder'); return; }
-    f.handle = h;
-    await idb('readwrite', s => s.put(h, f.path));
+// ---- session: a sign-in form; the access token lives in memory, the refresh token in td.auth ----
+// "Stay signed in" keeps td.auth in localStorage, unticked in sessionStorage (this tab only). Tabs share a refresh through a
+// Web Lock (td.refresh) and a BroadcastChannel (td.auth): refresh tokens rotate, and a reused one ends the session.
+// td.auth = { refresh_token, uid }. This tab's sessionStorage is read before localStorage, the storage in use before the other,
+// and a token of another person (another tab signed in as them) is never taken.
+function readRefresh(uid) {
+  const order = storeKind === 'local' ? [['local', ls], ['session', ss]] : [['session', ss], ['local', ls]];
+  for (const [kind, s] of order) {
+    try {
+      const v = JSON.parse(s.get(AUTH_KEY) || 'null');
+      if (v && typeof v.refresh_token === 'string' && (!uid || !v.uid || v.uid === uid)) return { kind, token: v.refresh_token, uid: v.uid || null };
+    } catch (e) {}
   }
-  boot.wrong = '';
-  start();
+  return null;
+}
+const saveRefresh = (token, uid) => (storeKind === 'local' ? ls : ss).set(AUTH_KEY, JSON.stringify({ refresh_token: token, uid: uid || (session && session.user.id) || null }));
+const clearAuth = () => { ls.del(AUTH_KEY); ss.del(AUTH_KEY); };
+const emails = () => { try { const v = JSON.parse(ls.get(EMAILS_KEY) || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (e) { return {}; } };
+const emailOf = handle => { const e = emails(); return handle && Object.prototype.hasOwnProperty.call(e, handle) && typeof e[handle] === 'string' ? e[handle] : ''; };
+const rememberEmail = (handle, email) => { const e = emails(); e[handle] = email; ls.set(EMAILS_KEY, JSON.stringify(e)); };
+const bc = typeof BroadcastChannel === 'function' ? new BroadcastChannel('td.auth') : null;
+if (bc) bc.onmessage = e => {
+  const m = e.data || {};
+  if (m.type === 'session' && session && m.session && m.session.user.id === session.user.id) { session = m.session; if (storeKind) saveRefresh(session.refresh_token, session.user.id); }
+  else if (m.type === 'signout' && session && m.uid === session.user.id) { session = null; storeKind = null; showSignIn('Signed out in another tab.', emailOf(me && me.handle)); }
+};
+async function authCall(path, body, token) {
+  let r;
+  try { r = await fetch(CFG.supabaseUrl + '/auth/v1/' + path, { method: 'POST', headers: C.headers(CFG.publishableKey, token ? { access_token: token } : null), body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { return { status: 0, json: null }; }
+  let json = null; try { json = await r.json(); } catch (e) {}
+  return { status: r.status, json };
+}
+const withLock = fn => navigator.locks && navigator.locks.request ? navigator.locks.request('td.refresh', fn) : fn();
+async function refreshSession(force, failedToken) {
+  return withLock(async () => {
+    if (!force && session && !C.needsRefresh(session, Date.now())) return { ok: true }; // another tab shared a fresh one
+    if (force && failedToken && session && session.access_token !== failedToken && !C.needsRefresh(session, Date.now())) return { ok: true }; // refreshed meanwhile
+    const stored = readRefresh(session && session.user.id);
+    const token = stored && (!session || stored.token !== session.refresh_token || force) ? stored.token : session && session.refresh_token;
+    if (!token) return { ok: false, err: C.restError(400, { error_code: 'session_not_found' }) };
+    const r = await authCall('token?grant_type=refresh_token', { refresh_token: token });
+    const s = r.status === 200 && C.sessionFromGrant(r.json, Date.now());
+    if (!s) return { ok: false, err: C.restError(r.status, r.json) };
+    session = s;
+    if (stored) storeKind = stored.kind;
+    if (storeKind) saveRefresh(s.refresh_token, s.user.id);
+    // the other tabs of this person take the new pair (a tab on sessionStorage could not read it otherwise)
+    if (bc) bc.postMessage({ type: 'session', session: s });
+    return { ok: true };
+  });
+}
+// every REST call: one refresh and one retry on a 401, then the form ("Session ended") with the queue kept
+async function rest(method, path, body, extra) {
+  if (!session) return { ok: false, status: 401, json: null, err: C.restError(401, null) };
+  const go = async () => {
+    let r;
+    try { r = await fetch(CFG.supabaseUrl + '/rest/v1/' + path, { method, headers: C.headers(CFG.publishableKey, session, Object.assign({}, VIA, extra || {})), body: body === undefined ? undefined : JSON.stringify(body) }); }
+    catch (e) { return { status: 0, json: null }; }
+    const text = await r.text(); let json = null;
+    try { json = text ? JSON.parse(text) : null; } catch (e) { json = text; }
+    return { status: r.status, json };
+  };
+  if (C.needsRefresh(session, Date.now())) await refreshSession(false);
+  const used = session && session.access_token;
+  let res = await go();
+  const authFail = x => x.status === 401 || (x.json && (x.json.code === 'PGRST301' || x.json.code === 'PGRST303'));
+  if (authFail(res)) {
+    const rf = await refreshSession(true, used);
+    if (!rf.ok) {
+      if (rf.err.kind === 'network' || rf.err.kind === 'server') return { ok: false, status: 0, json: null, err: rf.err };
+      sessionEnded();
+      return { ok: false, status: 401, json: null, err: C.restError(401, null) };
+    }
+    res = await go();
+  }
+  res.ok = res.status >= 200 && res.status < 300;
+  if (!res.ok) res.err = C.restError(res.status, res.json);
+  return res;
+}
+// paged GET: order=id, 1000 rows a page, until a short page
+async function getAll(path) {
+  const out = [];
+  for (let off = 0; ; off += C.PAGE) {
+    const r = await rest('GET', path + (path.includes('?') ? '&' : '?') + C.pageParams(off));
+    if (!r.ok) return r;
+    out.push(...r.json);
+    if (r.json.length < C.PAGE) return { ok: true, json: out };
+  }
+}
+const noteMax = rows => rows.forEach(r => { const u = Date.parse(r.updated_at); if (u > maxSeen) maxSeen = u; });
+
+function sessionEnded() {
+  if (!session && boot.gate === 'signin') return;
+  session = null;
+  showSignIn('Session ended. Sign in again.' + (Q.size ? ' ' + Q.size + (Q.size === 1 ? ' change waits' : ' changes wait') + ' and are sent after you sign in.' : ''), emailOf(me && me.handle));
+}
+function showSignIn(msg, prefill) {
+  boot.gate = 'signin'; boot.msg = msg || ''; boot.prefill = prefill || '';
+  document.querySelectorAll('dialog').forEach(d => d.remove());
+  render();
+}
+async function signIn(email, password, stay) {
+  const r = await authCall('token?grant_type=password', { email, password });
+  const s = r.status === 200 && C.sessionFromGrant(r.json, Date.now());
+  if (!s) return C.restError(r.status, r.json);
+  if (me && me.id !== s.user.id) { Q.clear(); tasks = []; } // another person: nothing of the last one carries over
+  session = s; clearAuth(); storeKind = stay ? 'local' : 'session'; saveRefresh(s.refresh_token, s.user.id);
+  await loadAll();
+  if (me) rememberEmail(me.handle, email);
+  return null;
+}
+let signOutArmed = false;
+async function signOut(prefillHandle) {
+  if (Q.size) {
+    flushAll();
+    for (let i = 0; i < 30 && Q.size; i++) await new Promise(r => setTimeout(r, 100));
+    if (Q.size && !signOutArmed) { signOutArmed = true; toast(Q.size + (Q.size === 1 ? ' change is' : ' changes are') + ' not saved yet. Sign out again to drop them.'); return; }
+  }
+  signOutArmed = false;
+  await writePrefs();
+  if (session && C.needsRefresh(session, Date.now())) await refreshSession(false); // logout needs a live token to revoke the session
+  const token = session && session.access_token, uid = session && session.user.id;
+  if (token) await authCall('logout?scope=local', null, token); // local scope: other devices stay signed in
+  clearAuth(); storeKind = null; session = null;
+  if (bc && uid) bc.postMessage({ type: 'signout', uid });
+  Q.clear(); tasks = []; clearInterval(pollTimer);
+  showSignIn('', emailOf(prefillHandle));
+}
+
+async function start() {
+  if (!CFG) return showGate('config');
+  const stored = readRefresh(null);
+  if (!stored) {
+    const want = new URLSearchParams(location.search).get('profile'); // ?profile=<handle> only prefills the email
+    return showSignIn('', emailOf(want));
+  }
+  storeKind = stored.kind;
+  const r = await refreshSession(true);
+  if (!r.ok) {
+    if (r.err.kind === 'network' || r.err.kind === 'server') return showGate('unreachable');
+    clearAuth();
+    return showSignIn(r.err.kind === 'rate' ? r.err.message : 'Session ended. Sign in again.', '');
+  }
+  await loadAll();
 }
 const showGate = kind => { boot.gate = kind; render(); };
-function gate(kind) {
-  const allow = '<div class="row">' + folders.filter(f => !f.handle).map(f => '<button class="allow" data-allow="' + esc(f.path) + '">Allow ' + esc(f.name) + '</button>').join('') + '</div>';
-  const html = {
-    loading: '',
-    config: '<ul class="errs">' + boot.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>',
-    grant: allow,
-    'wrong-folder': '<p>Wrong folder: expected ' + esc(boot.wrong) + '.</p>' + allow,
-    unsupported: '<p>This browser can\'t open a folder. Use Chrome or Edge.</p>',
-  }[kind];
-  document.getElementById('app').innerHTML = '<main class="gate">' + html + '</main>';
-  document.querySelectorAll('[data-allow]').forEach(b => b.onclick = () => allowFolder(folders.find(f => f.path === b.dataset.allow)));
-}
 
-// every *.json at the root of each read folder, in folder order, then by file name
-async function readFolders() {
-  const out = [];
-  for (const path of cfg.readFolders) {
-    const files = [];
-    for await (const h of dirOf(path).values()) if (h.kind === 'file' && listLabel(h.name)) files.push(h);
-    files.sort((a, b) => a.name.localeCompare(b.name));
-    for (const h of files) {
-      let r;
-      try { r = readList(await (await h.getFile()).text()); } catch (e) { r = { error: String(e.message || e) }; }
-      out.push(Object.assign({ key: listKey(path, h.name), file: h.name, folder: path }, r));
-    }
+// ---- load: lists (not archived), my roles, categories, people, my preferences, then every live item, paged ----
+let prefsExists = false;
+async function loadMeta() {
+  const uid = session.user.id;
+  const [lists, members, cats, profs] = await Promise.all([
+    getAll('lists?select=id,slug,name,default_category,sort,owner_id&archived_at=is.null'),
+    rest('GET', 'list_members?select=list_id,role&profile_id=eq.' + uid),
+    rest('GET', 'categories?select=slug,name,default_list_id&archived_at=is.null'),
+    rest('GET', 'profiles?select=' + C.PROFILE_COLUMNS + '&or=(kind.eq.human,id.eq.' + uid + ')'),
+  ]);
+  const bad = [lists, members, cats, profs].find(r => !r.ok);
+  if (bad) return bad;
+  ROLE = {}; members.json.forEach(m => { ROLE[m.list_id] = m.role; });
+  const order = LISTS.slice();
+  LIST = {}; lists.json.forEach(l => { LIST[l.id] = l; });
+  LISTS = lists.json.slice().sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)).map(l => l.id);
+  if (order.length) LISTS.sort((a, b) => (order.indexOf(a) + 1 || 1e6) - (order.indexOf(b) + 1 || 1e6));
+  CATS = {}; cats.json.forEach(c => { CATS[c.slug] = c; });
+  PROFILES = profs.json;
+  me = PROFILES.find(p => p.id === uid) || null;
+  if (st.list !== 'all' && !LIST[st.list]) st.list = 'all';
+  return { ok: true, added: lists.json.map(l => l.id).filter(id => !order.includes(id)) };
+}
+async function loadAll() {
+  boot.gate = 'loading'; render();
+  const keep = new Map([...Q.keys()].map(id => [id, find(id)]).filter(x => x[1])); // edits still waiting survive a sign-in
+  LISTS = [];
+  const meta = await loadMeta();
+  if (!meta.ok) return loadFailed(meta);
+  if (!me) { boot.msg = 'This login has no profile in the database. Run db/004_seed.sql for it.'; return showGate('error'); }
+  if (session.user.email) rememberEmail(me.handle, session.user.email); // td.emails prefills the form when switching back
+  const [items, prefs] = await Promise.all([
+    getAll('items?select=*&deleted_at=is.null'),
+    rest('GET', 'preferences?select=prefs&profile_id=eq.' + me.id + '&app=eq.tasksdashboard'),
+  ]);
+  if (!items.ok) return loadFailed(items);
+  if (!prefs.ok) return loadFailed(prefs);
+  noteMax(items.json);
+  tasks = items.json.filter(r => LIST[r.list_id]).map(C.rowToTask).map(t => keep.get(t.id) || t);
+  keep.forEach((t, id) => { if (!tasks.includes(t)) tasks.push(t); });
+  prefsExists = prefs.json.length > 0;
+  applyPrefs(C.prefsFromRow(prefsExists ? prefs.json[0].prefs : null, { listIds: LISTS, itemIds: tasks.map(t => t.id) }));
+  boot.gate = null;
+  render();
+  // the axes clamp to the window on the first render, so "unchanged" is measured after it
+  lastWritten = prefsExists ? prefsText() : null;
+  if (!prefsExists) savePrefsSoon();
+  startPolling();
+  flushAll();
+}
+function loadFailed(r) {
+  if (!session) return; // the form is already up
+  if (r.err && (r.err.kind === 'network' || r.err.kind === 'server')) return showGate('unreachable');
+  boot.msg = r.err ? r.err.message : 'Loading failed.';
+  showGate('error');
+}
+// lists, roles and categories again (on focus, or when an item shows up on a list the page does not know)
+async function refreshMeta() {
+  const before = new Set(LISTS);
+  const meta = await loadMeta();
+  if (!meta.ok) return;
+  tasks = tasks.filter(t => LIST[t.list] || Q.has(t.id));
+  const fresh = LISTS.filter(l => !before.has(l));
+  if (fresh.length) {
+    const r = await getAll('items?select=*&deleted_at=is.null&list_id=in.(' + fresh.join(',') + ')');
+    if (r.ok) { noteMax(r.json); const have = new Set(tasks.map(t => t.id)); r.json.forEach(row => { if (!have.has(row.id)) tasks.push(C.rowToTask(row)); }); }
   }
-  return out;
 }
-const demoLists = () => Object.keys(DATA).map(name => ({ key: name, file: name + '-tasks.json', folder: null, doc: DATA[name] }));
 
-// ---- preferences: config/<profile id>.prefs.json, written 1 s after a change (never in ?demo) ----
+// ---- writes: one serial queue per item, merged per item; every PATCH carries the version the last response returned ----
+// Q: item id -> { fields: Set of task fields waiting, base: their values before the first waiting change, create, inflight, origin }
+const Q = new Map();
+const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'status', 'sortKey', 'list', 'deleted'];
+const dbField = f => f === 'qStored' ? 'q' : f; // taskToPatch names the stored quadrant "q"
+const val = (t, f) => f === 'tags' ? t.tags.slice() : t[f];
+const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+let offline = false;
+// change a task locally and queue the write; returns the values before, for undo
+function edit(t, mutate, opts) {
+  const before = {}; FIELDS.forEach(f => { before[f] = val(t, f); });
+  mutate(t);
+  const changed = FIELDS.filter(f => !same(before[f], val(t, f)));
+  if (!changed.length) return null;
+  if (changed.includes('status')) t.doneAt = C.CLOSED.includes(t.status) ? (t.doneAt || new Date()) : null;
+  if (changed.includes('qStored') && t.qStored) t.q = t.qStored;
+  const e = Q.get(t.id) || { fields: new Set(), base: {}, create: null, inflight: false };
+  changed.forEach(f => { if (!(f in e.base)) e.base[f] = before[f]; e.fields.add(f); });
+  e.origin = opts && opts.origin || null;
+  Q.set(t.id, e);
+  flush(t.id);
+  return { before, fields: changed };
+}
+function create(t, opts) {
+  tasks.unshift(t);
+  Q.set(t.id, { fields: new Set(), base: {}, create: true, inflight: false, origin: opts && opts.origin || null });
+  flush(t.id);
+}
+const flushAll = () => [...Q.keys()].forEach(flush);
+function settle(id) { const e = Q.get(id); if (e && !e.inflight && !e.create && !e.fields.size) Q.delete(id); if (!Q.size && offline) { offline = false; toast('Back online: changes saved'); } }
+function applyRow(t, row, keepFields) {
+  const fresh = C.rowToTask(row);
+  Object.keys(fresh).forEach(k => { if (!keepFields.has(k) && !(k === 'q' && keepFields.has('qStored'))) t[k] = fresh[k]; });
+  t.version = fresh.version; t.num = fresh.num;
+  noteMax([row]);
+}
+async function flush(id) {
+  const e = Q.get(id), t = find(id);
+  if (!e || e.inflight || !t || !session) return;
+  e.inflight = true;
+  let res, sending = null;
+  if (e.create) {
+    const body = Object.assign({ id: t.id, list_id: t.list, category: t.category }, C.taskToPatch(t, ['title', 'notes', 'tags', 'q', 'pin', 'deadline', 'start', 'status', 'sortKey']));
+    res = await rest('POST', 'items', body, { Prefer: 'return=representation' });
+    // a retry after a lost response: the client id is already stored, so a 409 / 23505 counts as success
+    if (!res.ok && res.err.kind === 'duplicate') res = await rest('GET', 'items?select=*&id=eq.' + t.id);
+    if (res.ok && res.json.length === 1) { e.create = null; applyRow(t, res.json[0], e.fields); }
+    else if (res.ok) res = { ok: false, status: 403, err: C.restError(403, {}) }; // stored but not readable here: not this list
+  } else {
+    sending = { fields: new Set(e.fields), base: Object.assign({}, e.base) };
+    e.fields.clear(); e.base = {};
+    if (!sending.fields.size) { e.inflight = false; settle(id); return; }
+    const patch = C.taskToPatch(t, [...sending.fields].map(dbField), new Date().toISOString());
+    res = await rest('PATCH', 'items?id=eq.' + t.id + '&version=eq.' + t.version, patch, { Prefer: 'return=representation' });
+    if (res.ok && res.json.length === 1) applyRow(t, res.json[0], e.fields);
+    else if (res.ok) res = await conflict(t, e, sending);
+  }
+  e.inflight = false;
+  if (!res.ok) {
+    if (res.err.retry || res.status === 401) {
+      // offline or the session ended: the change waits (the form keeps the queue)
+      if (sending) sending.fields.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
+      if (res.err.retry && !offline) { offline = true; }
+      if (res.err.retry) toast((res.err.kind === 'rate' ? 'The database is busy: ' : 'Offline: ') + Q.size + (Q.size === 1 ? ' change waiting' : ' changes waiting'));
+      return;
+    }
+    failed(t, e, sending, res.err);
+  }
+  if (Q.get(id) && (e.fields.size || e.create)) flush(id);
+  settle(id);
+  if (res.ok && !document.querySelector('dialog[open]') && !dragId) renderSoon();
+}
+// a PATCH matched 0 rows: someone else saved first, or this login may not edit the item
+async function conflict(t, e, sending) {
+  const r = await rest('GET', 'items?select=*&id=eq.' + t.id);
+  if (!r.ok) return r;
+  const row = r.json[0];
+  if (!row || row.version <= t.version) {
+    if (row) applyRow(t, row, e.fields); else { t.deleted = true; e.fields.clear(); }
+    toast('You can\'t edit this item here');
+    return { ok: true };
+  }
+  const remote = C.rowToTask(row);
+  const clash = [...sending.fields].filter(f => !same(val(remote, f), sending.base[f]));
+  if (!clash.length) {
+    // nothing I changed was changed remotely: take their row, then send mine again on the new version
+    const mine = {}; sending.fields.forEach(f => { mine[f] = val(t, f); });
+    applyRow(t, row, e.fields);
+    Object.assign(t, mine);
+    sending.fields.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
+    return { ok: true };
+  }
+  const draft = { title: t.title, notes: t.notes };
+  applyRow(t, row, e.fields);
+  const names = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start' };
+  const what = clash.map(f => names[f] || f).join(', ');
+  if (e.origin === 'dialog') openTask(t.id, null, { draft, notice: 'Changed by someone else while you edited: ' + what + '. Their version is saved; your text is below. Save again to replace it.' });
+  else toast('Changed by someone else: ' + what);
+  return { ok: true };
+}
+// a write the database refused: the fields go back to what they were (unless changed again since), and the person is told why
+function failed(t, e, sending, err) {
+  if (e.create) {
+    Q.delete(t.id); tasks = tasks.filter(x => x !== t);
+    if (e.origin === 'dialog' && (err.kind === 'sensitive' || err.kind === 'invalid')) openTask(null, t.qStored, { draft: { title: t.title, notes: t.notes, list: t.list, tags: t.tags, deadline: t.deadline }, error: err.message });
+    else toast(err.message);
+    render(); return;
+  }
+  const draft = { title: t.title, notes: t.notes };
+  if (sending) sending.fields.forEach(f => { if (!e.fields.has(f)) { t[f] = sending.base[f]; if (f === 'status') t.doneAt = C.CLOSED.includes(t.status) ? t.doneAt || new Date() : null; } });
+  if (e.origin === 'dialog' && (err.kind === 'sensitive' || err.kind === 'invalid')) openTask(t.id, null, { draft, error: err.message });
+  else toast(err.message);
+  render();
+}
+let renderT = 0;
+const renderSoon = () => { clearTimeout(renderT); renderT = setTimeout(() => { if (!boot.gate) { if (document.activeElement && document.activeElement.id === 'q') st.focusQ = true; render(); } }, 50); };
+addEventListener('beforeunload', e => { if (Q.size) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('online', () => flushAll());
+
+// ---- polling: rows changed since the newest one seen, minus 120 s, every pollMs while the page is visible and on focus ----
+let pollTimer = 0, polling = false;
+function startPolling() { clearInterval(pollTimer); pollTimer = setInterval(() => { if (document.visibilityState === 'visible') poll(false); }, CFG.pollMs); }
+addEventListener('focus', () => { if (session && !boot.gate) poll(true); });
+async function poll(meta) {
+  if (polling || !session || boot.gate) return;
+  polling = true;
+  try {
+    flushAll();
+    if (meta) await refreshMeta();
+    const r = await getAll('items?select=*&' + C.pollFilter(maxSeen || Date.now()));
+    if (!r.ok) return;
+    noteMax(r.json);
+    let m = C.mergePoll(tasks, r.json, { pending: new Set(Q.keys()), knownLists: LISTS });
+    if (m.unknownLists.length && !meta) { await refreshMeta(); m = C.mergePoll(tasks, r.json, { pending: new Set(Q.keys()), knownLists: LISTS }); }
+    if (m.changed || meta) { tasks = m.tasks; if (!document.querySelector('dialog[open]') && !dragId) renderSoon(); }
+  } finally { polling = false; }
+}
+
+// ---- preferences v2: one row per person (preferences, app tasksdashboard), upserted 1 s after a change when they differ ----
 let themePref = 'auto', lastWritten = null, prefsTimer = 0;
 function applyTheme() {
   st.theme = (themePref === 'auto' ? matchMedia('(prefers-color-scheme: dark)').matches : themePref === 'dark') ? 1 : 0;
   document.documentElement.dataset.theme = THEMES[st.theme];
-  try { localStorage.setItem('td.theme', themePref); } catch (e) {}
+  ls.set('td.theme', themePref);
 }
 const collectPrefs = () => ({
-  version: 1, theme: themePref, view: st.view, list: st.list, listOrder: LISTS.slice(), tagOrder: tagOrder.slice(),
+  version: 2, theme: themePref, view: st.view, list: st.list, listOrder: LISTS.slice(), tagOrder: tagOrder.slice(),
   axes: window.tdAxes && window.tdAxes.get ? window.tdAxes.get() : { fx: 0.5, fy: 0.5 },
-  menuCollapsed: ['A', 'B', 'C', 'D'].filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] },
+  menuCollapsed: QS.filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] }, settings: Object.assign({}, settings),
 });
-const prefsText = () => JSON.stringify(collectPrefs(), null, 2) + '\n';
-async function loadPrefs(id) {
-  if (DEMO) return { prefs: readPrefs(null), found: true };
-  try {
-    const fh = await dirOf(PREFS_FOLDER).getFileHandle(id + '.prefs.json');
-    let raw = null;
-    try { raw = JSON.parse(await (await fh.getFile()).text()); } catch (e) {} // broken file: defaults, rewritten on the next change
-    return { prefs: readPrefs(raw), found: true };
-  } catch (e) { return { prefs: readPrefs(null), found: false }; }
-}
-// the side-menu width stays in this browser (td.rail); the old td.axes and td.lists values move into the first prefs file once
-function migrateOld(p) {
-  try {
-    const axes = JSON.parse(localStorage.getItem('td.axes') || 'null');
-    if (axes && axes.fx > 0 && axes.fx < 1 && axes.fy > 0 && axes.fy < 1) p.axes = { fx: axes.fx, fy: axes.fy };
-    const names = JSON.parse(localStorage.getItem('td.lists') || '[]');
-    if (Array.isArray(names)) p.listOrder = names.map(n => LISTS.find(k => label(k).toLowerCase() === String(n).toLowerCase())).filter(Boolean);
-    localStorage.removeItem('td.axes'); localStorage.removeItem('td.lists');
-  } catch (e) {}
-  return p;
-}
-// stale entries (a list, task or tag that no longer exists) are dropped
+const prefsText = () => JSON.stringify(collectPrefs());
+// stale entries (a list, item or tag that no longer exists) are dropped
 function applyPrefs(p) {
   themePref = p.theme; applyTheme();
   st.view = p.view;
   LISTS.sort((a, b) => (p.listOrder.indexOf(a) + 1 || 1e6) - (p.listOrder.indexOf(b) + 1 || 1e6));
-  st.list = p.list === 'all' || LISTS.includes(p.list) ? p.list : 'all';
+  st.list = p.list === 'all' || LIST[p.list] ? p.list : 'all';
   const known = new Set(tasks.flatMap(t => t.tags));
   tagOrder = p.tagOrder.filter(x => known.has(x));
   st.collapsed = new Set(p.menuCollapsed);
   st.cardMode = p.cards.mode;
-  st.flip = new Set(p.cards.flipped.filter(id => tasks.some(t => t.id === id)));
+  st.flip = new Set(p.cards.flipped);
+  settings = C.readSettings(p.settings);
   if (window.tdAxes && window.tdAxes.set) window.tdAxes.set(p.axes.fx, p.axes.fy);
 }
 function savePrefsSoon() {
-  if (DEMO || !profile || boot.gate) return;
+  if (!me || boot.gate) return;
   clearTimeout(prefsTimer);
   prefsTimer = setTimeout(writePrefs, PREFS_DELAY_MS);
 }
 async function writePrefs() {
   clearTimeout(prefsTimer);
-  if (DEMO || !profile || boot.gate) return;
+  if (!me || !session || boot.gate) return;
   const text = prefsText();
   if (text === lastWritten) return;
-  try {
-    const w = await (await dirOf(PREFS_FOLDER).getFileHandle(profile.id + '.prefs.json', { create: true })).createWritable();
-    await w.write(text); await w.close();
-    lastWritten = text;
-  } catch (e) { toast('Preferences not saved: ' + (e.message || e)); }
-}
-async function useProfile(id, fresh) {
-  if (!fresh) await writePrefs();
-  profile = PROFILES.find(p => p.id === id);
-  try { localStorage.setItem('td.profile', id); } catch (e) {}
-  const { prefs, found } = await loadPrefs(id);
-  applyPrefs(found ? prefs : migrateOld(prefs));
-  boot.gate = null;
-  render();
-  // the axes clamp to the window on the first render, so "unchanged" is measured after it; a migrated file is written at once
-  lastWritten = found ? prefsText() : null;
-  if (!found) savePrefsSoon();
+  const r = await rest('POST', 'preferences?on_conflict=profile_id,app', C.rowFromPrefs(me.id, collectPrefs()), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+  if (r.ok) { lastWritten = text; prefsExists = true; }
+  else if (!r.err.retry && r.status !== 401) toast('Preferences not saved: ' + r.err.message);
 }
 
-async function start() {
-  try {
-    let lists;
-    if (DEMO) lists = demoLists();
-    else {
-      if (boot.errors.length) return showGate('config');
-      if (typeof window.showDirectoryPicker !== 'function') return showGate('unsupported');
-      for (const f of folders) {
-        if (f.handle) continue;
-        f.stored = await idb('readonly', s => s.get(f.path));
-        if (f.stored && await permission(f.stored, false) === 'granted') f.handle = f.stored;
-      }
-      if (folders.some(f => !f.handle)) return showGate('grant');
-      lists = await readFolders();
-    }
-    setLists(lists);
-    const ids = PROFILES.map(p => p.id);
-    let remembered = null;
-    try { remembered = localStorage.getItem('td.profile'); } catch (e) {}
-    await useProfile(pickProfile({ param: new URLSearchParams(location.search).get('profile'), remembered, ids }), true);
-  } catch (e) {
-    // a grant dropped while reading: ask again
-    console.error(e);
-    folders.forEach(f => { f.stored = f.handle || f.stored; f.handle = null; });
-    showGate('grant');
+// ---- gates: config, loading, the sign-in form, unreachable (Retry), a login without a profile ----
+function gate(kind) {
+  const app = document.getElementById('app');
+  if (kind === 'signin') {
+    app.innerHTML = '<main class="gate"><form class="signin" id="signin" novalidate aria-labelledby="si-h">' +
+      '<div class="si-logo">' + ADV_LOGO + '</div><h1 id="si-h">Sign in</h1>' +
+      '<p class="si-msg" id="si-msg" role="alert" tabindex="-1">' + esc(boot.msg) + '</p>' +
+      '<label for="si-email">Email</label><input id="si-email" name="username" type="email" autocomplete="username" spellcheck="false" required value="' + esc(boot.prefill) + '">' +
+      '<label for="si-pass">Password</label><input id="si-pass" name="password" type="password" autocomplete="current-password" required>' +
+      '<label class="cb"><input id="si-stay" type="checkbox" checked> Stay signed in on this computer</label>' +
+      '<button id="si-go" type="submit">Sign in</button>' +
+      '<p class="si-hint">Logins are made in the Supabase dashboard (Authentication, Users). There is no sign-up or password reset here.</p></form></main>';
+    const f = document.getElementById('signin'), go = document.getElementById('si-go'), msg = document.getElementById('si-msg');
+    (boot.prefill ? document.getElementById('si-pass') : document.getElementById('si-email')).focus();
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const email = document.getElementById('si-email').value.trim(), pass = document.getElementById('si-pass').value;
+      if (!email || !pass) { msg.textContent = !email ? 'Enter your email.' : 'Enter your password.'; msg.focus(); return; }
+      go.disabled = true; go.textContent = 'Signing in…'; msg.textContent = '';
+      const err = await signIn(email, pass, document.getElementById('si-stay').checked);
+      if (!err) return;
+      go.disabled = false; go.textContent = 'Sign in';
+      msg.textContent = err.message; msg.focus();
+    };
+    return;
   }
+  const html = {
+    loading: '<p class="gate-sub" aria-busy="true">Loading…</p>',
+    config: '<p>The page is not set up yet.</p><ul class="errs">' + boot.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul><p class="gate-sub">Fix config/tasksdashboard.config.js next to this page, then reload.</p>',
+    unreachable: '<p>Can\'t reach the database.</p><p class="gate-sub">Check the connection. A free Supabase project pauses after a week without use; restore it in the dashboard.</p><button id="g">Retry</button>',
+    error: '<p>This login can\'t open the board.</p><p class="gate-sub">' + esc(boot.msg) + '</p><button id="g-out">Sign out</button>',
+  }[kind] || '';
+  app.innerHTML = '<main class="gate">' + html + '</main>';
+  const g = document.getElementById('g'); if (g) { g.focus(); g.onclick = () => { boot.gate = 'loading'; render(); session ? loadAll() : start(); }; }
+  const o = document.getElementById('g-out'); if (o) o.onclick = () => signOut();
 }
 
 function cardHtml(t, q) {
   const expanded = (st.cardMode === 'expanded') !== st.flip.has(t.id);
+  const editable = canDo('edit', t);
   const arrow = '<button class="exp" data-flip="' + t.id + '" aria-expanded="' + expanded + '" aria-label="' + (expanded ? 'Collapse card' : 'Expand card') + '">' + (expanded ? I.chevD : I.chevR) + '</button>';
-  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact');
-  const open = '<div class="' + cls + '" data-card="' + t.id + '" draggable="true" tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
-  const meta = t.deadline ? '<span class="meta">' + rel(t) + '</span>' : '';
-  const done = '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>';
-  if (!expanded) return open + '<span class="t">' + mdInline(t.title) + '</span>' + meta + arrow + done + '</div>';
-  const pin = t.pin === undefined ? '' : '<button class="pin" data-unpin="' + t.id + '" aria-label="' + (t.pin ? 'Urgent, set by hand. Clear' : 'Not urgent, set by hand. Clear') + '">' + (t.pin ? 'urgent (manual)' : 'not urgent (manual)') + '</button>';
+  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '');
+  const open = '<div class="' + cls + '" data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
+  const meta = t.deadline ? '<span class="meta">' + rel(t) + '</span>' : '<span></span>';
+  const done = editable ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>' : '<span></span>';
+  const badges = '<span class="tbs">' + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
+    (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
+    (t.category !== 'task' ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
+  if (!expanded) return open + '<span class="t">' + mdInline(t.title) + '</span>' + badges + meta + arrow + done + '</div>';
+  const pin = t.pin === undefined ? '<span></span>' : '<button class="pin" data-unpin="' + t.id + '"' + (editable ? '' : ' disabled') + ' aria-label="' + (t.pin ? 'Urgent, set by hand. Clear' : 'Not urgent, set by hand. Clear') + '">' + (t.pin ? 'urgent (manual)' : 'not urgent (manual)') + '</button>';
   const body = (t.deadline ? '<div class="row"><span>End ' + ymd(t.deadline) + '</span></div>' : '') +
     (t.tags.length ? '<div class="tags">' + t.tags.map(x => '<span class="tagtxt">' + esc(x) + '</span>').join('') + '</div>' : '') +
     (t.notes ? '<div class="md">' + mdToHtml(t.notes) + '</div>' : '');
-  return open + '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button><span class="t">' + mdInline(t.title) + '</span>' + pin + meta + arrow + done +
+  return open + '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button><span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
     (body ? '<div class="details">' + body + '</div>' : '') + '</div>';
 }
 
-const archivedIn = () => tasks.filter(t => t.doneAt && inList(t));
+const archivedIn = () => all().filter(t => t.doneAt && inList(t));
 const fmtDay = x => ymd(x).slice(0, 10);
 
-// archive: completed tasks of the selected list; search, tags, Mine and quadrant filters apply, Due does not
+// archive: done and cancelled items of the selected list; search, tags, Mine and quadrant filters apply, Due does not
 function archiveHtml() {
   const by = { completed: (a, b) => b.doneAt - a.doneAt, deadline: (a, b) => (a.deadline || Infinity) - (b.deadline || Infinity), title: (a, b) => a.title.localeCompare(b.title) }[st.arSort];
   const saved = st.due; st.due = 'any';
   const rows = archivedIn().filter(passFilters).sort(by);
   st.due = saved;
   const total = archivedIn().length;
+  const clearable = rows.filter(t => canDo('delete', t)).length;
   return '<div class="ar-tools"><label>Sort <select id="ar-sort">' + [['completed', 'Completed'], ['deadline', 'End'], ['title', 'Title']].map(([v, l]) => '<option value="' + v + '"' + (st.arSort === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
-    '<span class="n">' + rows.length + (rows.length !== total ? ' of ' + total : '') + '</span><span class="sp"></span>' + (total ? '<button id="ar-clear">Delete all archived</button>' : '') + '</div>' +
+    '<span class="n">' + rows.length + (rows.length !== total ? ' of ' + total : '') + '</span><span class="sp"></span>' + (clearable ? '<button id="ar-clear">Clear</button>' : '') + '</div>' +
     (rows.length ? '<table class="ar"><thead><tr><th>Title</th><th>Tags</th><th>Quadrant</th><th>Completed</th><th>End</th><th><span class="sr">Actions</span></th></tr></thead><tbody>' +
-      rows.map(t => '<tr><td><span class="k">' + ref(t) + '</span> ' + mdInline(t.title) + '</td><td>' + t.tags.map(esc).join(', ') + '</td><td><span class="ql" data-q="' + t.q + '">' + t.q + '</span> ' + QN[t.q] + '</td><td>' + fmtDay(t.doneAt) + '</td><td>' + (t.deadline ? fmtDay(t.deadline) : '') + '</td>' +
-        '<td class="ar-act"><button data-restore="' + t.id + '" aria-label="Restore ' + esc(plain(t.title)) + '">' + I.undo + '</button> <button data-del="' + t.id + '" aria-label="Delete ' + esc(plain(t.title)) + '">Delete</button></td></tr>').join('') + '</tbody></table>'
+      rows.map(t => '<tr><td><span class="k">' + ref(t) + '</span> ' + mdInline(t.title) + (t.status === 'cancelled' ? ' <span class="tb">cancelled</span>' : '') + '</td><td>' + t.tags.map(esc).join(', ') + '</td><td><span class="ql" data-q="' + t.q + '">' + t.q + '</span> ' + QN[t.q] + '</td><td>' + fmtDay(t.doneAt) + '</td><td>' + (t.deadline ? fmtDay(t.deadline) : '') + '</td>' +
+        '<td class="ar-act">' + (canDo('edit', t) ? '<button data-restore="' + t.id + '" aria-label="Restore ' + esc(plain(t.title)) + '">' + I.undo + '</button> ' : '') + (canDo('delete', t) ? '<button data-del="' + t.id + '" aria-label="Delete ' + esc(plain(t.title)) + '">Delete</button>' : '') + '</td></tr>').join('') + '</tbody></table>'
       : '<div class="empty n">' + (total ? 'No matches' : '0') + '</div>');
 }
 
@@ -1224,7 +1644,7 @@ function timelineHtml() {
   if (!st.tlStart) st.tlStart = mon(TODAY);
   const days = st.tlWeeks * 7, start = st.tlStart, end = new Date(start.getTime() + days * DAY);
   const dayIx = x => Math.floor((new Date(x).setHours(0, 0, 0, 0) - start) / DAY);
-  const shown = tasks.filter(t => !t.doneAt && inList(t) && t.deadline && passFilters(t) && t.deadline >= start && (t.start || t.deadline) < end);
+  const shown = all().filter(t => !t.doneAt && inList(t) && t.deadline && passFilters(t) && t.deadline >= start && (t.start || t.deadline) < end);
   const today = dayIx(TODAY);
   const cols = 'grid-template-columns:minmax(140px,220px) repeat(' + days + ',minmax(18px,1fr))';
   const head = [...Array(days)].map((_, i) => { const x = new Date(start.getTime() + i * DAY), we = x.getDay() === 0 || x.getDay() === 6; return '<div class="tl-d' + (we ? ' we' : '') + (i === today ? ' td' : '') + '">' + x.getDate() + '</div>'; }).join('');
@@ -1239,13 +1659,12 @@ function timelineHtml() {
     '<div class="tl-row tl-load" style="' + cols + '"><div class="tl-name n">Load</div>' + load + '</div></div>';
 }
 
-function confirmDelete(text, onYes) {
-  const dlg = dialogShell('<form method="dialog"><strong>' + esc(text) + '</strong><div class="actions"><button value="cancel" id="cf-cancel" autofocus>Cancel</button><button id="cf-ok" value="ok">Delete</button></div></form>', '[data-view="archive"]');
+function confirmAsk(text, yes, onYes, opener) {
+  const dlg = dialogShell('<form method="dialog"><strong>' + esc(text) + '</strong><div class="actions"><button value="cancel" id="cf-cancel" autofocus>Cancel</button><button id="cf-ok" value="ok">' + esc(yes) + '</button></div></form>', opener || '[data-view="archive"]');
   dlg.querySelector('#cf-cancel').focus();
   dlg.querySelector('#cf-ok').onclick = () => onYes();
 }
 
-// round 5: the logo, the animated "advanced_logo" (logo session, round 4b): its last frame at rest, played once by a click; colours and CSS in the round 5 block of <style>
 const ADV_LOGO = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 72 28\" role=\"img\" aria-label=\"TasksDashboard\" class=\"td-adv\"><title>TasksDashboard<\/title><svg x=\"0\" y=\"3\" width=\"22\" height=\"22\" viewBox=\"0 0 32 32\"><defs><radialGradient id=\"tdaf-g\" cx=\"0.62\" cy=\"0.38\" r=\"0.8\"><stop offset=\"0\" stop-color=\"#1E2024\"/><stop offset=\"1\" stop-color=\"#141518\"/><\/radialGradient><filter id=\"tdaf-bloom\" filterUnits=\"userSpaceOnUse\" x=\"-8\" y=\"-8\" width=\"48\" height=\"48\"><feGaussianBlur stdDeviation=\"1.6\"/><\/filter><clipPath id=\"tdaf-core\"><path d=\"M7.56 24.44V18.08A6.36 6.36 0 0 1 13.92 24.44Z\"/><\/clipPath><filter id=\"tdaf-glow\" filterUnits=\"userSpaceOnUse\" x=\"-8\" y=\"-8\" width=\"48\" height=\"48\"><feGaussianBlur stdDeviation=\".9\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/><\/feMerge><\/filter><clipPath id=\"tdaf-tile\"><rect width=\"32\" height=\"32\" rx=\"7.5\"/><\/clipPath><\/defs><rect width=\"32\" height=\"32\" rx=\"7.5\" fill=\"url(#tdaf-g)\"/><g clip-path=\"url(#tdaf-tile)\"><path class=\"bl\" d=\"M14.52 20.22L23.64 14.7A18.8 18.8 0 0 0 17.3 8.36L11.78 17.48A8.14 8.14 0 0 1 14.52 20.22Z\" fill=\"#E0644F\" opacity=\".55\" filter=\"url(#tdaf-bloom)\"/><\/g><path class=\"ax\" d=\"M5.34 5.34V26.66H26.66\" pathLength=\"1\" fill=\"none\" stroke=\"#77736B\" stroke-width=\"1.11\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><g class=\"core\"><path class=\"fd\" d=\"M7.56 24.44V18.08A6.36 6.36 0 0 1 13.92 24.44Z\" fill=\"none\" stroke=\"#96928B\" stroke-width=\"2.66\" clip-path=\"url(#tdaf-core)\"/><\/g><g class=\"w wc\"><path class=\"fc\" d=\"M15.7 24.27L26.35 24.05A18.8 18.8 0 0 0 24.03 15.38L14.69 20.52A8.14 8.14 0 0 1 15.7 24.27Z\" fill=\"#E3B551\" fill-opacity=\".18\" stroke=\"#E3B551\" stroke-width=\"1.11\" stroke-linejoin=\"round\"/><\/g><g class=\"w wb\"><path class=\"fb\" d=\"M11.48 17.31L16.62 7.97A18.8 18.8 0 0 0 7.95 5.65L7.73 16.3A8.14 8.14 0 0 1 11.48 17.31Z\" fill=\"#46A57F\" fill-opacity=\".18\" stroke=\"#46A57F\" stroke-width=\"1.11\" stroke-linejoin=\"round\"/><\/g><g class=\"w wa\"><path class=\"fa\" d=\"M14.52 20.22L23.64 14.7A18.8 18.8 0 0 0 17.3 8.36L11.78 17.48A8.14 8.14 0 0 1 14.52 20.22Z\" fill=\"#E0644F\" stroke=\"#FF9A85\" stroke-width=\".59\" stroke-linejoin=\"round\"/><\/g><g class=\"edge\" opacity=\"0\" fill=\"none\" stroke-width=\"1.3\" stroke-linejoin=\"round\" filter=\"url(#tdaf-glow)\"><path d=\"M15.7 24.27L26.35 24.05A18.8 18.8 0 0 0 24.03 15.38L14.69 20.52A8.14 8.14 0 0 1 15.7 24.27Z\" stroke=\"#F5D58A\"/><path d=\"M11.48 17.31L16.62 7.97A18.8 18.8 0 0 0 7.95 5.65L7.73 16.3A8.14 8.14 0 0 1 11.48 17.31Z\" stroke=\"#7FD3AE\"/><path d=\"M14.52 20.22L23.64 14.7A18.8 18.8 0 0 0 17.3 8.36L11.78 17.48A8.14 8.14 0 0 1 14.52 20.22Z\" stroke=\"#FFB3A3\"/><path d=\"M7.56 24.44V18.08A6.36 6.36 0 0 1 13.92 24.44Z\" stroke=\"#D8D4CC\" stroke-width=\"2.2\" clip-path=\"url(#tdaf-core)\"/><\/g><rect x=\".4\" y=\".4\" width=\"31.2\" height=\"31.2\" rx=\"7.1\" fill=\"none\" style=\"stroke:var(--td-rim,#141518)\" stroke-width=\".8\"/><\/svg><g class=\"wm\"><text x=\"26\" y=\"13\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"12\" font-weight=\"650\" letter-spacing=\"-0.2\" style=\"fill:var(--td-ink,#17181B)\">Tasks<\/text><text x=\"26\" y=\"24\" font-family=\"'Segoe UI Variable Display','Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif\" font-size=\"9\" font-weight=\"400\" style=\"fill:var(--td-ink2,#5C5953)\" textLength=\"45.6\" lengthAdjust=\"spacingAndGlyphs\">Dashboard<\/text><\/g><\/svg>";
 // one play at a time: a click while it plays does nothing. The play start lives here, not in the HTML: a render() during the play
 // renders the logo with .play again and moves its animations to the elapsed time, so the play is neither restarted nor cut
@@ -1266,12 +1685,12 @@ function bindLogo() {
   if (logoT0) { const t = performance.now() - logoT0; b.getAnimations({ subtree: true }).forEach(a => { a.currentTime = t; }); }
 }
 
-// list order: All stays first; the other lists keep the order the user dragged them into (saved in the profile's preferences)
+// list order: All stays first; the other lists keep the order the person dragged them into (saved in their preferences)
 const moveList = (l, to) => {
   LISTS.splice(LISTS.indexOf(l), 1);
   LISTS.splice(Math.max(0, Math.min(LISTS.length, to)), 0, l);
 };
-// drag a list chip (from the bar or the … menu) before or after another; dropping on All puts it first. Alt+arrows move a focused chip.
+// drag a list chip (from the bar or the +N menu) before or after another; dropping on All puts it first. Alt+arrows move a focused chip.
 let dragList = null;
 function bindListDrag(app) {
   const clear = () => app.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging'));
@@ -1316,8 +1735,11 @@ function bindListDrag(app) {
 
 function render() {
   if (boot.gate) return gate(boot.gate);
-  const open = tasks.filter(t => !t.doneAt);
-  const shown = open.filter(t => inList(t) && passFilters(t));
+  TODAY = new Date(); // "now" is recomputed on every render
+  const live = all();
+  live.forEach(t => { t.q = C.deriveQuadrant(t, settings, TODAY.getTime()); });
+  const open = live.filter(t => !t.doneAt);
+  const shown = open.filter(t => inList(t) && passFilters(t)).sort(C.byOrder);
   const chips = ['all'].concat(LISTS);
   let visible = chips.slice(0, VISIBLE), rest = chips.slice(VISIBLE);
   if (rest.includes(st.list)) { visible = visible.concat(st.list); rest = rest.filter(c => c !== st.list); } // shown sixth, ready to be dragged into the first five
@@ -1325,61 +1747,72 @@ function render() {
   const od = l => open.filter(t => (l === 'all' || t.list === l) && overdue(t)).length;
   const chip = l => '<span class="chip' + (chips.indexOf(l) >= VISIBLE ? ' stray' : '') + '"><button data-list="' + esc(l) + '" aria-pressed="' + (st.list === l) + '">' + (l === 'all' ? 'All' : esc(label(l))) + ' <span class="n">' + count(l) + '</span>' + (od(l) ? ' <span class="badge" aria-label="' + od(l) + ' overdue">' + od(l) + '</span>' : '') + '</button></span>';
   const allTags = [...new Set(open.filter(inList).flatMap(t => t.tags))].sort();
-  const anyFilter = st.q || st.due !== 'any' || st.tags.size || st.mine || st.quads.size;
+  const allCats = [...new Set(open.filter(inList).map(t => t.category))].sort();
+  const anyLow = open.some(t => inList(t) && lowConf(t));
+  const anyFilter = st.q || st.due !== 'any' || st.tags.size || st.cats.size || st.lowc || st.mine || st.quads.size;
   const dueLabel = { any: 'Due', overdue: 'Overdue', today: 'Today', week: 'Next 7 days', none: 'No date' }[st.due];
   const tagLabel = !st.tags.size ? 'Tag' : st.tags.size === 1 ? 'Tag: ' + [...st.tags][0] : 'Tags: ' + st.tags.size;
-  const menuGroups = ['A', 'B', 'C', 'D'].map(q => {
-    const rows = open.filter(t => inList(t) && t.q === q);
+  const catName = c => CATS[c] ? CATS[c].name : c;
+  const catLabel = !st.cats.size ? 'Category' : st.cats.size === 1 ? catName([...st.cats][0]) : 'Categories: ' + st.cats.size;
+  const menuGroups = QS.map(q => {
+    const rows = open.filter(t => inList(t) && t.q === q).sort(C.byOrder);
     const col = st.collapsed.has(q);
     return '<button class="grp" data-q="' + q + '" aria-expanded="' + !col + '"><span>' + q + ' ' + QN[q] + '</span><span>' + rows.length + '</span></button>' +
       (col ? '' : rows.map(t => '<button class="mrow' + (overdue(t) ? ' overdue' : '') + '" data-open="' + t.id + '" data-hl="' + t.id + '">' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
   }).join('');
+  const addable = canAddSomewhere();
   const quad = q => {
     const cards = shown.filter(t => t.q === q);
     const total = open.filter(t => inList(t) && t.q === q).length;
     const over = q === 'A' && settings.doLimit > 0 && total > settings.doLimit;
     const ex = st.expanded === q;
     return '<section class="q" data-q="' + q + '" aria-label="' + QN[q] + '"><div class="qh"><span class="ql" data-q="' + q + '" aria-hidden="true">' + q + '</span><span>' + QN[q] + '</span><span class="cnt' + (over ? ' over' : '') + '">' + total + '</span><span class="sp"></span>' +
-      '<button data-add="' + q + '" aria-label="Add to ' + QN[q] + '">' + I.plus + '</button><button data-expand="' + q + '" aria-label="' + (ex ? 'Collapse ' : 'Expand ') + QN[q] + '" aria-pressed="' + ex + '">' + I.expand + '</button></div>' +
+      (addable ? '<button data-add="' + q + '" aria-label="Add to ' + QN[q] + '">' + I.plus + '</button>' : '') + '<button data-expand="' + q + '" aria-label="' + (ex ? 'Collapse ' : 'Expand ') + QN[q] + '" aria-pressed="' + ex + '">' + I.expand + '</button></div>' +
       '<div class="qb" data-body="' + q + '">' + cards.map(t => cardHtml(t, q)).join('') + '</div></section>';
   };
   let dd = '';
   if (st.q.trim()) {
-    const hits = open.filter(t => inList(t) && matchQ(t, st.q));
+    const hits = open.filter(t => inList(t) && matchQ(t, st.q)).sort(C.byOrder);
     // the selected list is the filter: only All searches across lists
-    const byQ = a => ['A', 'B', 'C', 'D'].flatMap(q => a.filter(t => t.q === q));
+    const byQ = a => QS.flatMap(q => a.filter(t => t.q === q));
     const rows = byQ(hits).slice(0, 8);
     st.rows = rows;
-    const archived = tasks.filter(t => t.doneAt && inList(t) && matchQ(t, st.q)).length;
+    const archived = live.filter(t => t.doneAt && inList(t) && matchQ(t, st.q)).length;
     let html = '', last = '';
-    const row = (t, i, key, ln) => '<div class="r" role="option" id="opt' + i + '" aria-selected="' + (st.sel === i) + '" data-open="' + t.id + '"><span class="k">' + key + '</span><span class="tt">' + hl(plain(t.title), st.q) + (ln ? ' <span class="ln">' + ln + '</span>' : '') + '</span><span class="due' + (overdue(t) ? ' late' : '') + '">' + (t.deadline ? rel(t) : '') + '</span><span class="tg">' + t.tags.slice(0, 2).join(', ') + '</span></div>';
+    const row = (t, i, key, ln) => '<div class="r" role="option" id="opt' + i + '" aria-selected="' + (st.sel === i) + '" data-open="' + t.id + '"><span class="k">' + key + '</span><span class="tt">' + hl(plain(t.title), st.q) + (ln ? ' <span class="ln">' + ln + '</span>' : '') + '</span><span class="due' + (overdue(t) ? ' late' : '') + '">' + (t.deadline ? rel(t) : '') + '</span><span class="tg">' + esc(t.tags.slice(0, 2).join(', ')) + '</span></div>';
     rows.forEach((t, i) => { if (t.q !== last) { html += '<div class="h" data-q="' + t.q + '">' + t.q + ' ' + QN[t.q] + '</div>'; last = t.q; } html += row(t, i, ref(t), st.list === 'all' ? esc(label(t.list)) : ''); });
     if (!rows.length) html += '<div class="h">No matches</div>';
     if (archived) html += '<button class="h link" data-view="archive">' + archived + ' in archive</button>';
     dd = '<div class="dd" role="listbox" id="dd">' + html + '</div>';
   } else st.rows = [];
+  const others = PROFILES.filter(p => p.kind === 'human' && p.id !== me.id);
+  const owner = st.list !== 'all' && ROLE[st.list] === 'owner' && me.kind === 'human';
   const pops = {
-    profile: () => PROFILES.map(p => '<button data-switch="' + esc(p.id) + '" aria-pressed="' + (p === profile) + '">' + esc(p.name) + '</button>').join('') + '<hr><button data-menu="review">Weekly review</button><button data-menu="settings">Urgency settings</button><button data-cards>' + (st.cardMode === 'collapsed' ? 'Always collapsed cards' : 'Always expanded cards') + '</button>',
+    profile: () => '<div class="who-am" role="none">' + esc(me.display_name) + '</div>' + others.map(p => '<button data-switch="' + esc(p.handle) + '">Switch to ' + esc(p.display_name) + '</button>').join('') + '<button data-signout>Sign out</button>' +
+      '<hr><button data-menu="review">Weekly review</button><button data-menu="settings">Settings</button><button data-cards>' + (st.cardMode === 'collapsed' ? 'Always collapsed cards' : 'Always expanded cards') + '</button><button data-menu="archived">Archived lists</button>',
     more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
-    due: () => ['any:Any', 'overdue:Overdue', 'today:Today', 'week:Next 7 days', 'none:No date'].map(x => '<button data-due="' + x.split(':')[0] + '" aria-pressed="' + (st.due === x.split(':')[0]) + '">' + x.split(':')[1] + '</button>').join('') + '<button disabled>As of…</button>',
+    listmenu: () => (owner ? '<button data-archive-list="' + esc(st.list) + '">Archive ' + esc(label(st.list)) + '</button>' : '') + '<button data-menu="archived">Archived lists</button>',
+    due: () => ['any:Any', 'overdue:Overdue', 'today:Today', 'week:Next 7 days', 'none:No date'].map(x => '<button data-due="' + x.split(':')[0] + '" aria-pressed="' + (st.due === x.split(':')[0]) + '">' + x.split(':')[1] + '</button>').join(''),
     tag: () => allTags.map(x => '<button data-tag="' + esc(x) + '" aria-pressed="' + st.tags.has(x) + '">' + esc(x) + '</button>').join(''),
+    cat: () => allCats.map(x => '<button data-cat="' + esc(x) + '" aria-pressed="' + st.cats.has(x) + '">' + esc(catName(x)) + '</button>').join(''),
   };
   const pop = st.pop && pops[st.pop] ? '<div class="menu-pop" id="pop" role="menu" data-for="' + st.pop + '">' + pops[st.pop]() + '</div>' : '';
   const matrix = st.expanded ? '<div class="matrix one">' + quad(st.expanded) + '</div>' : '<div class="matrix">' + quad('B') + quad('A') + quad('D') + quad('C') + '</div>';
   document.getElementById('app').innerHTML =
     '<header class="top"><div class="bar"><button type="button" class="logo' + (logoT0 ? ' play' : '') + '" aria-label="TasksDashboard">' + ADV_LOGO + '</button><div class="lists" role="toolbar" aria-label="Lists">' + visible.map(chip).join('') +
     (rest.length ? '<span class="chip"><button id="more" aria-label="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '" aria-expanded="' + (st.pop === 'more') + '" title="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '">+' + rest.length + '</button></span>' : '') +
-    Object.keys(BAD).map(k => '<span class="chip bad"><button disabled title="' + esc(BAD[k].error) + '">' + esc(BAD[k].label) + '</button></span>').join('') +
-    '<span class="chip"><button id="newlist">New list</button></span></div>' +
-    '<div class="who"><button id="profile" aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '">' + profile.name + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + label(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
+    (st.list !== 'all' ? '<span class="chip"><button id="listmenu" aria-label="List options" aria-haspopup="menu" aria-expanded="' + (st.pop === 'listmenu') + '">' + I.dots + '</button></span>' : '') +
+    (me.kind === 'human' ? '<span class="chip"><button id="newlist">New list</button></span>' : '') + '</div>' +
+    '<div class="who"><button id="profile" aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '">' + esc(me.display_name) + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
     '<div class="searchrow"><div class="line"><span class="si" aria-hidden="true">' + I.search + '</span><input id="q" placeholder="Search" aria-label="Search tasks" role="combobox" aria-expanded="' + !!st.q.trim() + '" aria-controls="dd" value="' + esc(st.q) + '">' +
     '<button class="f" id="due" aria-haspopup="menu" aria-expanded="' + (st.pop === 'due') + '" aria-pressed="' + (st.due !== 'any') + '">' + dueLabel + '</button>' +
-    (allTags.length ? '<button class="f" id="tag" aria-haspopup="menu" aria-expanded="' + (st.pop === 'tag') + '" aria-pressed="' + !!st.tags.size + '">' + tagLabel + '</button>' : '') +
+    (allTags.length ? '<button class="f" id="tag" aria-haspopup="menu" aria-expanded="' + (st.pop === 'tag') + '" aria-pressed="' + !!st.tags.size + '">' + esc(tagLabel) + '</button>' : '') +
+    (allCats.length > 1 || st.cats.size ? '<button class="f" id="cat" aria-haspopup="menu" aria-expanded="' + (st.pop === 'cat') + '" aria-pressed="' + !!st.cats.size + '">' + esc(catLabel) + '</button>' : '') +
+    (anyLow || st.lowc ? '<button class="f" id="lowc" aria-pressed="' + st.lowc + '" title="Items an assistant added with low confidence">To check</button>' : '') +
     '<button class="f" id="mine" aria-pressed="' + st.mine + '">Mine</button>' +
-    
     (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop + '</header>' +
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
-    [['matrix', '▦'], ['archive', '▤'], ['timeline', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + label(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
+    [['matrix', '▦'], ['archive', '▤'], ['timeline', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
     '</div><nav class="groups" aria-label="Items by quadrant">' + menuGroups + '</nav></aside>' +
     '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : esc(label(st.list))) + '</h1>' +
     (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : matrix) + '</main></div>';
@@ -1408,21 +1841,35 @@ function toast(msg, undo) {
   el.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button>Undo</button>' : '');
   document.body.append(el);
   if (undo) el.querySelector('button').onclick = () => runUndo();
-  toastTimer = setTimeout(() => { el.remove(); lastUndo = null; }, 8000);
+  toastTimer = setTimeout(() => { el.remove(); lastUndo = null; }, UNDO_MS);
 }
 function runUndo() { if (!lastUndo) return; const u = lastUndo; lastUndo = null; u(); document.querySelector('.toast')?.remove(); render(); }
+// undo of an edit: the earlier values, sent as a new versioned write
+const undoEdit = (t, r) => () => { if (r) edit(t, x => r.fields.forEach(f => { x[f] = Array.isArray(r.before[f]) ? r.before[f].slice() : r.before[f]; })); };
 
-// drag and drop: the row sets importance, the column sets urgency by hand (pin); position sets order
+// card order: the shared sort_key, the midpoint of the new neighbours (±1024 at the ends); a quadrant whose keys are missing
+// or too close is renumbered (spacing 1024) first. The row sets importance, the column sets urgency by hand (pin).
+function placeIn(t, q, targetId, before) {
+  const peers = all().filter(x => !x.doneAt && x.list === t.list && x.q === q && x !== t).sort(C.byOrder);
+  const tg = targetId ? find(targetId) : null;
+  let i = peers.length;
+  if (tg) { const j = peers.indexOf(tg); i = j >= 0 ? j + (before ? 0 : 1) : peers.filter(x => C.byOrder(x, tg) < 0).length; }
+  const prev = peers[i - 1], next = peers[i];
+  if (peers.some(x => x.sortKey === null) || (prev && next && C.gapTooSmall(prev.sortKey, next.sortKey))) {
+    const order = peers.slice(); order.splice(i, 0, t);
+    C.renumber(order.map(x => x.id)).forEach(({ id, sortKey }) => { const x = find(id); if (x !== t && x.sortKey !== sortKey) edit(x, y => { y.sortKey = sortKey; }); });
+    return C.renumber(order.map(x => x.id))[i].sortKey;
+  }
+  return C.sortBetween(prev ? prev.sortKey : null, next ? next.sortKey : null);
+}
+const topKey = (list, q) => { const keys = all().filter(x => !x.doneAt && x.list === list && x.q === q && x.sortKey !== null).map(x => x.sortKey); return keys.length ? C.sortBetween(null, Math.min(...keys)) : 0; };
 function moveTask(id, q, targetId, before) {
-  const t = tasks.find(x => x.id === id); if (!t) return;
-  const snap = snapshot();
+  const t = find(id); if (!t || !canDo('edit', t)) return;
   const from = t.q;
-  if (q !== from) { if (URGENT[q] !== URGENT[from]) t.pin = URGENT[q]; t.q = q; }
-  tasks = tasks.filter(x => x !== t);
-  const i = targetId ? tasks.findIndex(x => x.id === targetId) : -1;
-  if (i < 0) tasks.push(t); else tasks.splice(before ? i : i + 1, 0, t);
+  const key = placeIn(t, q, targetId, before);
+  const r = edit(t, x => { if (q !== from) { if (URGENT[q] !== URGENT[from]) x.pin = URGENT[q]; x.qStored = q; } x.sortKey = key; });
   st.keep.add(t.id);
-  toast(q !== from ? 'Moved to ' + QN[q] : 'Order changed', () => { tasks = snap; });
+  toast(q !== from ? 'Moved to ' + QN[q] : 'Order changed', undoEdit(t, r));
   render();
 }
 
@@ -1438,26 +1885,56 @@ function askTag(text, onYes) {
   dlg.querySelector('#cf-cancel').focus();
   dlg.querySelector('#cf-ok').onclick = () => onYes();
 }
+// a tag renamed or deleted in the task window: one queued write per item that carries it, then a summary toast
+function retag(from, to) {
+  let n = 0, skipped = 0;
+  all().forEach(t => {
+    if (!t.tags.includes(from)) return;
+    if (!canDo('edit', t)) { skipped++; return; }
+    edit(t, x => { x.tags = to ? [...new Set(x.tags.map(y => y === from ? to : y))] : x.tags.filter(y => y !== from); }); n++;
+  });
+  toast((to ? 'Renamed the tag on ' : 'Removed the tag from ') + n + (n === 1 ? ' item' : ' items') + (skipped ? '; ' + skipped + ' you can\'t edit kept it' : ''));
+}
 
-function openTask(id, quad) {
-  const t = id ? tasks.find(x => x.id === id) : null;
+// the task window. opts.draft reopens it with the person's text after a conflict or a refused save; opts.error / opts.notice explain why
+function openTask(id, quad, opts) {
+  const o = opts || {}, dr = o.draft || {};
+  const t = id ? find(id) : null;
+  if (id && !t) return;
   const opener = id ? '[data-card="' + id + '"]' : (quad ? '[data-add="' + quad + '"]' : null);
-  const start = t ? t.start || null : new Date(TODAY); // a new task's start is the moment it is created, fixed
-  const listDefault = t ? t.list : (st.list === 'all' ? '' : st.list);
-  const listSel = (listDefault === '' ? '<option value="" selected>—</option>' : '') + LISTS.map(l => '<option value="' + esc(l) + '"' + (listDefault === l ? ' selected' : '') + '>' + esc(label(l)) + '</option>').join('');
-  const chosen = new Set(t ? t.tags : [profile.id]);
-  const known = orderTags([...new Set(tasks.flatMap(x => x.tags).concat([...chosen]))]);
+  const editable = t ? canDo('edit', t) : true;
+  const start = t ? t.start || null : new Date(); // a new task's start is the moment it is created, fixed
+  const addLists = LISTS.filter(l => canDo('add', null, l));
+  const listDefault = dr.list || (t ? t.list : (st.list === 'all' ? '' : st.list));
+  const choices = t ? LISTS.filter(l => l === t.list || canDo('add', null, l)) : addLists;
+  const listSel = (listDefault === '' ? '<option value="" selected>—</option>' : '') + choices.map(l => '<option value="' + esc(l) + '"' + (listDefault === l ? ' selected' : '') + '>' + esc(label(l)) + '</option>').join('');
+  const chosen = new Set(dr.tags || (t ? t.tags : me.mine_tags.slice(0, 1)));
+  const known = orderTags([...new Set(all().flatMap(x => x.tags).concat([...chosen]))]);
+  const dl = dr.deadline !== undefined ? dr.deadline : t && t.deadline;
+  // what the window showed: Save sends only what the person changed, and checks it against changes made meanwhile
+  const shown = t ? { version: t.version, title: t.title, notes: t.notes, tags: JSON.stringify(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q } : null;
+  const ro = editable ? '' : ' disabled';
   const dlg = document.createElement('dialog');
-  dlg.innerHTML = '<form method="dialog"><strong>' + (t ? 'Edit task' : 'New task') + '</strong>' +
-    '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="true" role="textbox" aria-labelledby="ft-l">' + (t ? mdInline(t.title) : '') + '</div><div class="err" id="fe" aria-live="polite"></div>' +
-    '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' +
-    '<div class="flabel" id="fn-l">Description</div><div class="rt" id="fn" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="fn-l">' + (t ? mdToHtml(t.notes) : '') + '</div>' +
-    '<label>List<select id="fl">' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div>' +
-    (t ? '<label>Quadrant<select id="fq">' + ['A', 'B', 'C', 'D'].map(q => '<option value="' + q + '"' + (t.q === q ? ' selected' : '') + '>' + q + ' ' + QN[q] + '</option>').join('') + '</select></label>' : '') +
-    '<label>End<input id="fd" type="datetime-local" value="' + (t && t.deadline ? new Date(t.deadline.getTime() - t.deadline.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div>' +
+  dlg.innerHTML = '<form method="dialog"><strong>' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</strong>' +
+    (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
+    (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list, quadrant and text.</p>' : '') +
+    '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
+    (editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '') +
+    '<div class="flabel" id="fn-l">Description</div><div class="rt" id="fn" contenteditable="' + editable + '" role="textbox" aria-multiline="true" aria-labelledby="fn-l">' + mdToHtml(dr.notes !== undefined ? dr.notes : t ? t.notes : '') + '</div>' +
+    '<label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div>' +
+    (t ? '<label>Quadrant<select id="fq"' + ro + '>' + QS.map(q => '<option value="' + q + '"' + (t.q === q ? ' selected' : '') + '>' + q + ' ' + QN[q] + '</option>').join('') + '</select></label>' : '') +
+    '<label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div>' +
     '<div class="flabel" id="tags-l">Tags</div><div class="tagbox" role="group" aria-labelledby="tags-l"></div>' +
-    '<div class="actions"><button value="cancel">Cancel</button><button id="fs" value="save">Save</button></div></form>';
+    (t ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
+    '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
+    '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
   document.body.append(dlg); dlg.showModal();
+  if (o.error) dlg.querySelector('#ft').focus();
+  // where the item came from (item_refs), read only and loaded when the window opens; links are shown as text
+  if (t) rest('GET', 'item_refs?select=kind,target,note&item_id=eq.' + t.id + '&order=created_at').then(r => {
+    const box = dlg.querySelector('#srcs'); if (!box) return;
+    box.innerHTML = r.ok && r.json.length ? r.json.map(x => '<div><span class="k">' + esc(x.kind) + '</span> ' + esc(x.target) + (x.note ? ' <span class="n">' + esc(x.note) + '</span>' : '') + '</div>').join('') : r.ok ? 'None' : esc(r.err.message);
+  });
   const ftEl = dlg.querySelector('#ft'), fnEl = dlg.querySelector('#fn');
   let lastEditor = ftEl;
   const syncFmt = () => dlg.querySelectorAll('[data-cmd]').forEach(b => { let on = false; try { on = document.queryCommandState(b.dataset.cmd); } catch (e) {} b.setAttribute('aria-pressed', String(on)); b.disabled = lastEditor === ftEl && b.dataset.cmd.startsWith('insert'); });
@@ -1485,8 +1962,8 @@ function openTask(id, quad) {
   syncFmt();
   const box = dlg.querySelector('.tagbox');
   // tags: one chip per known tag (pressed = on the task); the round + turns into a text box that grows with its text.
-  // 4-5 tag management: drag a chip to reorder (the order is shared by every task window), double-click or F2 to rename,
-  // the corner cross or Delete to remove the tag from every task after a yes/no question; Alt+arrows move a focused chip.
+  // Drag a chip to reorder (the order is shared by every task window), double-click or F2 to rename, the corner cross or
+  // Delete to remove the tag from every item after a yes/no question; Alt+arrows move a focused chip.
   let dragTag = null;
   const editBox = (value, onDone) => {
     const inp = document.createElement('input'); inp.className = 'tag-new'; inp.setAttribute('aria-label', value ? 'Rename tag' : 'New tag'); inp.size = 1; inp.value = value;
@@ -1504,20 +1981,20 @@ function openTask(id, quad) {
     tagOrder = known.concat(tagOrder.filter(y => !known.includes(y)));
   };
   const renameTag = (from, to) => {
-    const same = known.find(y => y !== from && y.toLowerCase() === to.toLowerCase());
-    const target = same || to;
-    tasks.forEach(t => { if (t.tags.includes(from)) t.tags = [...new Set(t.tags.map(y => y === from ? target : y))]; });
+    const same0 = known.find(y => y !== from && y.toLowerCase() === to.toLowerCase());
+    const target = same0 || to;
+    retag(from, target);
     if (chosen.has(from)) { chosen.delete(from); chosen.add(target); }
     if (st.tags.has(from)) { st.tags.delete(from); st.tags.add(target); }
-    if (same) known.splice(known.indexOf(from), 1); else known[known.indexOf(from)] = target;
+    if (same0) known.splice(known.indexOf(from), 1); else known[known.indexOf(from)] = target;
     tagOrder = known.concat(tagOrder.filter(y => !known.includes(y) && y !== from));
     render();
     return target;
   };
   const deleteTag = x => {
-    const n = tasks.filter(t => t.tags.includes(x)).length;
-    askTag(n ? n + (n === 1 ? ' item depends' : ' items depend') + ' on the tag “' + x + '”. Delete the tag?' : 'Delete the tag “' + x + '”?', () => {
-      tasks.forEach(t => { if (t.tags.includes(x)) t.tags = t.tags.filter(y => y !== x); });
+    const n = all().filter(t2 => t2.tags.includes(x)).length;
+    askTag(n ? n + (n === 1 ? ' item carries' : ' items carry') + ' the tag “' + x + '”. Delete the tag?' : 'Delete the tag “' + x + '”?', () => {
+      retag(x, null);
       chosen.delete(x); st.tags.delete(x);
       known.splice(known.indexOf(x), 1); tagOrder = tagOrder.filter(y => y !== x);
       drawTags(false);
@@ -1525,8 +2002,9 @@ function openTask(id, quad) {
     });
   };
   const drawTags = (focusAdd, focusTag) => {
-    box.innerHTML = known.map(x => '<span class="tagwrap" draggable="true" data-t="' + esc(x) + '"><button type="button" class="tagchip" data-t="' + esc(x) + '" aria-pressed="' + chosen.has(x) + '" aria-keyshortcuts="F2 Delete Alt+ArrowLeft Alt+ArrowRight">' + esc(x) + '</button><button type="button" class="tag-x" tabindex="-1" aria-label="Delete tag ' + esc(x) + '">' + I.x + '</button></span>').join('') +
-      '<button type="button" class="tag-add" aria-label="New tag">' + I.plus + '</button>';
+    box.innerHTML = known.map(x => '<span class="tagwrap"' + (editable ? ' draggable="true"' : '') + ' data-t="' + esc(x) + '"><button type="button" class="tagchip" data-t="' + esc(x) + '" aria-pressed="' + chosen.has(x) + '"' + (editable ? ' aria-keyshortcuts="F2 Delete Alt+ArrowLeft Alt+ArrowRight"' : ' disabled') + '>' + esc(x) + '</button>' + (editable ? '<button type="button" class="tag-x" tabindex="-1" aria-label="Delete tag ' + esc(x) + '">' + I.x + '</button>' : '') + '</span>').join('') +
+      (editable ? '<button type="button" class="tag-add" aria-label="New tag">' + I.plus + '</button>' : '');
+    if (!editable) return;
     const clearMarks = () => box.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(w => w.classList.remove('drop-before', 'drop-after', 'dragging'));
     box.querySelectorAll('.tagwrap').forEach(w => {
       const x = w.dataset.t, b = w.querySelector('.tagchip');
@@ -1549,7 +2027,7 @@ function openTask(id, quad) {
         if (dragTag === null || dragTag === x) return;
         e.preventDefault(); e.dataTransfer.dropEffect = 'move';
         const r = w.getBoundingClientRect(), before = e.clientX < r.left + r.width / 2;
-        box.querySelectorAll('.drop-before,.drop-after').forEach(o => o.classList.remove('drop-before', 'drop-after'));
+        box.querySelectorAll('.drop-before,.drop-after').forEach(o2 => o2.classList.remove('drop-before', 'drop-after'));
         w.classList.add(before ? 'drop-before' : 'drop-after');
       };
       w.ondrop = e => {
@@ -1575,32 +2053,73 @@ function openTask(id, quad) {
   };
   drawTags(false);
   dlg.addEventListener('cancel', e => { if (document.activeElement && document.activeElement.classList.contains('tag-new')) e.preventDefault(); });
-  dlg.querySelector('#fs').onclick = e => {
+  const fc = dlg.querySelector('#fcancel');
+  if (fc) fc.onclick = () => { dlg.close(); const r = edit(t, x => { x.status = 'cancelled'; }); toast('Cancelled: ' + plain(t.title), undoEdit(t, r)); };
+  const fdel = dlg.querySelector('#fdel');
+  if (fdel) fdel.onclick = () => { dlg.close(); removeTask(t); };
+  const fs = dlg.querySelector('#fs');
+  if (fs) fs.onclick = e => {
     const title = htmlToMd(dlg.querySelector('#ft')).replace(/\n+/g, ' ').trim(), notes = htmlToMd(dlg.querySelector('#fn')).trim(), list = dlg.querySelector('#fl').value;
     let bad = false;
     if (!plain(title).trim()) { dlg.querySelector('#fe').textContent = 'Title can\'t be empty'; bad = true; }
+    else if (title.length > 300) { dlg.querySelector('#fe').textContent = 'The title is over 300 characters (' + title.length + ')'; bad = true; }
     if (!list) { dlg.querySelector('#fle').textContent = 'Choose a list'; bad = true; }
     const endV = dlg.querySelector('#fd').value;
     if (endV && start && new Date(endV) <= start) { dlg.querySelector('#fde').textContent = 'End must be after ' + ymd(start); bad = true; }
     if (bad) { e.preventDefault(); (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
     const fq = t ? dlg.querySelector('#fq').value : (quad || 'B');
-    const dl = dlg.querySelector('#fd').value, tags = known.filter(x => chosen.has(x));
-    const snap = snapshot();
+    const deadline = endV ? new Date(endV) : null, tags = known.filter(x => chosen.has(x));
     if (t) {
-      const moved = t.list !== list;
-      if (fq !== t.q && URGENT[fq] !== URGENT[t.q]) t.pin = URGENT[fq];
-      Object.assign(t, { title, tags, q: fq, deadline: dl ? new Date(dl) : null }); if (notes) t.notes = notes; else delete t.notes; st.keep.add(t.id);
-      if (moved) { t.list = list; t.num = Math.max(0, ...tasks.filter(x => x.list === list && x !== t).map(x => x.num)) + 1; }
-      toast(moved ? 'Moved to ' + label(list) : 'Saved', () => { tasks = snap; });
+      const now = { title, notes, tags: JSON.stringify(tags), deadline: deadline ? deadline.getTime() : null, list, q: fq };
+      const mine = Object.keys(now).filter(k => now[k] !== shown[k]);
+      const cur = { title: t.title, notes: t.notes, tags: JSON.stringify(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q };
+      const theirs = t.version !== shown.version ? mine.filter(k => cur[k] !== shown[k] && cur[k] !== now[k]) : [];
+      if (theirs.length) {
+        const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', q: 'quadrant' };
+        setTimeout(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
+        return;
+      }
+      const moved = mine.includes('list'), fromQ = t.q;
+      const key = mine.includes('q') || moved ? topKey(list, fq) : t.sortKey;
+      const r = edit(t, x => {
+        if (mine.includes('q')) { if (URGENT[fq] !== URGENT[fromQ]) x.pin = URGENT[fq]; x.qStored = fq; }
+        if (mine.includes('title')) x.title = title;
+        if (mine.includes('notes')) x.notes = notes;
+        if (mine.includes('tags')) x.tags = tags;
+        if (mine.includes('deadline')) x.deadline = deadline;
+        if (moved) x.list = list;
+        x.sortKey = key;
+      }, { origin: 'dialog' });
+      st.keep.add(t.id);
+      if (r) toast(moved ? 'Moved to ' + label(list) : 'Saved', undoEdit(t, r));
     } else {
-      const nt = T(list, Math.max(0, ...tasks.filter(x => x.list === list).map(x => x.num)) + 1, fq, title, dl || null, tags, notes ? { start, notes } : { start });
-      tasks.unshift(nt); st.keep.add(nt.id); toast('Added to ' + label(list) + ': ' + plain(title), () => { tasks = snap; });
+      const cat = LIST[list].default_category || 'task';
+      const nt = { id: crypto.randomUUID(), list, num: 0, qStored: fq, q: fq, title, notes, tags, deadline, start, status: 'open', doneAt: null, pin: undefined,
+        sortKey: topKey(list, fq), category: cat, priority: null, reviewState: 'none', aiConfidence: null, createdBy: me.id, version: 1, deleted: false, updatedAt: null };
+      create(nt, { origin: 'dialog' }); st.keep.add(nt.id);
+      toast('Added to ' + label(list) + ': ' + plain(title), canDo('delete', null, list) ? () => removeTask(nt, true) : null);
     }
   };
   dlg.addEventListener('close', () => { dlg.remove(); render(); const back = opener && document.querySelector(opener); if (back) back.focus(); });
   dlg.querySelector('#ft').addEventListener('input', () => dlg.querySelector('#fe').textContent = '');
   dlg.querySelector('#fl').addEventListener('change', () => dlg.querySelector('#fle').textContent = '');
   dlg.querySelector('#fd').addEventListener('input', () => dlg.querySelector('#fde').textContent = '');
+}
+// soft delete (deleted_at); Undo within 8 s restores it, after that only admin SQL does (no trash view)
+function removeTask(t, quiet) {
+  const r = edit(t, x => { x.deleted = true; });
+  if (!quiet) toast('Deleted: ' + plain(t.title), () => edit(t, x => { x.deleted = false; }));
+  render();
+  return r;
+}
+// restore from the archive: the status from before it was completed or cancelled (item_events), open if unknown
+async function restoreTask(t) {
+  let prev = 'open';
+  const r = await rest('GET', 'item_events?select=diff&item_id=eq.' + t.id + '&order=id.desc&limit=50');
+  if (r.ok) { const ev = r.json.find(e => e.diff && e.diff.status && e.diff.status.new === t.status); if (ev && C.STATUSES.includes(ev.diff.status.old) && !C.CLOSED.includes(ev.diff.status.old)) prev = ev.diff.status.old; }
+  const u = edit(t, x => { x.status = prev; });
+  toast('Restored: ' + plain(t.title), undoEdit(t, u));
+  render();
 }
 
 function dialogShell(html, opener) {
@@ -1614,7 +2133,7 @@ function dialogShell(html, opener) {
 // weekly review: the last 7 days of the selected list (All = every list), ignoring search and filters
 function openReview() {
   const from = new Date(TODAY.getTime() - 7 * DAY), to = new Date(TODAY.getTime() + 7 * DAY);
-  const mine = tasks.filter(inList);
+  const mine = all().filter(inList);
   const open = mine.filter(t => !t.doneAt);
   const sec = (title, list) => '<section class="rv"><strong>' + title + ' <span class="n">' + list.length + '</span></strong>' + (list.length ? list.map(t => '<div class="rr"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + (t.deadline ? ' <span class="n">' + rel(t) + '</span>' : '') + '</div>').join('') : '<div class="rr n">0</div>') + '</section>';
   dialogShell('<form method="dialog"><strong>Weekly review</strong><div class="n">' + ymd(from).slice(0, 10) + ' – ' + ymd(TODAY).slice(0, 10) + '</div>' +
@@ -1625,19 +2144,70 @@ function openReview() {
     '<div class="actions"><button value="close" autofocus>Close</button></div></form>', '#profile');
 }
 
+// settings are saved per person in the preferences row
 function openSettings() {
-  const dlg = dialogShell('<form method="dialog"><strong>Urgency settings</strong>' +
+  const dlg = dialogShell('<form method="dialog"><strong>Settings</strong>' +
     '<label>Urgency threshold, %<input id="s-th" type="number" min="10" max="90" step="5" value="' + settings.threshold + '"></label>' +
     '<label>Urgency window, days<input id="s-win" type="number" min="1" max="30" value="' + settings.windowDays + '"></label>' +
     '<label class="cb"><input id="s-wd" type="checkbox"' + (settings.workingDays ? ' checked' : '') + '> Working days only</label>' +
     '<label>Do limit<input id="s-lim" type="number" min="0" max="50" value="' + settings.doLimit + '"></label>' +
     '<label>Working hours per day<input id="s-hpd" type="number" min="1" max="24" value="' + settings.hoursPerDay + '"></label>' +
-        '<div class="actions"><button value="cancel">Cancel</button><button id="s-save" value="save">Save</button></div></form>', '#profile');
+    '<div class="actions"><button value="cancel">Cancel</button><button id="s-save" value="save">Save</button></div></form>', '#profile');
   dlg.querySelector('#s-save').onclick = () => {
     const num = (id, lo, hi, dflt) => { const v = Number(dlg.querySelector(id).value); return v >= lo && v <= hi ? v : dflt; };
-    Object.assign(settings, { threshold: num('#s-th', 10, 90, 50), windowDays: num('#s-win', 1, 30, 7), workingDays: dlg.querySelector('#s-wd').checked, doLimit: num('#s-lim', 0, 50, 5), hoursPerDay: num('#s-hpd', 1, 24, 8) });
+    settings = C.readSettings({ threshold: num('#s-th', 10, 90, 50), windowDays: num('#s-win', 1, 30, 7), workingDays: dlg.querySelector('#s-wd').checked, doLimit: num('#s-lim', 0, 50, 5), hoursPerDay: num('#s-hpd', 1, 24, 8) });
     toast('Settings saved');
   };
+}
+
+// New list: rpc/create_list. A name without ASCII letters or digits (Cyrillic, say) gets a slug list-<6 random>.
+function openNewList() {
+  const dlg = dialogShell('<form method="dialog"><strong>New list</strong><label>Name<input id="nl-name" maxlength="60" autocomplete="off"></label><div class="err" id="nl-e" aria-live="polite"></div>' +
+    '<label class="cb"><input id="nl-shared" type="checkbox" checked> Shared with the household and the HomeOS agent</label>' +
+    '<div class="actions"><button value="cancel">Cancel</button><button id="nl-go" value="create">Create</button></div></form>', '#newlist');
+  const name = dlg.querySelector('#nl-name'), err = dlg.querySelector('#nl-e');
+  name.focus(); name.oninput = () => { err.textContent = ''; };
+  dlg.querySelector('#nl-go').onclick = async e => {
+    e.preventDefault();
+    const n = name.value.trim();
+    if (!n) { err.textContent = 'Enter a name'; name.focus(); return; }
+    const body = { p_name: n, p_shared: dlg.querySelector('#nl-shared').checked };
+    if (!/[a-z]/i.test(n)) body.p_slug = 'list-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+    const r = await rest('POST', 'rpc/create_list', body);
+    if (!r.ok) { err.textContent = r.err.kind === 'duplicate' ? 'A list with this name exists' : r.err.message; name.focus(); return; }
+    dlg.close();
+    await refreshMeta();
+    st.list = typeof r.json === 'string' && LIST[r.json] ? r.json : st.list;
+    toast('List created: ' + n);
+    render();
+  };
+}
+// Archive a list (owners, people only): it leaves the chips, All and search; nothing in it can be edited until it is restored
+async function archiveList(id) {
+  const name = label(id);
+  const r = await rest('PATCH', 'lists?id=eq.' + id, { archived_at: new Date().toISOString() }, { Prefer: 'return=representation' });
+  if (!r.ok || r.json.length !== 1) { toast(r.ok ? 'Only an owner archives a list' : r.err.message); return; }
+  await writePrefs();
+  await refreshMeta();
+  if (st.list === id) st.list = 'all';
+  toast('Archived: ' + name, () => restoreList(id));
+  render();
+}
+async function restoreList(id) {
+  const r = await rest('PATCH', 'lists?id=eq.' + id, { archived_at: null }, { Prefer: 'return=representation' });
+  if (!r.ok || r.json.length !== 1) { toast(r.ok ? 'Only an owner restores a list' : r.err.message); return false; }
+  await refreshMeta();
+  toast('Restored list: ' + r.json[0].name);
+  render();
+  return true;
+}
+async function openArchivedLists() {
+  const r = await rest('GET', 'lists?select=id,name,archived_at&archived_at=not.is.null&order=archived_at.desc');
+  const rows = r.ok ? r.json : [];
+  const dlg = dialogShell('<form method="dialog"><strong>Archived lists</strong>' + (!r.ok ? '<p class="err">' + esc(r.err.message) + '</p>' : '') +
+    (rows.length ? rows.map(l => '<div class="al"><span>' + esc(l.name) + ' <span class="n">' + fmtDay(new Date(l.archived_at)) + '</span></span>' + (ROLE[l.id] === 'owner' && me.kind === 'human' ? '<button type="button" data-restore-list="' + esc(l.id) + '">Restore</button>' : '') + '</div>').join('') : '<p class="n">No archived lists</p>') +
+    '<div class="actions"><button value="close" autofocus>Close</button></div></form>', '#profile');
+  dlg.querySelectorAll('[data-restore-list]').forEach(b => b.onclick = async () => { b.disabled = true; if (await restoreList(b.dataset.restoreList)) dlg.close(); else b.disabled = false; });
 }
 
 function bind() {
@@ -1645,25 +2215,10 @@ function bind() {
   bindLogo();
   app.querySelectorAll('[data-list]').forEach(b => b.onclick = () => { st.list = b.dataset.list; st.pop = null; st.expanded = null; render(); });
   bindListDrag(app);
-  const more = document.getElementById('more'); if (more) more.onclick = e => { e.stopPropagation(); st.pop = st.pop === 'more' ? null : 'more'; render(); };
-  // New list writes an empty <name>-tasks.json into the create folder (memory only in ?demo)
-  document.getElementById('newlist').onclick = async () => {
-    const n = prompt('List name'); if (n === null) return;
-    const file = newListFile(n);
-    if (!file) { toast('Letters, digits and dashes only'); return; }
-    const key = DEMO ? file.replace(/-tasks\.json$/, '') : listKey(cfg.createFolder, file);
-    if (LISTS.includes(key) || BAD[key]) { toast('List exists: ' + label(key)); return; }
-    if (!DEMO) {
-      try {
-        const dir = dirOf(cfg.createFolder);
-        if (await dir.getFileHandle(file).then(() => true, () => false)) { toast('File exists: ' + file); return; }
-        const w = await (await dir.getFileHandle(file, { create: true })).createWritable();
-        await w.write(JSON.stringify(newListDoc(NEW_LIST_TZ), null, 2) + '\n'); await w.close();
-      } catch (e) { toast('List not created: ' + (e.message || e)); return; }
-    }
-    LIST_LABEL[key] = listLabel(file);
-    LISTS.push(key); st.list = key; render();
-  };
+  const popBtn = (id, name) => { const b = document.getElementById(id); if (b) b.onclick = e => { e.stopPropagation(); st.pop = st.pop === name ? null : name; render(); }; };
+  popBtn('more', 'more'); popBtn('listmenu', 'listmenu'); popBtn('due', 'due'); popBtn('tag', 'tag'); popBtn('cat', 'cat'); popBtn('profile', 'profile');
+  const nl = document.getElementById('newlist'); if (nl) nl.onclick = () => openNewList();
+  app.querySelectorAll('[data-archive-list]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.archiveList; st.pop = null; render(); confirmAsk('Archive the list “' + label(id) + '”? It disappears from the board and nothing in it can be changed until an owner restores it.', 'Archive', () => archiveList(id), '#listmenu'); });
   // the theme starts as Auto (follows the system); a click sets Light or Dark
   document.getElementById('theme').onclick = () => { themePref = st.theme ? 'light' : 'dark'; applyTheme(); render(); document.getElementById('theme').focus(); };
   const qi = document.getElementById('q');
@@ -1675,18 +2230,18 @@ function bind() {
     else if (e.key === 'Enter') { e.preventDefault(); if (st.sel >= 0 && st.rows[st.sel]) { const id = st.rows[st.sel].id; st.sel = -1; openTask(id); } else { qi.blur(); document.getElementById('dd')?.remove(); } }
     else if (e.key === 'Escape') { document.getElementById('dd')?.remove(); st.sel = -1; }
   };
-  document.getElementById('due').onclick = e => { e.stopPropagation(); st.pop = st.pop === 'due' ? null : 'due'; render(); };
-  const tag = document.getElementById('tag'); if (tag) tag.onclick = e => { e.stopPropagation(); st.pop = st.pop === 'tag' ? null : 'tag'; render(); };
   app.querySelectorAll('[data-due]').forEach(b => b.onclick = () => { st.due = b.dataset.due; st.pop = null; render(); });
   app.querySelectorAll('[data-tag]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = b.dataset.tag; st.tags.has(x) ? st.tags.delete(x) : st.tags.add(x); render(); });
-  document.getElementById('profile').onclick = e => { e.stopPropagation(); st.pop = st.pop === 'profile' ? null : 'profile'; render(); };
-  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); b.dataset.menu === 'review' ? openReview() : openSettings(); });
+  app.querySelectorAll('[data-cat]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = b.dataset.cat; st.cats.has(x) ? st.cats.delete(x) : st.cats.add(x); render(); });
+  const lc = document.getElementById('lowc'); if (lc) lc.onclick = () => { st.lowc = !st.lowc; render(); };
+  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ review: openReview, settings: openSettings, archived: openArchivedLists })[b.dataset.menu](); });
   app.querySelectorAll('[data-flip]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.flip; st.flip.has(id) ? st.flip.delete(id) : st.flip.add(id); render(); document.querySelector('[data-flip="' + id + '"]')?.focus(); });
   app.querySelectorAll('[data-cards]').forEach(b => b.onclick = e => { e.stopPropagation(); st.cardMode = st.cardMode === 'collapsed' ? 'expanded' : 'collapsed'; st.flip.clear(); render(); document.querySelector('[data-cards]')?.focus(); });
-  app.querySelectorAll('[data-switch]').forEach(b => b.onclick = async e => { e.stopPropagation(); st.pop = null; await useProfile(b.dataset.switch); toast('Profile: ' + profile.name); });
+  // switch: sign out here (local scope), then the form with the other person's email when this browser knows it
+  app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; signOut(b.dataset.switch); });
+  app.querySelectorAll('[data-signout]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; signOut(); });
   document.getElementById('mine').onclick = () => { st.mine = !st.mine; render(); };
-  app.querySelectorAll('[data-quad]').forEach(b => b.onclick = () => { const q = b.dataset.quad; st.quads.has(q) ? st.quads.delete(q) : st.quads.add(q); render(); });
-  const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', mine: false, sel: -1 }); st.tags.clear(); st.quads.clear(); render(); };
+  const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', mine: false, lowc: false, sel: -1 }); st.tags.clear(); st.cats.clear(); st.quads.clear(); render(); };
   app.querySelectorAll('.grp').forEach(b => b.onclick = () => { const q = b.dataset.q; st.collapsed.has(q) ? st.collapsed.delete(q) : st.collapsed.add(q); render(); });
   app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openTask(b.dataset.open));
   app.querySelectorAll('[data-hl]').forEach(b => { b.onmouseenter = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.add('hl'); b.onmouseleave = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.remove('hl'); });
@@ -1715,30 +2270,40 @@ function bind() {
       if (over && over.dataset.card !== dragId) { const r = over.getBoundingClientRect(); target = over.dataset.card; before = e.clientY < r.top + r.height / 2; }
       const id = dragId; dragId = null; moveTask(id, q, target, before);
     };
-    sec.ondblclick = e => { if (!e.target.closest('[data-card], button')) openTask(null, q); };
+    sec.ondblclick = e => { if (!e.target.closest('[data-card], button') && canAddSomewhere()) openTask(null, q); };
   });
-  app.querySelectorAll('[data-copy]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = tasks.find(x => x.id === b.dataset.copy); const r = ref(t); try { navigator.clipboard.writeText(r); } catch (err) {} toast('Copied ' + r); });
-  app.querySelectorAll('[data-unpin]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = tasks.find(x => x.id === b.dataset.unpin); const snap = snapshot(); delete t.pin; toast('Urgency follows dates', () => { tasks = snap; }); render(); });
+  app.querySelectorAll('[data-copy]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.copy); const r = refText(t); try { navigator.clipboard.writeText(r); } catch (err) {} toast('Copied ' + r); });
+  app.querySelectorAll('[data-unpin]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.unpin); const r = edit(t, x => { x.pin = undefined; }); toast('Urgency follows dates', undoEdit(t, r)); render(); });
   app.querySelectorAll('[data-expand]').forEach(b => b.onclick = () => { const q = b.dataset.expand; st.expanded = st.expanded === q ? null : q; render(); document.querySelector('[data-expand="' + q + '"]')?.focus(); });
-  app.querySelectorAll('[data-done]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = tasks.find(x => x.id === b.dataset.done); const snap = snapshot(); t.doneAt = new Date(); toast('Completed: ' + plain(t.title), () => { tasks = snap; }); render(); });
+  app.querySelectorAll('[data-done]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.done); const r = edit(t, x => { x.status = 'done'; }); toast('Completed: ' + plain(t.title), undoEdit(t, r)); render(); });
   app.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openTask(null, b.dataset.add));
   app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { st.view = b.dataset.view; st.expanded = null; render(); document.querySelector('[role=tab][data-view="' + st.view + '"]')?.focus(); });
   const tabs = [...app.querySelectorAll('[role=tab]')];
   tabs.forEach((b, i) => b.onkeydown = e => { const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight', back = e.key === 'ArrowUp' || e.key === 'ArrowLeft'; if (fwd || back) { e.preventDefault(); tabs[(i + (fwd ? 1 : tabs.length - 1)) % tabs.length].click(); } });
   const ars = document.getElementById('ar-sort'); if (ars) ars.onchange = () => { st.arSort = ars.value; render(); };
-  app.querySelectorAll('[data-restore]').forEach(b => b.onclick = () => { const t = tasks.find(x => x.id === b.dataset.restore); const snap = snapshot(); delete t.doneAt; tasks = [t].concat(tasks.filter(x => x !== t)); toast('Restored: ' + plain(t.title), () => { tasks = snap; }); render(); });
-  app.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const t = tasks.find(x => x.id === b.dataset.del); confirmDelete('Delete "' + plain(t.title) + '" permanently?', () => { const snap = snapshot(); tasks = tasks.filter(x => x !== t); toast('Deleted: ' + plain(t.title), () => { tasks = snap; }); }); });
-  const arc = document.getElementById('ar-clear'); if (arc) arc.onclick = () => { const n = archivedIn().length; confirmDelete('Delete ' + n + ' archived tasks permanently?', () => { const snap = snapshot(); const gone = new Set(archivedIn()); tasks = tasks.filter(x => !gone.has(x)); toast('Deleted ' + n + ' archived', () => { tasks = snap; }); }); };
+  app.querySelectorAll('[data-restore]').forEach(b => b.onclick = () => restoreTask(find(b.dataset.restore)));
+  app.querySelectorAll('[data-del]').forEach(b => b.onclick = () => removeTask(find(b.dataset.del)));
+  // Clear: soft-deletes every archived item shown that this login may delete, after one question; Undo brings them all back
+  const arc = document.getElementById('ar-clear'); if (arc) arc.onclick = () => {
+    const saved = st.due; st.due = 'any';
+    const gone = archivedIn().filter(passFilters).filter(t => canDo('delete', t));
+    st.due = saved;
+    confirmAsk('Delete ' + gone.length + (gone.length === 1 ? ' archived item?' : ' archived items?') + ' Undo is possible for a few seconds only.', 'Delete', () => {
+      gone.forEach(t => removeTask(t, true));
+      toast('Deleted ' + gone.length + ' archived', () => gone.forEach(t => edit(t, x => { x.deleted = false; })));
+    });
+  };
   const shift = w => { st.tlStart = new Date(st.tlStart.getTime() + w * 7 * DAY); render(); };
   const tp = document.getElementById('tl-prev'); if (tp) { tp.onclick = () => shift(-1); document.getElementById('tl-next').onclick = () => shift(1); document.getElementById('tl-today').onclick = () => { st.tlStart = null; render(); }; document.getElementById('tl-weeks').onchange = e => { st.tlWeeks = Number(e.target.value); render(); }; }
 }
 document.addEventListener('keydown', e => {
+  if (boot.gate) return;
   const typing = e.target.closest && e.target.closest('input,textarea,select,dialog');
   if (e.key === '/' && !typing) { e.preventDefault(); st.focusQ = true; render(); }
   else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing && lastUndo) { e.preventDefault(); runUndo(); }
   else if (e.key === 'Escape' && !typing) { if (st.pop) { st.pop = null; render(); } else if (st.expanded) { const q = st.expanded; st.expanded = null; render(); document.querySelector('[data-expand="' + q + '"]')?.focus(); } }
 });
-document.addEventListener('click', e => { if (st.pop && !e.target.closest('#pop')) { st.pop = null; render(); } });
+document.addEventListener('click', e => { if (st.pop && !boot.gate && !e.target.closest('#pop')) { st.pop = null; render(); } });
 window.addEventListener('resize', anchorPop);
 window.tdAxes = { onSave: savePrefsSoon }; // the axes layer below adds get and set
 render();
@@ -1778,7 +2343,7 @@ document.addEventListener('DOMContentLoaded', start);
   });
 
   // movable axes: the y axis splits not urgent | urgent, the x axis splits important / not important
-  // the split is kept in the profile's preferences file: the main script sets it through window.tdAxes and is told when it changes
+  // the split is kept in the person's preferences row: the main script sets it through window.tdAxes and is told when it changes
   let fx = 0.5, fy = 0.5;
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   let minCol = 0;
