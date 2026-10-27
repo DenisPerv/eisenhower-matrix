@@ -1,12 +1,13 @@
 {
   "version": 1,
   "theme": "light",
-  "view": "archive",
+  "view": "matrix",
   "list": "../../references/Family-Tasks/reminders-tasks.json",
   "listOrder": [
-    "../../references/Family-Tasks/backlog-tasks.json",
     "../../references/Family-Tasks/reminders-tasks.json",
-    "../../references/Family-Tasks/OtherTasks.json"
+    "../../references/Family-Tasks/backlog-tasks.json",
+    "../../references/Family-Tasks/OtherTasks.json",
+    "../../references/Family-Tasks/asdasdas-tasks.json"
   ],
   "tagOrder": [
     "anastasiia",
@@ -33,8 +34,8 @@
     "wish"
   ],
   "axes": {
-    "fx": 0.4723,
-    "fy": 0.3542
+    "fx": 0.5184,
+    "fy": 0.5112
   },
   "menuCollapsed": [],
   "cards": {
