@@ -6,7 +6,7 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 |---|---|
 | `TasksDashboard.html` | the whole app, one file, no build |
 | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`, public values, committed |
-| `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `900_selftest.sql` | the database, applied in file order |
+| `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `900_selftest.sql` | the database, applied in file order |
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
 | `test/core.test.js`, `test/cli.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
 | `README.md`, `CLAUDE.md`, `dependencies-doc.md` | documentation |
