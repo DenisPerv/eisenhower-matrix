@@ -1,17 +1,40 @@
 {
   "version": 1,
   "theme": "light",
-  "view": "matrix",
-  "list": "all",
+  "view": "archive",
+  "list": "../../references/Family-Tasks/reminders-tasks.json",
   "listOrder": [
     "../../references/Family-Tasks/backlog-tasks.json",
     "../../references/Family-Tasks/reminders-tasks.json",
     "../../references/Family-Tasks/OtherTasks.json"
   ],
-  "tagOrder": [],
+  "tagOrder": [
+    "anastasiia",
+    "candidate",
+    "content-review",
+    "decision",
+    "documents",
+    "event",
+    "gmail",
+    "homeos",
+    "maksym",
+    "memory",
+    "plan",
+    "proposed",
+    "recipes",
+    "references-review",
+    "reminder",
+    "residence-permit",
+    "routines",
+    "shared",
+    "structure",
+    "tbd",
+    "valheim",
+    "wish"
+  ],
   "axes": {
-    "fx": 0.4854,
-    "fy": 0.4868
+    "fx": 0.4723,
+    "fy": 0.3542
   },
   "menuCollapsed": [],
   "cards": {
