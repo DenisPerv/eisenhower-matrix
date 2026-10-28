@@ -114,9 +114,10 @@ create table if not exists public.invites (
   check ((list_id is not null and role in ('editor','contributor','viewer'))
       or (tag_list_id is not null and role in ('editor','viewer')))
 );
--- one open invitation per target and email (share again refreshes it)
+-- one open invitation per target and email, a declined one included (share again refreshes that row, so the owner
+-- never sees a second "pending" row that would reveal a decline: S4)
 create unique index if not exists invites_one_open on public.invites (coalesce(list_id, tag_list_id), email_lower)
-  where accepted_at is null and declined_at is null and revoked_at is null;
+  where accepted_at is null and revoked_at is null;
 
 create table if not exists public.invite_blocks (
   profile_id uuid not null references public.profiles(id) on delete cascade,   -- who blocks
@@ -133,7 +134,7 @@ create table if not exists ops.signup_allowlist (
   is_household boolean not null default false,
   created_by   text not null default session_user,
   created_at   timestamptz not null default now(),
-  expires_at   timestamptz not null default now() + interval '1 day',
+  expires_at   timestamptz not null default now() + interval '15 minutes',   -- add it right before creating the login
   used_at      timestamptz
 );
 create table if not exists ops.settings (key text primary key, value numeric not null, note text);
@@ -143,9 +144,13 @@ alter table ops.settings         enable row level security;
 insert into ops.settings (key, value, note) values
   ('max_users',               200,   'hook: human profiles before Google sign-ups are refused'),
   ('max_db_mb',               400,   'hook: database size before Google sign-ups are refused'),
-  ('write_rate_per_min',      120,   'item writes per actor per minute (S7)'),
+  ('write_rate_per_min',      120,   'item writes per guest per minute, any statement size (S7)'),
+  ('household_write_rate_per_min', 1000, 'item writes per household member or agent per minute'),
+  ('guest_writes_per_day',    2000,  'item writes per guest per 24 hours'),
   ('guest_lists',             20,    'live lists a guest owns'),
+  ('guest_lists_total',       100,   'lists a guest owns, archived included'),
   ('guest_items',             1000,  'live items a guest created'),
+  ('guest_items_total',       3000,  'items a guest created, deleted included'),
   ('guest_tags',              500,   'live tags in a guest''s tag lists'),
   ('guest_body_chars',        10000, 'body_md length for guests'),
   ('guest_details_bytes',     8192,  'details size for guests'),
@@ -155,6 +160,23 @@ insert into ops.settings (key, value, note) values
   ('invites_per_day',         20,    'invitations a person sends per 24 hours'),
   ('invites_open',            50,    'open invitations a person has at once')
 on conflict (key) do nothing;
+
+-- size caps on text people set through the API (S6)
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_display_name_len') then
+    alter table public.profiles add constraint profiles_display_name_len check (char_length(display_name) between 1 and 60);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'profiles_mine_tags_len') then
+    alter table public.profiles add constraint profiles_mine_tags_len check (cardinality(mine_tags) <= 50);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'preferences_prefs_size') then
+    alter table public.preferences add constraint preferences_prefs_size check (octet_length(prefs::text) <= 65536);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'item_refs_target_len') then
+    alter table public.item_refs add constraint item_refs_target_len
+      check (char_length(target) <= 2048 and char_length(coalesce(note, '')) <= 2000);
+  end if;
+end $$;
 
 -- indexes (A2)
 create index if not exists list_members_profile_idx     on public.list_members (profile_id);

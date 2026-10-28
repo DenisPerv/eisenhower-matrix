@@ -51,7 +51,7 @@ revoke execute on function
   public.is_admin_sql(), public.setting(text), public.invite_upsert(uuid, uuid, text, text, text), public.my_open_invite(uuid),
   public.hook_before_user_created(jsonb), public.handle_new_user(), public.guard_auth_email_change(), public.guard_auth_identity(),
   public.items_tags_compat(), public.items_tags_compat_after(), public.tags_before_write(), public.item_tags_before_write(),
-  public.tag_members_keep_owner(), public.members_after_remove()
+  public.tag_members_keep_owner(), public.members_after_remove(), public.items_write_rate()
   from public, anon, authenticated;
 -- the sign-up hook: Supabase Auth only
 grant usage on schema public to supabase_auth_admin;

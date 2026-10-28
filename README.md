@@ -27,7 +27,7 @@ The household's own setup lives in HomeOS (`references/homeos/tasksdb/`); this R
    | `db/003_rls.sql` again | grants for what 005 to 010 added |
    | `db/011_multiuser_rls.sql` | multi-user policies and grants; runs after every `003` (it replaces some of 003's household policies); ends with a check that fails if a public table has RLS off or a public function is executable by `anon` |
    | `db/900_selftest.sql` | the RLS selftest; it ends with an error whose text must read `SELFTEST 57 of 57 passed (rolled back). Failures: none` |
-   | `db/901_selftest_multiuser.sql` | the multi-user selftest (guests, invitations, tags, hook, identity guards, limits); must read `SELFTEST 69 of 69 passed (rolled back). Failures: none` |
+   | `db/901_selftest_multiuser.sql` | the multi-user selftest (guests, invitations, tags, hook, identity guards, limits); must read `SELFTEST 73 of 73 passed (rolled back). Failures: none` |
 
    Every file is re-runnable. Later changes come only as new `db/NNN_*.sql` files, followed by `003`, `011`, `900` and `901`. Order rule for the trigger function `items_before_write`: `002` → `006` → `010`.
 6. **Config.** Project Settings → API Keys: copy the **publishable** key (`sb_publishable_…`) into `config/tasksdashboard.config.js` (below). Never the secret or service key.

@@ -13,10 +13,15 @@ language sql stable set search_path = '' as $$
   select session_user in ('postgres','supabase_admin') and nullif(current_setting('request.jwt.claims', true), '') is null
 $$;
 
+-- a limit from ops.settings; a missing key raises, so a limit never fails open
 create or replace function public.setting(p_key text) returns numeric
-language sql stable security definer set search_path = '' as $$
-  select value from ops.settings where key = p_key
-$$;
+language plpgsql stable security definer set search_path = '' as $$
+declare v numeric;
+begin
+  select value into v from ops.settings where key = p_key;
+  if v is null then raise exception 'ops.settings has no %', p_key; end if;
+  return v;
+end $$;
 
 create or replace function public.is_household() returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -76,11 +81,6 @@ begin
   if not v_admin then
     select kind, is_household into v_kind, v_hh from public.profiles where id = v_uid;
     if v_kind is null then raise exception 'no profile for this login' using errcode = '42501'; end if;
-    -- 010: write rate per actor (S7)
-    select count(*) into v_n from public.item_events e where e.actor_id = v_uid and e.at > now() - interval '1 minute';
-    if v_n >= public.setting('write_rate_per_min') then
-      raise exception 'too many changes in a minute; wait a moment' using errcode = '54000';
-    end if;
   end if;
 
   if tg_op = 'INSERT' then
@@ -113,13 +113,18 @@ begin
         raise exception 'this category is not available' using errcode = '42501';
       end if;
       if v_hh then
-        select count(*) into v_n from public.items where list_id = new.list_id and deleted_at is null;
+        select count(*) into v_n from public.items
+         where list_id = new.list_id and deleted_at is null and status not in ('done','cancelled');
         if v_n >= public.setting('household_items_per_list') then
           raise exception 'this list is full' using errcode = '54000';
         end if;
       else
         select count(*) into v_n from public.items where created_by = v_uid and deleted_at is null;
         if v_n >= public.setting('guest_items') then
+          raise exception 'item limit reached' using errcode = '54000';
+        end if;
+        select count(*) into v_n from public.items where created_by = v_uid;
+        if v_n >= public.setting('guest_items_total') then
           raise exception 'item limit reached' using errcode = '54000';
         end if;
       end if;
@@ -180,8 +185,9 @@ begin
   end if;
 
   -- 010: owner_id must be a member of the item's list (F8). Set explicitly to a non-member: 22023; carried along by a
-  -- move into a list the owner is not in: cleared.
+  -- move into a list the owner is not in: cleared. An unchanged owner on an unmoved item is left as it is.
   if new.owner_id is not null and not v_admin
+     and (tg_op = 'INSERT' or new.owner_id is distinct from old.owner_id or new.list_id is distinct from old.list_id)
      and not exists (select 1 from public.list_members m where m.list_id = new.list_id and m.profile_id = new.owner_id) then
     if tg_op = 'UPDATE' and new.owner_id is not distinct from old.owner_id then
       new.owner_id := null;
@@ -223,6 +229,31 @@ drop trigger if exists items_before_write on public.items;
 create trigger items_before_write before insert or update on public.items
   for each row execute function public.items_before_write();
 
+-- Write rate (S7), per statement: AFTER STATEMENT runs after the statement's row events are written, so a bulk PATCH or
+-- an array POST is counted in full and rolled back whole. Household members and agents have their own, higher rate;
+-- guests also have a daily quota.
+create or replace function public.items_write_rate() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := auth.uid(); v_hh boolean; v_n int;
+begin
+  if public.is_admin_sql() or v_uid is null then return null; end if;
+  select is_household into v_hh from public.profiles where id = v_uid;
+  select count(*) into v_n from public.item_events e where e.actor_id = v_uid and e.at > now() - interval '1 minute';
+  if v_n > public.setting(case when coalesce(v_hh, false) then 'household_write_rate_per_min' else 'write_rate_per_min' end) then
+    raise exception 'too many changes in a minute; wait a moment' using errcode = '54000';
+  end if;
+  if not coalesce(v_hh, false) then
+    select count(*) into v_n from public.item_events e where e.actor_id = v_uid and e.at > now() - interval '1 day';
+    if v_n > public.setting('guest_writes_per_day') then
+      raise exception 'too many changes today' using errcode = '54000';
+    end if;
+  end if;
+  return null;
+end $$;
+drop trigger if exists items_write_rate on public.items;
+create trigger items_write_rate after insert or update on public.items
+  for each statement execute function public.items_write_rate();
+
 -- every item has a space owner from here on (009 back-filled the existing ones)
 update public.items i set space_owner_id = l.owner_id
   from public.lists l where l.id = i.list_id and i.space_owner_id is null;
@@ -232,8 +263,8 @@ alter table public.items alter column space_owner_id set not null;
 
 -- Compatibility (review §6): writers may still send items.tags. The names are filed into a Default tag list and the
 -- column is cleared. Whose Default: a person's own; an agent's on_behalf_of person's, else the list owner's (the agent
--- must edit that Default, else 42501); admin SQL: the list owner's. On UPDATE a non-empty array is the full set of
--- that Default's tags on the item (others are soft-removed); an empty array changes nothing.
+-- must edit that Default, else 42501); admin SQL: the list owner's. Additive on INSERT and UPDATE: names are added (a
+-- removed one comes back), nothing is removed; an empty array changes nothing. Removal goes through item_tags.
 -- The before trigger runs after items_before_write (name order), so the sensitive-data screen saw the names.
 create or replace function public.items_tags_compat() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -259,7 +290,6 @@ declare
   v_who   uuid;
   v_tl    uuid;
   v_tag   uuid;
-  v_ids   uuid[] := '{}';
   v_name  text;
 begin
   if v_raw is null then return null; end if;
@@ -288,17 +318,10 @@ begin
     elsif exists (select 1 from public.tags where id = v_tag and deleted_at is not null) then
       update public.tags set deleted_at = null where id = v_tag;
     end if;
-    v_ids := v_ids || v_tag;
     insert into public.item_tags (item_id, tag_id, added_by) values (new.id, v_tag, coalesce(v_uid, v_who))
     on conflict (item_id, tag_id) do update set removed_at = null, changed_at = now()
       where public.item_tags.removed_at is not null;
   end loop;
-  if tg_op = 'UPDATE' then
-    update public.item_tags it set removed_at = now(), changed_at = now()
-      from public.tags t
-     where it.tag_id = t.id and t.tag_list_id = v_tl and it.item_id = new.id
-       and it.removed_at is null and not (it.tag_id = any (v_ids));
-  end if;
   return null;
 end $$;
 drop trigger if exists items_tags_compat_after on public.items;
@@ -413,7 +436,8 @@ begin
     raise exception 'this category is not available' using errcode = '42501';
   end if;
   select count(*) into v_n from public.lists where owner_id = auth.uid() and archived_at is null;
-  if v_n >= public.setting(case when v_hh then 'household_lists' else 'guest_lists' end) then
+  if v_n >= public.setting(case when v_hh then 'household_lists' else 'guest_lists' end)
+     or (not v_hh and (select count(*) from public.lists where owner_id = auth.uid()) >= public.setting('guest_lists_total')) then
     raise exception 'list limit reached' using errcode = '54000';
   end if;
   insert into public.lists (slug, name, default_category, owner_id, created_by, sort)
@@ -478,8 +502,10 @@ declare
 begin
   if exists (select 1 from public.profiles where id = new.id) then return null; end if;
   if public.is_admin_sql() and coalesce(new.raw_app_meta_data->>'provider', '') = '' then return null; end if;
+  -- allowlist rows are for password logins only; a Google sign-up never claims one
   select * into v_row from ops.signup_allowlist a
    where a.email_lower = lower(new.email) and a.used_at is null and a.expires_at > now()
+     and coalesce(new.raw_app_meta_data->>'provider', '') = 'email'
    order by a.created_at limit 1 for update;
   if found then
     v_kind := v_row.kind; v_hh := v_row.is_household;
@@ -511,7 +537,13 @@ create trigger handle_new_user after insert on auth.users for each row execute f
 create or replace function public.guard_auth_email_change() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
-  if new.email is distinct from old.email and old.email is not null and not public.is_admin_sql() then
+  -- allowed: admin SQL, or the new address is already one of this user's verified Google identity emails (a Google
+  -- account whose address changed); never an address the user merely typed
+  if new.email is distinct from old.email and old.email is not null and not public.is_admin_sql()
+     and not exists (select 1 from auth.identities i
+                      where i.user_id = new.id and i.provider = 'google'
+                        and lower(i.identity_data->>'email') = lower(new.email)
+                        and coalesce((i.identity_data->>'email_verified')::boolean, false)) then
     raise exception 'email changes are made by admin SQL only' using errcode = '42501';
   end if;
   return new;
@@ -550,12 +582,18 @@ begin
   select count(*) into v_n from public.invites
    where invited_by = auth.uid() and accepted_at is null and declined_at is null and revoked_at is null and expires_at > now();
   if v_n >= public.setting('invites_open') then raise exception 'too many open invitations' using errcode = '54000'; end if;
+  -- an open or declined row is refreshed, so the owner always sees one "pending" row (S4); a decline is cleared
+  -- unless the invitee blocked this owner
   select id into v_id from public.invites
    where coalesce(list_id, tag_list_id) = coalesce(p_list, p_tag_list) and email_lower = v_email
-     and accepted_at is null and declined_at is null and revoked_at is null;
+     and accepted_at is null and revoked_at is null;
   if v_id is not null then
     update public.invites set role = p_role, invited_by = auth.uid(), target_name = p_name,
-                              created_at = now(), expires_at = now() + interval '30 days'
+                              created_at = now(), expires_at = now() + interval '30 days',
+                              declined_at = case when exists (
+                                select 1 from public.invite_blocks b join auth.identities i on i.user_id = b.profile_id
+                                 where b.blocked_id = auth.uid() and lower(i.identity_data->>'email') = v_email)
+                                then declined_at end
      where id = v_id;
   else
     insert into public.invites (list_id, tag_list_id, email_lower, role, invited_by, target_name)

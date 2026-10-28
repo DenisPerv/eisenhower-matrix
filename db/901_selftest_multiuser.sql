@@ -265,7 +265,7 @@ begin
   perform public.decline_invite(inv, true);
   perform public._mt_as(a);
   v := public._mt(format('select public.share_list(%L, %L, ''editor'')::text', al, be));
-  perform public._mt_chk('G43a', v || '|' || public._mt(format('select state from public.list_people(%L) where email = %L', al, be)), '{"ok": true}|pending');
+  perform public._mt_chk('G43a', v || '|' || public._mt(format('select count(*) || state from public.list_people(%L) where email = %L group by state', al, be)), '{"ok": true}|1pending');
   perform public._mt_as(b);
   perform public._mt_chk('G43b', public._mt('select count(*)::text from public.my_invitations()'), '0');
 
@@ -275,6 +275,11 @@ begin
                                    || '/' || count(*) filter (where m.role = 'editor' and p.handle = 'homeos-agent')
                                    || '/' || count(*) filter (where p.id in (a, b, c))
                                    from public.list_members m join public.profiles p on p.id = m.profile_id where m.list_id = hl), 'true/true/_/0');
+  -- G26b direct member inserts: a guest owner cannot add a household person, a household owner cannot add a guest
+  perform public._mt_as(a);
+  perform public._mt_chk('G26b', public._mt(format('insert into public.list_members (list_id, profile_id, role) values (%L, %L, ''viewer'')', am, h1)), 'ERR 42501%');
+  perform public._mt_as(h1);
+  perform public._mt_chk('G26c', public._mt(format('insert into public.list_members (list_id, profile_id, role) values (%L, %L, ''viewer'')', hl, a)), 'ERR 42501%');
   -- G38 the agent files tags on behalf of H1 (into H1's Default); on behalf of a guest it is refused
   perform public._mt_as(ag);
   perform public._mt_chk('G38a', public._mt(format('insert into public.items (list_id, category, title, created_via, on_behalf_of, tags) values (%L, ''task'', ''tagged'', ''skill:st-mu'', %L, ''{st-mu-x}'')', hl, h1)), 'ok:1');
@@ -327,10 +332,11 @@ begin
   perform public._mt_chk('G27', v, 'ERR 54000%|ERR 54000%|ERR 54000%|ERR 54000%');
 
   -- G29 A archives the shared list: B sees it frozen; sharing it is refused
+  perform public._mt_as(b);
+  perform public._mt(format('delete from public.invite_blocks where blocked_id = %L', a));
   perform public._mt_as(a);
   perform public.share_list(al, be, 'editor');
   perform public._mt_as(b);
-  perform public._mt(format('delete from public.invite_blocks where blocked_id = %L', a));
   select id into inv from public.my_invitations() where kind = 'list';
   perform public.accept_invite(inv);
   perform public._mt_as(a);
@@ -352,8 +358,22 @@ begin
     if w <> 'ok:1' then v := w; end if;
   end loop;
   perform public._mt_chk('G44', (n + i)::text || ' ' || coalesce(v, 'none'), '121 ERR 54000%');
-
+  -- G44b one bulk statement is counted in full: over the rate, it is refused whole
   perform public._mt_as(null);
+  insert into public.items (list_id, category, title, created_by) values (bg, 'task', 'bulk 1', b), (bg, 'task', 'bulk 2', b), (bg, 'task', 'bulk 3', b);
+  update ops.settings set value = (select count(*) from public.item_events where actor_id = b and at > now() - interval '1 minute') + 2
+   where key = 'write_rate_per_min';
+  perform public._mt_as(b);
+  v := public._mt(format('update public.items set body_md = ''bulk'' where list_id = %L', bg));
+  perform public._mt_as(null);
+  perform public._mt_chk('G44b', v || '/' || (select count(*) from public.items where list_id = bg and body_md = 'bulk'), 'ERR 54000%/0');
+  -- 011 is in force (a lone re-run of 003 would bring back the household policies)
+  perform public._mt_chk('P1 policies',
+    (select string_agg(policyname, ',' order by policyname) from pg_policies
+      where schemaname = 'public' and ((policyname = 'profiles_read' and qual like '%is_household%')
+         or (policyname = 'members_add' and with_check like '%is_household%')
+         or (policyname = 'links_read' and qual like '%to_item%'))), 'links_read,members_add,profiles_read');
+
   raise exception 'SELFTEST % of % passed (rolled back). Failures: %',
     current_setting('mt.total')::int - current_setting('mt.nf')::int,
     current_setting('mt.total'), coalesce(nullif(current_setting('mt.f'), ''), 'none');
