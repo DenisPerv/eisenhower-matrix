@@ -102,7 +102,8 @@ async function tab(B, ctxId, opts = {}) {
   T.theme = v => s('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: v }] });
   T.shot = async name => { const r = await s('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(OUT, name + '.png'), Buffer.from(r.data, 'base64')); return name + '.png'; };
   T.insert = async (sel, text) => { await T.ev(`document.querySelector(${JSON.stringify(sel)}).focus()`); await s('Input.insertText', { text }); };
-  T.ready = () => T.wait('!document.querySelector(".gate") && !!document.querySelector(".matrix, .ar, .tl")', 20000);
+  // round 3: the first-login welcome is closed with Later unless a test keeps it (T.keepWelcome)
+  T.ready = async () => { const ok = await T.wait('!document.querySelector(".gate") && !!document.querySelector(".matrix, .ar, .tl, .rvw")', 20000); if (ok && !T.keepWelcome) await T.ev('(document.getElementById("wl-later")?.click(),true)'); return ok; };
   T.close = () => B.send('Target.closeTarget', { targetId });
   await T.size(opts.width || 1440, opts.height || 900);
   return T;
@@ -523,16 +524,49 @@ async function gUi() {
   for (const [who, theme] of [['maksym', 'light'], ['anastasiia', 'dark']]) {
     const T = await tab(B, await ctx(B));
     await T.theme(theme);
+    // round 3, adjustment 12: a person who has not seen the welcome gets it once (prefs.welcomeSeen; put back in cleanup)
+    const c0 = who === 'maksym' ? MK : AN;
+    const pr = await c0.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c0.uid + '&app=eq.tasksdashboard');
+    if (pr.ok && pr.json.length) await c0.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c0.uid, Object.assign({}, pr.json[0].prefs, { welcomeSeen: false })), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    T.keepWelcome = true;
     check(G, `${who}: opens signed in`, await open(T, await grantFor(who)));
-    await T.click('#profile'); await T.click('[data-menu=settings]'); await T.wait('!!document.getElementById("s-lim")');
+    check(G, `${who}: the welcome shows once, with the urgency values from the settings, and highlights the profile menu`, await T.wait('!!document.getElementById("welcome")', 5000) &&
+      await T.ev(`(()=>{const w=document.getElementById('welcome').textContent;return /Welcome to TasksDashboard/.test(w)&&/Urgency window/.test(w)&&/Due soon/.test(w)&&/Do limit/.test(w)&&document.getElementById('profile').classList.contains('beacon')})()`));
+    for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(500); await T.shot(`ui-welcome-${who}-${w}x${h}-${theme}`); }
+    await T.size(1440, 900);
+    await T.click('#wl-later'); T.keepWelcome = false;
+    check(G, `${who}: Later closes it and the highlight goes`, await T.ev('!document.getElementById("welcome")&&!document.getElementById("profile").classList.contains("beacon")'));
+    await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
     const lim = who === 'maksym' ? 7 : 4;
     await T.ev(`document.getElementById('s-lim').value='${lim}';document.getElementById('s-save').click();true`);
-    await T.click('#profile'); await T.click('[data-cards]');
+    // round 3, adjustment 13: Card layout (cards open expanded, owner shown, auto-collapse 300)
+    await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+    await T.shot(`ui-cardlayout-${who}-1440x900-${theme}`);
+    await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('input[name=cl-mode][value=expanded]').checked=true;d.querySelector('[data-cl=owner]').checked=true;d.querySelector('#cl-auto').value='300';d.querySelector('#cl-save').click();return true})()`);
+    check(G, `${who}: Card layout expanded: cards open; "For <name>" on cards with an owner`, await T.wait(`!document.querySelector('[data-card]') || document.querySelectorAll('[data-card].full').length>0`, 5000), 'For-lines: ' + await T.ev(`[...document.querySelectorAll('.card.full .details .row span')].filter(s=>/^For /.test(s.textContent)).length`));
     await sleep(2000);
     await T.reload(); await T.ready();
-    await T.click('#profile'); await T.click('[data-menu=settings]'); await T.wait('!!document.getElementById("s-lim")');
-    check(G, `${who}: settings and preferences survive a reload (Do limit ${lim}, card mode)`, await T.ev(`document.getElementById('s-lim').value==='${lim}'`) && /Always expanded|Always collapsed/.test(await T.ev('document.body.innerHTML.match(/Always (expanded|collapsed) cards/)?.[0]||""')));
+    check(G, `${who}: the welcome does not come back after a reload`, await T.ev('!document.getElementById("welcome")'));
+    await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+    check(G, `${who}: Card layout survives a reload`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.querySelector('input[name=cl-mode][value=expanded]').checked&&d.querySelector('[data-cl=owner]').checked&&d.querySelector('#cl-auto').value==='300'})()`));
+    await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
+    await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
+    check(G, `${who}: settings and preferences survive a reload (Do limit ${lim})`, await T.ev(`document.getElementById('s-lim').value==='${lim}'`));
+    check(G, `${who}: Urgency settings hold only window, due soon % and Do limit`, await T.ev('!!document.getElementById("s-win")&&!!document.getElementById("s-th")&&!document.getElementById("s-wd")&&!document.getElementById("s-hpd")&&!document.getElementById("s-name")'));
     await T.ev('document.querySelector("dialog[open]")?.close(),true');
+    // round 3, adjustment 7: rail tabs Matrix, Archive, Review; Timeline (draft) from the account menu
+    check(G, `${who}: rail tabs are Matrix, Archive, Review`, await T.ev(`[...document.querySelectorAll('.views [role=tab]')].map(b=>b.dataset.view).join()==='matrix,archive,review'`));
+    await T.click('[data-view=review]');
+    check(G, `${who}: Review opens as a view with its four sections`, await T.wait('document.querySelectorAll(".rvw .rv").length===4', 5000));
+    await T.shot(`ui-review-${who}-1440x900-${theme}`);
+    await T.click('#profile');
+    check(G, `${who}: the account menu has General settings, Urgency settings and Timeline (draft), no Weekly review`, await T.ev(`(()=>{const t=document.getElementById('pop').textContent;return /General settings/.test(t)&&/Urgency settings/.test(t)&&/Timeline \\(draft\\)/.test(t)&&!/Weekly review/.test(t)})()`));
+    await T.click('[data-menu=timeline]');
+    check(G, `${who}: Timeline (draft) opens the Timeline view`, await T.wait('!!document.querySelector(".tl")', 5000));
+    await T.click('#profile'); await T.click('[data-menu=general]');
+    check(G, `${who}: General settings hold display name and time zone`, await T.wait('!!document.getElementById("s-name")&&!!document.getElementById("s-tz")&&!document.getElementById("s-lim")', 5000));
+    await T.ev('document.querySelector("dialog[open]")?.close(),true');
+    await T.click('[data-view=matrix]');
     // counts on the chips equal the database (open, live items on lists that are not archived)
     const c = who === 'maksym' ? MK : AN;
     const lists = (await c.rest('GET', 'lists?select=id,name&archived_at=is.null')).json;
@@ -541,6 +575,9 @@ async function gUi() {
     const bad = lists.filter(l => chips[l.id] !== undefined && chips[l.id] !== items.filter(i => i.list_id === l.id).length).map(l => l.name);
     check(G, `${who}: chip counts equal REST counts`, !bad.length && chips.all === items.filter(i => lists.some(l => l.id === i.list_id)).length, bad.join(', '));
     for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(600); await T.shot(`ui-${who}-${w}x${h}-${theme}`); }
+    await T.size(390, 844); await sleep(400);
+    for (const v of ['matrix', 'review']) { await T.click(`[data-view=${v}]`); await sleep(300); check(G, `${who}: no horizontal scroll at 390 px (${v})`, await T.ev('document.documentElement.scrollWidth<=innerWidth'), await T.ev('document.documentElement.scrollWidth+" / "+innerWidth')); }
+    await T.click('[data-view=matrix]');
     await T.size(1440, 900);
     check(G, `${who}: ${onlyHosts()}`, !strayHosts(T.hosts, SUPA, ORIGIN).length, [...T.hosts].join(', '));
     check(G, `${who}: no console errors`, !T.errors.length, T.errors.slice(0, 2).join(' / '));

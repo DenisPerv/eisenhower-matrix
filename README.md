@@ -69,7 +69,7 @@ Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intende
 - **Stay signed in:** ticked keeps the refresh token in `localStorage` `td.auth`; unticked keeps it in `sessionStorage` (this tab only; a new tab asks again). The access token stays in memory. `td.auth` also holds the login's id: a tab reads its own `sessionStorage` first and never takes another person's token.
 - **Several tabs:** a refresh runs under the Web Lock `td.refresh`, and the BroadcastChannel `td.auth` hands the new token pair to the person's other tabs (refresh tokens rotate; reusing an old one ends the session). Parallel 401s cause one refresh, not one each.
 - **401:** one silent refresh and a retry; if that fails, the form shows "Session ended. Sign in again." and the waiting changes are sent after the next sign-in.
-- **Account menu (the name; a badge counts open invitations):** the display name and the session email; Tags; Sharing; Settings; Weekly review, card mode, Archived lists, Hidden lists (when any); **Accounts on this browser** (`td.accounts`, other accounts by email, "Google" when they used it; picking one signs out here, then opens Google with that email, or the password form filled in; a cross forgets it); Add account (sign out, then the sign-in screen); Sign out (`/auth/v1/logout?scope=local` with a fresh token: this browser only; other devices stay signed in; with changes still waiting it sends them first, and if they can't be sent it says so and signs out on the second click). Nothing from other people's profiles is listed, and no token of another account is kept.
+- **Account menu (the name; a badge counts open invitations):** the display name and the session email; Tags; Sharing; General settings (people); Urgency settings; Timeline (draft) (opens the Timeline view), Card layout, Archived lists, Hidden lists (when any); **Accounts on this browser** (`td.accounts`, other accounts by email, "Google" when they used it; picking one signs out here, then opens Google with that email, or the password form filled in; a cross forgets it); Add account (sign out, then the sign-in screen); Sign out (`/auth/v1/logout?scope=local` with a fresh token: this browser only; other devices stay signed in; with changes still waiting it sends them first, and if they can't be sent it says so and signs out on the second click). Nothing from other people's profiles is listed, and no token of another account is kept.
 
 ## Model
 
@@ -89,7 +89,7 @@ Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intende
 
 ## Data and sync
 
-- **Load:** lists (`archived_at=is.null`), my `list_members` rows (role, `hidden_at`), categories, profiles (my own row; the household's rows for household members, by RLS; `email` is not readable), `rpc/visible_profiles` (names of people I share a list or tag list with), my tag lists and `tag_list_members` rows, live tags, `rpc/my_invitations`, my preferences, then every live item and every live `item_tags` row. Every load pages with `order=id&limit=1000&offset=…` (`item_tags`: `order=item_id,tag_id`) until a short page.
+- **Load:** lists (`archived_at=is.null`), my `list_members` rows (role, `hidden_at`), categories, profiles (my own row; the household's rows for household members, by RLS; `email` is not readable), `rpc/visible_profiles` (names of people I share a list or tag list with), my tag lists and `tag_list_members` rows, live tags (`select=*`: when the rows carry `updated_at`, `db/012`, the poll also reads changed tags), `rpc/my_invitations`, my preferences, then every live item and every live `item_tags` row. Every load pages with `order=id&limit=1000&offset=…` (`item_tags`: `order=item_id,tag_id`) until a short page.
 - **Tags** (`item_tags`, `db/009`): a task holds tag ids; a chip shows the tag's name, with the owner's initial when two people's tag lists hold the same name (`tagLabels`; never on my own). Tags of a hidden tag list don't show. Adding writes `item_tags` (a removed row is revived by PATCH `removed_at=null`, else inserted); removing sets `removed_at`. These go after the item's own fields in the same queue, without a version (the last write wins). A new name is created in my Default tag list on Save (a deleted one with that name is revived). Renaming a tag is one PATCH on `tags`; deleting sets `tags.deleted_at` and takes it off every item I may edit. The legacy `items.tags` column is never read or written by the page.
 - **Owner:** a new item from the page carries `owner_id` = me (who it is for; "Mine").
 - **Roles** (`list_members.role`): viewer reads only; contributor adds and edits only items they created, never deletes; owner and editor do everything. The page hides what the role can't do; the database enforces it.
@@ -98,7 +98,7 @@ Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intende
 - **Task window:** Save sends only the fields changed in the window. If the item changed while the window was open (a poll updates it in place) and someone else changed one of those same fields, the window reopens with the person's text and a note instead of overwriting it.
 - **Errors** (`restError`): 22023 starting "sensitive data" the database's text (card, IBAN or ID number; the window stays open); any other 22023 a bad value in plain words (`DB_TEXT`, e.g. "The person it is for is not a member of this list."; kind `invalid`, the window stays open), or "This list is archived. Restore it first."; 54000 a limit (`DB_TEXT`, e.g. "This list is full: its item limit is reached."); 42501 / 403 "Not allowed for your role on this list.", "This list is archived. Restore it first." or a sharing text from `DB_TEXT` ("This invitation is no longer open.", "Owners can't leave their own list.", …); 23514 "The title is over 300 characters."; 23505 on a list "A list with this name exists."; 401 refresh once; 429 wait.
 - **Offline:** a network error, a 5xx or a 429 keeps the change in the queue ("Offline: N changes waiting", or "The database is busy" for 429); it is sent on `online`, on the next poll or on focus. Leaving the page with changes waiting asks first.
-- **Poll:** every `pollMs` while the page is visible, and on focus: items with `updated_at` ≥ the newest seen minus 120 s (`POLL_OVERLAP_MS`), deleted ones included; versions dedupe; items with waiting changes are skipped. Then `item_tags` with `changed_at` ≥ the newest seen minus 120 s (`tagPollFilter`), soft removals included (`mergeTagRows`). On focus, or when an item shows up on an unknown list or a tag on an unknown tag, lists, roles, categories, tag lists, tags and invitations load again; a list or tag list that became readable reloads every live `item_tags` row.
+- **Poll:** every `pollMs` while the page is visible, and on focus: items with `updated_at` ≥ the newest seen minus 120 s (`POLL_OVERLAP_MS`), deleted ones included; versions dedupe; items with waiting changes are skipped. Then `item_tags` with `changed_at` ≥ the newest seen minus 120 s (`tagPollFilter`), soft removals included (`mergeTagRows`; an unknown tag id is noted even on an item with changes waiting, whose row is still skipped). Unknown tag ids, from any poll, are read with `tags?id=in.(…)`; then, from `db/012` on, tags with `updated_at` ≥ the newest seen minus 120 s (`tagDefsFilter`, deleted ones included) are merged (`mergeTagDefs`: a rename relabels the chips, a deleted tag goes). Before `db/012` that request is never sent (detected from the loaded rows, so nothing fails). A tag on a tag list the page does not know reloads lists and tag lists. On focus, or when an item shows up on an unknown list or a tag on an unknown tag, lists, roles, categories, tag lists, tags and invitations load again; a list or tag list that became readable reloads every live `item_tags` row.
 - **Hidden lists:** "Hide for me" (`rpc/set_list_hidden`) takes a list off my chips, All and search; Account menu → Hidden lists → Show again.
 - **Card order:** the shared `items.sort_key` (`db/005`), ascending; cards without one go last. A dropped card takes the midpoint of its new neighbours (±1024 at the ends); a quadrant with missing keys or a gap under 1e-6 is renumbered with spacing 1024 first. New cards go on top.
 - **Undo** (toast, 8 s, or Ctrl/Cmd+Z): sends the inverse as a new versioned write: add → soft delete (no Undo where the role can't delete), delete → restore, done / cancel → the earlier status, move or edit → the old fields.
@@ -113,7 +113,8 @@ Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intende
   - **Account menu → Sharing:** Invitations (`rpc/my_invitations`: Accept → `rpc/accept_invite`; Decline; Decline and block, after a question → `rpc/decline_invite`), My lists (Share), Shared with me (role and owner; People, Hide for me or Show, Leave → `rpc/leave_list` after a question).
   - **List chip menu:** owner: Share…, Archive; member: People, Hide for me, Leave; both: Archived lists, Hidden lists.
   - **Account menu → Tags:** my tags (rename in place, ↑ ↓ for my tag order, delete after a question, New tag + Add, Share my tags…) and tag lists shared with me (their tags; Hide for me or Show via `rpc/set_tag_list_hidden`, Leave via `rpc/leave_tag_list`).
-- **Settings → Display name and Time zone** (people): PATCH of my own `profiles` row (`display_name`, `timezone`; the time zone from the browser's list, the browser's own by default).
+- **General settings → Welcome note → Show again** shows the first-login welcome once more.
+- **General settings → Display name and Time zone** (people): PATCH of my own `profiles` row (`display_name`, `timezone`; the time zone from the browser's list, the browser's own by default).
 - **Sources:** the task window lists the item's `item_refs` (read only; links are shown as text).
 
 ## Preferences and Settings
@@ -124,24 +125,36 @@ One row per person in `preferences` (`app = tasksdashboard`), upserted on `profi
 |---|---|---|
 | `version` | `2` | format |
 | `theme` | `auto` | `auto` (system), `light`, `dark` |
-| `view` | `matrix` | `matrix`, `archive`, `timeline` |
+| `view` | `matrix` | `matrix`, `archive`, `review`, `timeline` (`VIEWS`) |
 | `list` | `all` | `all` or a list id |
 | `listOrder` | `[]` | list ids in chip order |
 | `tagOrder` | `[]` | my tag order (tag ids) in the task window and Account menu → Tags; names from before multi-user are dropped |
 | `axes` | `{ fx: 0.5, fy: 0.5 }` | matrix split: `fx` = width share of the not-urgent column, `fy` = height share of the important row; clamped to the window |
 | `menuCollapsed` | `[]` | collapsed side-menu groups `A`..`D` |
-| `cards` | `{ mode: 'collapsed', flipped: [] }` | card mode and the item ids shown the other way |
-| `settings` | below | the Settings dialog |
+| `cards` | `{ mode: 'collapsed', flipped: [] }` | how cards open (Card layout → Cards open) and the item ids shown the other way |
+| `cardLayout` | `CARD_LAYOUT_DEFAULTS`, below | Account menu → Card layout |
+| `welcomeSeen` | `false` | the first-login welcome was closed (General settings → Show again sets it back) |
+| `settings` | below | Account menu → Urgency settings |
 
 Unknown keys, version 1 path keys and ids that no longer exist are dropped; a value of the wrong type takes its default.
 
 | Setting | Default | Range |
 |---|---|---|
-| `threshold` (urgency threshold, %) | 50 | 10-90 |
-| `windowDays` (urgency window) | 7 | 1-30 |
-| `workingDays` | false | |
+| `windowDays` (urgency window: a task without a fixed quadrant moves to Do when its end is this close) | 7 | 1-30 |
+| `threshold` (due soon, %: a card is marked "due soon" when less than this share of the window is left, `dueSoon`) | 50 | 10-90 |
 | `doLimit` ("Do" limit; the A count turns red above it; the CLI's `do`) | 5 | 0-50 |
-| `hoursPerDay` | 8 | 1-24 |
+
+`workingDays` and `hoursPerDay` (before round 3, never read) are dropped on read.
+
+| `cardLayout` key | Default | Holds |
+|---|---|---|
+| `description`, `number`, `arrow`, `end` | `true` | an open card shows the description, the task number, the expand arrow (on every card), the End date |
+| `created`, `creator`, `owner` | `false` | an open card shows "Created <date>", "By <name>" (`created_by`), "For <name>" (`owner_id`; display names, "you" for me) |
+| `tags` | `all` | `all`, `lists` (only tags from the tag lists in `tagLists`), `off` (`cardTagIds`) |
+| `tagLists` | `[]` | tag list ids; ones that no longer exist are dropped |
+| `autoCollapse` | `100` | 0-5000 characters: with cards opening expanded, a card whose description is longer starts collapsed (`cardExpanded`; the arrow still opens it); 0 = off |
+
+The defaults are the card before round 3.
 
 ## Storage in the browser
 
@@ -160,10 +173,13 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
 
 - **Top bar:** Priority fan logo (`ADV_LOGO`), a button that plays its animation once (`LOGO_PLAY_MS` 3600 ms; nothing with reduced motion); list chips (All first, five chips, the rest behind `+N`; drag or Alt+arrows to reorder; a selected list from `+N` shows sixth); `…` list menu on a selected list (Archive, Archived lists); New list (people only); the person's menu; theme button (Auto until the first click).
 - **Search:** Due, Tag, Category, "To check" (low confidence) and Mine filters; results grouped by quadrant; `/` focuses, arrows and Enter open. Mine (`isMine`) = items whose `owner_id` is me, or that carry a tag I can see whose name is in my `mine_tags`. The Tag filter and search use the chip labels.
-- **Side menu:** views (Matrix, Archive, Timeline) and the open items by quadrant; drag its edge to resize (256 px to start, 128-560 px), drag below 128 px, double-click or Enter on the edge to hide; a slim tab brings it back.
+- **Side menu:** views (Matrix, Archive, Review) and the open items by quadrant; drag its edge to resize (256 px to start, 128-560 px), drag below 128 px, double-click or Enter on the edge to hide; a slim tab brings it back.
 - **Matrix:** drag cards between and inside quadrants (the row sets importance, the column sets urgency by hand); `+` and double-click to add; expand one quadrant; movable axes (drag, arrows, Home or double-click to reset).
 - **Task window:** title and description with bold, italic and lists; list (with All selected, a new item's list is preselected: the `task` category's default list when I may add there, else my own first list, else the first I may add to: `defaultAddList`); quadrant; end; tags (chips of the tag lists I own or edit; tags from tag lists I only view show pressed and disabled and are kept; + adds a name, created in my Default on Save; double-click or F2 renames the tag, the cross or Delete deletes it, both for owners and editors of its tag list; drag or Alt+arrows reorder); Sources; Mark cancelled; Delete. Read only for a viewer.
-- **Other views:** Archive (sort, Restore, Delete, Clear with a question); Timeline with weekends, today and a load row; Weekly review.
+- **Welcome** (people, once: `welcomeSeen`): a note pinned under the profile menu, which gets an accent ring while it is open (a pulse twice, none with reduced motion). It explains Urgency window, Due soon and Do limit with the person's current values; **Set urgency now** opens Urgency settings, **Later** or Esc closes it. Either marks it seen. It is not a `<dialog>`, so polls keep rendering under it.
+- **Card layout** (Account menu): Cards open (Collapsed / Expanded), auto-collapse length, what a card shows, tags (all, only chosen tag lists, none); Reset puts the defaults back.
+- **Due soon:** an open card whose end is less than `threshold` % of the urgency window away (and not past) gets a yellow hairline around its date and a "due soon" text for screen readers; its side-menu row a yellow bar. Overdue keeps its red mark.
+- **Other views:** Archive (sort, Restore, Delete, Clear with a question); Review (rail; the 7 days around today: Overdue, Due soon, Completed in the last 7 days, Due in the next 7 days; a row opens its task); Timeline (account menu, "Timeline (draft)") with weekends, today and a load row.
 
 ## CLI
 
@@ -191,7 +207,7 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
 
 | Command | What | Network |
 |---|---|---|
-| `node --test "test/*.test.js"` | `core.test.js` (the core rules), `multiuser.test.js` (Google sign-in: `isHostedOrigin`, PKCE against RFC 7636 appendix B, `authorizeUrl`, `readCallback`, `oauthMessage`, `td.accounts`; errors in plain words; tags from `item_tags`, `tagLabels`, `isMine`, `mergeTagRows`; `membershipActions`, `defaultAddList`) `round3.test.js` (round 3: `createdList`, `listNameClash`, `freeListName`) and `cli.test.js` (arguments, keys, dates, output, exit codes, owners and `OWNER/slug`, the e2e `--url` / `--access-env` helpers, the guest login names and `guestLeaks`) | none |
+| `node --test "test/*.test.js"` | `core.test.js` (the core rules), `multiuser.test.js` (Google sign-in: `isHostedOrigin`, PKCE against RFC 7636 appendix B, `authorizeUrl`, `readCallback`, `oauthMessage`, `td.accounts`; errors in plain words; tags from `item_tags`, `tagLabels`, `isMine`, `mergeTagRows`; `membershipActions`, `defaultAddList`) `round3.test.js` (round 3: `createdList`, `listNameClash`, `freeListName`, settings without the two cut keys, `dueSoon`, `mergeTagRows` with changes waiting, `mergeTagDefs`, `tagDefsFilter`, `cardLayout` and `welcomeSeen` in the preferences, `readCardLayout`, `cardExpanded`, `cardTagIds`) and `cli.test.js` (arguments, keys, dates, output, exit codes, owners and `OWNER/slug`, the e2e `--url` / `--access-env` helpers, the guest login names and `guestLeaks`) | none |
 | `node test/e2e.mjs --env <file> --out <dir> [--group auth,data,sync,archive,errors,ui,guests] [--smoke] [--page <html>] [--url <https origin> [--access-env <file>]]` | the page against the live database in headless Chrome or Edge (or Playwright's chromium) over DevTools; report `e2e-report.md` and screenshots in `<dir>`; without `--group`, every group but smoke | live, Node 22+ |
 
 - The e2e runner signs in over REST in Node and seeds `td.auth`; the form is only fed dummy credentials while Fetch interception answers it, so no real password is typed into the page.
@@ -202,7 +218,7 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
   - **Guest A** (`TASKSDB_GUEST_A_EMAIL` / `_PASSWORD`; must be a guest login, `is_household` false, else the group stops): reads only its own lists, tags and the `task` / `reminder` categories (`guestLeaks` over lists, items, categories, profiles, tag lists, tags and `item_tags`). Maksym shares a test list as Viewer through the UI: nothing before Accept; Accept in Account menu → Sharing; then that list and its item, none of Maksym's tags, only Maksym in `visible_profiles`. A makes a tag and shares its Default with Maksym (never the other way, so the household's tags never reach a guest): Maksym sees it only after Accept, and Leave takes it away. Decline and block on a second invitation: Maksym still reads "pending", and a new invitation never reaches A. Maksym removes A in the Share dialog: 0 rows. Board screenshots at 1440×900 and 390×844.
   - **Guest A and guest B** (`TASKSDB_GUEST_B_*` too): A shares its own list with B through the UI; B sees nothing before Accept (at 390×844), then the list without A's tags until A shares its Default; A removes B: 0 rows.
   - A missing login skips its part (`skipped` in the report with the missing names, never counted as passed). Cleanup undoes every step: invitations revoked, blocks and memberships removed, the guests' tags soft-deleted, test lists archived. Guest A reuses one list of its own (slug `guests-e2e-a`, restored and archived again each run), so runs never use up its lifetime list limit.
-- **Group `ui`** also creates a test list through New list: its chip must be drawn ≤ 300 ms after the RPC answers (`td:list-rpc` → `td:list-shown`), and the same name again must be refused in the window without an RPC.
+- **Group `ui`** also creates a test list through New list: its chip must be drawn ≤ 300 ms after the RPC answers (`td:list-rpc` → `td:list-shown`), and the same name again must be refused in the window without an RPC. It also checks the rail tabs (Matrix, Archive, Review), the Review view, the account menu (General settings, Urgency settings, Timeline (draft)) and what each settings window holds; the welcome (shown once after `welcomeSeen` is set back to false, screenshots at both widths, Later closes it, not back after a reload; every other page closes it on open) and Card layout (saved, survives a reload, then reset).
 - `--smoke` is read only: the board opens signed in, chip counts equal the database, only the Supabase host is contacted, no console errors.
 - Console errors include security messages from the browser (a CSP violation counts as an error).
 - **`--url <https origin>`** (a hosted copy, e.g. `https://homeos-tasksboard.pages.dev`): the page is `<origin>/` instead of the local file, and sessions are seeded on `<origin>/version.json` (same origin, so the same `td.auth`). An origin only: https, no path. The host checks then allow exactly the Supabase host and the page origin. The core rules still load from the local `TasksDashboard.html` (or `--page`). Without `--url` everything runs from `file://`.
@@ -210,7 +226,7 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
 
 ## Code
 
-- `<script id="core">` (global `TDCore`): config, headers, sessions, `restError`, row ↔ task, preferences v2, `deriveQuadrant`, card order, `mergePoll`, `inverseOf`, paging, `overdueItems`, `topDo`, role rules. No DOM, no clock.
+- `<script id="core">` (global `TDCore`): config, headers, sessions, `restError`, row ↔ task, preferences v2, `deriveQuadrant`, card order, `mergePoll`, `inverseOf`, paging, `overdueItems`, `topDo`, role rules; round 3: `createdList`, `listNameClash`, `freeListName`, `dueSoon`, `mergeTagDefs`, `tagDefsFilter`, `readCardLayout`, `cardExpanded`, `cardTagIds`. No DOM, no clock.
 - The UI script holds the session, the write queue, polling and rendering. The 4-5 layer script (axes, side-menu width) exposes `window.tdAxes` (`get`, `set`, `onSave`).
 
 ## Hosting

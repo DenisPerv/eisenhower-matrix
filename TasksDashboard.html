@@ -593,6 +593,43 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .tl-d.we{background:repeating-linear-gradient(90deg,transparent 0 3px,var(--well) 3px 4px)}
 .tl-bar{border-radius:var(--r-sm);background:var(--c);height:14px;min-height:14px}
 #tl-prev,#tl-next{border-radius:var(--r)}
+/* round 3: weekly review as a rail view (A9 redesigns it); rows open their task */
+.rvw{background:var(--solid);border:1px solid var(--hair);border-radius:var(--r-xl);box-shadow:var(--depth);padding:var(--s3) var(--s4) var(--s4)}
+.rvw .rv:first-of-type{margin-top:var(--s2)}
+.rvw .rr{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);border-radius:var(--r-sm);cursor:pointer;font:inherit;font-size:13px}
+.rvw button.rr:hover{background:var(--hover)}
+.rvw .rr .k{font-family:var(--mono);color:var(--ink3)}
+/* round 3: "due soon" (less than threshold % of the urgency window left): a hairline in the Delegate yellow, as overdue has one in red */
+.card.soon .meta{border-radius:var(--r-sm);border:1px solid color-mix(in srgb,var(--qc) 70%,transparent);padding:1px 6px;font-family:var(--mono);color:var(--ink)}
+.mrow.soon{box-shadow:inset 2px 0 0 var(--qc)}
+.nl-x{justify-content:flex-start;margin-top:var(--s2)}
+.s-hint{margin:2px 0 var(--s3);font-size:12px;line-height:1.4;color:var(--ink3);max-width:46ch}
+.s-row{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin-top:var(--s4);padding-top:var(--s3);border-top:1px solid var(--hair);font:500 13px var(--ui)}
+/* round 3: Card layout */
+dialog form.cl{min-width:min(420px,calc(100vw - 48px))}
+dialog fieldset{border:1px solid var(--hair);border-radius:var(--r);margin:var(--s4) 0 0;padding:var(--s2) var(--s4) var(--s3);display:grid;gap:var(--s2)}
+dialog legend{padding:0 var(--s2);font:500 13px var(--ui);color:var(--ink2)}
+.cl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2) var(--s4)}
+.cl-lists{display:grid;gap:var(--s2);padding-left:22px}
+.cl-lists .n{font-size:12px;color:var(--ink3)}
+@media (max-width:480px){.cl-grid{grid-template-columns:1fr}}
+/* round 3: the first-login welcome, pinned under the profile menu; the menu button gets an accent ring while it is open */
+.welcome{position:fixed;z-index:25;width:min(360px,calc(100vw - 16px));background:var(--solid);border:1px solid var(--hair2);border-radius:var(--r-xl);
+  box-shadow:var(--depth),0 30px 70px -30px var(--glow);padding:var(--s5);color:var(--ink);
+  background-image:linear-gradient(90deg,var(--accent),var(--cyan) 60%,transparent);background-size:100% 2px;background-repeat:no-repeat}
+.welcome::before{content:"";position:absolute;top:-6px;right:22px;width:10px;height:10px;background:var(--solid);border-left:1px solid var(--hair2);border-top:1px solid var(--hair2);transform:rotate(45deg)}
+.welcome h2{margin:0 0 var(--s3);font:600 17px var(--serif)}
+.welcome p{margin:0 0 var(--s4);font-size:13px;line-height:1.45;color:var(--ink2)}
+.welcome dl{margin:0;display:grid;gap:var(--s2)}
+.welcome dt{display:flex;justify-content:space-between;gap:var(--s3);font:500 13px var(--ui)}
+.welcome dt .v{font:600 12px var(--mono);font-variant-numeric:tabular-nums;color:var(--accent-ink)}
+.welcome dd{margin:0 0 var(--s2);font-size:12px;line-height:1.4;color:var(--ink3)}
+.welcome .actions{margin-top:var(--s4)}
+#wl-go{background:var(--accent);border-color:transparent;color:var(--on-accent)}
+#profile.beacon{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--r);box-shadow:0 0 0 6px var(--accent-bg),0 0 22px -4px var(--glow)}
+@media (prefers-reduced-motion:no-preference){#profile.beacon{animation:td-beacon 1.6s ease-out 2}}
+@keyframes td-beacon{0%{box-shadow:0 0 0 0 var(--glow)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 6px var(--accent-bg),0 0 22px -4px var(--glow)}}
+@media (max-width:700px){.welcome{left:8px;right:8px!important;width:auto}.welcome::before{display:none}}
 
 /* dialog: a sharp panel with an aurora hairline across the top, plain dimmed backdrop */
 dialog{border-radius:var(--r-xl);border:1px solid var(--hair2);background:var(--solid);box-shadow:var(--depth),0 40px 90px -40px var(--glow);
@@ -985,6 +1022,7 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
       priority: typeof r.priority === 'number' ? r.priority : null, reviewState: r.review_state || 'none',
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
+      createdAt: date(r.created_at),
     };
   }
   // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
@@ -1015,15 +1053,22 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
   }
 
   // preferences v2, one row per person and app. List keys are list ids; flipped holds item ids.
-  const SETTINGS_DEFAULTS = { threshold: 50, windowDays: 7, workingDays: false, doLimit: 5, hoursPerDay: 8 };
-  const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS };
+  // round 3: workingDays and hoursPerDay are gone (never read); readSettings drops them from older rows
+  const SETTINGS_DEFAULTS = { threshold: 50, windowDays: 7, doLimit: 5 };
+  // the rail's tabs are matrix, archive and review; timeline opens from the account menu ("Timeline (draft)")
+  const VIEWS = ['matrix', 'archive', 'review', 'timeline'];
+  // round 3, adjustment 13: what a card shows (Account menu → Card layout). The defaults are today's card. tags: 'all', 'lists'
+  // (only the tag lists in tagLists) or 'off'; autoCollapse: an expanded-mode card whose description is longer starts collapsed (0 = off)
+  const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, tags: 'all', tagLists: [], autoCollapse: 100 };
+  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'owner'];
+  const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false };
   const clone = o => JSON.parse(JSON.stringify(o));
   function readSettings(raw) {
     const s = clone(SETTINGS_DEFAULTS);
     if (!isObj(raw)) return s;
     const num = (k, lo, hi) => { if (typeof raw[k] === 'number' && raw[k] >= lo && raw[k] <= hi) s[k] = raw[k]; };
-    num('threshold', 10, 90); num('windowDays', 1, 30); num('doLimit', 0, 50); num('hoursPerDay', 1, 24);
-    if (typeof raw.workingDays === 'boolean') s.workingDays = raw.workingDays;
+    num('threshold', 10, 90); num('windowDays', 1, 30); num('doLimit', 0, 50);
     return s;
   }
   // unknown keys, v1 path keys and stale ids are dropped; a value of the wrong type falls back to its default
@@ -1034,7 +1079,7 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     const listOk = x => typeof x === 'string' && !x.includes('/') && (!lists || lists.has(x));
     const frac = v => typeof v === 'number' && v > 0 && v < 1;
     if (['auto', 'light', 'dark'].includes(raw.theme)) p.theme = raw.theme;
-    if (['matrix', 'archive', 'timeline'].includes(raw.view)) p.view = raw.view;
+    if (VIEWS.includes(raw.view)) p.view = raw.view;
     if (raw.list === 'all' || listOk(raw.list)) p.list = raw.list;
     if (strs(raw.listOrder)) p.listOrder = raw.listOrder.filter(listOk);
     if (strs(raw.tagOrder)) p.tagOrder = raw.tagOrder.slice();
@@ -1045,7 +1090,32 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
       if (strs(raw.cards.flipped)) p.cards.flipped = raw.cards.flipped.filter(id => !items || items.has(id));
     }
     p.settings = readSettings(raw.settings);
+    p.cardLayout = readCardLayout(raw.cardLayout, known && known.tagListIds);
+    if (typeof raw.welcomeSeen === 'boolean') p.welcomeSeen = raw.welcomeSeen;
     return p;
+  }
+  function readCardLayout(raw, tagListIds) {
+    const c = clone(CARD_LAYOUT_DEFAULTS);
+    if (!isObj(raw)) return c;
+    CARD_FIELDS.forEach(k => { if (typeof raw[k] === 'boolean') c[k] = raw[k]; });
+    if (['all', 'lists', 'off'].includes(raw.tags)) c.tags = raw.tags;
+    const ids = tagListIds ? new Set(tagListIds) : null;
+    if (strs(raw.tagLists)) c.tagLists = raw.tagLists.filter(id => !ids || ids.has(id));
+    if (Number.isInteger(raw.autoCollapse) && raw.autoCollapse >= 0 && raw.autoCollapse <= 5000) c.autoCollapse = raw.autoCollapse;
+    return c;
+  }
+  // a card is expanded when the mode says so (and, in expanded mode, its description is not over autoCollapse), unless flipped
+  function cardExpanded(t, mode, layout, flipped) {
+    const l = layout || CARD_LAYOUT_DEFAULTS;
+    const long = l.autoCollapse > 0 && String(t.notes || '').length > l.autoCollapse;
+    return (mode === 'expanded' && !long) !== !!(flipped && flipped.has(t.id));
+  }
+  // the tag ids a card shows: all, none, or those whose tag list is chosen; tagListOf = { tag id: tag list id }
+  function cardTagIds(ids, layout, tagListOf) {
+    const l = layout || CARD_LAYOUT_DEFAULTS;
+    if (l.tags === 'off') return [];
+    if (l.tags === 'lists') return (ids || []).filter(id => l.tagLists.includes((tagListOf || {})[id]));
+    return (ids || []).slice();
   }
   const rowFromPrefs = (profileId, prefs) => ({ profile_id: profileId, app: 'tasksdashboard', prefs: Object.assign(clone(prefs), { version: 2 }) });
 
@@ -1056,6 +1126,13 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     const important = (typeof t.priority === 'number' && t.priority >= 3) || IMPORTANT_CATEGORIES.includes(t.category);
     const urgent = t.pin !== undefined && t.pin !== null ? !!t.pin : !!(t.deadline && t.deadline.getTime() - now <= s.windowDays * DAY);
     return important ? (urgent ? 'A' : 'B') : (urgent ? 'C' : 'D');
+  }
+  // round 3, adjustment 11: "due soon" = open, not overdue, and less than threshold % of the urgency window left
+  function dueSoon(t, settings, now) {
+    const s = settings || SETTINGS_DEFAULTS;
+    if (!t || !t.deadline || t.deleted || CLOSED.includes(t.status)) return false;
+    const left = t.deadline.getTime() - now;
+    return left >= 0 && left < s.windowDays * DAY * s.threshold / 100;
   }
 
   // card order: ascending sort_key; a card without one goes after those with one, by number
@@ -1224,8 +1301,10 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     let changed = 0;
     rows.forEach(r => {
       const t = byId.get(r.item_id);
-      if (!t || pending.has(r.item_id)) return;
+      if (!t) return;
+      // round 3: an unknown tag is reported even on an item with writes waiting (its row is still skipped)
       if (known && !known.has(r.tag_id) && !r.removed_at) unknownTags.add(r.tag_id);
+      if (pending.has(r.item_id)) return;
       const has = t.tags.includes(r.tag_id);
       if (r.removed_at && has) { t.tags = t.tags.filter(x => x !== r.tag_id); changed++; }
       else if (!r.removed_at && !has) { t.tags = t.tags.concat(r.tag_id); changed++; }
@@ -1233,6 +1312,22 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     return { changed, unknownTags: [...unknownTags] };
   }
   const tagPollFilter = maxSeen => 'changed_at=gte.' + encodeURIComponent(new Date(maxSeen - POLL_OVERLAP_MS).toISOString());
+  // round 3, adjustment 4: tag rows (fetched by id, or changed since tags.updated_at, db/012) merged into the tags the page
+  // knows: a rename relabels, a deleted one goes, a new one on a known tag list comes in; one on an unknown tag list is reported
+  function mergeTagDefs(tags, rows, knownTagLists) {
+    const out = Object.assign({}, tags || {}), lists = new Set(knownTagLists || []);
+    const unknownLists = new Set();
+    let changed = 0;
+    (rows || []).forEach(r => {
+      if (!r || typeof r.id !== 'string') return;
+      if (r.deleted_at) { if (out[r.id]) { delete out[r.id]; changed++; } return; }
+      if (!lists.has(r.tag_list_id)) { unknownLists.add(r.tag_list_id); return; }
+      const cur = out[r.id], next = { id: r.id, tag_list_id: r.tag_list_id, name: r.name, sort: r.sort };
+      if (!cur || cur.name !== next.name || cur.tag_list_id !== next.tag_list_id || cur.sort !== next.sort) { out[r.id] = next; changed++; }
+    });
+    return { tags: out, changed, unknownLists: [...unknownLists] };
+  }
+  const tagDefsFilter = maxSeen => 'updated_at=gte.' + encodeURIComponent(new Date(maxSeen - POLL_OVERLAP_MS).toISOString());
   // what the caller may do with a list or a tag list: owners share (and archive or rename); members hide and leave
   function membershipActions(role, kind) {
     if (role === 'owner') return kind === 'list' ? ['share', 'people', 'archive'] : ['share', 'people', 'rename'];
@@ -1277,7 +1372,8 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, forgetAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
-    createdList, listNameClash, freeListName };
+    createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, cardTagIds };
 });
 </script>
 <script>
@@ -1337,6 +1433,7 @@ const THEMES = ['light', 'dark'];
 let toastTimer = null, lastUndo = null, dragId = null;
 const overdue = t => t.deadline && t.deadline < TODAY;
 const upcoming = t => t.start && t.start > TODAY;
+const soon = t => C.dueSoon(t, settings, TODAY.getTime()); // round 3: less than threshold % of the urgency window left
 const inList = t => st.list === 'all' || t.list === st.list;
 const refText = t => initial(t.list) + t.num;
 const ref = t => esc(refText(t)); // escaped: the initial comes from a list name
@@ -1563,6 +1660,7 @@ async function signOut(prefillHandle) {
   clearAuth(); storeKind = null; session = null;
   if (bc && uid) bc.postMessage({ type: 'signout', uid });
   Q.clear(); tasks = []; clearInterval(pollTimer);
+  document.getElementById('welcome')?.remove(); welcomeOn = false;
   showSignIn('', emailOf(prefillHandle));
 }
 
@@ -1599,7 +1697,7 @@ async function loadMeta() {
     rest('POST', 'rpc/visible_profiles', {}),
     rest('GET', 'tag_lists?select=id,owner_id,name,is_default,sort'),
     rest('GET', 'tag_list_members?select=tag_list_id,role,hidden_at&profile_id=eq.' + uid),
-    getAll('tags?select=id,tag_list_id,name,sort&deleted_at=is.null'),
+    getAll('tags?select=*&deleted_at=is.null'), // select=*: tags.updated_at (db/012) is seen without asking for it
     rest('POST', 'rpc/my_invitations', {}),
   ]);
   const bad = [lists, members, cats, profs, vis, tls, tlm, tags, inv].find(r => !r.ok);
@@ -1617,7 +1715,11 @@ async function loadMeta() {
   const tlRole = {}, tlHidden = new Set();
   tlm.json.forEach(m => { tlRole[m.tag_list_id] = m.role; if (m.hidden_at) tlHidden.add(m.tag_list_id); });
   TAG_LISTS = {}; tls.json.forEach(l => { TAG_LISTS[l.id] = Object.assign({}, l, { role: tlRole[l.id] || null, hidden: tlHidden.has(l.id) }); });
-  TAG = {}; tags.json.forEach(x => { if (TAG_LISTS[x.tag_list_id]) TAG[x.id] = x; });
+  TAG = {}; tags.json.forEach(x => { if (TAG_LISTS[x.tag_list_id]) TAG[x.id] = { id: x.id, tag_list_id: x.tag_list_id, name: x.name, sort: x.sort }; });
+  // tags.updated_at exists from db/012 on: the poll then reads changed tags too. Detected from the rows, so an older database
+  // gets no request that would fail (no console noise); with no tag visible it stays unknown and the refresh is skipped
+  if (tags.json.length) TAGS_UPDATED = 'updated_at' in tags.json[0];
+  noteTagDefMax(tags.json);
   relabel();
   INVITES = inv.json || [];
   if (st.list !== 'all' && !LIST[st.list]) st.list = 'all';
@@ -1638,6 +1740,17 @@ async function loadItemTags() {
   return r;
 }
 const noteTagMax = rows => rows.forEach(r => { const u = Date.parse(r.changed_at); if (u > maxTagSeen) maxTagSeen = u; });
+let TAGS_UPDATED = false, maxTagDefSeen = 0;
+const noteTagDefMax = rows => rows.forEach(r => { const u = Date.parse(r.updated_at); if (u > maxTagDefSeen) maxTagDefSeen = u; });
+// round 3: tag rows into TAG; a tag on a tag list the page does not know means a new share: lists, tag lists and tags again
+async function takeTagDefs(rows) {
+  noteTagDefMax(rows);
+  const m = C.mergeTagDefs(TAG, rows, Object.keys(TAG_LISTS));
+  TAG = m.tags;
+  if (m.unknownLists.length) { await refreshMeta(); return true; }
+  if (m.changed) relabel();
+  return m.changed > 0;
+}
 async function loadAll() {
   boot.gate = 'loading'; render();
   const keep = new Map([...Q.keys()].map(id => [id, find(id)]).filter(x => x[1])); // edits still waiting survive a sign-in
@@ -1662,7 +1775,7 @@ async function loadAll() {
   if (!it.ok) return loadFailed(it);
   if (!maxTagSeen) maxTagSeen = Date.now();
   prefsExists = prefs.json.length > 0;
-  applyPrefs(C.prefsFromRow(prefsExists ? prefs.json[0].prefs : null, { listIds: LISTS, itemIds: tasks.map(t => t.id) }));
+  applyPrefs(C.prefsFromRow(prefsExists ? prefs.json[0].prefs : null, { listIds: LISTS, itemIds: tasks.map(t => t.id), tagListIds: Object.keys(TAG_LISTS) }));
   boot.gate = null;
   render();
   // the axes clamp to the window on the first render, so "unchanged" is measured after it
@@ -1670,6 +1783,7 @@ async function loadAll() {
   if (!prefsExists) savePrefsSoon();
   startPolling();
   flushAll();
+  if (!welcomeSeen && me.kind === 'human') showWelcome();
 }
 function loadFailed(r) {
   if (!session) return; // the form is already up
@@ -1855,18 +1969,28 @@ async function poll(meta) {
     if (m.unknownLists.length && !meta) { await refreshMeta(); m = C.mergePoll(tasks, r.json, { pending: new Set(Q.keys()), knownLists: known() }); }
     tasks = m.tasks;
     const tr = await getAll('item_tags?select=item_id,tag_id,removed_at,changed_at&' + C.tagPollFilter(maxTagSeen || Date.now()), 'item_id,tag_id');
-    let tm = { changed: 0, unknownTags: [] };
+    let tm = { changed: 0, unknownTags: [] }, defs = false;
     if (tr.ok) {
       noteTagMax(tr.json);
       tm = C.mergeTagRows(tasks, tr.json, { pending: new Set(Q.keys()), knownTags: Object.keys(TAG) });
-      if (tm.unknownTags.length && !meta) await refreshMeta();
+      // round 3: unknown tag ids from any poll (focus polls too) are read by id; a new tag list behind them reloads the lists
+      if (tm.unknownTags.length) {
+        const u = await rest('GET', 'tags?select=*&id=in.(' + tm.unknownTags.join(',') + ')');
+        if (u.ok) defs = await takeTagDefs(u.json);
+      }
     }
-    if (m.changed || tm.changed || tm.unknownTags.length || meta) { if (!document.querySelector('dialog[open]') && !dragId) renderSoon(); }
+    // renames and new tags of shared tag lists (tags.updated_at, db/012; skipped before it)
+    if (TAGS_UPDATED) {
+      const d = await getAll('tags?select=*&' + C.tagDefsFilter(maxTagDefSeen || Date.now()));
+      if (d.ok && d.json.length) defs = (await takeTagDefs(d.json)) || defs;
+    }
+    if (m.changed || tm.changed || tm.unknownTags.length || defs || meta) { if (!document.querySelector('dialog[open]') && !dragId) renderSoon(); }
   } finally { polling = false; }
 }
 
 // ---- preferences v2: one row per person (preferences, app tasksdashboard), upserted 1 s after a change when they differ ----
 let themePref = 'auto', lastWritten = null, prefsTimer = 0;
+let cardLayout = C.readCardLayout(null), welcomeSeen = false; // round 3: Card layout and the first-login welcome
 function applyTheme() {
   st.theme = (themePref === 'auto' ? matchMedia('(prefers-color-scheme: dark)').matches : themePref === 'dark') ? 1 : 0;
   document.documentElement.dataset.theme = THEMES[st.theme];
@@ -1876,6 +2000,7 @@ const collectPrefs = () => ({
   version: 2, theme: themePref, view: st.view, list: st.list, listOrder: LISTS.slice(), tagOrder: tagOrder.slice(),
   axes: window.tdAxes && window.tdAxes.get ? window.tdAxes.get() : { fx: 0.5, fy: 0.5 },
   menuCollapsed: QS.filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] }, settings: Object.assign({}, settings),
+  cardLayout: JSON.parse(JSON.stringify(cardLayout)), welcomeSeen,
 });
 const prefsText = () => JSON.stringify(collectPrefs());
 // stale entries (a list, item or tag that no longer exists) are dropped
@@ -1890,6 +2015,7 @@ function applyPrefs(p) {
   st.cardMode = p.cards.mode;
   st.flip = new Set(p.cards.flipped);
   settings = C.readSettings(p.settings);
+  cardLayout = p.cardLayout; welcomeSeen = p.welcomeSeen;
   if (window.tdAxes && window.tdAxes.set) window.tdAxes.set(p.axes.fx, p.axes.fy);
 }
 function savePrefsSoon() {
@@ -1958,23 +2084,29 @@ function gate(kind) {
   const o = document.getElementById('g-out'); if (o) o.onclick = () => signOut();
 }
 
+// round 3: what a card shows follows Card layout (cardLayout); the grid keeps an empty cell where a part is switched off
 function cardHtml(t, q) {
-  const expanded = (st.cardMode === 'expanded') !== st.flip.has(t.id);
+  const L = cardLayout;
+  const expanded = C.cardExpanded(t, st.cardMode, L, st.flip);
   const editable = canDo('edit', t);
-  const arrow = '<button class="exp" data-flip="' + t.id + '" aria-expanded="' + expanded + '" aria-label="' + (expanded ? 'Collapse card' : 'Expand card') + '">' + (expanded ? I.chevD : I.chevR) + '</button>';
-  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '');
+  const arrow = L.arrow ? '<button class="exp" data-flip="' + t.id + '" aria-expanded="' + expanded + '" aria-label="' + (expanded ? 'Collapse card' : 'Expand card') + '">' + (expanded ? I.chevD : I.chevR) + '</button>' : '<span></span>';
+  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (soon(t) ? ' soon' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '');
   const open = '<div class="' + cls + '" data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
-  const meta = t.deadline ? '<span class="meta">' + rel(t) + '</span>' : '<span></span>';
+  const meta = t.deadline ? '<span class="meta"' + (soon(t) ? ' title="Due soon: less than ' + settings.threshold + '% of the ' + settings.windowDays + '-day urgency window left"' : '') + '>' + rel(t) + (soon(t) ? '<span class="sr">, due soon</span>' : '') + '</span>' : '<span></span>';
   const done = editable ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>' : '<span></span>';
   const badges = '<span class="tbs">' + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
     (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
     (t.category !== 'task' ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
   if (!expanded) return open + '<span class="t">' + mdInline(t.title) + '</span>' + badges + meta + arrow + done + '</div>';
   const pin = t.pin === undefined ? '<span></span>' : '<button class="pin" data-unpin="' + t.id + '"' + (editable ? '' : ' disabled') + ' aria-label="' + (t.pin ? 'Urgent, set by hand. Clear' : 'Not urgent, set by hand. Clear') + '">' + (t.pin ? 'urgent (manual)' : 'not urgent (manual)') + '</button>';
-  const body = (t.deadline ? '<div class="row"><span>End ' + ymd(t.deadline) + '</span></div>' : '') +
-    (shownTags(t).length ? '<div class="tags">' + shownTags(t).map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '') +
-    (t.notes ? '<div class="md">' + mdToHtml(t.notes) + '</div>' : '');
-  return open + '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button><span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
+  const tagListOf = {}; shownTags(t).forEach(x => { tagListOf[x] = TAG[x] && TAG[x].tag_list_id; });
+  const tagIds = C.cardTagIds(shownTags(t), L, tagListOf);
+  const facts = [L.end && t.deadline ? 'End ' + ymd(t.deadline) : '', L.created && t.createdAt ? 'Created ' + ymd(t.createdAt) : '',
+    L.creator && t.createdBy ? 'By ' + personName(t.createdBy) : '', L.owner && t.ownerId ? 'For ' + personName(t.ownerId) : ''].filter(Boolean);
+  const body = (facts.length ? '<div class="row">' + facts.map(x => '<span>' + esc(x) + '</span>').join('') + '</div>' : '') +
+    (tagIds.length ? '<div class="tags">' + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '') +
+    (L.description && t.notes ? '<div class="md">' + mdToHtml(t.notes) + '</div>' : '');
+  return open + (L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>') + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
     (body ? '<div class="details">' + body + '</div>' : '') + '</div>';
 }
 
@@ -2118,7 +2250,7 @@ function render() {
     const rows = open.filter(t => inList(t) && t.q === q).sort(C.byOrder);
     const col = st.collapsed.has(q);
     return '<button class="grp" data-q="' + q + '" aria-expanded="' + !col + '"><span>' + q + ' ' + QN[q] + '</span><span>' + rows.length + '</span></button>' +
-      (col ? '' : rows.map(t => '<button class="mrow' + (overdue(t) ? ' overdue' : '') + '" data-open="' + t.id + '" data-hl="' + t.id + '">' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
+      (col ? '' : rows.map(t => '<button class="mrow' + (overdue(t) ? ' overdue' : soon(t) ? ' soon' : '') + '" data-open="' + t.id + '" data-hl="' + t.id + '">' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
   }).join('');
   const addable = canAddSomewhere();
   const quad = q => {
@@ -2152,8 +2284,8 @@ function render() {
   const pops = {
     profile: () => '<div class="who-am" role="none"><strong>' + esc(me.display_name) + '</strong>' + (session.user.email ? '<span>' + esc(session.user.email) + '</span>' : '') + '</div>' +
       (human ? '<button data-menu="tags">Tags</button><button data-menu="sharing">Sharing' + (INVITES.length ? ' <span class="badge" aria-label="' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '">' + INVITES.length + '</span>' : '') + '</button>' : '') +
-      '<button data-menu="settings">Settings</button>' +
-      '<hr><button data-menu="review">Weekly review</button><button data-cards>' + (st.cardMode === 'collapsed' ? 'Always collapsed cards' : 'Always expanded cards') + '</button><button data-menu="archived">Archived lists</button>' +
+      (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
+      '<hr><button data-menu="timeline">Timeline (draft)</button><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
       (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : '') +
       '<hr>' + (others.length ? '<div class="vh" role="none">Accounts on this browser</div>' : '') +
       others.map(a => '<span class="acct"><button data-switch="' + esc(a.handle) + '" title="Sign out, then sign in as ' + esc(a.email) + '">' + esc(a.email) + (a.provider === 'google' ? ' <span class="n">Google</span>' : '') + '</button><button class="acct-x" data-forget="' + esc(a.handle) + '" aria-label="Forget ' + esc(a.email) + ' on this browser">' + I.x + '</button></span>').join('') +
@@ -2176,7 +2308,7 @@ function render() {
     (rest.length ? '<span class="chip"><button id="more" aria-label="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '" aria-expanded="' + (st.pop === 'more') + '" title="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '">+' + rest.length + '</button></span>' : '') +
     (st.list !== 'all' ? '<span class="chip"><button id="listmenu" aria-label="List options" aria-haspopup="menu" aria-expanded="' + (st.pop === 'listmenu') + '">' + I.dots + '</button></span>' : '') +
     (me.kind === 'human' ? '<span class="chip"><button id="newlist">New list</button></span>' : '') + '</div>' +
-    '<div class="who"><button id="profile" aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '"' + (INVITES.length ? ' aria-label="' + esc(me.display_name) + ', ' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '"' : '') + '>' + esc(me.display_name) + (INVITES.length ? ' <span class="badge" aria-hidden="true">' + INVITES.length + '</span>' : '') + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
+    '<div class="who"><button id="profile"' + (welcomeOn ? ' class="beacon"' : '') + ' aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '"' + (INVITES.length ? ' aria-label="' + esc(me.display_name) + ', ' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '"' : '') + '>' + esc(me.display_name) + (INVITES.length ? ' <span class="badge" aria-hidden="true">' + INVITES.length + '</span>' : '') + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
     '<div class="searchrow"><div class="line"><span class="si" aria-hidden="true">' + I.search + '</span><input id="q" placeholder="Search" aria-label="Search tasks" role="combobox" aria-expanded="' + !!st.q.trim() + '" aria-controls="dd" value="' + esc(st.q) + '">' +
     '<button class="f" id="due" aria-haspopup="menu" aria-expanded="' + (st.pop === 'due') + '" aria-pressed="' + (st.due !== 'any') + '">' + dueLabel + '</button>' +
     (allTags.length ? '<button class="f" id="tag" aria-haspopup="menu" aria-expanded="' + (st.pop === 'tag') + '" aria-pressed="' + !!st.tags.size + '">' + esc(tagLabel) + '</button>' : '') +
@@ -2185,10 +2317,10 @@ function render() {
     '<button class="f" id="mine" aria-pressed="' + st.mine + '">Mine</button>' +
     (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop + '</header>' +
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
-    [['matrix', '▦'], ['archive', '▤'], ['timeline', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
+    [['matrix', '▦'], ['archive', '▤'], ['review', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v || (st.view === 'timeline' && v === 'matrix') ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
     '</div><nav class="groups" aria-label="Items by quadrant">' + menuGroups + '</nav></aside>' +
     '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : esc(label(st.list))) + '</h1>' +
-    (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : matrix) + '</main></div>';
+    (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : st.view === 'review' ? reviewHtml() : matrix) + '</main></div>';
   bind();
   anchorPop();
   const qi = document.getElementById('q'); if (st.focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); st.focusQ = false; }
@@ -2523,7 +2655,7 @@ function openTask(id, quad, opts) {
         const cat = LIST[list].default_category || 'task';
         // the person who adds it is who it is for (owner_id; "Mine"), as the owner tag was before multi-user
         const nt = { id: crypto.randomUUID(), list, num: 0, qStored: fq, q: fq, title, notes, tags, deadline, start, status: 'open', doneAt: null, pin: undefined,
-          sortKey: topKey(list, fq), category: cat, priority: null, reviewState: 'none', aiConfidence: null, createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
+          sortKey: topKey(list, fq), category: cat, priority: null, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
         create(nt, { origin: 'dialog' }); st.keep.add(nt.id);
         toast('Added to ' + label(list) + ': ' + plain(title), canDo('delete', null, list) ? () => removeTask(nt, true) : null);
       }
@@ -2563,51 +2695,117 @@ function dialogShell(html, opener) {
   return dlg;
 }
 
-// weekly review: the last 7 days of the selected list (All = every list), ignoring search and filters
-function openReview() {
+// weekly review (round 3: a rail view; its redesign with weeks, prefilter and export is A9): the 7 days around today of the
+// selected list (All = every list), ignoring search and filters; a row opens its task
+function reviewHtml() {
   const from = new Date(TODAY.getTime() - 7 * DAY), to = new Date(TODAY.getTime() + 7 * DAY);
   const mine = all().filter(inList);
   const open = mine.filter(t => !t.doneAt);
-  const sec = (title, list) => '<section class="rv"><strong>' + title + ' <span class="n">' + list.length + '</span></strong>' + (list.length ? list.map(t => '<div class="rr"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + (t.deadline ? ' <span class="n">' + rel(t) + '</span>' : '') + '</div>').join('') : '<div class="rr n">0</div>') + '</section>';
-  dialogShell('<form method="dialog"><strong>Weekly review</strong><div class="n">' + ymd(from).slice(0, 10) + ' – ' + ymd(TODAY).slice(0, 10) + '</div>' +
+  const sec = (title, list) => '<section class="rv"><strong>' + title + ' <span class="n">' + list.length + '</span></strong>' + (list.length ? list.map(t => '<button type="button" class="rr" data-open="' + t.id + '"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + (t.deadline ? ' <span class="n">' + rel(t) + '</span>' : '') + '</button>').join('') : '<div class="rr n">0</div>') + '</section>';
+  return '<div class="rvw"><div class="ar-tools"><span class="n">' + fmtDay(from) + ' – ' + fmtDay(to) + '</span></div>' +
     sec('Overdue', open.filter(overdue)) +
-    sec('Became urgent this week', open.filter(t => t.deadline && t.deadline > TODAY && t.deadline - TODAY < settings.windowDays * DAY * (1 - settings.threshold / 100))) +
-    sec('Completed this week', mine.filter(t => t.doneAt && t.doneAt >= from)) +
-    sec('Due in the next 7 days', open.filter(t => t.deadline && t.deadline >= TODAY && t.deadline <= to)) +
-    '<div class="actions"><button value="close" autofocus>Close</button></div></form>', '#profile');
+    sec('Due soon', open.filter(t => C.dueSoon(t, settings, TODAY.getTime()))) +
+    sec('Completed in the last 7 days', mine.filter(t => t.doneAt && t.doneAt >= from)) +
+    sec('Due in the next 7 days', open.filter(t => t.deadline && t.deadline >= TODAY && t.deadline <= to)) + '</div>';
 }
 
 // settings are saved per person in the preferences row; display name and time zone are the profile's own columns
-function openSettings() {
+// round 3: two windows. General (people): display name, time zone. Urgency: window, due soon %, Do limit (SETTINGS_DEFAULTS).
+function openSettings(kind) {
   const browserTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; } })();
   const zones = (() => { try { return Intl.supportedValuesOf('timeZone'); } catch (e) { return []; } })();
-  const human = me.kind === 'human';
-  const dlg = dialogShell('<form method="dialog"><strong>Settings</strong>' +
-    (human ? '<label>Display name<input id="s-name" maxlength="60" autocomplete="name" value="' + esc(me.display_name) + '"></label><div class="err" id="s-name-e" aria-live="polite"></div>' +
-      '<label>Time zone<input id="s-tz" list="s-tzs" autocomplete="off" spellcheck="false" value="' + esc(me.timezone || browserTz) + '"></label><datalist id="s-tzs">' + zones.map(z => '<option value="' + esc(z) + '">').join('') + '</datalist><div class="err" id="s-tz-e" aria-live="polite"></div>' : '') +
-    '<label>Urgency threshold, %<input id="s-th" type="number" min="10" max="90" step="5" value="' + settings.threshold + '"></label>' +
-    '<label>Urgency window, days<input id="s-win" type="number" min="1" max="30" value="' + settings.windowDays + '"></label>' +
-    '<label class="cb"><input id="s-wd" type="checkbox"' + (settings.workingDays ? ' checked' : '') + '> Working days only</label>' +
-    '<label>Do limit<input id="s-lim" type="number" min="0" max="50" value="' + settings.doLimit + '"></label>' +
-    '<label>Working hours per day<input id="s-hpd" type="number" min="1" max="24" value="' + settings.hoursPerDay + '"></label>' +
+  const human = me.kind === 'human', general = kind === 'general' && human;
+  const D = C.SETTINGS_DEFAULTS;
+  const dlg = dialogShell('<form method="dialog" class="settings"><strong>' + (general ? 'General settings' : 'Urgency settings') + '</strong>' +
+    (general ? '<label>Display name<input id="s-name" maxlength="60" autocomplete="name" value="' + esc(me.display_name) + '"></label><div class="err" id="s-name-e" aria-live="polite"></div>' +
+      '<label>Time zone<input id="s-tz" list="s-tzs" autocomplete="off" spellcheck="false" value="' + esc(me.timezone || browserTz) + '"></label><datalist id="s-tzs">' + zones.map(z => '<option value="' + esc(z) + '">').join('') + '</datalist><div class="err" id="s-tz-e" aria-live="polite"></div>' +
+      '<div class="s-row"><span>Welcome note</span><button type="button" id="s-welcome">Show again</button></div>'
+    : '<label>Urgency window, days<input id="s-win" type="number" min="1" max="30" value="' + settings.windowDays + '" aria-describedby="s-win-h"></label><p class="s-hint" id="s-win-h">A task without a fixed quadrant moves to Do when its end is this close. 1-30, default ' + D.windowDays + '.</p>' +
+      '<label>Due soon, % of the window<input id="s-th" type="number" min="10" max="90" step="5" value="' + settings.threshold + '" aria-describedby="s-th-h"></label><p class="s-hint" id="s-th-h">A card is marked due soon when less than this share of the window is left. 10-90, default ' + D.threshold + '.</p>' +
+      '<label>Do limit<input id="s-lim" type="number" min="0" max="50" value="' + settings.doLimit + '" aria-describedby="s-lim-h"></label><p class="s-hint" id="s-lim-h">The Do count turns red above this number. 0 turns it off; default ' + D.doLimit + '.</p>') +
     '<div class="actions"><button value="cancel">Cancel</button><button id="s-save" value="save">Save</button></div></form>', '#profile');
+  const again = dlg.querySelector('#s-welcome');
+  // after the window's own close handler (render, focus back to the menu), so the note keeps the focus
+  if (again) again.onclick = () => { welcomeSeen = false; dlg.addEventListener('close', () => setTimeout(showWelcome)); dlg.close(); };
   dlg.querySelector('#s-save').onclick = e => {
     const num = (id, lo, hi, dflt) => { const v = Number(dlg.querySelector(id).value); return v >= lo && v <= hi ? v : dflt; };
     const patch = {};
-    if (human) {
-      const name = dlg.querySelector('#s-name').value.replace(/[\u0000-\u001f\u007f]/g, '').trim(), tz = dlg.querySelector('#s-tz').value.trim();
-      if (!name) { e.preventDefault(); dlg.querySelector('#s-name-e').textContent = 'Enter a name'; dlg.querySelector('#s-name').focus(); return; }
-      if (tz && zones.length && !zones.includes(tz) && tz !== 'UTC') { e.preventDefault(); dlg.querySelector('#s-tz-e').textContent = 'Pick a time zone from the list'; dlg.querySelector('#s-tz').focus(); return; }
-      if (name !== me.display_name) patch.display_name = name;
-      if (tz && tz !== me.timezone) patch.timezone = tz;
-    }
-    settings = C.readSettings({ threshold: num('#s-th', 10, 90, 50), windowDays: num('#s-win', 1, 30, 7), workingDays: dlg.querySelector('#s-wd').checked, doLimit: num('#s-lim', 0, 50, 5), hoursPerDay: num('#s-hpd', 1, 24, 8) });
+    if (!general) { settings = C.readSettings({ threshold: num('#s-th', 10, 90, D.threshold), windowDays: num('#s-win', 1, 30, D.windowDays), doLimit: num('#s-lim', 0, 50, D.doLimit) }); return toast('Urgency settings saved'); }
+    const name = dlg.querySelector('#s-name').value.replace(/[\u0000-\u001f\u007f]/g, '').trim(), tz = dlg.querySelector('#s-tz').value.trim();
+    if (!name) { e.preventDefault(); dlg.querySelector('#s-name-e').textContent = 'Enter a name'; dlg.querySelector('#s-name').focus(); return; }
+    if (tz && zones.length && !zones.includes(tz) && tz !== 'UTC') { e.preventDefault(); dlg.querySelector('#s-tz-e').textContent = 'Pick a time zone from the list'; dlg.querySelector('#s-tz').focus(); return; }
+    if (name !== me.display_name) patch.display_name = name;
+    if (tz && tz !== me.timezone) patch.timezone = tz;
     if (!Object.keys(patch).length) return toast('Settings saved');
     rest('PATCH', 'profiles?id=eq.' + me.id, patch, { Prefer: 'return=representation' }).then(r => {
       if (r.ok && r.json.length) { Object.assign(me, patch); NAMES[me.id] = me.display_name; toast('Settings saved'); render(); }
       else toast('Settings saved; name and time zone not: ' + (r.ok ? 'not allowed' : r.err.message));
     });
   };
+}
+
+// round 3, adjustment 13: Card layout (prefs.cardLayout and cards.mode). Defaults are today's card.
+function openCardLayout() {
+  const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
+  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', owner: 'Who it is for' };
+  const lists = Object.values(TAG_LISTS).filter(l => !l.hidden).sort((a, b) => (a.owner_id !== (me && me.id)) - (b.owner_id !== (me && me.id)) || (a.sort || 0) - (b.sort || 0));
+  const radio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
+  const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' +
+    '<fieldset><legend>Cards open</legend>' + radio('cl-mode', 'collapsed', 'Collapsed', st.cardMode === 'collapsed') + radio('cl-mode', 'expanded', 'Expanded', st.cardMode === 'expanded') + '</fieldset>' +
+    '<label>Collapse when the description is longer than, characters<input id="cl-auto" type="number" min="0" max="5000" value="' + L.autoCollapse + '" aria-describedby="cl-auto-h"></label>' +
+    '<p class="s-hint" id="cl-auto-h">For cards that open expanded. 0 turns it off; default ' + D.autoCollapse + '. The arrow still opens a card.</p>' +
+    '<fieldset><legend>A card shows</legend><div class="cl-grid">' + C.CARD_FIELDS.map(k => '<label class="cb"><input type="checkbox" data-cl="' + k + '"' + (L[k] ? ' checked' : '') + '> ' + names[k] + '</label>').join('') + '</div></fieldset>' +
+    '<fieldset><legend>Tags</legend>' + radio('cl-tags', 'all', 'All tags', L.tags === 'all') + radio('cl-tags', 'lists', 'Only from these tag lists', L.tags === 'lists') +
+    '<div class="cl-lists">' + (lists.length ? lists.map(l => '<label class="cb"><input type="checkbox" data-cl-list="' + esc(l.id) + '"' + (L.tagLists.includes(l.id) ? ' checked' : '') + '> ' + esc(l.name) + (l.owner_id !== me.id ? ' <span class="n">' + esc(personName(l.owner_id)) + '</span>' : '') + '</label>').join('') : '<p class="s-hint">No tag lists yet.</p>') + '</div>' +
+    radio('cl-tags', 'off', 'No tags', L.tags === 'off') + '</fieldset>' +
+    '<div class="actions"><button type="button" id="cl-reset">Reset</button><span class="sp"></span><button value="cancel">Cancel</button><button id="cl-save" value="save">Save</button></div></form>', '#profile');
+  const q = s => dlg.querySelector(s);
+  const syncLists = () => { const on = q('input[name=cl-tags]:checked').value === 'lists'; dlg.querySelectorAll('[data-cl-list]').forEach(b => { b.disabled = !on; }); };
+  dlg.querySelectorAll('input[name=cl-tags]').forEach(r => r.onchange = syncLists); syncLists();
+  q('#cl-reset').onclick = () => {
+    C.CARD_FIELDS.forEach(k => { q('[data-cl="' + k + '"]').checked = D[k]; });
+    q('#cl-auto').value = D.autoCollapse; q('input[name=cl-tags][value=all]').checked = true; q('input[name=cl-mode][value=collapsed]').checked = true; syncLists();
+  };
+  q('#cl-save').onclick = () => {
+    const raw = { tags: q('input[name=cl-tags]:checked').value, tagLists: [...dlg.querySelectorAll('[data-cl-list]:checked')].map(b => b.dataset.clList) };
+    C.CARD_FIELDS.forEach(k => { raw[k] = q('[data-cl="' + k + '"]').checked; });
+    const n = Number(q('#cl-auto').value); raw.autoCollapse = Number.isInteger(n) && n >= 0 && n <= 5000 ? n : D.autoCollapse;
+    cardLayout = C.readCardLayout(raw, Object.keys(TAG_LISTS));
+    const mode = q('input[name=cl-mode]:checked').value;
+    if (mode !== st.cardMode) { st.cardMode = mode; st.flip.clear(); }
+    toast('Card layout saved');
+  };
+}
+
+// round 3, adjustment 12: a short welcome once per person (prefs.welcomeSeen), beside the profile menu, which it highlights.
+// Not a <dialog>: an open dialog holds back renders after a poll, and this note may stay open while the person works.
+let welcomeOn = false;
+function showWelcome() {
+  if (document.getElementById('welcome') || !me) return;
+  const s = settings;
+  const el = document.createElement('section');
+  el.id = 'welcome'; el.className = 'welcome'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-labelledby', 'wl-h'); el.setAttribute('aria-describedby', 'wl-p');
+  el.innerHTML = '<h2 id="wl-h">Welcome to TasksDashboard</h2><p id="wl-p">Tasks close to their end date stand out, so set your urgency now. You can change it any time under your profile → Urgency settings.</p>' +
+    '<dl><dt>Urgency window <span class="v">' + s.windowDays + ' days</span></dt><dd>A task without a fixed quadrant moves to Do when its end date is this close.</dd>' +
+    '<dt>Due soon <span class="v">' + s.threshold + '%</span></dt><dd>A card is marked due soon when less than this share of the window is left.</dd>' +
+    '<dt>Do limit <span class="v">' + s.doLimit + '</span></dt><dd>The Do count turns red above this number.</dd></dl>' +
+    '<div class="actions"><button type="button" id="wl-later">Later</button><button type="button" id="wl-go">Set urgency now</button></div>';
+  document.body.append(el);
+  welcomeOn = true;
+  const done = () => { el.remove(); welcomeOn = false; welcomeSeen = true; removeEventListener('resize', placeWelcome); render(); };
+  el.querySelector('#wl-later').onclick = () => { done(); document.getElementById('profile')?.focus(); };
+  el.querySelector('#wl-go').onclick = () => { done(); openSettings('urgency'); };
+  el.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); el.querySelector('#wl-later').click(); } };
+  addEventListener('resize', placeWelcome);
+  render(); placeWelcome();
+  el.querySelector('#wl-go').focus();
+}
+function placeWelcome() {
+  const el = document.getElementById('welcome'), b = document.getElementById('profile');
+  if (!el || !b) return;
+  const r = b.getBoundingClientRect();
+  el.style.top = Math.round(r.bottom + 10) + 'px';
+  el.style.right = Math.max(8, Math.round(innerWidth - r.right)) + 'px';
 }
 
 // New list: rpc/create_list, private unless "Share with the household" (household members only, D-d of the multi-user plan).
@@ -2918,13 +3116,12 @@ function bind() {
   app.querySelectorAll('[data-tag]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = b.dataset.tag; st.tags.has(x) ? st.tags.delete(x) : st.tags.add(x); render(); });
   app.querySelectorAll('[data-cat]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = b.dataset.cat; st.cats.has(x) ? st.cats.delete(x) : st.cats.add(x); render(); });
   const lc = document.getElementById('lowc'); if (lc) lc.onclick = () => { st.lowc = !st.lowc; render(); };
-  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ review: openReview, settings: openSettings, archived: openArchivedLists, tags: openTags, sharing: openSharing, hidden: openHiddenLists })[b.dataset.menu](); });
+  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ timeline: () => { st.view = 'timeline'; st.expanded = null; render(); }, general: () => openSettings('general'), urgency: () => openSettings('urgency'), cardlayout: openCardLayout, archived: openArchivedLists, tags: openTags, sharing: openSharing, hidden: openHiddenLists })[b.dataset.menu](); });
   // the list chip menu: Share or People, Hide for me, Leave
   app.querySelectorAll('#pop [data-share-list], #pop [data-people-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); openShare('list', b.dataset.shareList || b.dataset.peopleList, '#listmenu'); });
   app.querySelectorAll('#pop [data-hide-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); hideList(b.dataset.hideList, true); });
   app.querySelectorAll('#pop [data-leave-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); leaveList(b.dataset.leaveList); });
   app.querySelectorAll('[data-flip]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.flip; st.flip.has(id) ? st.flip.delete(id) : st.flip.add(id); render(); document.querySelector('[data-flip="' + id + '"]')?.focus(); });
-  app.querySelectorAll('[data-cards]').forEach(b => b.onclick = e => { e.stopPropagation(); st.cardMode = st.cardMode === 'collapsed' ? 'expanded' : 'collapsed'; st.flip.clear(); render(); document.querySelector('[data-cards]')?.focus(); });
   // accounts on this browser: sign out here (local scope), then Google with that email, or the form with it filled in
   app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; switchAccount(b.dataset.switch); });
   app.querySelectorAll('[data-forget]').forEach(b => b.onclick = e => { e.stopPropagation(); saveAccounts(C.forgetAccount(accounts(), b.dataset.forget)); render(); document.querySelector('[data-addaccount]')?.focus(); });
