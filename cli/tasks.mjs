@@ -173,10 +173,16 @@ async function command(a, cmd, c, out) {
   if (cmd === 'do') {
     const l = a.list ? bySlug(ls, a.list) : null;
     if (a.list && !l) throw new TdError(EXIT.error, 'list not found: ' + a.list);
-    // Do limit: the person's own setting (preferences), 5 for agents
+    // Urgency window and Do limit: the login's own settings (preferences); with --for, that person's (db/012
+    // urgency_settings, household profiles for household logins and agents); else the defaults (agents)
     let settings = core.readSettings(null);
-    const p = await c.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c.uid + '&app=eq.tasksdashboard');
-    if (p.ok && p.json.length) settings = core.readSettings(p.json[0].prefs && p.json[0].prefs.settings);
+    if (a.for) {
+      const u = await c.rest('POST', 'rpc/urgency_settings', { p_profile: await profileId(c, a.for) });
+      if (u.ok && u.json) settings = core.readSettings(Object.fromEntries(Object.entries(u.json).filter(([, v]) => v !== null)));
+    } else {
+      const p = await c.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c.uid + '&app=eq.tasksdashboard');
+      if (p.ok && p.json.length) settings = core.readSettings(p.json[0].prefs && p.json[0].prefs.settings);
+    }
     const items = await liveItems(c, ls, l ? '&list_id=eq.' + l.id : '');
     const top = core.topDo(items, { now, settings, list: l && l.id, limit: a.limit === undefined ? undefined : Number(a.limit) });
     const order = Object.keys(top).sort((x, y) => ls[x].name.localeCompare(ls[y].name));
