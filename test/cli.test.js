@@ -77,6 +77,22 @@ test('errorExit maps database errors to CLI exit codes', () => {
   assert.equal(L.errorExit(C.restError(400, { error_code: 'invalid_credentials' })), 7);
 });
 
+test('e2e guests: guest login names, leaks a guest must never read', () => {
+  assert.deepEqual(L.guestLogins({}), [
+    { handle: 'guest-a', missing: ['TASKSDB_GUEST_A_EMAIL', 'TASKSDB_GUEST_A_PASSWORD'] },
+    { handle: 'guest-b', missing: ['TASKSDB_GUEST_B_EMAIL', 'TASKSDB_GUEST_B_PASSWORD'] }]);
+  const env = { TASKSDB_GUEST_A_EMAIL: 'a@x.test', TASKSDB_GUEST_A_PASSWORD: 'p', TASKSDB_GUEST_B_EMAIL: 'b@x.test' };
+  assert.deepEqual(L.guestLogins(env).map(g => g.missing), [[], ['TASKSDB_GUEST_B_PASSWORD']]);
+  const allow = { uid: 'g', lists: ['mine', 'shared'], tagLists: ['gdef'] };
+  const clean = { lists: [{ id: 'mine' }, { id: 'shared' }], items: [{ id: 'i1', list_id: 'shared' }], categories: [{ slug: 'task' }, { slug: 'reminder' }],
+    profiles: [{ id: 'g' }], tagLists: [{ id: 'gdef' }], tags: [{ id: 't1', tag_list_id: 'gdef', name: 'x' }], itemTags: [{ item_id: 'i1', tag_id: 't1' }] };
+  assert.deepEqual(L.guestLeaks(clean, allow), []);
+  assert.deepEqual(L.guestLeaks({}, allow), []);
+  const dirty = { lists: [{ id: 'hh', slug: 'family-tasks' }], items: [{ id: 'i9', list_id: 'hh' }], categories: [{ slug: 'tbd' }], profiles: [{ id: 'm', handle: 'maksym' }],
+    tagLists: [{ id: 'mdef' }], tags: [{ id: 't9', tag_list_id: 'mdef', name: 'car' }], itemTags: [{ item_id: 'i1', tag_id: 't9' }] };
+  assert.deepEqual(L.guestLeaks(dirty, allow), ['list family-tasks', 'item i9', 'category tbd', 'profile maksym', 'tag list mdef', 'tag car', 'item tag i1/t9']);
+});
+
 test('e2e --url and --access-env: arguments, https origin only, CF-Access headers only for the page origin, hosts allowed', () => {
   assert.deepEqual(L.e2eArgs(['--env', 'e', '--url', 'https://p.pages.dev', '--smoke', '--access-env', 'a']), { env: 'e', url: 'https://p.pages.dev', smoke: true, 'access-env': 'a' });
   assert.equal(L.e2eArgs(['--url', '--smoke']).url, true);

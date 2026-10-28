@@ -61,6 +61,7 @@ Public values only: the project URL, the publishable key, the poll interval. Nev
 
 - `node --test "test/*.test.js"` before every commit (no network).
 - `node test/e2e.mjs --env <env file> --out <dir>` before a release merge (live database; writes only in `_selftest` and test lists it archives).
+- The `guests` group needs guest logins (`TASKSDB_GUEST_A_*`, `TASKSDB_GUEST_B_*`) that are guests (`is_household` false); a missing one is reported as skipped. Never point it at a real person's account, and never share a household list or tag list with a guest: guests only see test lists the run makes, and only a guest's tags are shared, to Maksym.
 
 ## Data
 

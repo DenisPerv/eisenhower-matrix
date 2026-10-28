@@ -167,30 +167,37 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
 
 | Command | Options | Does |
 |---|---|---|
-| `add-task` | `--title` (required) `--list <slug>` `--q A\|B\|C\|D` `--due <when>` `--tags a,b` `--body <md>` `--priority 0-5` `--confidence 0-1` `--needs-review` | adds a task; default list = the `task` category's default list; `dedup_key = task:<sha1(lower(title) + due day + list slug)[0:12]>`; `sort_key` on top of its quadrant |
-| `add-reminder` | `--title --due` (required) `--list <slug>` `--notify 09:00,18:00` `--body` | adds to `--list`, else the `reminder` category's default list; `dedup_key = reminder:<creation yyyy-mm-dd--hh-mm>`; `details.notify` |
+| `add-task` | `--title` (required) `--list <list>` `--q A\|B\|C\|D` `--due <when>` `--tags a,b` `--owner <handle>\|none` `--notify a,b` `--body <md>` `--priority 0-5` `--confidence 0-1` `--needs-review` | adds a task; default list = the `task` category's default list; `dedup_key = task:<sha1(lower(title) + due day + list slug)[0:12]>`; `sort_key` on top of its quadrant |
+| `add-reminder` | `--title --due` (required) `--list <list>` `--owner <handle>\|none` `--notify a,b` `--body` | adds to `--list`, else the `reminder` category's default list; `dedup_key = reminder:<creation yyyy-mm-dd--hh-mm>`; `details.notify` (people's handles) |
 | `overdue` | `--limit 10` `--list <slug>` | open items with `due_at` before now, the most recent first |
 | `do` | `--list <slug>` `--limit N` | per list, quadrant A (stored or derived) in card order, up to the login's own `settings.doLimit` (5 for agents) |
 | `restore-list` | `--list <slug>` | un-archives a list (people only: `--as maksym` or `anastasiia`) |
 
+- **Lists:** `<list>` is a slug, or `OWNER/slug` when two owners use the same slug (slugs are unique per owner); with several matches household lists win, else exit 1 naming each `owner/slug`.
+- **Who an item is for:** `--owner` (a person's handle, or `none`) sets `owner_id`; `--notify` takes people's handles into `details.notify`. Owner tags are never written: `maksym` or `anastasiia` in `--tags` set the owner, `shared` (or both names) sets none, and the tag is dropped (`ownerFromTags`). The owner must be a member of the list (else 22023, exit 1).
 - **Common options:** `--env <file>` (KEY=value lines; `TASKSDB_*` variables from the environment fill gaps), `--as <handle>` (default `homeos-agent`; reads `TASKSDB_<HANDLE>_EMAIL` / `_PASSWORD`, with `AGENT` and `TELEGRAM` for the two agents), `--for <handle>` (`on_behalf_of`, a person), `--via <channel>` (`created_via` and `x-homeos-via`, default `script:tasks-cli`), `--run-id`, `--json`, `--dry-run` (reads, sends no write).
 - **When:** `YYYY-MM-DD` (09:00) or `YYYY-MM-DD HH:mm` in Europe/Lisbon, or ISO with an offset.
 - **Env:** `TASKSDB_URL`, `TASKSDB_ANON_KEY` (the publishable key), and the login pairs. The URL and key get the page's config checks (https or localhost, never a secret key); a failure is exit 2.
 - **List status:** every write reads its list first; an archived list is exit 8 and nothing is sent. `overdue` and `do` skip archived lists.
 - **Output:** one line per item, `<initial><num> · title · due · list`, or `--json`.
-- **Exit codes** (`EXIT`): 0 ok, 1 error (including not allowed and a bad value, 22023 without "sensitive data"), 2 env missing, 3 conflict, 4 duplicate, 5 sensitive data, 6 unreachable, 7 auth failed, 8 list archived (or, for `restore-list`, not archived or not found).
+- **Exit codes** (`EXIT`): 0 ok, 1 error (including not allowed and a bad value, 22023 without "sensitive data"), 2 env missing, 3 conflict, 4 duplicate, 5 sensitive data, 6 unreachable, 7 auth failed, 8 list archived (or, for `restore-list`, not archived or not found), 9 a limit (54000, see Limits).
 - It never prints an env value, a token or a password.
 
 ## Tests
 
 | Command | What | Network |
 |---|---|---|
-| `node --test "test/*.test.js"` | `core.test.js` (the core rules), `multiuser.test.js` (Google sign-in: `isHostedOrigin`, PKCE against RFC 7636 appendix B, `authorizeUrl`, `readCallback`, `oauthMessage`, `td.accounts`; errors in plain words; tags from `item_tags`, `tagLabels`, `isMine`, `mergeTagRows`; `membershipActions`, `defaultAddList`) and `cli.test.js` (arguments, keys, dates, output, exit codes, the e2e `--url` / `--access-env` helpers) | none |
-| `node test/e2e.mjs --env <file> --out <dir> [--group auth,data,sync,archive,errors,ui] [--smoke] [--page <html>] [--url <https origin> [--access-env <file>]]` | the page against the live database in headless Chrome or Edge (or Playwright's chromium) over DevTools; report `e2e-report.md` and screenshots in `<dir>` | live, Node 22+ |
+| `node --test "test/*.test.js"` | `core.test.js` (the core rules), `multiuser.test.js` (Google sign-in: `isHostedOrigin`, PKCE against RFC 7636 appendix B, `authorizeUrl`, `readCallback`, `oauthMessage`, `td.accounts`; errors in plain words; tags from `item_tags`, `tagLabels`, `isMine`, `mergeTagRows`; `membershipActions`, `defaultAddList`) and `cli.test.js` (arguments, keys, dates, output, exit codes, owners and `OWNER/slug`, the e2e `--url` / `--access-env` helpers, the guest login names and `guestLeaks`) | none |
+| `node test/e2e.mjs --env <file> --out <dir> [--group auth,data,sync,archive,errors,ui,guests] [--smoke] [--page <html>] [--url <https origin> [--access-env <file>]]` | the page against the live database in headless Chrome or Edge (or Playwright's chromium) over DevTools; report `e2e-report.md` and screenshots in `<dir>`; without `--group`, every group but smoke | live, Node 22+ |
 
 - The e2e runner signs in over REST in Node and seeds `td.auth`; the form is only fed dummy credentials while Fetch interception answers it, so no real password is typed into the page.
-- Writes stay in the `_selftest` list and one Cyrillic-named test list; it soft-deletes its items, archives both lists and puts both people's preferences back at the end. Leftovers are listed in the report.
+- Writes stay in the `_selftest` list and the test lists the run creates (one Cyrillic-named; `guests`: below); it soft-deletes its items, archives both lists and puts both people's preferences back at the end. Leftovers are listed in the report.
 - Every session the run made is logged out at the end.
+- **Group `guests`** (multi-user, `db/009-011`), with Maksym as the household side:
+  - **Always:** Maksym opens Share from a test list's chip menu; his own address is refused; an address nobody has shows as "Viewer, pending" with Revoke, and Revoke withdraws it; Anastasiia (not on the list) sees nobody on it.
+  - **Guest A** (`TASKSDB_GUEST_A_EMAIL` / `_PASSWORD`; must be a guest login, `is_household` false, else the group stops): reads only its own lists, tags and the `task` / `reminder` categories (`guestLeaks` over lists, items, categories, profiles, tag lists, tags and `item_tags`). Maksym shares a test list as Viewer through the UI: nothing before Accept; Accept in Account menu → Sharing; then that list and its item, none of Maksym's tags, only Maksym in `visible_profiles`. A makes a tag and shares its Default with Maksym (never the other way, so the household's tags never reach a guest): Maksym sees it only after Accept, and Leave takes it away. Decline and block on a second invitation: Maksym still reads "pending", and a new invitation never reaches A. Maksym removes A in the Share dialog: 0 rows. Board screenshots at 1440×900 and 390×844.
+  - **Guest A and guest B** (`TASKSDB_GUEST_B_*` too): A shares its own list with B through the UI; B sees nothing before Accept (at 390×844), then the list without A's tags until A shares its Default; A removes B: 0 rows.
+  - A missing login skips its part (`skipped` in the report with the missing names, never counted as passed). Cleanup undoes every step: invitations revoked, blocks and memberships removed, the guests' tags soft-deleted, test lists archived.
 - `--smoke` is read only: the board opens signed in, chip counts equal the database, only the Supabase host is contacted, no console errors.
 - Console errors include security messages from the browser (a CSP violation counts as an error).
 - **`--url <https origin>`** (a hosted copy, e.g. `https://homeos-tasksboard.pages.dev`): the page is `<origin>/` instead of the local file, and sessions are seeded on `<origin>/version.json` (same origin, so the same `td.auth`). An origin only: https, no path. The host checks then allow exactly the Supabase host and the page origin. The core rules still load from the local `TasksDashboard.html` (or `--page`). Without `--url` everything runs from `file://`.
@@ -218,7 +225,17 @@ The same two files can be served by any static host over https; nothing in the a
 - On the free plan a session never times out; Sign out (or revoking sessions in the dashboard) ends it.
 - No trash view: a deleted item is recoverable only by admin SQL after the 8 s Undo.
 - No password sign-up and no password reset in the app; new accounts come only through Google (when sign-ups are on, behind the sign-up hook). `file://` has no Google sign-in.
-- No unblock in the app: "Decline and block" is undone by admin SQL (`invite_blocks`).
+- No unblock in the app: "Decline and block" is undone by deleting one's own `invite_blocks` row (REST) or by admin SQL.
+- **Limits** (`ops.settings`, `db/009`; admin SQL tunes them). Over one: 54000 in plain words, CLI exit 9.
+
+  | Who | Limit |
+  |---|---|
+  | guests | 20 live lists (100 with archived), 1,000 live items they created (3,000 with deleted), 500 live tags, `body_md` ≤ 10,000 characters, `details` ≤ 8 KB, 2,000 item writes a day, 120 item writes a minute |
+  | household | 50 live lists each, 5,000 live items per list, 5,000 live tags, 1,000 item writes a minute (people and agents) |
+  | everyone | 20 invitations a day, 50 open at once; an invitation expires after 30 days |
+  | sign-up hook | Google sign-ups refused at 200 human profiles or a 400 MB database ("TasksDashboard is full right now"); password sign-ups only with a one-shot `ops.signup_allowlist` row (15 minutes) |
+
+- Guests never see the household categories (`tbd`, `decision`, `candidate`, `plan`, `wish`, `renewal`), household profiles, or another person's tags unless that person shares a tag list with them.
 - Links in descriptions and sources are shown as text.
 - No repeat, subtasks, effort, reminders delivery or `.ics` export in the app.
 - The End field uses the browser's date-time control, so its format follows the system locale.

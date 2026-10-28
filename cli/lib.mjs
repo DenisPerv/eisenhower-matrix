@@ -152,3 +152,22 @@ export function accessHeaders(request, origin, creds) {
 }
 // hosts a page contacted besides the Supabase host and (hosted) the page origin's host
 export const strayHosts = (hosts, supabaseHost, origin) => [...hosts].filter(h => h !== supabaseHost && !(origin && h === new URL(origin).host));
+
+// ---- e2e group guests (multi-user) ----
+// guest logins: TASKSDB_GUEST_A_* and TASKSDB_GUEST_B_*; a missing pair skips its checks (names only, never a value)
+export const GUESTS = ['guest-a', 'guest-b'];
+export const guestLogins = env => GUESTS.map(handle => ({ handle, missing: missingEnv(env, handle).filter(k => k.includes('_GUEST_')) }));
+// what a guest read but must not see: lists and items outside the lists it may read, household categories, other people's
+// profile rows, tag lists it was not given, their tags, and item_tags rows of those tags. [] = nothing leaked.
+export function guestLeaks(seen, allow) {
+  const lists = new Set(allow.lists || []), tagLists = new Set(allow.tagLists || []), out = [];
+  for (const l of seen.lists || []) if (!lists.has(l.id)) out.push('list ' + (l.slug || l.id));
+  for (const i of seen.items || []) if (!lists.has(i.list_id)) out.push('item ' + i.id);
+  for (const c of seen.categories || []) if (!['task', 'reminder'].includes(c.slug)) out.push('category ' + c.slug);
+  for (const p of seen.profiles || []) if (p.id !== allow.uid) out.push('profile ' + (p.handle || p.id));
+  for (const t of seen.tagLists || []) if (!tagLists.has(t.id)) out.push('tag list ' + t.id);
+  const okTags = new Set();
+  for (const t of seen.tags || []) { if (tagLists.has(t.tag_list_id)) okTags.add(t.id); else out.push('tag ' + (t.name || t.id)); }
+  for (const x of seen.itemTags || []) if (!okTags.has(x.tag_id)) out.push('item tag ' + x.item_id + '/' + x.tag_id);
+  return out;
+}

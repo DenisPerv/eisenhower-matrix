@@ -1,23 +1,23 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|guests|smoke] [--page <html>]
 //   [--url <https origin> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/, and sessions are seeded on <origin>/version.json
 // (same origin, same storage); --access-env adds the Cloudflare Access service-token headers to requests for that origin only.
 // No dependencies. Real sessions come from a REST sign-in in Node, seeded into the page's td.auth; the form itself is only fed
 // dummy credentials while Fetch interception answers it, so no real password is ever typed into the page. Writes stay in the
-// _selftest list (and one Cyrillic-named test list it creates and archives). The transport never logs CDP parameters.
+// _selftest list (and test lists it creates and archives; guests: see gGuests). The transport never logs CDP parameters.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin, accessCreds, accessHeaders, strayHosts } from '../cli/lib.mjs';
+import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin, accessCreds, accessHeaders, strayHosts, guestLogins, guestLeaks } from '../cli/lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, ACCESS = null; // --url and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'guests'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 const OUT = path.resolve(args.out || path.join(os.tmpdir(), 'td-e2e-' + Date.now()));
 const PAGE = path.resolve(args.page || APP_HTML);
@@ -25,8 +25,10 @@ const RUN = 'e2e-' + new Date().toISOString().replace(/\D/g, '').slice(2, 12);
 const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rows = [], leftovers = [];
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, skipped = 0;
 const check = (group, what, ok, note) => { ok ? pass++ : fail++; rows.push(`| ${group} | ${what} | ${ok ? 'pass' : 'FAIL'} | ${String(note || '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 160)} |`); console.log(`${ok ? 'pass' : 'FAIL'} ${group}: ${what}`); };
+// a check that cannot run here (a login missing from the env): reported, never counted as passed or failed
+const skip = (group, what, note) => { skipped++; rows.push(`| ${group} | ${what} | skipped | ${String(note || '').replace(/|/g, '/')} |`); console.log(`skip ${group}: ${what} (${note})`); };
 
 // ---- browser ----
 function findBrowser() {
@@ -185,6 +187,7 @@ async function setup() {
 }
 async function cleanup() {
   if (!MK) return;
+  for (const undo of guestUndo.reverse()) { try { await undo(); } catch (e) { leftovers.push('guests cleanup step failed: ' + e.message); } }
   for (const [who, c] of [['maksym', MK], ['anastasiia', AN]]) {
     if (prefsSnap[who] === undefined) continue;
     if (prefsSnap[who] === null) { leftovers.push(`a preferences row for ${who} that did not exist before`); continue; }
@@ -577,13 +580,223 @@ async function gSmoke() {
   await T.close();
 }
 
+// ---- guests (multi-user, db/009-011): guest logins from the env (TASKSDB_GUEST_A_*, TASKSDB_GUEST_B_*), Maksym as the household side.
+// A missing login skips its checks (named in the report), never fails. Guests only ever see test lists this group makes; the
+// household's tags never reach a guest (the tag-list share goes from the guest to Maksym). Every step is undone in cleanup().
+const guestUndo = [];
+const closeDialogs = T => T.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
+const rpcOf = async (c, fn, body) => { const r = await c.rest('POST', 'rpc/' + fn, body || {}); return r.ok ? r.json : null; };
+async function mkList(c, name, own) {
+  const r = await c.rest('POST', 'rpc/create_list', { p_name: name, p_shared: false });
+  if (!r.ok) throw new Error('create_list failed: ' + r.err.message);
+  const l = (await c.rest('GET', 'lists?select=id,slug,name&id=eq.' + r.json)).json[0];
+  if (own) testLists.push(l); // Maksym's: archived by cleanup() with its items
+  return l;
+}
+// everything a login can read that matters for isolation (guests have few rows: one page is enough)
+async function snapshotOf(c) {
+  const g = async p => { const r = await c.rest('GET', p); return r.ok ? r.json : null; };
+  return { lists: await g('lists?select=id,slug,owner_id'), items: await g('items?select=id,list_id&deleted_at=is.null'), categories: await g('categories?select=slug'),
+    profiles: await g('profiles?select=id,handle'), tagLists: await g('tag_lists?select=id,owner_id'), tags: await g('tags?select=id,tag_list_id,name&deleted_at=is.null'),
+    itemTags: await g('item_tags?select=item_id,tag_id&removed_at=is.null') };
+}
+// leaks of a guest: anything outside its own lists and tag lists plus the ones it accepted (extra)
+async function leaksOf(c, extra) {
+  const s = await snapshotOf(c);
+  const failed = Object.keys(s).filter(k => !s[k]);
+  if (failed.length) return ['read failed: ' + failed.join(', ')];
+  return guestLeaks(s, { uid: c.uid, lists: s.lists.filter(l => l.owner_id === c.uid).map(l => l.id).concat([...extra.lists]),
+    tagLists: s.tagLists.filter(t => t.owner_id === c.uid).map(t => t.id).concat([...extra.tagLists]) });
+}
+// the Share dialog of a list from its chip menu, or of my Default from Account menu, Tags
+async function openListShare(T, listId) {
+  await closeDialogs(T); await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200);
+  await pick(T, listId);
+  await T.click('#listmenu'); await T.wait('!!document.querySelector("#pop [data-share-list]")', 5000); await T.click('#pop [data-share-list]');
+  return T.wait('!!document.getElementById("sh-email")', 8000);
+}
+async function shareInDialog(T, email, role) {
+  await T.ev('document.getElementById("sh-email").value="";document.getElementById("sh-e").textContent="";true');
+  await T.insert('#sh-email', email);
+  await T.ev(`document.getElementById('sh-role').value=${JSON.stringify(role)};document.getElementById('sh-go').click();true`);
+}
+async function openSharingMenu(T, inviteId) {
+  await closeDialogs(T); await T.ev('dispatchEvent(new Event("focus")),true');
+  await T.wait(`INVITES.some(i=>i.id===${JSON.stringify(inviteId)})`, 10000);
+  await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=sharing]")', 5000); await T.click('[data-menu=sharing]');
+  return T.wait(`!!document.querySelector('[data-accept="${inviteId}"]')`, 8000);
+}
+const guestCheck = async (G, who, c, extra, what) => { const l = await leaksOf(c, extra); check(G, `${who}: ${what}`, !l.length, l.slice(0, 6).join(', ')); };
+async function loginGuest(G, handle, label) {
+  const c = await connect(env, handle, { core, via: 'script:e2e', runId: RUN }); clients.push(c);
+  const p = (await c.rest('GET', 'profiles?select=id,is_household&id=eq.' + c.uid)).json;
+  const ok = Array.isArray(p) && p[0] && p[0].is_household === false;
+  check(G, `${label} is a guest login (is_household false)`, ok, ok ? '' : 'stopped: not a guest login');
+  return ok ? c : null;
+}
+
+async function gGuests() {
+  const G = 'guests', M = await maksymPage();
+  const [ga, gb] = guestLogins(env);
+  // owner side, no guest needed: my own address is refused; an address nobody has shows as pending; Revoke withdraws it
+  const L1 = await mkList(MK, 'Guests e2e ' + RUN, true);
+  const it1 = (await MK.rest('POST', 'items', { list_id: L1.id, category: 'task', title: `${RUN} guest sees this`, quadrant: 'B' }, { Prefer: 'return=representation' })).json[0];
+  const mDef = ((await MK.rest('GET', `tag_lists?select=id&is_default=eq.true&owner_id=eq.${MK.uid}`)).json || [])[0];
+  const mTag = mDef && ((await MK.rest('GET', `tags?select=id,name&deleted_at=is.null&limit=1&tag_list_id=eq.${mDef.id}`)).json || [])[0];
+  if (mTag) await MK.rest('POST', 'item_tags', { item_id: it1.id, tag_id: mTag.id });
+  check(G, 'owner: the Share dialog opens from the list chip menu', await openListShare(M, L1.id));
+  await shareInDialog(M, MK.session.user.email, 'viewer');
+  check(G, 'owner: sharing with my own address is refused in the dialog', await M.wait('(document.getElementById("sh-e")||{}).textContent.length>0', 8000), await M.text('#sh-e'));
+  const nobody = `${RUN}-nobody@example.invalid`;
+  await shareInDialog(M, nobody, 'viewer');
+  const people = async (c, id) => (await rpcOf(c, 'list_people', { p_list: id })) || [];
+  const pending = await until(async () => (await people(MK, L1.id)).find(p => p.state === 'pending' && p.email === nobody));
+  check(G, 'owner: an invitation by email shows as pending (Viewer); nothing is sent', !!pending && pending.role === 'viewer');
+  check(G, 'owner: the Share dialog lists it with Revoke', !!pending && await M.wait(`!!document.querySelector('#sh-people [data-revoke="${pending.invite_id}"]')`, 8000));
+  await M.shot('guests-share-dialog-maksym-1440x900');
+  check(G, 'a household member who is not on the list sees nobody on it (list_people)', (await people(AN, L1.id)).length === 0);
+  if (pending) await M.click(`#sh-people [data-revoke="${pending.invite_id}"]`);
+  check(G, 'owner: Revoke withdraws the invitation', await until(async () => !(await people(MK, L1.id)).some(p => p.email === nobody)));
+  await closeDialogs(M);
+
+  if (ga.missing.length) {
+    skip(G, 'guest A: isolation, invitation before and after Accept, no household tags, tag-list share to Maksym, decline and block, removal (both widths)', 'env missing: ' + ga.missing.join(', '));
+    skip(G, 'guest A and guest B: list share through the UI, nothing before Accept, tags only after the Default is shared, removal gives 0 rows', 'needs guest A and guest B');
+    return;
+  }
+  const A = await loginGuest(G, 'guest-a', 'guest A');
+  if (!A) return;
+  const aEmail = A.session.user.email, xA = { lists: new Set(), tagLists: new Set() };
+  const aDef = ((await A.rest('GET', `tag_lists?select=id,name&is_default=eq.true&owner_id=eq.${A.uid}`)).json || [])[0];
+  const s0 = await snapshotOf(A);
+  check(G, 'guest A: has its own lists (My tasks) and a Default tag list', !!aDef && (s0.lists || []).some(l => l.owner_id === A.uid), `lists ${(s0.lists || []).length}, live tags ${(s0.tags || []).length}`);
+  await guestCheck(G, 'guest A', A, xA, 'reads no household list, item, category, profile or tag');
+  const AP = await tab(B, await ctx(B));
+  check(G, 'guest A: opens signed in from ' + where(), await open(AP, await grantFor('guest-a')));
+  check(G, 'guest A: the page holds only its own lists and tags, task and reminder categories, nobody else\'s name',
+    await AP.ev(`LISTS.every(l=>l.owner_id===me.id) && Object.values(TAG).every(t=>(TAG_LISTS[t.tag_list_id]||{}).owner_id===me.id) && Object.keys(CATS).every(c=>c==='task'||c==='reminder') && Object.keys(NAMES).every(id=>id===me.id)`));
+  for (const [w, h] of [[1440, 900], [390, 844]]) { await AP.size(w, h); await sleep(600); await AP.shot(`guests-a-board-${w}x${h}`); }
+  await AP.size(1440, 900);
+
+  // Maksym shares L1 with A as Viewer through the UI: nothing before Accept
+  await openListShare(M, L1.id); await shareInDialog(M, aEmail, 'viewer');
+  const inv1 = await until(async () => ((await rpcOf(A, 'my_invitations')) || []).find(i => i.kind === 'list' && i.target_name === L1.name));
+  guestUndo.push(async () => { for (const p of await people(MK, L1.id)) if (p.state === 'pending') await rpcOf(MK, 'revoke_invite', { p_invite: p.invite_id }); });
+  check(G, 'guest A: the invitation arrives (my_invitations: list, Viewer, from Maksym)', !!inv1 && inv1.role === 'viewer');
+  check(G, 'guest A: before Accept, nothing of the list or its items', ((await A.rest('GET', 'lists?select=id&id=eq.' + L1.id)).json || [1]).length === 0 && ((await A.rest('GET', 'items?select=id&list_id=eq.' + L1.id)).json || [1]).length === 0);
+  check(G, 'guest A: Account menu, Sharing shows Accept', !!inv1 && await openSharingMenu(AP, inv1.id));
+  await AP.shot('guests-a-sharing-1440x900');
+  if (inv1) await AP.click(`[data-accept="${inv1.id}"]`);
+  xA.lists.add(L1.id);
+  check(G, 'guest A: after Accept, the list and its item', await until(async () => ((await A.rest('GET', 'items?select=id&list_id=eq.' + L1.id)).json || []).length === 1));
+  check(G, 'guest A: none of Maksym\'s tags on the shared item', ((await A.rest('GET', 'item_tags?select=tag_id&item_id=eq.' + it1.id)).json || [1]).length === 0, mTag ? 'the item carries one of his tags' : 'Maksym has no tag to put on it');
+  await guestCheck(G, 'guest A', A, xA, 'after Accept: still no household row, only the shared list added');
+  check(G, 'guest A: names visible = Maksym only (visible_profiles)', JSON.stringify(((await rpcOf(A, 'visible_profiles')) || []).map(p => p.id)) === JSON.stringify([MK.uid]));
+  await closeDialogs(AP); await AP.ev('dispatchEvent(new Event("focus")),true');
+  check(G, 'guest A: the list shows, read only (Viewer), with no tag of Maksym on the page', await AP.wait(`!!document.querySelector('[data-list="${L1.id}"]')`, 10000) &&
+    await AP.ev(`Object.values(TAG).every(t=>(TAG_LISTS[t.tag_list_id]||{}).owner_id===me.id) && !document.querySelector('[data-done="${it1.id}"]')`));
+
+  // A shares A's Default with Maksym (never the other way): Maksym sees A's tags only after Accept, then leaves
+  const aTagName = (RUN + '-a').slice(0, 40);
+  await closeDialogs(AP); await AP.click('#profile'); await AP.click('[data-menu=tags]'); await AP.wait('!!document.getElementById("tg-new")', 8000);
+  await AP.insert('#tg-new', aTagName); await AP.click('#tg-add');
+  const aTag = await until(async () => ((await A.rest('GET', `tags?select=id,name&deleted_at=is.null&name=eq.${encodeURIComponent(aTagName)}&tag_list_id=eq.${aDef.id}`)).json || [])[0]);
+  if (aTag) guestUndo.push(() => A.rest('PATCH', 'tags?id=eq.' + aTag.id, { deleted_at: new Date().toISOString() }));
+  check(G, 'guest A: a new tag from Account menu, Tags lands in A\'s Default', !!aTag);
+  await AP.wait(`!!document.querySelector('[data-share-tags="${aDef.id}"]')`, 8000); await AP.click(`[data-share-tags="${aDef.id}"]`);
+  await AP.wait('!!document.getElementById("sh-email")', 8000); await shareInDialog(AP, MK.session.user.email, 'viewer');
+  const inv2 = await until(async () => ((await rpcOf(MK, 'my_invitations')) || []).find(i => i.kind === 'tag_list' && i.target_name === aDef.name));
+  guestUndo.push(async () => { await rpcOf(MK, 'leave_tag_list', { p_tag_list: aDef.id }); for (const p of (await rpcOf(A, 'tag_list_people', { p_tag_list: aDef.id })) || []) if (p.state === 'pending') await rpcOf(A, 'revoke_invite', { p_invite: p.invite_id }); });
+  check(G, 'Maksym: before Accept, none of A\'s tags', !!inv2 && ((await MK.rest('GET', 'tags?select=id&tag_list_id=eq.' + aDef.id)).json || [1]).length === 0);
+  check(G, 'Maksym: Accept in Account menu, Sharing', !!inv2 && await openSharingMenu(M, inv2.id));
+  if (inv2) await M.click(`[data-accept="${inv2.id}"]`);
+  check(G, 'Maksym: after Accept, A\'s tags are readable', await until(async () => ((await MK.rest('GET', 'tags?select=name&deleted_at=is.null&tag_list_id=eq.' + aDef.id)).json || []).some(t => t.name === aTagName)));
+  await closeDialogs(M); await M.ev('dispatchEvent(new Event("focus")),true'); await sleep(1500);
+  await M.click('#profile'); await M.click('[data-menu=tags]');
+  check(G, 'Maksym: Account menu, Tags lists A\'s Default under Shared with me', await M.wait(`!!document.querySelector('[data-tl-leave="${aDef.id}"]') && document.querySelector('dialog[open]').textContent.includes(${JSON.stringify(aTagName)})`, 8000));
+  await M.shot('guests-maksym-tags-shared-1440x900');
+  await guestCheck(G, 'guest A', A, xA, 'sharing its Default gives it nothing of Maksym\'s');
+  await M.click(`[data-tl-leave="${aDef.id}"]`); await M.wait('!!document.getElementById("cf-ok")', 5000); await M.click('#cf-ok');
+  check(G, 'Maksym: Leave takes A\'s tags away again', await until(async () => ((await MK.rest('GET', 'tags?select=id&tag_list_id=eq.' + aDef.id)).json || [1]).length === 0));
+  await closeDialogs(M);
+
+  // decline and block a second invitation: A sees nothing more from Maksym; the owner still sees "pending" (S4)
+  const L2 = await mkList(MK, 'Guests e2e block ' + RUN, true);
+  await rpcOf(MK, 'share_list', { p_list: L2.id, p_email: aEmail, p_role: 'viewer' });
+  const inv3 = await until(async () => ((await rpcOf(A, 'my_invitations')) || []).find(i => i.target_name === L2.name));
+  guestUndo.push(async () => { await A.rest('DELETE', `invite_blocks?profile_id=eq.${A.uid}&blocked_id=eq.${MK.uid}`); for (const p of await people(MK, L2.id)) if (p.state === 'pending') await rpcOf(MK, 'revoke_invite', { p_invite: p.invite_id }); });
+  check(G, 'guest A: Decline and block asks first', !!inv3 && await openSharingMenu(AP, inv3.id) && (await AP.click(`[data-block="${inv3.id}"]`), await AP.wait('!!document.getElementById("cf-ok")', 5000)));
+  await AP.click('#cf-ok');
+  check(G, 'guest A: the block is stored (invite_blocks, own row)', await until(async () => ((await A.rest('GET', `invite_blocks?select=blocked_id&profile_id=eq.${A.uid}`)).json || []).some(b => b.blocked_id === MK.uid)));
+  check(G, 'Maksym: the declined invitation still reads "pending" (S4)', (await people(MK, L2.id)).some(p => p.state === 'pending' && p.email === aEmail.toLowerCase()));
+  const again = await rpcOf(MK, 'share_list', { p_list: L2.id, p_email: aEmail, p_role: 'editor' });
+  check(G, 'Maksym: inviting again answers the same; guest A sees no invitation and nothing of the list', !!again && again.ok === true && !((await rpcOf(A, 'my_invitations')) || []).some(i => i.target_name === L2.name) && ((await A.rest('GET', 'lists?select=id&id=eq.' + L2.id)).json || [1]).length === 0);
+  await A.rest('DELETE', `invite_blocks?profile_id=eq.${A.uid}&blocked_id=eq.${MK.uid}`);
+  check(G, 'guest A: may delete its own block (admin-free unblock over REST)', ((await A.rest('GET', `invite_blocks?select=blocked_id&profile_id=eq.${A.uid}`)).json || [1]).every(b => b.blocked_id !== MK.uid));
+
+  // Maksym removes A from L1 in the Share dialog: 0 rows for A
+  await openListShare(M, L1.id);
+  check(G, 'owner: the Share dialog lists A as a member with Remove', await M.wait(`!!document.querySelector('#sh-people [data-remove="${A.uid}"]')`, 8000));
+  await M.click(`#sh-people [data-remove="${A.uid}"]`);
+  xA.lists.delete(L1.id);
+  check(G, 'guest A: after removal, 0 rows of the list and its items', await until(async () => ((await A.rest('GET', 'lists?select=id&id=eq.' + L1.id)).json || [1]).length === 0 && ((await A.rest('GET', 'items?select=id&list_id=eq.' + L1.id)).json || [1]).length === 0));
+  await closeDialogs(M);
+  await guestCheck(G, 'guest A', A, xA, 'at the end: only its own rows');
+  await closeDialogs(AP); await AP.ev('dispatchEvent(new Event("focus")),true');
+  check(G, 'guest A: the list leaves the page', await AP.wait(`!document.querySelector('[data-list="${L1.id}"]') && LISTS.every(l=>l.owner_id===me.id)`, 10000));
+  check(G, `guest A: ${onlyHosts()}`, !strayHosts(AP.hosts, SUPA, ORIGIN).length, [...AP.hosts].join(', '));
+  check(G, 'guest A: no console errors', !AP.errors.length, AP.errors.slice(0, 2).join(' / '));
+  await AP.close();
+
+  // A ↔ B: two guests never meet except through a share A makes in the UI
+  if (gb.missing.length) {
+    skip(G, 'guest A and guest B: list share through the UI, nothing before Accept, tags only after the Default is shared, removal gives 0 rows', 'env missing: ' + gb.missing.join(', '));
+    return;
+  }
+  const Bc = await loginGuest(G, 'guest-b', 'guest B');
+  if (!Bc) return;
+  const bEmail = Bc.session.user.email, xB = { lists: new Set(), tagLists: new Set() };
+  await guestCheck(G, 'guest B', Bc, xB, 'reads nothing of A or the household');
+  const LA = await mkList(A, 'Guests e2e A ' + RUN, false);
+  guestUndo.push(async () => { await A.rest('PATCH', `items?list_id=eq.${LA.id}&deleted_at=is.null`, { deleted_at: new Date().toISOString() }); await A.rest('PATCH', 'lists?id=eq.' + LA.id, { archived_at: new Date().toISOString() }); leftovers.push(`archived guest A test list ${LA.slug}`); });
+  const itA = (await A.rest('POST', 'items', { list_id: LA.id, category: 'task', title: `${RUN} A to B`, quadrant: 'B' }, { Prefer: 'return=representation' })).json[0];
+  if (aTag) await A.rest('POST', 'item_tags', { item_id: itA.id, tag_id: aTag.id });
+  const AP2 = await tab(B, await ctx(B));
+  await open(AP2, await grantFor('guest-a'));
+  await openListShare(AP2, LA.id); await shareInDialog(AP2, bEmail, 'viewer');
+  const invB = await until(async () => ((await rpcOf(Bc, 'my_invitations')) || []).find(i => i.target_name === LA.name));
+  guestUndo.push(async () => { for (const p of await people(A, LA.id)) if (p.state === 'pending') await rpcOf(A, 'revoke_invite', { p_invite: p.invite_id }); });
+  check(G, 'guest B: A\'s invitation arrives; before Accept nothing of the list', !!invB && ((await Bc.rest('GET', 'items?select=id&list_id=eq.' + LA.id)).json || [1]).length === 0);
+  const BP = await tab(B, await ctx(B), { width: 390, height: 844 });
+  check(G, 'guest B: opens signed in at 390×844', await open(BP, await grantFor('guest-b')));
+  check(G, 'guest B: Accept in Account menu, Sharing', !!invB && await openSharingMenu(BP, invB.id));
+  if (invB) await BP.click(`[data-accept="${invB.id}"]`);
+  xB.lists.add(LA.id);
+  check(G, 'guest B: after Accept, A\'s list and item, and none of A\'s tags', await until(async () => ((await Bc.rest('GET', 'items?select=id&list_id=eq.' + LA.id)).json || []).length === 1) && ((await Bc.rest('GET', 'item_tags?select=tag_id&item_id=eq.' + itA.id)).json || [1]).length === 0);
+  await guestCheck(G, 'guest B', Bc, xB, 'only A\'s shared list added');
+  await rpcOf(A, 'share_tag_list', { p_tag_list: aDef.id, p_email: bEmail, p_role: 'viewer' });
+  const invBt = await until(async () => ((await rpcOf(Bc, 'my_invitations')) || []).find(i => i.kind === 'tag_list'));
+  guestUndo.push(() => rpcOf(Bc, 'leave_tag_list', { p_tag_list: aDef.id }));
+  if (invBt) await rpcOf(Bc, 'accept_invite', { p_invite: invBt.id });
+  xB.tagLists.add(aDef.id);
+  check(G, 'guest B: A\'s tag shows on the shared item once A\'s Default is shared', !aTag || await until(async () => ((await Bc.rest('GET', 'item_tags?select=tag_id&removed_at=is.null&item_id=eq.' + itA.id)).json || []).some(x => x.tag_id === aTag.id)));
+  await guestCheck(G, 'guest B', Bc, xB, 'still no household row');
+  await closeDialogs(BP); await BP.ev('dispatchEvent(new Event("focus")),true'); await BP.wait(`!!document.querySelector('[data-list="${LA.id}"]')`, 10000);
+  for (const [w, h] of [[390, 844], [1440, 900]]) { await BP.size(w, h); await sleep(600); await BP.shot(`guests-b-board-${w}x${h}`); }
+  await A.rest('DELETE', `list_members?list_id=eq.${LA.id}&profile_id=eq.${Bc.uid}`);
+  await rpcOf(Bc, 'leave_tag_list', { p_tag_list: aDef.id });
+  check(G, 'guest B: after A removes B, 0 rows of the list, its items and A\'s tags', ((await Bc.rest('GET', 'items?select=id&list_id=eq.' + LA.id)).json || [1]).length === 0 && ((await Bc.rest('GET', 'tags?select=id&tag_list_id=eq.' + aDef.id)).json || [1]).length === 0);
+  check(G, 'guest B: no console errors', !BP.errors.length, BP.errors.slice(0, 2).join(' / '));
+  await BP.close(); await AP2.close();
+}
+
 const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, guests: gGuests, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'guests'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }
@@ -594,9 +807,9 @@ try {
   if (B) B.close();
   for (const c of clients.reverse()) await c.close();
   const report = ['# TasksDashboard e2e', '', `Run \`${RUN}\`, ${new Date().toISOString()}, ${Math.round((Date.now() - t0) / 1000)} s. Page \`${ORIGIN ? ORIGIN + '/' + (ACCESS ? '` (Access service token)' : '`') : PAGE + '`'}. Groups: ${want.join(', ')}. Logins from the env file; no values printed.`, '',
-    `**${pass} of ${pass + fail} passed.**`, '', '| Group | Check | Result | Note |', '|---|---|---|---|', ...rows, '', '## Leftovers', '', ...(leftovers.length ? leftovers.map(x => '- ' + x) : ['- none']), '',
+    `**${pass} of ${pass + fail} passed${skipped ? `, ${skipped} skipped` : ''}.**`, '', '| Group | Check | Result | Note |', '|---|---|---|---|', ...rows, '', '## Leftovers', '', ...(leftovers.length ? leftovers.map(x => '- ' + x) : ['- none']), '',
     'Screenshots: the `*.png` files next to this report.'].join('\n');
   fs.writeFileSync(path.join(OUT, 'e2e-report.md'), report + '\n');
-  console.log(`${pass} of ${pass + fail} passed; report ${path.join(OUT, 'e2e-report.md')}`);
+  console.log(`${pass} of ${pass + fail} passed${skipped ? `, ${skipped} skipped` : ''}; report ${path.join(OUT, 'e2e-report.md')}`);
   process.exitCode = fail ? 1 : 0;
 }
