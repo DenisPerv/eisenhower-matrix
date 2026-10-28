@@ -30,11 +30,12 @@ begin
     (mk, 'st-maksym@example.invalid', 'authenticated', 'authenticated'), (an, 'st-anastasiia@example.invalid', 'authenticated', 'authenticated'),
     (ag, 'st-agent@example.invalid', 'authenticated', 'authenticated'),  (tg, 'st-telegram@example.invalid', 'authenticated', 'authenticated'),
     (nx, 'st-noprofile@example.invalid', 'authenticated', 'authenticated');
-  insert into public.profiles (id, handle, display_name, kind, email, mine_tags) values
-    (mk, 'st-maksym', 'Maksym', 'human', 'st-maksym@example.invalid', '{maksym,shared}'),
-    (an, 'st-anastasiia', 'Anastasiia', 'human', 'st-anastasiia@example.invalid', '{anastasiia,shared}'),
-    (ag, 'st-homeos-agent', 'HomeOS agent', 'agent', 'st-agent@example.invalid', '{}'),
-    (tg, 'st-telegram-bot', 'Telegram bot', 'agent', 'st-telegram@example.invalid', '{}');
+  -- the fixtures are the household (db/009 is_household); 901 tests guests
+  insert into public.profiles (id, handle, display_name, kind, email, mine_tags, is_household) values
+    (mk, 'st-maksym', 'Maksym', 'human', 'st-maksym@example.invalid', '{maksym,shared}', true),
+    (an, 'st-anastasiia', 'Anastasiia', 'human', 'st-anastasiia@example.invalid', '{anastasiia,shared}', true),
+    (ag, 'st-homeos-agent', 'HomeOS agent', 'agent', 'st-agent@example.invalid', '{}', true),
+    (tg, 'st-telegram-bot', 'Telegram bot', 'agent', 'st-telegram@example.invalid', '{}', true);
   insert into public.categories (slug, name) values ('task', 'Task') on conflict do nothing;
   insert into public.lists (slug, name, owner_id, created_by) values ('st-backlog', 'Backlog', mk, mk) returning id into bl;
   insert into public.list_members (list_id, profile_id, role) values (bl, mk, 'owner'), (bl, an, 'owner'), (bl, ag, 'editor');

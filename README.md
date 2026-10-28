@@ -22,10 +22,14 @@ The household's own setup lives in HomeOS (`references/homeos/tasksdb/`); this R
    | `db/006_archived_lists.sql` | archived lists are frozen: no update of their items except by admin SQL |
    | `db/007_renewal.sql` | category `renewal` (default list Reminders; `details`: `renew_by` and the records-index row name, dates only) |
    | `db/008_telegram_editor.sql` | `telegram-bot` becomes an editor on Reminders and OtherTasks (was contributor): the Telegram bot may change any open item there; agents still never delete or restore |
-   | `db/003_rls.sql` again | grants for what 005 to 008 added |
+   | `db/009_multiuser_schema.sql` | multi-user tables and columns: `profiles.is_household`, `categories.audience`, slugs unique per owner, `items.space_owner_id` with dedup keys unique per space owner, `list_members.hidden_at`, `invites`, `invite_blocks`, `tag_lists`, `tag_list_members`, `tags`, `item_tags`, `ops.signup_allowlist`, `ops.settings` (caps and limits); a Default tag list per profile |
+   | `db/010_multiuser_functions.sql` | replaces `items_before_write` (after 006), `create_list` (private unless `p_shared`, household only) and `keepalive_status`; tag compatibility trigger (`items.tags` filed into a Default, then cleared); sign-up hook `hook_before_user_created`; `handle_new_user` (profile, "My tasks", Default); identity guards on `auth.users` and `auth.identities`; invitations (`share_list`, `share_tag_list`, `my_invitations`, `accept_invite`, `decline_invite`, `revoke_invite`); `leave_list`, `leave_tag_list`, `set_list_hidden`, `set_tag_list_hidden`, `list_people`, `tag_list_people`, `visible_profiles` |
+   | `db/003_rls.sql` again | grants for what 005 to 010 added |
+   | `db/011_multiuser_rls.sql` | multi-user policies and grants; runs after every `003` (it replaces some of 003's household policies); ends with a check that fails if a public table has RLS off or a public function is executable by `anon` |
    | `db/900_selftest.sql` | the RLS selftest; it ends with an error whose text must read `SELFTEST 57 of 57 passed (rolled back). Failures: none` |
+   | `db/901_selftest_multiuser.sql` | the multi-user selftest (guests, invitations, tags, hook, identity guards, limits); must read `SELFTEST 69 of 69 passed (rolled back). Failures: none` |
 
-   Every file is re-runnable. Later changes come only as new `db/NNN_*.sql` files, followed by `003` and `900`.
+   Every file is re-runnable. Later changes come only as new `db/NNN_*.sql` files, followed by `003`, `011`, `900` and `901`. Order rule for the trigger function `items_before_write`: `002` → `006` → `010`.
 6. **Config.** Project Settings → API Keys: copy the **publishable** key (`sb_publishable_…`) into `config/tasksdashboard.config.js` (below). Never the secret or service key.
 
 ## Config

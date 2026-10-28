@@ -6,7 +6,7 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 |---|---|
 | `TasksDashboard.html` | the whole app, one file, no build |
 | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`, public values, committed |
-| `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `900_selftest.sql` | the database, applied in file order |
+| `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `009_multiuser_schema.sql`, `010_multiuser_functions.sql`, `011_multiuser_rls.sql`, `900_selftest.sql`, `901_selftest_multiuser.sql` | the database, applied in file order (README "Set up") |
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
 | `test/core.test.js`, `test/cli.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
 | `README.md`, `CLAUDE.md`, `dependencies-doc.md` | documentation |
@@ -54,8 +54,8 @@ Public values only: the project URL, the publishable key, the poll interval. Nev
 
 ## Database
 
-- Changes only as a new `db/NNN_*.sql` file, never by editing an applied one. After one: re-run `003_rls.sql`, then `900_selftest.sql` (it must report every assertion passed).
-- `006_archived_lists.sql` replaces the trigger function from `002`: re-running `002` means re-running `006`.
+- Changes only as a new `db/NNN_*.sql` file, never by editing an applied one. After one: re-run `003_rls.sql`, `011_multiuser_rls.sql`, then `900_selftest.sql` and `901_selftest_multiuser.sql` (each must report every assertion passed).
+- `006_archived_lists.sql` and then `010_multiuser_functions.sql` replace the trigger function from `002`: re-running `002` means re-running `006` and `010`.
 
 ## Tests
 
