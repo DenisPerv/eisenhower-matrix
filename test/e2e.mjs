@@ -564,6 +564,8 @@ async function gUi() {
     await T.size(1440, 900);
     await T.click('#wl-later'); T.keepWelcome = false;
     check(G, `${who}: Later closes it and the highlight goes`, await T.ev('!document.getElementById("welcome")&&!document.getElementById("profile").classList.contains("beacon")'));
+    // the board opens on the person's last list (a preference); the round-4 card checks need All lists
+    await pick(T, 'all');
     await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
     const lim = who === 'maksym' ? 7 : 4;
     await T.ev(`document.getElementById('s-lim').value='${lim}';document.getElementById('s-save').click();true`);
@@ -596,16 +598,17 @@ async function gUi() {
     check(G, `${who}: Source on, All lists: the card shows "Reminder" and the task window shows Sources (round 4, item 3)`, await T.wait(`/Reminder/.test(${r4c}?.querySelector('.tbs')?.textContent||'')`, 5000) &&
       (await T.ev(`(${r4c}.click(),true)`), await T.wait('!!document.querySelector("dialog[open] #srcs")', 5000)));
     await closeDialogs(T);
-    await T.ev(`(st.list='${ST.id}',st.pop=null,render(),true)`);
+    // the app's state lives inside its script's closure (not page globals): select the list through its chip
+    await pick(T, ST.id);
     check(G, `${who}: Source on, one list selected: no badge and no Sources (round 4, item 3)`, await T.wait(`!!${r4c}&&!${r4c}.querySelector('.tbs .tb:not(.ai)')`, 5000) &&
       (await T.ev(`(${r4c}.click(),true)`), await T.wait('!!document.querySelector("dialog[open] #ft")', 5000)) && await T.ev('!document.querySelector("dialog[open] #srcs")'));
     await closeDialogs(T);
     // round 4, item 2: an owner's list menu has Share and no People; a member's has People and no Share
-    const owns = await T.ev(`ROLE['${ST.id}']==='owner'`);
+    const owns = (await MK.rest('GET', `lists?select=owner_id&id=eq.${ST.id}`)).json[0]?.owner_id === (who === 'maksym' ? MK : AN).uid;
     await T.click('#listmenu');
     check(G, `${who}: the _selftest list menu shows ${owns ? 'Share and no People (owner)' : 'People and no Share (member)'} (round 4, item 2)`,
       await T.ev(owns ? `!!document.querySelector('#pop [data-share-list]')&&!document.querySelector('#pop [data-people-list]')` : `!!document.querySelector('#pop [data-people-list]')&&!document.querySelector('#pop [data-share-list]')`));
-    await T.ev(`(st.pop=null,st.list='all',render(),true)`);
+    await pick(T, 'all');
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
     await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
@@ -687,7 +690,7 @@ async function gUi() {
       const html = file ? fs.readFileSync(path.join(dlDir, file), 'utf8') : '';
       check(G, 'Download saves one HTML file: the review, the KPI charts as SVG, print styles, no script, no network', !!file && /<h1>Weekly review<\/h1>/.test(html) && /class="kpi-g"/.test(html) && /<svg/.test(html) && /@media print/.test(html) && !/<script/i.test(html) && !/(src|href)="https?:/i.test(html), file || 'no file');
       check(G, 'the saved file has the redesigned KPI (the three questions, quadrant rows) and no test list rows (U11, F3)', /Is my open work growing, and where\?/.test(html) && /class="kpi-qs"/.test(html) && !html.includes('kpi-pie') && !html.includes('_selftest'));
-      check(G, 'the saved file puts Visuals first, then the line, then the tasks (round 4, item 6)', /<h2>Visuals<\/h2>/.test(html) && html.indexOf('class="kpi"') < html.indexOf('rv-sep') && (html.indexOf('class="rvq') < 0 || html.indexOf('rv-sep') < html.indexOf('class="rvq')));
+      check(G, 'the saved file puts Visuals first, then the line, then the tasks (round 4, item 6)', /<h2>Visuals<\/h2>/.test(html) && html.indexOf('class="kpi"') < html.indexOf('class="rv-sep"') && (html.indexOf('class="rvq') < 0 || html.indexOf('class="rv-sep"') < html.indexOf('class="rvq')));
       if (file) {
         const E = await tab(B, await ctx(B));
         await E.go(pathToFileURL(path.join(dlDir, file)).href); await sleep(300);
@@ -849,7 +852,11 @@ async function gUiTags(G, T) {
   const G1 = `dialog[open] .tgg[data-tgg="${tl.id}"]`, GB = `dialog[open] .tgg[data-tgg="${bl && bl.id}"]`;
   await T.wait(`!!document.querySelector('${G1}')`, 5000);
   check(G, 'task window: a tag list the task does not use starts closed: one row "name · 1" and a chevron, no chips (U7)', await T.ev(`(()=>{const g=document.querySelector('${G1}');return !!g&&g.classList.contains('shut')&&!g.querySelector('.tagchip')&&g.querySelector('[data-tgg-open]').getAttribute('aria-expanded')==='false'&&/· 1$/.test(g.querySelector('.tgg-k').textContent)&&g.getBoundingClientRect().height<=48})()`));
-  check(G, 'task window: my default list starts open (U7)', await T.ev(`!document.querySelector('dialog[open] .tgg:first-child').classList.contains('shut')`));
+  // my default list starts open unless my saved prefs (tagListsOpen, restored after the run) say I closed it
+  const dfl = (await MK.rest('GET', `tag_lists?select=id&is_default=eq.true&owner_id=eq.${MK.uid}`)).json[0];
+  const dSaved = dfl && prefsSnap.maksym && prefsSnap.maksym.tagListsOpen ? prefsSnap.maksym.tagListsOpen[dfl.id] : undefined;
+  const dOpen = typeof dSaved === 'boolean' ? dSaved : true;
+  check(G, `task window: my default list starts ${dOpen ? 'open' : 'closed, as my saved prefs left it'} (U7)`, !!dfl && await T.ev(`(()=>{const g=document.querySelector('dialog[open] .tgg[data-tgg="${dfl && dfl.id}"]');return !!g&&g.classList.contains('shut')===${!dOpen}})()`));
   await T.insert('dialog[open] #tg-q', 'e2e-a');
   check(G, 'task window: the search shows only matching chips, across groups, closed ones included (U6)', await T.wait(`(()=>{const c=[...document.querySelectorAll('dialog[open] .tagbox .tagchip')];return c.length>0&&c.every(b=>b.textContent.includes('e2e-a'))&&!!document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')})()`, 3000));
   await T.shot('ui-task-search-maksym-1440x900');
