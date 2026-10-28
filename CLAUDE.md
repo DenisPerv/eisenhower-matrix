@@ -8,7 +8,7 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`, public values, committed |
 | `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `009_multiuser_schema.sql`, `010_multiuser_functions.sql`, `011_multiuser_rls.sql`, `900_selftest.sql`, `901_selftest_multiuser.sql` | the database, applied in file order (README "Set up") |
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
-| `test/core.test.js`, `test/cli.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
+| `test/core.test.js`, `test/multiuser.test.js`, `test/cli.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
 | `README.md`, `CLAUDE.md`, `dependencies-doc.md` | documentation |
 | `docs/deployment/` | deployment of the hosted copy (Cloudflare Pages): `README.md`, `1-version-check.md`, `2-deploy.md`, `3-post-deploy-check.md` |
 
