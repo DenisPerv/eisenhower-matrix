@@ -907,6 +907,64 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .actions .danger:hover{background:var(--danger-bg);border-color:var(--danger)}
 .al{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--hair)}
 @media (max-width:700px){.actions{flex-wrap:wrap}.actions .sp{flex-basis:100%;height:0}}
+/* round 3, A7: a compact title (wraps to two lines at most, smaller type), who the task is for */
+.rt.one{min-height:0;white-space:normal;overflow-y:auto;max-height:calc(2 * 1.35em + 14px);padding:6px 10px;font:500 15px/1.35 var(--ui)}
+.fwho{margin:6px 0 0;font:400 12.5px/1.4 var(--font);color:var(--ink3)}
+/* round 3, A7: task window tags, one row per tag list; the list's name (a button) puts all of its tags on */
+.tagbox{gap:8px}
+.tgg{flex:1 0 100%;display:grid;grid-template-columns:9.5em minmax(0,1fr);gap:6px 10px;align-items:start}
+.tgg-h{justify-content:flex-start;min-height:28px;padding:0 6px;border:0;background:transparent;font:500 12.5px var(--ui);color:var(--ink2);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:var(--r-sm);box-shadow:inset 2px 0 0 var(--hair2)}
+.tgg-h:hover:not(:disabled){background:var(--accent-bg);color:var(--accent-ink);box-shadow:inset 2px 0 0 var(--accent)}
+.tgg-h:disabled{opacity:1;cursor:default}
+.tgg-h .n{font-size:11.5px;margin-left:4px}
+.tgg-h .star,.tgl-star.on{color:var(--accent)}
+.tgg-c{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:28px}
+.tgg-c > .n{font-size:12px;align-self:center}
+@media (max-width:480px){.tgg{grid-template-columns:1fr;gap:4px}}
+/* round 3, A6: Account menu → Tags, the tag lists stacked as trays; a tag dragged onto another tray moves there */
+dialog:has(form.tgm){width:min(640px,94vw)}
+.tgm-body{display:grid;gap:8px;margin-top:10px}
+.tgl{border:1px solid var(--hair);border-radius:var(--r);padding:6px 10px 10px;background:var(--solid);transition:box-shadow .15s,background-color .15s}
+.tgl.arch{background:var(--well)}
+.tgl.dragging{opacity:.4}
+.tgl.drop{box-shadow:inset 0 0 0 2px var(--accent),0 0 22px -8px var(--glow);background:var(--accent-bg)}
+.tgl.drop-before{box-shadow:0 -3px 0 var(--accent)}
+.tgl.drop-after{box-shadow:0 3px 0 var(--accent)}
+.tgl-h{display:flex;align-items:center;gap:6px;min-height:34px}
+.tgl-grip{cursor:grab;color:var(--ink3);font:600 12px/1 var(--mono);letter-spacing:-3px;padding:4px 6px 4px 0;user-select:none}
+.tgl-star{display:inline-flex;align-items:center;justify-content:center;width:28px;min-width:28px;min-height:28px;padding:0;border:0;background:transparent;color:var(--ink3);font-size:15px;flex:none}
+button.tgl-star:hover{color:var(--accent-ink);background:var(--accent-bg)}
+dialog .tgl-h input.tgl-name{flex:1;width:auto;min-width:6em;min-height:30px;padding:0 6px;border-color:transparent;background:transparent;font:500 14px var(--ui)}
+dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
+.tgl-h span.tgl-name{flex:0 1 auto;font:500 14px var(--ui);padding:0 6px;overflow-wrap:anywhere}
+.tgl-h > .n{flex:1;font-size:12px;color:var(--ink3)}
+.tgl-n{font:600 12px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink3);padding:0 4px}
+.tgl-b{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tgl-b button{min-height:30px}
+.tgl-b .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
+.tgl-b .danger{color:var(--danger-ink)}
+.tgl-tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;min-height:28px}
+.tgl-tags > .n{font-size:12px}
+.tagchip.mine{box-shadow:inset 0 -2px 0 var(--accent)}
+.tgm-new{margin-top:10px}
+.tgm-menu{min-width:190px;z-index:30}
+.menu-pop .danger{color:var(--danger-ink)}
+.menu-pop button.all{color:var(--accent-ink)}
+@media (max-width:700px){.tgl-h{flex-wrap:wrap}.tgl-b{flex-basis:100%;justify-content:flex-start}}
+/* round 3, A10: side-menu rows drag between quadrant groups */
+.mrow.dragging{opacity:.4}
+.mrow.drop-before{box-shadow:inset 0 2px 0 var(--accent)}
+.mrow.drop-after{box-shadow:inset 0 -2px 0 var(--accent)}
+.grp.drop{box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-bg)}
+/* round 3, A5: the note of a first share, pinned at the bottom right (not a dialog: the board keeps updating) */
+.notices{position:fixed;z-index:24;right:16px;bottom:76px;width:min(380px,calc(100vw - 32px));display:grid;gap:8px}
+.ntc{background:var(--solid);border:1px solid var(--hair2);border-left:3px solid var(--accent);border-radius:var(--r-lg);box-shadow:var(--depth),0 18px 40px -24px var(--glow);padding:10px 12px}
+.ntc p{margin:0;font:400 13px/1.45 var(--font);color:var(--ink)}
+.ntc-b{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
+.ntc-b button{min-height:30px}
+.ntc-b .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
+.ntc-b .danger{color:var(--danger-ink)}
+@media (max-width:700px){.notices{left:8px;right:8px;width:auto}}
 </style>
 </head>
 <body>
@@ -972,12 +1030,14 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     if (status === 401 || code === 'PGRST301' || code === 'PGRST303') return e('auth', 'Session ended. Sign in again.', { refresh: true });
     // 22023 is the sensitive-data screen and also "bad value" (db/010): told apart by the text
     if (code === '22023' && (!msg || /^sensitive data/i.test(msg))) return e('sensitive', msg ? msg.replace(/^sensitive data: /, 'Not saved: this ') + '. Remove it and save again.' : 'Not saved: sensitive data.');
-    if (code === '22023' && /archived/i.test(msg)) return e('denied', 'This list is archived. Restore it first.');
+    // round 3: the database's own text first (db/012 says "the default tag list is not archived", which is not an archived list)
+    const archived = /tag list is archived/i.test(msg) ? 'This tag list is archived. Restore it first.' : 'This list is archived. Restore it first.';
+    if (code === '22023' && !DB_TEXT[msg] && /archived/i.test(msg)) return e('denied', archived);
     if (code === '22023') return e('invalid', DB_TEXT[msg] || sentence(msg));
     if (code === '54000') return e('limit', DB_TEXT[msg] || sentence(msg));
-    if (code === '42501' || status === 403) return e('denied', /archived/i.test(msg) ? 'This list is archived. Restore it first.' : DB_TEXT[msg] || (/^owners cannot leave/.test(msg) ? 'Owners can\'t leave their own list.' : 'Not allowed for your role on this list.'));
+    if (code === '42501' || status === 403) return e('denied', DB_TEXT[msg] || (/archived/i.test(msg) ? archived : /^owners cannot leave/.test(msg) ? 'Owners can\'t leave their own list.' : 'Not allowed for your role on this list.'));
     if (code === '23514') return e('invalid', /title/i.test(msg) ? 'The title is over 300 characters.' : 'A value is out of range: ' + msg);
-    if (code === '23505') return e('duplicate', /lists_slug|slug/i.test(msg) ? 'A list with this name exists.' : 'Already saved.');
+    if (code === '23505') return e('duplicate', /tag.?list/i.test(msg) ? 'You already have a tag list with this name.' : /lists_slug|slug|list named/i.test(msg) ? 'A list with this name exists.' : 'Already saved.');
     if (status >= 500) return e('server', 'The database had an error (' + status + '); changes wait and are sent again.', { retry: true });
     return e('other', msg || 'Request failed (' + status + ').');
   }
@@ -1001,9 +1061,20 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     'only household members share with the household': 'Only household members share with the household.',
     'this category is not available': 'This category is not available to you.',
     'owners cannot leave their tag list': 'Owners can\'t leave their own tag list.',
+    // round 3 (db/012): tag lists, notices
+    'tag list limit reached': 'You have reached your limit of tag lists.',
+    'a tag list name has 1 to 60 characters': 'A tag list name has 1 to 60 characters.',
+    'the default tag list is not archived': 'The default tag list can\'t be deleted. Make another list the default first.',
+    'only owners and editors share a tag list': 'Only owners and editors share this tag list.',
+    'only owners and editors delete tags': 'Only owners and editors delete tags.',
+    'only owners and editors archive a tag list': 'Only owners and editors delete a tag list.',
+    'only the owner chooses the default tag list': 'Only the owner chooses the default tag list.',
+    'tags move only between lists of one owner that you may edit': 'Tags move only between one owner\'s tag lists that you may edit.',
+    'no such tag list': 'This tag list is gone, or you may not change it.',
+    'no such notice': 'This note is no longer open.',
   };
 
-  const PROFILE_COLUMNS = 'id,handle,display_name,kind,timezone,locale,mine_tags,reminder_channel';
+  const PROFILE_COLUMNS = 'id,handle,display_name,kind,timezone,locale,mine_tags,mine_tag_ids,reminder_channel';
   const iso = d => d ? new Date(d).toISOString() : null;
   const date = s => s ? new Date(s) : null;
 
@@ -1275,7 +1346,8 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
   const accountFor = (list, handle) => (list || []).find(a => a.handle === handle) || null;
 
   // ---- sharing and tags (multi-user T9, review §6, §7) ----
-  const LIST_ROLES = ['editor', 'contributor', 'viewer'], TAG_LIST_ROLES = ['editor', 'viewer'];
+  // round 3 (db/012): tag lists have the same three roles as lists (viewer uses tags, contributor edits tags, editor everything)
+  const LIST_ROLES = ['editor', 'contributor', 'viewer'], TAG_LIST_ROLES = ['editor', 'contributor', 'viewer'];
   // labels of the tags the caller can see: a name that two people's tag lists both hold is marked with its owner's initial
   // (never on the caller's own tag); names = { profile id: display name }
   function tagLabels(tags, tagLists, names, meId) {
@@ -1289,8 +1361,9 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     });
     return out;
   }
-  // "Mine": the item is for me (owner_id), or carries a tag I can see whose name is in my mine_tags
-  const isMine = (t, me, tagNames) => !!me && (t.ownerId === me.id || (t.tags || []).some(id => tagNames[id] !== undefined && (me.mine_tags || []).includes(tagNames[id])));
+  // "Mine": the item is for me (owner_id), or carries a tag I can see whose id is in my mine_tag_ids (db/012; with several tag
+  // lists a name can mean different tags, so mine_tags names are no longer read)
+  const isMine = (t, me, tagNames) => !!me && (t.ownerId === me.id || (t.tags || []).some(id => tagNames[id] !== undefined && (me.mine_tag_ids || []).includes(id)));
   const tagDiff = (before, after) => ({ add: (after || []).filter(x => !(before || []).includes(x)), remove: (before || []).filter(x => !(after || []).includes(x)) });
   // item_tags rows (load or poll) applied to the tasks; items with writes waiting are skipped; unknown tag ids are reported
   function mergeTagRows(tasks, rows, opts) {
@@ -1328,13 +1401,16 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     return { tags: out, changed, unknownLists: [...unknownLists] };
   }
   const tagDefsFilter = maxSeen => 'updated_at=gte.' + encodeURIComponent(new Date(maxSeen - POLL_OVERLAP_MS).toISOString());
-  // what the caller may do with a list or a tag list: owners share (and archive or rename); members hide and leave
+  // what the caller may do with a list or a tag list: owners share (and archive or rename); members hide and leave.
+  // Round 3: editors of a tag list share it too (up to editor)
   function membershipActions(role, kind) {
     if (role === 'owner') return kind === 'list' ? ['share', 'people', 'archive'] : ['share', 'people', 'rename'];
     if (!role) return [];
+    if (kind !== 'list' && role === 'editor') return ['share', 'hide', 'leave'];
     return kind === 'list' ? ['people', 'hide', 'leave'] : ['hide', 'leave'];
   }
-  const canEditTags = role => role === 'owner' || role === 'editor';
+  // adds and renames tags in a tag list: contributor and up (db/012)
+  const canEditTags = role => role === 'owner' || role === 'editor' || role === 'contributor';
   // A6: where a new item goes when All is selected. The category's default list when the caller may add there (the household's
   // lists), else the caller's first own list, else the first list they may add to; '' when none
   function defaultAddList(o) {
@@ -1365,6 +1441,71 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     for (let i = 2; ; i++) { const n = base + ' (' + i + ')'; if (!taken.has(n.toLowerCase())) return n; }
   }
 
+  // ---- round 3, A5-A7: several tag lists with roles, first-share notices, the tag filter by id, the side menu by keyboard ----
+  // what the caller may do on a tag list (db/012): viewer uses its tags on items; contributor also adds, renames and reorders tags;
+  // editor also deletes tags, renames the list, archives ("Delete list"), moves tags out and shares; owner also chooses the default,
+  // reorders the lists and removes people. An archived list is read only until an owner or editor restores it.
+  const TAG_LIST_RIGHTS = { viewer: ['use'], contributor: ['use', 'addTag', 'renameTag', 'sortTag'] };
+  TAG_LIST_RIGHTS.editor = TAG_LIST_RIGHTS.contributor.concat(['deleteTag', 'renameList', 'archive', 'move', 'share']);
+  TAG_LIST_RIGHTS.owner = TAG_LIST_RIGHTS.editor.concat(['setDefault', 'sortList', 'removePeople']);
+  function tagListRights(l) {
+    if (!l || !l.role) return new Set();
+    if (l.archived_at) return new Set(l.role === 'owner' || l.role === 'editor' ? ['restore'] : []);
+    const r = new Set(TAG_LIST_RIGHTS[l.role] || []);
+    if (l.is_default) { r.delete('archive'); r.delete('setDefault'); }
+    return r;
+  }
+  // where a tag of list `from` may move: another live list of the same owner, with move rights on both (move_tags checks the same)
+  const moveTargets = (from, tagLists) => !from || !tagListRights(from).has('move') ? [] :
+    Object.values(tagLists || {}).filter(l => l && l.id !== from.id && l.owner_id === from.owner_id && tagListRights(l).has('move'));
+  // tag lists in picker order: my default first, my other lists by sort, then shared lists by owner name and sort; each with its tag
+  // ids by sort, then name. Live lists the caller may see (hidden ones only with o.hidden); o.archived gives the archived ones instead
+  function tagGroups(tagLists, tags, meId, names, opts) {
+    const o = opts || {}, nm = id => String((names || {})[id] || '');
+    const mine = l => l.owner_id === meId;
+    const lists = Object.values(tagLists || {}).filter(l => l && l.role && !!l.archived_at === !!o.archived && (o.hidden || !l.hidden));
+    lists.sort((a, b) => mine(b) - mine(a) || (mine(a) ? !!b.is_default - !!a.is_default : nm(a.owner_id).localeCompare(nm(b.owner_id)) || String(a.owner_id).localeCompare(String(b.owner_id)))
+      || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name)));
+    const by = {};
+    Object.values(tags || {}).forEach(t => { (by[t.tag_list_id] = by[t.tag_list_id] || []).push(t); });
+    return lists.map(l => ({ list: l, tags: (by[l.id] || []).sort((a, b) => (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name))).map(t => t.id) }));
+  }
+  // the Tag filter: a key is a tag id, or 'name:<lower name>' for "All named X" (an explicit choice); an item passes with any key
+  const tagFilterKey = name => 'name:' + String(name).toLowerCase();
+  const tagFilterHit = (ids, keys, nameOf) => !keys || !keys.size || (ids || []).some(id => keys.has(id) || (nameOf[id] !== undefined && keys.has(tagFilterKey(nameOf[id]))));
+  // the filter menu: one entry per tag id (its chip label), and "All named X" before the tags when several tags share the name
+  function tagFilterOptions(ids, labels, nameOf) {
+    const uniq = [...new Set(ids || [])].filter(id => labels[id] !== undefined && nameOf[id] !== undefined);
+    const count = {};
+    uniq.forEach(id => { const k = tagFilterKey(nameOf[id]); count[k] = (count[k] || 0) + 1; });
+    uniq.sort((a, b) => String(nameOf[a]).localeCompare(String(nameOf[b])) || String(labels[a]).localeCompare(String(labels[b])));
+    const out = [], done = new Set();
+    uniq.forEach(id => {
+      const k = tagFilterKey(nameOf[id]);
+      if (count[k] > 1 && !done.has(k)) { done.add(k); out.push({ key: k, label: 'All named ' + nameOf[id], all: true }); }
+      out.push({ key: id, label: labels[id] });
+    });
+    return out;
+  }
+  // the one-time note of a first share (shared_notices, db/012)
+  const ROLE_LABEL = { owner: 'Owner', editor: 'Editor', contributor: 'Contributor', viewer: 'Viewer' };
+  const noticeText = n => (n.inviter_name || 'Someone') + ' shared ' + (n.list_id ? 'the list' : 'the tags') + ' “' + n.target_name + '” with you as ' + (ROLE_LABEL[n.role] || n.role) + '.';
+  // who may share: the owner of a list; the owner or an editor of a tag list
+  const canShare = (role, kind) => role === 'owner' || (kind === 'tag_list' && role === 'editor');
+  // side menu by keyboard (Alt+Up, Alt+Down): one step in the order the menu shows (A, B, C, D, each in card order); at a group's
+  // edge the row goes to the end of the group above or the start of the group below. groups = { A: [ids], … }. null: nowhere to go
+  function menuMove(groups, id, dir) {
+    const q = QS.find(k => (groups[k] || []).includes(id));
+    if (!q) return null;
+    const row = groups[q], i = row.indexOf(id);
+    if (dir < 0 && i > 0) return { q, targetId: row[i - 1], before: true };
+    if (dir > 0 && i < row.length - 1) return { q, targetId: row[i + 1], before: false };
+    const next = QS[QS.indexOf(q) + (dir < 0 ? -1 : 1)];
+    if (!next) return null;
+    const other = groups[next] || [];
+    return dir < 0 ? { q: next, targetId: other.length ? other[other.length - 1] : null, before: false } : { q: next, targetId: other.length ? other[0] : null, before: true };
+  }
+
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
@@ -1373,7 +1514,8 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     ACCOUNTS_MAX, readAccounts, rememberAccount, forgetAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, cardTagIds };
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, cardTagIds,
+    TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove };
 });
 </script>
 <script>
@@ -1420,6 +1562,7 @@ let session = null, storeKind = null, me = null, sessionProvider = null;
 let LISTS = [], LIST = {}, ROLE = {}, CATS = {};
 // multi-user: lists hidden for me, names of people I share something with, tag lists, tags and their chip labels, my invitations
 let HIDDEN_LISTS = [], NAMES = {}, TAG_LISTS = {}, TAG = {}, LABEL = {}, TAG_NAME = {}, INVITES = [], maxTagSeen = 0;
+let NOTICES = []; // round 3: open notes of a first share (shared_notices, seen_at null)
 let tasks = [], maxSeen = 0;
 let settings = C.readSettings(null);
 const ymd = (x) => x ? new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 16).replace('T', ' ') : '';
@@ -1446,8 +1589,11 @@ const canAddSomewhere = () => st.list === 'all' ? LISTS.some(l => canDo('add', n
 const shownTags = t => t.tags.filter(id => LABEL[id] !== undefined);
 const tagText = t => shownTags(t).map(id => LABEL[id]).join(' ');
 const myDefault = () => Object.values(TAG_LISTS).find(l => l.owner_id === (me && me.id) && l.is_default) || null;
-const tagEditable = id => !!TAG[id] && TAG_LISTS[TAG[id].tag_list_id] && C.canEditTags(TAG_LISTS[TAG[id].tag_list_id].role);
+// round 3: what my role allows on a tag list (C.tagListRights: use, addTag, renameTag, sortTag, deleteTag, renameList, archive, move, …)
+const rightsOf = tlId => C.tagListRights(TAG_LISTS[tlId]);
+const tagCan = (id, what) => !!TAG[id] && rightsOf(TAG[id].tag_list_id).has(what);
 const personName = id => id === (me && me.id) ? 'you' : NAMES[id] || 'someone';
+const displayName = id => (NAMES[id] || (me && id === me.id ? me.display_name : '') || 'someone') + (me && id === me.id ? ' (you)' : '');
 
 // markdown subset: **bold**, *italic*, "- " bullets, "1. " numbers. Text is escaped first, so no HTML from the database reaches the page.
 const plain = s => String(s || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(?!\s)(.+?)\*/g, '$1').replace(/^\s*(?:[-*]|\d+[.)])\s+/gm, '');
@@ -1486,7 +1632,7 @@ const passFilters = t => {
   if (st.keep.has(t.id)) return true;
   if (!matchQ(t, st.q)) return false;
   if (st.mine && !C.isMine(t, me, TAG_NAME)) return false;
-  if (st.tags.size && !shownTags(t).some(id => st.tags.has(LABEL[id]))) return false;
+  if (!C.tagFilterHit(shownTags(t), st.tags, TAG_NAME)) return false; // st.tags: tag ids, or "All named X" keys
   if (st.cats.size && !st.cats.has(t.category)) return false;
   if (st.lowc && !lowConf(t)) return false;
   if (st.quads.size && !st.quads.has(t.q)) return false;
@@ -1661,6 +1807,7 @@ async function signOut(prefillHandle) {
   if (bc && uid) bc.postMessage({ type: 'signout', uid });
   Q.clear(); tasks = []; clearInterval(pollTimer);
   document.getElementById('welcome')?.remove(); welcomeOn = false;
+  NOTICES = []; drawNotices();
   showSignIn('', emailOf(prefillHandle));
 }
 
@@ -1686,21 +1833,23 @@ const showGate = kind => { boot.gate = kind; render(); };
 
 // ---- load: lists (not archived), my roles, categories, people, my preferences, then every live item, paged ----
 let prefsExists = false;
+const NOTICES_PATH = 'shared_notices?select=*&seen_at=is.null&order=created_at';
 async function loadMeta() {
   const uid = session.user.id;
   // profiles: my own row and, for the household, the household's rows (RLS); other names only through visible_profiles
-  const [lists, members, cats, profs, vis, tls, tlm, tags, inv] = await Promise.all([
+  const [lists, members, cats, profs, vis, tls, tlm, tags, inv, ntc] = await Promise.all([
     getAll('lists?select=id,slug,name,default_category,sort,owner_id&archived_at=is.null'),
     rest('GET', 'list_members?select=list_id,role,hidden_at&profile_id=eq.' + uid),
     rest('GET', 'categories?select=slug,name,default_list_id&archived_at=is.null'),
     rest('GET', 'profiles?select=' + C.PROFILE_COLUMNS + ',is_household'),
     rest('POST', 'rpc/visible_profiles', {}),
-    rest('GET', 'tag_lists?select=id,owner_id,name,is_default,sort'),
+    rest('GET', 'tag_lists?select=id,owner_id,name,is_default,sort,archived_at'),
     rest('GET', 'tag_list_members?select=tag_list_id,role,hidden_at&profile_id=eq.' + uid),
     getAll('tags?select=*&deleted_at=is.null'), // select=*: tags.updated_at (db/012) is seen without asking for it
     rest('POST', 'rpc/my_invitations', {}),
+    rest('GET', NOTICES_PATH),
   ]);
-  const bad = [lists, members, cats, profs, vis, tls, tlm, tags, inv].find(r => !r.ok);
+  const bad = [lists, members, cats, profs, vis, tls, tlm, tags, inv, ntc].find(r => !r.ok);
   if (bad) return bad;
   ROLE = {}; const hidden = new Set();
   members.json.forEach(m => { ROLE[m.list_id] = m.role; if (m.hidden_at) hidden.add(m.list_id); });
@@ -1722,12 +1871,13 @@ async function loadMeta() {
   noteTagDefMax(tags.json);
   relabel();
   INVITES = inv.json || [];
+  NOTICES = ntc.json || [];
   if (st.list !== 'all' && !LIST[st.list]) st.list = 'all';
   return { ok: true, added: LISTS.filter(id => !order.includes(id)) };
 }
-// chip labels of the tags I can see (hidden tag lists left out): a name two people hold gets the other owner's initial
+// chip labels of the tags I can see (hidden and archived tag lists left out): a name two people hold gets the other owner's initial
 function relabel() {
-  const shown = Object.values(TAG).filter(x => !TAG_LISTS[x.tag_list_id].hidden);
+  const shown = Object.values(TAG).filter(x => !TAG_LISTS[x.tag_list_id].hidden && !TAG_LISTS[x.tag_list_id].archived_at);
   LABEL = C.tagLabels(shown, TAG_LISTS, NAMES, me && me.id);
   TAG_NAME = {}; shown.forEach(x => { TAG_NAME[x.id] = x.name; });
 }
@@ -1784,6 +1934,7 @@ async function loadAll() {
   startPolling();
   flushAll();
   if (!welcomeSeen && me.kind === 'human') showWelcome();
+  drawNotices();
 }
 function loadFailed(r) {
   if (!session) return; // the form is already up
@@ -1961,6 +2112,12 @@ async function poll(meta) {
   try {
     flushAll();
     if (meta) await refreshMeta();
+    else {
+      // round 3: a first share joins at once and leaves a note; a note on a list or tag list the page does not know loads it
+      const nr = await rest('GET', NOTICES_PATH);
+      if (nr.ok) { NOTICES = nr.json; if (NOTICES.some(n => n.list_id ? !LIST[n.list_id] && !HIDDEN_LISTS.some(l => l.id === n.list_id) : !TAG_LISTS[n.tag_list_id])) await refreshMeta(); }
+    }
+    drawNotices();
     const r = await getAll('items?select=*&' + C.pollFilter(maxSeen || Date.now()));
     if (!r.ok) return;
     noteMax(r.json);
@@ -2102,7 +2259,7 @@ function cardHtml(t, q) {
   const tagListOf = {}; shownTags(t).forEach(x => { tagListOf[x] = TAG[x] && TAG[x].tag_list_id; });
   const tagIds = C.cardTagIds(shownTags(t), L, tagListOf);
   const facts = [L.end && t.deadline ? 'End ' + ymd(t.deadline) : '', L.created && t.createdAt ? 'Created ' + ymd(t.createdAt) : '',
-    L.creator && t.createdBy ? 'By ' + personName(t.createdBy) : '', L.owner && t.ownerId ? 'For ' + personName(t.ownerId) : ''].filter(Boolean);
+    L.creator && t.createdBy ? 'By ' + displayName(t.createdBy) : '', L.owner && t.ownerId ? 'For ' + displayName(t.ownerId) : ''].filter(Boolean);
   const body = (facts.length ? '<div class="row">' + facts.map(x => '<span>' + esc(x) + '</span>').join('') + '</div>' : '') +
     (tagIds.length ? '<div class="tags">' + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '') +
     (L.description && t.notes ? '<div class="md">' + mdToHtml(t.notes) + '</div>' : '');
@@ -2238,19 +2395,22 @@ function render() {
   const count = l => open.filter(t => l === 'all' || t.list === l).length;
   const od = l => open.filter(t => (l === 'all' || t.list === l) && overdue(t)).length;
   const chip = l => '<span class="chip' + (chips.indexOf(l) >= VISIBLE ? ' stray' : '') + '"><button data-list="' + esc(l) + '" aria-pressed="' + (st.list === l) + '">' + (l === 'all' ? 'All' : esc(label(l))) + ' <span class="n">' + count(l) + '</span>' + (od(l) ? ' <span class="badge" aria-label="' + od(l) + ' overdue">' + od(l) + '</span>' : '') + '</button></span>';
-  const allTags = [...new Set(open.filter(inList).flatMap(t => shownTags(t).map(x => LABEL[x])))].sort((a, b) => a.localeCompare(b));
+  // round 3: the Tag filter is by tag id; a name several tags share also offers "All named X" (C.tagFilterOptions)
+  const allTags = C.tagFilterOptions(open.filter(inList).flatMap(shownTags), LABEL, TAG_NAME);
+  const tagKeyLabel = k => k.startsWith('name:') ? 'all ' + k.slice(5) : LABEL[k] || '?';
   const allCats = [...new Set(open.filter(inList).map(t => t.category))].sort();
   const anyLow = open.some(t => inList(t) && lowConf(t));
   const anyFilter = st.q || st.due !== 'any' || st.tags.size || st.cats.size || st.lowc || st.mine || st.quads.size;
   const dueLabel = { any: 'Due', overdue: 'Overdue', today: 'Today', week: 'Next 7 days', none: 'No date' }[st.due];
-  const tagLabel = !st.tags.size ? 'Tag' : st.tags.size === 1 ? 'Tag: ' + [...st.tags][0] : 'Tags: ' + st.tags.size;
+  const tagLabel = !st.tags.size ? 'Tag' : st.tags.size === 1 ? 'Tag: ' + tagKeyLabel([...st.tags][0]) : 'Tags: ' + st.tags.size;
   const catName = c => CATS[c] ? CATS[c].name : c;
   const catLabel = !st.cats.size ? 'Category' : st.cats.size === 1 ? catName([...st.cats][0]) : 'Categories: ' + st.cats.size;
   const menuGroups = QS.map(q => {
     const rows = open.filter(t => inList(t) && t.q === q).sort(C.byOrder);
     const col = st.collapsed.has(q);
     return '<button class="grp" data-q="' + q + '" aria-expanded="' + !col + '"><span>' + q + ' ' + QN[q] + '</span><span>' + rows.length + '</span></button>' +
-      (col ? '' : rows.map(t => '<button class="mrow' + (overdue(t) ? ' overdue' : soon(t) ? ' soon' : '') + '" data-open="' + t.id + '" data-hl="' + t.id + '">' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
+      (col ? '' : rows.map(t => '<button class="mrow' + (overdue(t) ? ' overdue' : soon(t) ? ' soon' : '') + '" data-open="' + t.id + '" data-hl="' + t.id + '" data-mq="' + q + '"' +
+        (canDo('edit', t) ? ' draggable="true" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
   }).join('');
   const addable = canAddSomewhere();
   const quad = q => {
@@ -2298,7 +2458,7 @@ function render() {
       (listActs.includes('leave') ? '<button data-leave-list="' + esc(st.list) + '">Leave ' + esc(label(st.list)) + '</button>' : '') +
       '<hr><button data-menu="archived">Archived lists</button>' + (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : ''),
     due: () => ['any:Any', 'overdue:Overdue', 'today:Today', 'week:Next 7 days', 'none:No date'].map(x => '<button data-due="' + x.split(':')[0] + '" aria-pressed="' + (st.due === x.split(':')[0]) + '">' + x.split(':')[1] + '</button>').join(''),
-    tag: () => allTags.map(x => '<button data-tag="' + esc(x) + '" aria-pressed="' + st.tags.has(x) + '">' + esc(x) + '</button>').join(''),
+    tag: () => allTags.map(o => '<button data-tag="' + esc(o.key) + '"' + (o.all ? ' class="all"' : '') + ' aria-pressed="' + st.tags.has(o.key) + '">' + esc(o.label) + '</button>').join(''),
     cat: () => allCats.map(x => '<button data-cat="' + esc(x) + '" aria-pressed="' + st.cats.has(x) + '">' + esc(catName(x)) + '</button>').join(''),
   };
   const pop = st.pop && pops[st.pop] ? '<div class="menu-pop" id="pop" role="menu" data-for="' + st.pop + '">' + pops[st.pop]() + '</div>' : '';
@@ -2378,16 +2538,15 @@ function moveTask(id, q, targetId, before) {
   render();
 }
 
-// tags keep one order across every task window (tag ids, saved in the preferences); tags not placed yet go to the end, by label
+// round 3: tags are ordered by tags.sort inside their tag list (shared, set in Account menu → Tags); the preference tagOrder of
+// older rows is kept as it was and no longer read
 let tagOrder = [];
-const isNew = x => String(x).startsWith('new:'); // a name typed in the window, created in my Default on Save
-const lab = x => isNew(x) ? x.slice(4) : LABEL[x] || (TAG[x] ? TAG[x].name : '?');
-function orderTags(list) {
-  const real = list.filter(x => !isNew(x));
-  const fresh = real.filter(x => !tagOrder.includes(x)).sort((a, b) => lab(a).localeCompare(lab(b)));
-  tagOrder = tagOrder.concat(fresh);
-  return tagOrder.filter(x => real.includes(x)).concat(list.filter(isNew));
-}
+// a name typed in the task window: 'new:<tag list id>:<name>', created in that tag list on Save
+const isNew = x => String(x).startsWith('new:');
+const newKey = (list, name) => 'new:' + list + ':' + name;
+const newList = x => String(x).slice(4, String(x).indexOf(':', 4));
+const newName = x => String(x).slice(String(x).indexOf(':', 4) + 1);
+const lab = x => isNew(x) ? newName(x) : LABEL[x] || (TAG[x] ? TAG[x].name : '?');
 function askTag(text, onYes) {
   const dlg = dialogShell('<form method="dialog"><strong>' + esc(text) + '</strong><div class="actions"><button value="cancel" id="cf-cancel">No</button><button id="cf-ok" value="ok">Yes, delete</button></div></form>', '.tagbox .tagchip');
   dlg.querySelector('#cf-cancel').focus();
@@ -2408,22 +2567,25 @@ async function deleteTagDb(id) {
   await rest('PATCH', 'item_tags?tag_id=eq.' + id + '&removed_at=is.null', { removed_at: now });
   const n = tasks.filter(t => t.tags.includes(id)).length;
   tasks.forEach(t => { if (t.tags.includes(id)) t.tags = t.tags.filter(x => x !== id); });
-  st.tags.delete(LABEL[id]); delete TAG[id]; tagOrder = tagOrder.filter(x => x !== id); relabel();
+  st.tags.delete(id); delete TAG[id]; relabel();
   toast('Deleted the tag' + (n ? ' and took it off ' + n + (n === 1 ? ' item' : ' items') : ''));
   renderSoon();
   return true;
 }
-// new names go into my Default tag list; a name it already holds (a deleted one too) is reused
-async function ensureTags(names) {
+// new names go into a tag list (round 3: the one the person chose, else my default), at its end; a name it already holds (a deleted
+// one too) is reused. items: [{ list: tag list id, name }]
+async function ensureTags(items) {
   const d = myDefault();
-  if (!d) { toast('This login has no Default tag list'); return []; }
   const out = [];
-  for (const name of names) {
-    const own = Object.values(TAG).find(x => x.tag_list_id === d.id && x.name.toLowerCase() === name.toLowerCase());
+  for (const { list, name } of items) {
+    const tl = list || (d && d.id);
+    if (!tl) { toast('This login has no default tag list'); continue; }
+    const own = Object.values(TAG).find(x => x.tag_list_id === tl && x.name.toLowerCase() === name.toLowerCase());
     if (own) { out.push(own.id); continue; }
-    let r = await rest('POST', 'tags', { tag_list_id: d.id, name }, { Prefer: 'return=representation' });
+    const sort = Math.max(0, ...Object.values(TAG).filter(x => x.tag_list_id === tl).map(x => x.sort || 0)) + C.SPACING;
+    let r = await rest('POST', 'tags', { tag_list_id: tl, name, sort }, { Prefer: 'return=representation' });
     if (!r.ok && r.err.kind === 'duplicate') {
-      const g = await rest('GET', 'tags?select=id,tag_list_id,name,sort,deleted_at&tag_list_id=eq.' + d.id);
+      const g = await rest('GET', 'tags?select=id,tag_list_id,name,sort,deleted_at&tag_list_id=eq.' + tl);
       const old = g.ok && g.json.find(x => x.name.toLowerCase() === name.toLowerCase());
       if (old) r = await rest('PATCH', 'tags?id=eq.' + old.id, { deleted_at: null }, { Prefer: 'return=representation' });
     }
@@ -2449,12 +2611,14 @@ function openTask(id, quad, opts) {
   const listDefault = dr.list || (t ? t.list : (st.list === 'all' ? C.defaultAddList({ lists: LISTS, roles: ROLE, byId: LIST, meId: me.id, cats: CATS }) : st.list));
   const choices = t ? LISTS.filter(l => l === t.list || canDo('add', null, l)) : addLists;
   const listSel = (listDefault === '' ? '<option value="" selected>—</option>' : '') + choices.map(l => '<option value="' + esc(l) + '"' + (listDefault === l ? ' selected' : '') + '>' + esc(label(l)) + '</option>').join('');
-  // tags: chips of the tag lists I own or edit (pressed = on the task); tags from tag lists I only view show, but don't change
-  const editLists = new Set(Object.values(TAG_LISTS).filter(l => C.canEditTags(l.role) && !l.hidden).map(l => l.id));
-  const fixed = t ? shownTags(t).filter(x => !editLists.has(TAG[x].tag_list_id)) : [];
-  const chosen = new Set((dr.tags || (t ? t.tags : [])).filter(x => !fixed.includes(x)));
-  const known = orderTags([...new Set(Object.values(TAG).filter(x => editLists.has(x.tag_list_id)).map(x => x.id).concat([...chosen].filter(isNew)))]);
-  const untouched = () => (t ? t.tags : []).filter(x => !known.includes(x)); // view-only and hidden tag lists: kept as they are
+  // round 3, adjustment 6: tags grouped under their tag list (my default first, my other lists by sort, then shared lists by owner).
+  // Every live tag list I can see is usable (viewer and up, db/012). Tags of hidden or archived tag lists don't show and are kept.
+  const groupsNow = () => C.tagGroups(TAG_LISTS, TAG, me.id, NAMES);
+  const usable = () => new Set(groupsNow().flatMap(g => g.tags));
+  const chosen = new Set((dr.tags || (t ? t.tags : [])).filter(x => usable().has(x) || isNew(x)));
+  const fresh = {}; // names typed in the window, per tag list: created there on Save
+  [...chosen].filter(isNew).forEach(x => { (fresh[newList(x)] = fresh[newList(x)] || []).push(x); });
+  const untouched = () => { const u = usable(); return (t ? t.tags : []).filter(x => !u.has(x)); };
   const dl = dr.deadline !== undefined ? dr.deadline : t && t.deadline;
   const tagKey = a => JSON.stringify(a.slice().sort());
   // what the window showed: Save sends only what the person changed, and checks it against changes made meanwhile
@@ -2468,6 +2632,7 @@ function openTask(id, quad, opts) {
     (editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '') +
     '<div class="flabel" id="fn-l">Description</div><div class="rt" id="fn" contenteditable="' + editable + '" role="textbox" aria-multiline="true" aria-labelledby="fn-l">' + mdToHtml(dr.notes !== undefined ? dr.notes : t ? t.notes : '') + '</div>' +
     '<label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div>' +
+    (t && (t.ownerId || t.createdBy) ? '<p class="fwho" id="fwho">' + (t.ownerId ? 'For ' + esc(displayName(t.ownerId)) : 'For nobody in particular') + (t.createdBy && t.createdBy !== t.ownerId ? '. Created by ' + esc(displayName(t.createdBy)) : '') + '.</p>' : '') +
     (t ? '<label>Quadrant<select id="fq"' + ro + '>' + QS.map(q => '<option value="' + q + '"' + (t.q === q ? ' selected' : '') + '>' + q + ' ' + QN[q] + '</option>').join('') + '</select></label>' : '') +
     '<label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div>' +
     '<div class="flabel" id="tags-l">Tags</div><div class="tagbox" role="group" aria-labelledby="tags-l"></div>' +
@@ -2507,10 +2672,10 @@ function openTask(id, quad, opts) {
   dlg.querySelectorAll('[data-cmd]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { lastEditor.focus(); document.execCommand(b.dataset.cmd); syncFmt(); }; });
   syncFmt();
   const box = dlg.querySelector('.tagbox');
-  // tags: one chip per tag I can put on items (pressed = on the task); the round + turns into a text box that grows with its text
-  // (a new name goes into my Default on Save). Drag a chip to reorder (the order is mine, shared by every task window),
-  // double-click or F2 to rename the tag, the corner cross or Delete to delete the tag after a yes/no question; Alt+arrows move it.
-  let dragTag = null;
+  // tags: one row per tag list, its name first (a click puts all of its tags on the task, or takes them off when all are on), then
+  // one chip per tag (pressed = on the task). The + of a list I may add to (contributor and up) turns into a text box: the new name
+  // is created in that list on Save. Double-click or F2 renames a tag (contributor and up), the corner cross or Delete deletes it
+  // after a question (editor and up). Order and moves between lists live in Account menu → Tags.
   const editBox = (value, onDone) => {
     const inp = document.createElement('input'); inp.className = 'tag-new'; inp.setAttribute('aria-label', value ? 'Rename tag' : 'New tag'); inp.size = 1; inp.value = value; inp.maxLength = 40;
     let done = false;
@@ -2522,89 +2687,85 @@ function openTask(id, quad, opts) {
     inp.onblur = () => commit(true);
     return inp;
   };
-  const keepOrder = () => { tagOrder = known.filter(x => !isNew(x)).concat(tagOrder.filter(y => !known.includes(y))); };
-  const moveTag = (x, to) => { known.splice(known.indexOf(x), 1); known.splice(Math.max(0, Math.min(known.length, to)), 0, x); keepOrder(); };
+  const dropFresh = x => { const l = newList(x); fresh[l] = (fresh[l] || []).filter(y => y !== x); chosen.delete(x); };
   const renameTag = (from, to, after) => {
     if (isNew(from)) {
-      const k = 'new:' + to, i = known.indexOf(from);
-      if (known.includes(k)) known.splice(i, 1); else known[i] = k;
+      const l = newList(from), k = newKey(l, to), row = fresh[l] || [];
+      if (row.includes(k)) row.splice(row.indexOf(from), 1); else row[row.indexOf(from)] = k;
       if (chosen.has(from)) { chosen.delete(from); chosen.add(k); }
       return after(k);
     }
-    if (!tagEditable(from)) return after(from);
-    const oldLabel = LABEL[from];
-    renameTagDb(from, to).then(ok => { if (ok && st.tags.has(oldLabel)) { st.tags.delete(oldLabel); st.tags.add(LABEL[from]); } after(from); });
+    if (!tagCan(from, 'renameTag')) return after(from);
+    renameTagDb(from, to).then(() => after(from));
   };
   const deleteTag = x => {
-    if (isNew(x)) { known.splice(known.indexOf(x), 1); chosen.delete(x); return drawTags(false); }
-    if (!tagEditable(x)) return;
+    if (isNew(x)) { dropFresh(x); return drawTags(); }
+    if (!tagCan(x, 'deleteTag')) return;
     const n = tasks.filter(t2 => !t2.deleted && t2.tags.includes(x)).length;
     askTag(n ? n + (n === 1 ? ' item carries' : ' items carry') + ' the tag “' + lab(x) + '”. Delete the tag?' : 'Delete the tag “' + lab(x) + '”?', () => {
       deleteTagDb(x).then(ok => {
         if (!ok) return;
-        chosen.delete(x); if (known.includes(x)) known.splice(known.indexOf(x), 1);
-        drawTags(false);
+        chosen.delete(x);
+        drawTags();
         setTimeout(() => (box.querySelector('.tagchip') || box.querySelector('.tag-add'))?.focus(), 0);
       });
     });
   };
   const drawTags = (focusAdd, focusTag) => {
-    box.innerHTML = known.map(x => '<span class="tagwrap"' + (editable ? ' draggable="true"' : '') + ' data-t="' + esc(x) + '"><button type="button" class="tagchip" data-t="' + esc(x) + '" aria-pressed="' + chosen.has(x) + '"' + (editable ? ' aria-keyshortcuts="F2 Delete Alt+ArrowLeft Alt+ArrowRight"' : ' disabled') + '>' + esc(lab(x)) + '</button>' + (editable ? '<button type="button" class="tag-x" tabindex="-1" aria-label="Delete tag ' + esc(lab(x)) + '">' + I.x + '</button>' : '') + '</span>').join('') +
-      fixed.map(x => '<span class="tagwrap"><button type="button" class="tagchip" aria-pressed="true" disabled title="From ' + esc(personName(TAG_LISTS[TAG[x].tag_list_id].owner_id)) + '\'s tags (view only)">' + esc(lab(x)) + '</button></span>').join('') +
-      (editable ? '<button type="button" class="tag-add" aria-label="New tag">' + I.plus + '</button>' : '');
+    const groups = groupsNow();
+    box.innerHTML = groups.map(g => {
+      const R = C.tagListRights(g.list), ids = g.tags.concat(fresh[g.list.id] || []), own = g.list.owner_id === me.id;
+      const chips = ids.map(x => {
+        const ren = isNew(x) || R.has('renameTag'), del = isNew(x) || R.has('deleteTag');
+        const keys = [ren ? 'F2' : '', del ? 'Delete' : ''].filter(Boolean).join(' ');
+        return '<span class="tagwrap" data-t="' + esc(x) + '"><button type="button" class="tagchip" data-t="' + esc(x) + '" aria-pressed="' + chosen.has(x) + '"' + (editable ? (keys ? ' aria-keyshortcuts="' + keys + '"' : '') : ' disabled') + '>' + esc(lab(x)) + '</button>' +
+          (editable && del ? '<button type="button" class="tag-x" tabindex="-1" aria-label="Delete tag ' + esc(lab(x)) + '">' + I.x + '</button>' : '') + '</span>';
+      }).join('');
+      const add = editable && R.has('addTag') ? '<button type="button" class="tag-add" data-add-to="' + esc(g.list.id) + '" aria-label="New tag in ' + esc(g.list.name) + '">' + I.plus + '</button>' : '';
+      return '<div class="tgg" role="group" aria-label="' + esc(g.list.name) + '"><button type="button" class="tgg-h" data-bulk="' + esc(g.list.id) + '"' + (editable && ids.length ? '' : ' disabled') +
+        ' title="All tags of this list on the task; again to take them off">' + esc(g.list.name) + (g.list.is_default && own ? ' <span class="star" aria-label="default">★</span>' : '') + (own ? '' : ' <span class="n">' + esc(displayName(g.list.owner_id)) + '</span>') + '</button>' +
+        '<div class="tgg-c">' + (chips || (add ? '' : '<span class="n">no tags</span>')) + add + '</div></div>';
+    }).join('') || '<p class="n">No tag lists</p>';
     if (!editable) return;
-    const clearMarks = () => box.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(w => w.classList.remove('drop-before', 'drop-after', 'dragging'));
+    box.querySelectorAll('.tgg-h[data-bulk]').forEach(h => h.onclick = () => {
+      const ids = (groups.find(g => g.list.id === h.dataset.bulk) || { tags: [] }).tags.concat(fresh[h.dataset.bulk] || []);
+      const allOn = ids.every(x => chosen.has(x));
+      ids.forEach(x => { if (allOn) chosen.delete(x); else chosen.add(x); });
+      drawTags(false); box.querySelector('.tgg-h[data-bulk="' + h.dataset.bulk + '"]')?.focus();
+    });
     box.querySelectorAll('.tagwrap[data-t]').forEach(w => {
       const x = w.dataset.t, b = w.querySelector('.tagchip');
+      const ren = isNew(x) || tagCan(x, 'renameTag'), del = isNew(x) || tagCan(x, 'deleteTag');
       b.onclick = () => { chosen.has(x) ? chosen.delete(x) : chosen.add(x); b.setAttribute('aria-pressed', chosen.has(x)); };
       b.ondblclick = e => {
         e.preventDefault();
-        if (!isNew(x) && !tagEditable(x)) return;
-        w.replaceWith(editBox(isNew(x) ? x.slice(4) : TAG[x].name, v => { if (v && v !== (isNew(x) ? x.slice(4) : TAG[x].name)) renameTag(x, v, k => drawTags(false, k)); else drawTags(false, x); }));
+        if (!ren) return;
+        const was = isNew(x) ? newName(x) : TAG[x].name;
+        w.replaceWith(editBox(was, v => { if (v && v !== was) renameTag(x, v, k => drawTags(false, k)); else drawTags(false, x); }));
         box.querySelector('.tag-new').focus();
         box.querySelector('.tag-new').select();
       };
       b.onkeydown = e => {
-        if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteTag(x); }
-        else if (e.key === 'F2') { e.preventDefault(); b.ondblclick(e); }
-        else if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); moveTag(x, known.indexOf(x) + (e.key === 'ArrowLeft' ? -1 : 1)); drawTags(false, x); }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && del) { e.preventDefault(); deleteTag(x); }
+        else if (e.key === 'F2' && ren) { e.preventDefault(); b.ondblclick(e); }
       };
-      w.querySelector('.tag-x').onclick = () => deleteTag(x);
-      w.ondragstart = e => { dragTag = x; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', x); w.classList.add('dragging'); };
-      w.ondragend = () => { dragTag = null; clearMarks(); };
-      w.ondragover = e => {
-        if (dragTag === null || dragTag === x) return;
-        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-        const r = w.getBoundingClientRect(), before = e.clientX < r.left + r.width / 2;
-        box.querySelectorAll('.drop-before,.drop-after').forEach(o2 => o2.classList.remove('drop-before', 'drop-after'));
-        w.classList.add(before ? 'drop-before' : 'drop-after');
-      };
-      w.ondrop = e => {
-        if (dragTag === null || dragTag === x) return;
-        e.preventDefault(); e.stopPropagation();
-        const r = w.getBoundingClientRect(), before = e.clientX < r.left + r.width / 2, moving = dragTag;
-        known.splice(known.indexOf(moving), 1);
-        known.splice(known.indexOf(x) + (before ? 0 : 1), 0, moving);
-        keepOrder();
-        dragTag = null; drawTags(false, moving);
-      };
+      const cross = w.querySelector('.tag-x'); if (cross) cross.onclick = () => deleteTag(x);
     });
-    const add = box.querySelector('.tag-add');
-    add.onclick = () => {
+    box.querySelectorAll('[data-add-to]').forEach(add => add.onclick = () => {
+      const l = add.dataset.addTo;
       add.replaceWith(editBox('', v => {
         if (v) {
-          // an existing tag with that name (mine first), else a new one for my Default
-          const same = known.filter(x => lab(x).toLowerCase() === v.toLowerCase() || (!isNew(x) && TAG[x].name.toLowerCase() === v.toLowerCase()));
-          const d = myDefault();
-          const k = same.find(x => !isNew(x) && d && TAG[x].tag_list_id === d.id) || same[0] || 'new:' + v;
-          if (!known.includes(k)) known.push(k);
+          // an existing tag of that list with the name, else a new one there
+          const same = Object.values(TAG).find(y => y.tag_list_id === l && y.name.toLowerCase() === v.toLowerCase());
+          const k = same ? same.id : newKey(l, v);
+          if (!same && !(fresh[l] || []).includes(k)) (fresh[l] = fresh[l] || []).push(k);
           chosen.add(k);
         }
-        drawTags(v !== null);
+        drawTags(v !== null ? l : false);
       }));
       box.querySelector('.tag-new').focus();
-    };
-    if (focusAdd) box.querySelector('.tag-add').focus();
+    });
+    if (focusAdd) box.querySelector('[data-add-to="' + focusAdd + '"]')?.focus();
     if (focusTag) [...box.querySelectorAll('.tagchip')].find(b => b.dataset.t === focusTag)?.focus();
   };
   drawTags(false);
@@ -2625,9 +2786,9 @@ function openTask(id, quad, opts) {
     if (bad) { e.preventDefault(); (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
     const fq = t ? dlg.querySelector('#fq').value : (quad || 'B');
     const deadline = endV ? new Date(endV) : null;
-    const picked = known.filter(x => chosen.has(x)), newNames = picked.filter(isNew).map(x => x.slice(4));
+    const picked = [...chosen], newNames = picked.filter(isNew).map(x => ({ list: newList(x), name: newName(x) }));
     const save = created => {
-      const tags = untouched().concat(picked.filter(x => !isNew(x)), created.filter(x => !untouched().includes(x)));
+      const tags = [...new Set(untouched().concat(picked.filter(x => !isNew(x)), created))];
       if (t) {
         const now = { title, notes, tags: tagKey(tags), deadline: deadline ? deadline.getTime() : null, list, q: fq };
         const mine = Object.keys(now).filter(k => now[k] !== shown[k]);
@@ -2661,7 +2822,7 @@ function openTask(id, quad, opts) {
       }
     };
     if (!newNames.length) return save([]);
-    // new tag names: created in my Default first, then the save goes on (the window closes when they exist)
+    // new tag names: created in their tag lists first, then the save goes on (the window closes when they exist)
     e.preventDefault(); fs.disabled = true; fs.textContent = 'Saving…';
     ensureTags(newNames).then(ids => { dlg.close(); save(ids); render(); });
   };
@@ -2808,12 +2969,41 @@ function placeWelcome() {
   el.style.right = Math.max(8, Math.round(innerWidth - r.right)) + 'px';
 }
 
-// New list: rpc/create_list, private unless "Share with the household" (household members only, D-d of the multi-user plan).
-// A name without ASCII letters or digits (Cyrillic, say) gets a slug list-<6 random>; so does a retry after a slug clash (db/010
-// makes the slug from the name; db/012 adds -2, -3 itself). Round 3: Create is off while it runs, and the new list is put in
-// locally from the RPC's answer and selected at once (no reload of lists, items or item_tags: an empty list has none; the next
-// poll reconciles). A name I already use: "You already have a list named X"; an archived one offers Restore or "X (2)".
-const randomSlug = () => 'list-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+// round 3, adjustment 3: the note of a first share (shared_notices, db/012). Someone shared a list or tags with me and I joined
+// without Accept: Keep (marks it seen), Leave, or Block (leaves everything that person joined me to this way, blocks them).
+// Not a <dialog>, like the welcome: polls keep rendering under it. Drawn again only when the open notes change.
+let noticesKey = null;
+function drawNotices() {
+  const open = session && !boot.gate && me && me.kind === 'human' ? NOTICES : [];
+  const key = open.map(n => n.id).join();
+  let el = document.getElementById('notices');
+  if (key === noticesKey && !!el === !!open.length) return;
+  noticesKey = key;
+  if (!open.length) { el?.remove(); return; }
+  if (!el) { el = document.createElement('aside'); el.id = 'notices'; el.className = 'notices'; el.setAttribute('aria-label', 'Shared with you'); document.body.append(el); }
+  el.innerHTML = open.map(n => '<div class="ntc" role="status" data-notice="' + esc(n.id) + '"><p>' + esc(C.noticeText(n)) + '</p><div class="ntc-b">' +
+    '<button type="button" class="quiet danger" data-ntc="block">Block</button><button type="button" class="quiet" data-ntc="leave">Leave</button><button type="button" data-ntc="seen">Keep</button></div></div>').join('');
+  el.querySelectorAll('[data-ntc]').forEach(b => b.onclick = () => answerNotice(b.closest('[data-notice]').dataset.notice, b.dataset.ntc));
+}
+async function answerNotice(id, action) {
+  const n = NOTICES.find(x => x.id === id); if (!n) return;
+  const go = async () => {
+    const r = await rpc('answer_shared_notice', { p_notice: id, p_action: action });
+    if (!r.ok) return toast(r.err.message);
+    NOTICES = NOTICES.filter(x => x.id !== id && !(action === 'block' && x.invited_by === n.invited_by));
+    drawNotices();
+    if (action === 'seen') return;
+    await afterMembership(action === 'block' ? 'Blocked ' + n.inviter_name + '. You left what they shared with you.' : 'Left “' + n.target_name + '”');
+  };
+  if (action === 'block') confirmAsk('Block ' + n.inviter_name + '? You leave everything ' + n.inviter_name + ' shared with you without an invitation, and get no more shares from them.', 'Block', go, '#profile');
+  else go();
+}
+
+// New list: rpc/create_list_row (db/012), private unless "Share with the household" (household members only, D-d of the multi-user
+// plan). The database makes the slug (ASCII letters and digits of the name, else list-<6 hex>, -2, -3 … on a clash) and returns
+// the row. Round 3: Create is off while it runs, and the new list is put in locally from the RPC's answer and selected at once (no
+// reload of lists, items or item_tags: an empty list has none; the next poll reconciles). A name I already use: "You already have
+// a list named X"; an archived one offers Restore or "X (2)".
 function openNewList() {
   const hh = !!me.is_household;
   const dlg = dialogShell('<form method="dialog"><strong>New list</strong><label>Name<input id="nl-name" maxlength="60" autocomplete="off"></label><div class="err" id="nl-e" aria-live="polite"></div><div class="actions nl-x" id="nl-x" hidden></div>' +
@@ -2832,17 +3022,12 @@ function openNewList() {
   const mineNow = () => Object.values(LIST).concat(HIDDEN_LISTS, archived);
   const create = async n => {
     const body = { p_name: n, p_shared: hh && dlg.querySelector('#nl-shared').checked };
-    if (!/[a-z0-9]/i.test(n)) body.p_slug = randomSlug();
-    let r = await rest('POST', 'rpc/create_list', body);
-    if (!r.ok && r.err.kind === 'duplicate') {
-      // a slug or name clash the page did not know about: look again; a different name with the same slug gets a slug of its own
-      await readArchived(); await refreshMeta();
-      const c = C.listNameClash(n, mineNow(), me.id);
-      if (!c.live && !c.archived) { body.p_slug = randomSlug(); r = await rest('POST', 'rpc/create_list', body); }
-    }
+    const r = await rest('POST', 'rpc/create_list_row', body);
+    // a same-name list the page did not know about (another tab made it): look again, so the message below can name it
+    if (!r.ok && r.err.kind === 'duplicate') { await readArchived(); await refreshMeta(); }
     performance.mark('td:list-rpc');
     if (!r.ok) return r;
-    const l = C.createdList(r.json, { name: n, slug: body.p_slug, ownerId: me.id, sort: Math.max(0, ...Object.values(LIST).filter(y => y.owner_id === me.id).map(y => y.sort || 0)) + 1 });
+    const l = C.createdList(r.json, { name: n, slug: null, ownerId: me.id, sort: Math.max(0, ...Object.values(LIST).filter(y => y.owner_id === me.id).map(y => y.sort || 0)) + 1 });
     if (!l) return { ok: false, err: { message: 'The list was made, but the answer was not understood. Reload the page.' } };
     LIST[l.id] = l; ROLE[l.id] = 'owner';
     if (!LISTS.includes(l.id)) LISTS.push(l.id);
@@ -2915,21 +3100,25 @@ const roleSelect = (roles, cur, attrs) => '<select ' + attrs + '>' + roles.map(r
 // after a change to memberships: lists, tag lists, tags and invitations again, then the board
 async function afterMembership(msg) { await refreshMeta(); if (st.list !== 'all' && !LIST[st.list]) st.list = 'all'; if (msg) toast(msg); render(); }
 
-// Share (owner) or People (member): who is on it, pending invitations, and the invite form. kind 'list' or 'tag_list'.
+// Share (owner; for a tag list also an editor) or People (member): who is on it, pending invitations, and the share form.
+// kind 'list' or 'tag_list'. Round 3 (db/012): the share is sent with p_join, so a person who already has an account joins at once
+// the first time (with a note saying who shared it); anyone else gets an invitation as before. Only the owner changes roles or
+// removes people; an editor of a tag list may revoke the invitations they sent (the database refuses others).
 function openShare(kind, id, opener) {
   const isList = kind === 'list';
   const target = isList ? (LIST[id] || HIDDEN_LISTS.find(l => l.id === id)) : TAG_LISTS[id];
   if (!target) return;
-  const owner = (isList ? ROLE[id] : (TAG_LISTS[id] || {}).role) === 'owner' && me.kind === 'human';
+  const myRole = isList ? ROLE[id] : (TAG_LISTS[id] || {}).role;
+  const owner = myRole === 'owner' && me.kind === 'human', sharer = C.canShare(myRole, kind) && me.kind === 'human';
   const roles = isList ? C.LIST_ROLES : C.TAG_LIST_ROLES;
-  const what = isList ? 'They see the list and its items once they accept, with what the role allows: Editor changes everything, Contributor adds and edits their own items, Viewer reads.'
-    : 'They see your tags on items they can already see, once they accept. Editor also adds tags to this list and puts them on items they can edit; Viewer only sees them.';
-  const dlg = dialogShell('<form method="dialog"><strong>' + (owner ? 'Share ' : 'People on ') + '“' + esc(target.name) + '”</strong>' +
-    (owner ? '<p class="sh-note">' + esc(what) + '</p>' : '') + '<div id="sh-people" class="sh-people" aria-live="polite">Loading…</div>' +
-    (owner ? '<div class="sh-form"><label>Email<input id="sh-email" type="email" autocomplete="off" spellcheck="false" maxlength="254"></label>' +
+  const what = isList ? 'Editor changes everything, Contributor adds and edits their own items, Viewer reads.'
+    : 'They see these tags on items they can already see. Viewer puts them on items; Contributor also adds, renames and reorders tags; Editor also deletes and moves tags, deletes the list and shares it.';
+  const dlg = dialogShell('<form method="dialog"><strong>' + (sharer ? 'Share ' : 'People on ') + '“' + esc(target.name) + '”</strong>' +
+    (sharer ? '<p class="sh-note">' + esc(what) + '</p>' : '') + '<div id="sh-people" class="sh-people" aria-live="polite">Loading…</div>' +
+    (sharer ? '<div class="sh-form"><label>Email<input id="sh-email" type="email" autocomplete="off" spellcheck="false" maxlength="254"></label>' +
       '<label>Role' + roleSelect(roles, 'viewer', 'id="sh-role"') + '</label></div><div class="err" id="sh-e" aria-live="polite"></div>' +
-      '<p class="sh-note">No email is sent: tell them to sign in to TasksDashboard with Google and accept it under Sharing.</p>' : '') +
-    '<div class="actions"><button value="close"' + (owner ? '' : ' autofocus') + '>Close</button>' + (owner ? '<button id="sh-go" value="share">Invite</button>' : '') + '</div></form>', opener || '#profile');
+      '<p class="sh-note">No email is sent. Someone who already has an account sees it at once the first time you share with them; anyone else signs in to TasksDashboard with Google and accepts it under Sharing.</p>' : '') +
+    '<div class="actions"><button value="close"' + (sharer ? '' : ' autofocus') + '>Close</button>' + (sharer ? '<button id="sh-go" value="share">Share</button>' : '') + '</div></form>', opener || '#profile');
   const box = dlg.querySelector('#sh-people'), err = dlg.querySelector('#sh-e');
   const memberAt = pid => (isList ? 'list_members?list_id=eq.' : 'tag_list_members?tag_list_id=eq.') + id + '&profile_id=eq.' + pid;
   const load = async () => {
@@ -2940,7 +3129,8 @@ function openShare(kind, id, opener) {
       const who = p.state === 'member' ? (p.profile_id === me.id ? esc(me.display_name) + ' <span class="n">(you)</span>' : esc(p.display_name || 'someone')) : esc(p.email);
       const role = p.role === 'owner' || !owner ? '<span class="n">' + ROLE_NAMES[p.role] + '</span>'
         : p.state === 'member' ? roleSelect(roles, p.role, 'data-role-of="' + esc(p.profile_id) + '" aria-label="Role of ' + esc(p.display_name || 'member') + '"') : '<span class="n">' + ROLE_NAMES[p.role] + ', pending</span>';
-      const act = !owner || p.role === 'owner' ? '' : p.state === 'member' ? '<button type="button" class="quiet" data-remove="' + esc(p.profile_id) + '">Remove</button>' : '<button type="button" class="quiet" data-revoke="' + esc(p.invite_id) + '">Revoke</button>';
+      const act = p.role === 'owner' ? '' : p.state === 'member' ? (owner ? '<button type="button" class="quiet" data-remove="' + esc(p.profile_id) + '">Remove</button>' : '')
+        : sharer ? '<button type="button" class="quiet" data-revoke="' + esc(p.invite_id) + '">Revoke</button>' : '';
       return '<div class="al"><span class="al-who">' + who + '</span><span class="al-b">' + role + act + '</span></div>';
     }).join('') || 'Nobody yet';
     box.querySelectorAll('[data-role-of]').forEach(s => s.onchange = async () => {
@@ -2953,7 +3143,7 @@ function openShare(kind, id, opener) {
     });
     box.querySelectorAll('[data-revoke]').forEach(b => b.onclick = async () => {
       const r2 = await rpc('revoke_invite', { p_invite: b.dataset.revoke });
-      toast(r2.ok ? 'Invitation revoked' : r2.err.message); load();
+      toast(r2.ok ? 'Invitation revoked' : owner ? r2.err.message : 'Only the owner revokes an invitation someone else sent.'); load();
     });
   };
   load();
@@ -2966,10 +3156,11 @@ function openShare(kind, id, opener) {
       const v = email.value.trim(), role = dlg.querySelector('#sh-role').value;
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { err.textContent = 'Enter an email address'; email.focus(); return; }
       go.disabled = true;
-      const r = await rpc(isList ? 'share_list' : 'share_tag_list', isList ? { p_list: id, p_email: v, p_role: role } : { p_tag_list: id, p_email: v, p_role: role });
+      // p_join: true (db/012): a first share joins a person who has an account; the answer is { ok: true } either way
+      const r = await rpc(isList ? 'share_list' : 'share_tag_list', isList ? { p_list: id, p_email: v, p_role: role, p_join: true } : { p_tag_list: id, p_email: v, p_role: role, p_join: true });
       go.disabled = false;
       if (!r.ok) { err.textContent = r.err.message; email.focus(); return; }
-      email.value = ''; toast('Invited ' + v + ' as ' + ROLE_NAMES[role]); load();
+      email.value = ''; toast('Shared with ' + v + ' as ' + ROLE_NAMES[role]); load();
     };
   }
 }
@@ -3032,54 +3223,273 @@ function openHiddenLists() {
   dlg.querySelectorAll('[data-unhide-list]').forEach(b => b.onclick = async () => { b.disabled = true; await hideList(b.dataset.unhideList, false); dlg.close(); });
 }
 
-// Account menu, Tags: my Default (add, rename, reorder, delete, Share) and tag lists shared with me (hide, leave)
-function openTags() {
-  const d = myDefault();
-  const own = d ? orderTags(Object.values(TAG).filter(x => x.tag_list_id === d.id).map(x => x.id)) : [];
-  const others = Object.values(TAG_LISTS).filter(l => l.owner_id !== me.id && l.role).sort((a, b) => personName(a.owner_id).localeCompare(personName(b.owner_id)));
-  const dlg = dialogShell('<form method="dialog"><strong>Tags</strong>' +
-    '<section class="rv"><strong>My tags <span class="n">' + own.length + '</span></strong>' + (d ? '<p class="n">Private until you share them. People you share with see your tags only on items they can already see.</p>' +
-      own.map((x, i) => '<div class="tg-row"><input data-tag-name="' + esc(x) + '" value="' + esc(TAG[x].name) + '" maxlength="40" aria-label="Rename tag ' + esc(TAG[x].name) + '">' +
-        '<button type="button" class="quiet" data-tag-up="' + esc(x) + '" aria-label="Move ' + esc(TAG[x].name) + ' up"' + (i ? '' : ' disabled') + '>↑</button><button type="button" class="quiet" data-tag-down="' + esc(x) + '" aria-label="Move ' + esc(TAG[x].name) + ' down"' + (i < own.length - 1 ? '' : ' disabled') + '>↓</button>' +
-        '<button type="button" class="quiet danger" data-tag-del="' + esc(x) + '" aria-label="Delete tag ' + esc(TAG[x].name) + '">' + I.x + '</button></div>').join('') +
-      '<div class="tg-row"><input id="tg-new" maxlength="40" placeholder="New tag" aria-label="New tag"><button type="button" id="tg-add">Add</button></div>' +
-      '<div class="tg-share"><button type="button" data-share-tags="' + esc(d.id) + '">Share my tags…</button></div>' : '<p class="n">This login has no Default tag list.</p>') + '</section>' +
-    '<section class="rv"><strong>Shared with me <span class="n">' + others.length + '</span></strong>' + (others.map(l => {
-      const names = Object.values(TAG).filter(x => x.tag_list_id === l.id).map(x => x.name).sort((a, b) => a.localeCompare(b));
-      return '<div class="al"><span class="al-who">' + esc(personName(l.owner_id)) + '’s ' + esc(l.name) + ' <span class="n">' + ROLE_NAMES[l.role] + (l.hidden ? ', hidden' : '') + '</span><span class="tg-list">' + (names.map(n => '<span class="tagtxt">' + esc(n) + '</span>').join('') || '<span class="n">no tags</span>') + '</span></span>' +
-        '<span class="al-b"><button type="button" class="quiet" data-tl-hide="' + esc(l.id) + '" data-hidden="' + l.hidden + '">' + (l.hidden ? 'Show' : 'Hide for me') + '</button><button type="button" class="quiet danger" data-tl-leave="' + esc(l.id) + '">Leave</button></span></div>';
-    }).join('') || '<div class="rr n">None</div>') + '</section>' +
-    '<div class="actions"><button value="close" autofocus>Close</button></div></form>', '#profile');
-  const again = () => { dlg.close(); openTags(); };
-  dlg.querySelectorAll('[data-tag-name]').forEach(inp => inp.onchange = async () => {
-    const id = inp.dataset.tagName, v = inp.value.trim().replace(/^#+/, '').trim().slice(0, 40);
-    if (!v || v === TAG[id].name) { inp.value = TAG[id].name; return; }
-    if (!(await renameTagDb(id, v))) inp.value = TAG[id].name; else toast('Renamed to ' + v);
-  });
-  const move = (id, by) => { const i = own.indexOf(id); own.splice(i, 1); own.splice(i + by, 0, id); tagOrder = own.concat(tagOrder.filter(x => !own.includes(x))); savePrefsSoon(); again(); };
-  dlg.querySelectorAll('[data-tag-up]').forEach(b => b.onclick = () => move(b.dataset.tagUp, -1));
-  dlg.querySelectorAll('[data-tag-down]').forEach(b => b.onclick = () => move(b.dataset.tagDown, 1));
-  dlg.querySelectorAll('[data-tag-del]').forEach(b => b.onclick = () => {
-    const id = b.dataset.tagDel, n = tasks.filter(t => !t.deleted && t.tags.includes(id)).length;
-    confirmAsk((n ? n + (n === 1 ? ' item carries' : ' items carry') + ' the tag “' + TAG[id].name + '”. ' : '') + 'Delete the tag “' + TAG[id].name + '”?', 'Delete', async () => { if (await deleteTagDb(id)) again(); }, '[data-menu="tags"]');
-  });
-  const add = dlg.querySelector('#tg-add');
+// Account menu → Tags (round 3, adjustment 5): every tag list I can see, stacked in the task window's order (my default, ★, first).
+// Each action shows only when my role allows it (C.tagListRights). A list I may rename has its name as a text box. A tag opens its
+// menu on click or right-click: Rename, Move to list (another live list of the same owner; move_tags merges a name already there),
+// Count as Mine (profiles.mine_tag_ids), Delete. Drag a tag onto another list to move it, or between tags of its list to reorder
+// it (tags.sort, Alt+Left / Alt+Right); drag my lists by their grip to reorder them (tag_lists.sort, Alt+Up / Alt+Down on the name).
+// "Delete list" archives it (set_tag_list_archived): its chips leave every card. "Archived tags" shows the archived lists the same
+// way, read only, with Restore.
+function openTags(archivedView) {
+  const dlg = dialogShell('<form method="dialog" class="tgm"><strong>' + (archivedView ? 'Archived tags' : 'Tags') + '</strong>' +
+    '<p class="sh-note">' + (archivedView ? 'These tag lists are read only and their tags show on no card. Restore one to use or change it.' : 'Drag a tag onto another list to move it, or between tags to reorder. Click a tag for more.') + '</p>' +
+    '<div id="tgm-body" class="tgm-body"></div><div class="err" id="tgm-e" aria-live="polite"></div>' +
+    (archivedView ? '' : '<div class="tg-row tgm-new"><input id="tgl-new" maxlength="60" placeholder="New tag list" aria-label="Name of a new tag list"><button type="button" id="tgl-add">Create list</button></div>') +
+    '<div class="actions"><button type="button" id="tgm-switch" class="quiet">' + (archivedView ? 'Back to tags' : 'Archived tags') + '</button><span class="sp"></span><button value="close">Close</button></div></form>', '#profile');
+  const body = dlg.querySelector('#tgm-body'), err = dlg.querySelector('#tgm-e');
+  const say = m => { err.textContent = m || ''; };
+  let drag = null;
+  const groupsNow = () => C.tagGroups(TAG_LISTS, TAG, me.id, NAMES, { archived: !!archivedView, hidden: true });
+  const after = (msg, focus) => { relabel(); renderSoon(); draw(focus); if (msg) toast(msg); };
+  const trayHtml = g => {
+    const l = g.list, id = esc(l.id), R = C.tagListRights(l), own = l.owner_id === me.id, mine = new Set(me.mine_tag_ids || []);
+    const sortable = R.has('sortList') && !l.is_default;
+    const star = !own || l.archived_at ? '' : l.is_default ? '<span class="tgl-star on" title="The default list: new tags go here">★<span class="sr"> default</span></span>'
+      : '<button type="button" class="tgl-star" data-default="' + id + '" title="Make this the default list" aria-label="Make ' + esc(l.name) + ' the default list">☆</button>';
+    const name = R.has('renameList') ? '<input class="tgl-name" data-tgl-name="' + id + '" value="' + esc(l.name) + '" maxlength="60" aria-label="Name of the tag list ' + esc(l.name) + '"' + (sortable ? ' aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' : '<span class="tgl-name">' + esc(l.name) + '</span>';
+    const who = own ? '' : '<span class="n">' + esc(displayName(l.owner_id)) + ', ' + ROLE_NAMES[l.role] + (l.hidden ? ', hidden' : '') + '</span>';
+    const acts = (R.has('share') ? '<button type="button" class="quiet" data-tl-share="' + id + '">Share</button>' : '') +
+      (R.has('archive') ? '<button type="button" class="quiet danger" data-tl-del="' + id + '">Delete list</button>' : '') +
+      (R.has('restore') ? '<button type="button" data-tl-restore="' + id + '">Restore</button>' : '') +
+      (!own && !l.archived_at ? '<button type="button" class="quiet" data-tl-hide="' + id + '" data-hidden="' + !!l.hidden + '">' + (l.hidden ? 'Show' : 'Hide for me') + '</button><button type="button" class="quiet danger" data-tl-leave="' + id + '">Leave</button>' : '');
+    const dragOk = !l.archived_at && (R.has('sortTag') || R.has('move'));
+    const chips = g.tags.map(x => '<span class="tagwrap" data-t="' + esc(x) + '"' + (dragOk ? ' draggable="true"' : '') + '><button type="button" class="tagchip' + (mine.has(x) ? ' mine' : '') + '" data-tag-menu="' + esc(x) + '"' +
+      (l.archived_at ? ' disabled' : ' aria-haspopup="menu"' + (R.has('sortTag') ? ' aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"' : '')) + (mine.has(x) ? ' title="Counts as Mine"' : '') + '>' + esc(TAG[x].name) + '</button></span>').join('');
+    const add = R.has('addTag') ? '<button type="button" class="tag-add" data-tl-addtag="' + id + '" aria-label="New tag in ' + esc(l.name) + '">' + I.plus + '</button>' : '';
+    return '<section class="tgl' + (l.archived_at ? ' arch' : '') + '" data-tgl="' + id + '" aria-label="' + esc(l.name) + '"><div class="tgl-h">' +
+      (sortable ? '<span class="tgl-grip" draggable="true" data-grip="' + id + '" title="Drag to reorder" aria-hidden="true">⋮⋮</span>' : '') + star + name + who +
+      '<span class="tgl-n" title="' + g.tags.length + (g.tags.length === 1 ? ' tag' : ' tags') + '">' + g.tags.length + '</span><span class="tgl-b">' + acts + '</span></div>' +
+      '<div class="tgl-tags">' + (chips || (add ? '' : '<span class="n">no tags</span>')) + add + '</div></section>';
+  };
+  const draw = focus => {
+    closeMenu();
+    const groups = groupsNow();
+    body.innerHTML = groups.map(trayHtml).join('') || '<p class="n">' + (archivedView ? 'No archived tag lists.' : 'No tag lists.') + '</p>';
+    bindTrays(groups);
+    if (focus) body.querySelector(focus)?.focus();
+  };
+  // order: a tag between its neighbours (tags.sort, a midpoint; the list renumbered when the gap is too small); my lists 1, 2, 3 …
+  const placeTag = async (x, ids, to) => {
+    const order = ids.filter(y => y !== x); order.splice(Math.max(0, Math.min(order.length, to)), 0, x);
+    const i = order.indexOf(x), prev = TAG[order[i - 1]], next = TAG[order[i + 1]];
+    const writes = prev && next && C.gapTooSmall(prev.sort, next.sort) ? C.renumber(order).map(({ id, sortKey }) => [id, sortKey]).filter(([id, s]) => TAG[id].sort !== s)
+      : [[x, C.sortBetween(prev ? prev.sort : null, next ? next.sort : null)]];
+    for (const [id, sort] of writes) {
+      const r = await rest('PATCH', 'tags?id=eq.' + id, { sort }, { Prefer: 'return=representation' });
+      if (!r.ok || !r.json.length) { say(r.ok ? 'You may not reorder these tags.' : r.err.message); return draw(); }
+      TAG[id].sort = sort;
+    }
+    after('', '[data-tag-menu="' + x + '"]');
+  };
+  const placeList = async (id, to) => {
+    const own = groupsNow().map(g => g.list).filter(l => C.tagListRights(l).has('sortList') && !l.is_default).map(l => l.id);
+    own.splice(own.indexOf(id), 1); own.splice(Math.max(0, Math.min(own.length, to)), 0, id);
+    for (const [i, lid] of own.entries()) {
+      if (TAG_LISTS[lid].sort === i + 1) continue;
+      const r = await rest('PATCH', 'tag_lists?id=eq.' + lid, { sort: i + 1 }, { Prefer: 'return=representation' });
+      if (!r.ok || !r.json.length) { say(r.ok ? 'You may not reorder these lists.' : r.err.message); break; }
+      TAG_LISTS[lid].sort = i + 1;
+    }
+    after('', '[data-tgl-name="' + id + '"]');
+  };
+  const moveTag = async (x, to) => {
+    const name = TAG[x].name, target = TAG_LISTS[to];
+    const r = await rpc('move_tags', { p_tags: [x], p_to: to });
+    if (!r.ok) { say(r.err.message); return; }
+    await refreshMeta(); await loadItemTags();
+    after(r.json && r.json.merged ? '“' + name + '” merged into the tag of that name in ' + target.name : 'Moved “' + name + '” to ' + target.name);
+  };
+  const toggleMine = async x => {
+    const ids = new Set(me.mine_tag_ids || []);
+    if (ids.has(x)) ids.delete(x); else if (ids.size >= 50) return say('Mine counts at most 50 tags.'); else ids.add(x);
+    const r = await rest('PATCH', 'profiles?id=eq.' + me.id, { mine_tag_ids: [...ids] }, { Prefer: 'return=representation' });
+    if (!r.ok || !r.json.length) return say(r.ok ? 'Not saved.' : r.err.message);
+    me.mine_tag_ids = r.json[0].mine_tag_ids || [...ids];
+    after(ids.has(x) ? '“' + TAG[x].name + '” counts as Mine' : '“' + TAG[x].name + '” no longer counts as Mine', '[data-tag-menu="' + x + '"]');
+  };
+  const renameInPlace = x => {
+    const w = body.querySelector('.tagwrap[data-t="' + x + '"]'); if (!w) return;
+    const inp = document.createElement('input'); inp.className = 'tag-new'; inp.maxLength = 40; inp.value = TAG[x].name; inp.setAttribute('aria-label', 'Rename tag ' + TAG[x].name);
+    let done = false;
+    const commit = async keep => {
+      if (done) return; done = true;
+      const v = keep ? inp.value.trim().replace(/^#+/, '').trim().slice(0, 40) : '';
+      if (v && v !== TAG[x].name && await renameTagDb(x, v)) after('Renamed to ' + v, '[data-tag-menu="' + x + '"]'); else draw('[data-tag-menu="' + x + '"]');
+    };
+    inp.style.width = 'calc(' + Math.max(3, inp.value.length + 1) + 'ch + 20px)';
+    inp.oninput = () => { inp.style.width = 'calc(' + Math.max(3, inp.value.length + 1) + 'ch + 20px)'; };
+    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); commit(false); } };
+    inp.onblur = () => commit(true);
+    w.replaceWith(inp); inp.focus(); inp.select();
+  };
+  // the tag menu, anchored under its chip inside the window; Esc or a click elsewhere closes it
+  function closeMenu() { dlg.querySelector('.tgm-menu')?.remove(); }
+  const openMenu = (x, chip) => {
+    closeMenu();
+    const l = TAG_LISTS[TAG[x].tag_list_id], R = C.tagListRights(l), mine = (me.mine_tag_ids || []).includes(x);
+    const targets = C.moveTargets(l, TAG_LISTS);
+    const m = document.createElement('div');
+    m.className = 'menu-pop tgm-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', 'Tag ' + TAG[x].name);
+    m.innerHTML = (R.has('renameTag') ? '<button type="button" role="menuitem" data-m="rename">Rename</button>' : '') +
+      (targets.length ? '<div class="vh" role="none">Move to list</div>' + targets.map(t2 => '<button type="button" role="menuitem" data-m="move" data-to="' + esc(t2.id) + '">' + esc(t2.name) + '</button>').join('') : '') +
+      '<button type="button" role="menuitem" data-m="mine">' + (mine ? 'Don’t count as Mine' : 'Count as Mine') + '</button>' +
+      (R.has('deleteTag') ? '<hr><button type="button" role="menuitem" class="danger" data-m="delete">Delete</button>' : '');
+    dlg.append(m);
+    const d = dlg.getBoundingClientRect(), r = chip.getBoundingClientRect();
+    // under the chip, or above it when the window has no room below (the window scrolls, so the menu would be cut)
+    const below = r.bottom + 4 + m.offsetHeight <= d.bottom - 8;
+    m.style.top = ((below ? r.bottom + 4 : r.top - 4 - m.offsetHeight) - d.top + dlg.scrollTop) + 'px';
+    m.style.left = Math.max(8, Math.min(r.left - d.left, d.width - m.offsetWidth - 8)) + 'px';
+    const items = [...m.querySelectorAll('button')];
+    items[0].focus();
+    m.onkeydown = e => {
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); chip.focus(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
+    };
+    m.querySelectorAll('[data-m]').forEach(b => b.onclick = e => {
+      e.stopPropagation(); closeMenu();
+      ({ rename: () => renameInPlace(x), move: () => moveTag(x, b.dataset.to), mine: () => toggleMine(x),
+        delete: () => { const n = tasks.filter(t => !t.deleted && t.tags.includes(x)).length;
+          confirmAsk((n ? n + (n === 1 ? ' item carries' : ' items carry') + ' the tag “' + TAG[x].name + '”. ' : '') + 'Delete the tag “' + TAG[x].name + '”?', 'Delete', async () => { if (await deleteTagDb(x)) draw(); }, '[data-menu="tags"]'); } })[b.dataset.m]();
+    });
+  };
+  dlg.addEventListener('click', e => { if (!e.target.closest('.tgm-menu') && !e.target.closest('[data-tag-menu]')) closeMenu(); });
+  dlg.addEventListener('cancel', e => { if (dlg.querySelector('.tgm-menu') || (document.activeElement && document.activeElement.classList.contains('tag-new'))) { e.preventDefault(); closeMenu(); } });
+  const bindTrays = groups => {
+    const ids = id => (groups.find(g => g.list.id === id) || { tags: [] }).tags;
+    const clear = () => body.querySelectorAll('.drop,.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop', 'drop-before', 'drop-after', 'dragging'));
+    body.querySelectorAll('[data-tag-menu]').forEach(b => {
+      const x = b.dataset.tagMenu, l = TAG[x].tag_list_id;
+      b.onclick = e => { e.stopPropagation(); openMenu(x, b); };
+      b.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); openMenu(x, b); };
+      b.onkeydown = e => {
+        if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && C.tagListRights(TAG_LISTS[l]).has('sortTag')) { e.preventDefault(); const row = ids(l); placeTag(x, row, row.indexOf(x) + (e.key === 'ArrowLeft' ? -1 : 1)); }
+        else if (e.key === 'F2' && tagCan(x, 'renameTag')) { e.preventDefault(); renameInPlace(x); }
+      };
+    });
+    body.querySelectorAll('.tagwrap[draggable]').forEach(w => {
+      w.ondragstart = e => { drag = { kind: 'tag', id: w.dataset.t, from: TAG[w.dataset.t].tag_list_id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', TAG[w.dataset.t].name); w.classList.add('dragging'); };
+      w.ondragend = () => { drag = null; clear(); };
+    });
+    body.querySelectorAll('[data-grip]').forEach(g => {
+      g.ondragstart = e => { drag = { kind: 'list', id: g.dataset.grip }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', TAG_LISTS[g.dataset.grip].name); g.closest('.tgl').classList.add('dragging'); };
+      g.ondragend = () => { drag = null; clear(); };
+    });
+    body.querySelectorAll('.tgl[data-tgl]').forEach(sec => {
+      const to = sec.dataset.tgl, L = TAG_LISTS[to];
+      // where a drop lands: a tag in its own list (reorder) or in a list it may move to; a list among my sortable lists
+      const verdict = e => {
+        if (!drag) return null;
+        if (drag.kind === 'tag') {
+          if (drag.from === to) { if (!C.tagListRights(L).has('sortTag')) return null; const over = e.target.closest('.tagwrap[data-t]'); return { reorder: over && over.dataset.t !== drag.id ? over : null }; }
+          return C.moveTargets(TAG_LISTS[drag.from], TAG_LISTS).some(t2 => t2.id === to) ? { move: true } : null;
+        }
+        if (drag.id === to || !C.tagListRights(L).has('sortList') || L.is_default) return null;
+        const r = sec.getBoundingClientRect();
+        return { list: true, before: e.clientY < r.top + r.height / 2 };
+      };
+      sec.ondragover = e => {
+        const v = verdict(e); if (!v) return;
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        body.querySelectorAll('.drop,.drop-before,.drop-after').forEach(x => x.classList.remove('drop', 'drop-before', 'drop-after'));
+        if (v.move) sec.classList.add('drop');
+        else if (v.list) sec.classList.add(v.before ? 'drop-before' : 'drop-after');
+        else if (v.reorder) { const r = v.reorder.getBoundingClientRect(); v.reorder.classList.add(e.clientX < r.left + r.width / 2 ? 'drop-before' : 'drop-after'); }
+      };
+      sec.ondragleave = e => { if (!sec.contains(e.relatedTarget)) sec.classList.remove('drop', 'drop-before', 'drop-after'); };
+      sec.ondrop = e => {
+        const v = verdict(e), d = drag; drag = null; clear();
+        if (!v || !d) return;
+        e.preventDefault();
+        if (v.move) moveTag(d.id, to);
+        else if (v.list) { const own = groups.map(g => g.list).filter(l => C.tagListRights(l).has('sortList') && !l.is_default).map(l => l.id).filter(x => x !== d.id); placeList(d.id, own.indexOf(to) + (v.before ? 0 : 1)); }
+        else if (v.reorder) { const r = v.reorder.getBoundingClientRect(), row = ids(to).filter(x => x !== d.id); placeTag(d.id, ids(to), row.indexOf(v.reorder.dataset.t) + (e.clientX < r.left + r.width / 2 ? 0 : 1)); }
+      };
+    });
+    body.querySelectorAll('[data-tgl-name]').forEach(inp => {
+      const id = inp.dataset.tglName;
+      inp.onchange = async () => {
+        const v = inp.value.trim().slice(0, 60);
+        if (!v || v === TAG_LISTS[id].name) { inp.value = TAG_LISTS[id].name; return; }
+        const r = await rest('PATCH', 'tag_lists?id=eq.' + id, { name: v }, { Prefer: 'return=representation' });
+        if (!r.ok || !r.json.length) { inp.value = TAG_LISTS[id].name; return say(r.ok ? 'You may not rename this list.' : r.err.kind === 'duplicate' ? 'You already have a tag list with this name.' : r.err.message); }
+        TAG_LISTS[id].name = r.json[0].name; say(''); after('Renamed the tag list to ' + v, '[data-tgl-name="' + id + '"]');
+      };
+      inp.onkeydown = e => {
+        if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+        else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && C.tagListRights(TAG_LISTS[id]).has('sortList') && !TAG_LISTS[id].is_default) {
+          e.preventDefault();
+          const own = groups.map(g => g.list).filter(l => C.tagListRights(l).has('sortList') && !l.is_default).map(l => l.id);
+          placeList(id, own.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1));
+        }
+      };
+    });
+    body.querySelectorAll('[data-default]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.default, r = await rpc('set_default_tag_list', { p_tag_list: id });
+      if (!r.ok) return say(r.err.message);
+      Object.values(TAG_LISTS).forEach(l => { if (l.owner_id === me.id) l.is_default = l.id === id; });
+      after('New tags now go to ' + TAG_LISTS[id].name, '[data-tgl="' + id + '"] .tgl-star');
+    });
+    body.querySelectorAll('[data-tl-share]').forEach(b => b.onclick = () => openShare('tag_list', b.dataset.tlShare, '[data-menu="tags"]'));
+    body.querySelectorAll('[data-tl-del]').forEach(b => b.onclick = () => {
+      const id = b.dataset.tlDel, l = TAG_LISTS[id], n = ids(id).length;
+      confirmAsk('Delete the tag list “' + l.name + '”? ' + (n ? 'Its ' + n + (n === 1 ? ' tag leaves' : ' tags leave') + ' every card. ' : '') + 'Nothing is erased: Archived tags brings it back.', 'Delete list', async () => {
+        const r = await rpc('set_tag_list_archived', { p_tag_list: id, p_archived: true });
+        if (!r.ok) return say(r.err.message);
+        l.archived_at = new Date().toISOString();
+        after('Deleted the tag list ' + l.name + '. Archived tags brings it back.');
+      }, '[data-menu="tags"]');
+    });
+    body.querySelectorAll('[data-tl-restore]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.tlRestore, r = await rpc('set_tag_list_archived', { p_tag_list: id, p_archived: false });
+      if (!r.ok) return say(r.err.message);
+      TAG_LISTS[id].archived_at = null;
+      after('Restored the tag list ' + TAG_LISTS[id].name);
+    });
+    body.querySelectorAll('[data-tl-hide]').forEach(b => b.onclick = async () => {
+      const r = await rpc('set_tag_list_hidden', { p_tag_list: b.dataset.tlHide, p_hidden: b.dataset.hidden !== 'true' });
+      if (!r.ok) return say(r.err.message);
+      await afterMembership(b.dataset.hidden !== 'true' ? 'Those tags are hidden for you' : 'Those tags show again'); draw();
+    });
+    body.querySelectorAll('[data-tl-leave]').forEach(b => b.onclick = () => confirmAsk('Leave these tags? You will no longer see them; only their owner or an editor can share them with you again.', 'Leave', async () => {
+      const r = await rpc('leave_tag_list', { p_tag_list: b.dataset.tlLeave });
+      if (!r.ok) return say(r.err.message);
+      await afterMembership('Left the tags'); draw();
+    }, '[data-menu="tags"]'));
+    body.querySelectorAll('[data-tl-addtag]').forEach(b => b.onclick = () => {
+      const l = b.dataset.tlAddtag, inp = document.createElement('input');
+      inp.className = 'tag-new'; inp.maxLength = 40; inp.setAttribute('aria-label', 'New tag in ' + TAG_LISTS[l].name);
+      let done = false;
+      const commit = async keep => {
+        if (done) return; done = true;
+        const v = keep ? inp.value.trim().replace(/^#+/, '').trim().slice(0, 40) : '';
+        if (v && (await ensureTags([{ list: l, name: v }])).length) after('Tag added: ' + v, '[data-tl-addtag="' + l + '"]'); else draw('[data-tl-addtag="' + l + '"]');
+      };
+      inp.oninput = () => { inp.style.width = 'calc(' + Math.max(3, inp.value.length + 1) + 'ch + 20px)'; };
+      inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); commit(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); commit(false); } };
+      inp.onblur = () => commit(true);
+      b.replaceWith(inp); inp.focus();
+    });
+  };
+  const add = dlg.querySelector('#tgl-add');
   if (add) {
-    const inp = dlg.querySelector('#tg-new');
-    const go = async () => { const v = inp.value.trim().replace(/^#+/, '').trim().slice(0, 40); if (!v) return inp.focus(); const ids = await ensureTags([v]); if (ids.length) { toast('Tag added: ' + v); again(); } };
+    const inp = dlg.querySelector('#tgl-new');
+    const go = async () => {
+      const v = inp.value.trim().slice(0, 60); if (!v) return inp.focus();
+      add.disabled = true;
+      const r = await rpc('create_tag_list', { p_name: v });
+      add.disabled = false;
+      if (!r.ok) { say(r.err.message); return inp.focus(); }
+      const x = Array.isArray(r.json) ? r.json[0] : r.json;
+      TAG_LISTS[x.id] = { id: x.id, owner_id: me.id, name: x.name, is_default: !!x.is_default, sort: x.sort, archived_at: null, role: 'owner', hidden: false };
+      inp.value = ''; say('');
+      after('Tag list created: ' + x.name, '[data-tl-addtag="' + x.id + '"]');
+    };
     add.onclick = go; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
   }
-  dlg.querySelectorAll('[data-share-tags]').forEach(b => b.onclick = () => openShare('tag_list', b.dataset.shareTags, '[data-menu="tags"]'));
-  dlg.querySelectorAll('[data-tl-hide]').forEach(b => b.onclick = async () => {
-    const r = await rpc('set_tag_list_hidden', { p_tag_list: b.dataset.tlHide, p_hidden: b.dataset.hidden !== 'true' });
-    if (!r.ok) return toast(r.err.message);
-    await afterMembership(b.dataset.hidden !== 'true' ? 'Those tags are hidden for you' : 'Those tags show again'); again();
-  });
-  dlg.querySelectorAll('[data-tl-leave]').forEach(b => b.onclick = () => confirmAsk('Leave these tags? You will no longer see them; only their owner can invite you again.', 'Leave', async () => {
-    const r = await rpc('leave_tag_list', { p_tag_list: b.dataset.tlLeave });
-    if (!r.ok) return toast(r.err.message);
-    await afterMembership('Left the tags'); again();
-  }, '[data-menu="tags"]'));
+  dlg.querySelector('#tgm-switch').onclick = () => { dlg.addEventListener('close', () => setTimeout(() => openTags(!archivedView))); dlg.close(); };
+  draw();
 }
 
 // Accounts on this browser: picking one signs out here, then opens Google with that email (login_hint, account picker) or
@@ -3132,6 +3542,36 @@ function bind() {
   app.querySelectorAll('.grp').forEach(b => b.onclick = () => { const q = b.dataset.q; st.collapsed.has(q) ? st.collapsed.delete(q) : st.collapsed.add(q); render(); });
   app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openTask(b.dataset.open));
   app.querySelectorAll('[data-hl]').forEach(b => { b.onmouseenter = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.add('hl'); b.onmouseleave = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.remove('hl'); });
+  // round 3, adjustment 10: side-menu rows drag between quadrant groups (Plan → Eliminate) and within one, like cards (moveTask,
+  // placeIn); a drop on a group's heading puts the row at that group's end. Alt+Up / Alt+Down move a row one step (C.menuMove).
+  const nav = app.querySelector('.groups');
+  const navClear = () => nav.querySelectorAll('.drop-before,.drop-after,.drop,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop', 'dragging'));
+  const menuRows = () => { const g = {}; QS.forEach(q => { g[q] = [...nav.querySelectorAll('.mrow[data-mq="' + q + '"]')].map(b => b.dataset.open); }); return g; };
+  nav.querySelectorAll('.mrow[draggable]').forEach(b => {
+    b.ondragstart = e => { dragId = b.dataset.open; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); b.classList.add('dragging'); };
+    b.ondragend = () => { dragId = null; navClear(); document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); };
+    b.onkeydown = e => {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault();
+      const id = b.dataset.open, m = C.menuMove(menuRows(), id, e.key === 'ArrowUp' ? -1 : 1);
+      if (!m) return;
+      moveTask(id, m.q, m.targetId, m.before);
+      document.querySelector('.mrow[data-open="' + id + '"]')?.focus();
+    };
+  });
+  const spot = e => {
+    const row = e.target.closest('.mrow[data-mq]'), grp = e.target.closest('.grp');
+    if (row && row.dataset.open !== dragId) { const r = row.getBoundingClientRect(); return { q: row.dataset.mq, el: row, target: row.dataset.open, before: e.clientY < r.top + r.height / 2 }; }
+    return grp ? { q: grp.dataset.q, el: grp, target: null, before: false } : null;
+  };
+  nav.ondragover = e => {
+    const s = dragId && spot(e); if (!s) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    nav.querySelectorAll('.drop-before,.drop-after,.drop').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop'));
+    s.el.classList.add(s.target ? (s.before ? 'drop-before' : 'drop-after') : 'drop');
+  };
+  nav.ondragleave = e => { if (!nav.contains(e.relatedTarget)) nav.querySelectorAll('.drop-before,.drop-after,.drop').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop')); };
+  nav.ondrop = e => { const s = dragId && spot(e); if (!s) return; e.preventDefault(); const id = dragId; dragId = null; moveTask(id, s.q, s.target, s.before); };
   app.querySelectorAll('[data-card]').forEach(c => {
     c.onclick = e => { if (!e.target.closest('button')) openTask(c.dataset.card); };
     c.onkeydown = e => { if (e.key === 'Enter' && e.target === c) openTask(c.dataset.card); };

@@ -114,11 +114,13 @@ test('tagLabels: a name two owners hold is marked with the other owner\'s initia
   assert.deepEqual({ ...two }, { y1: 'a ·?', y2: 'a ·?' });
 });
 
-test('isMine: owner_id is me, or a visible tag in my mine_tags', () => {
-  const me = { id: 'me', mine_tags: ['maksym'] };
+// round 3 (db/012): by tag id (mine_tag_ids), no longer by name (mine_tags)
+test('isMine: owner_id is me, or a visible tag whose id is in my mine_tag_ids', () => {
+  const me = { id: 'me', mine_tags: ['maksym'], mine_tag_ids: ['g1', 'g2'] };
   assert.equal(C.isMine({ ownerId: 'me', tags: [] }, me, {}), true);
   assert.equal(C.isMine({ ownerId: 'b', tags: ['g1'] }, me, { g1: 'maksym' }), true);
   assert.equal(C.isMine({ ownerId: null, tags: ['g2'] }, me, { g1: 'maksym' }), false, 'a tag I cannot see does not count');
+  assert.equal(C.isMine({ ownerId: null, tags: ['g3'] }, me, { g3: 'maksym' }), false, 'a name in mine_tags no longer counts');
   assert.equal(C.isMine({ ownerId: 'me', tags: [] }, null, {}), false);
 });
 
@@ -136,9 +138,11 @@ test('mergeTagRows and tagDiff: adds, soft removals, pending items skipped, unkn
 test('membershipActions, canEditTags, defaultAddList (A6)', () => {
   assert.deepEqual(C.membershipActions('owner', 'list'), ['share', 'people', 'archive']);
   assert.deepEqual(C.membershipActions('viewer', 'list'), ['people', 'hide', 'leave']);
-  assert.deepEqual(C.membershipActions('editor', 'tag_list'), ['hide', 'leave']);
+  // round 3: an editor of a tag list shares it; a contributor adds and renames tags
+  assert.deepEqual(C.membershipActions('editor', 'tag_list'), ['share', 'hide', 'leave']);
+  assert.deepEqual(C.membershipActions('viewer', 'tag_list'), ['hide', 'leave']);
   assert.deepEqual(C.membershipActions(undefined, 'list'), []);
-  assert.equal(C.canEditTags('editor'), true); assert.equal(C.canEditTags('viewer'), false);
+  assert.equal(C.canEditTags('editor'), true); assert.equal(C.canEditTags('contributor'), true); assert.equal(C.canEditTags('viewer'), false);
   const byId = { H: { owner_id: 'max' }, G: { owner_id: 'guest' }, S: { owner_id: 'max' } };
   const cats = { task: { default_list_id: 'H' } };
   assert.equal(C.defaultAddList({ lists: ['H', 'G'], roles: { H: 'editor', G: 'owner' }, byId, meId: 'guest', cats }), 'H');

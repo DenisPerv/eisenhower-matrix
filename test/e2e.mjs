@@ -160,7 +160,7 @@ const core = loadCore(PAGE);
 const SUPA = new URL(env.TASKSDB_URL).host;
 const cli = (...a) => spawnSync(process.execPath, [path.join(HERE, '..', 'cli', 'tasks.mjs'), ...a, '--env', args.env, '--run-id', RUN], { encoding: 'utf8' });
 
-let B, MK, AN, ST, prefsSnap = {}, testLists = [];
+let B, MK, AN, ST, prefsSnap = {}, testLists = [], testTagLists = [];
 const clients = []; // every session this run made is logged out at the end
 const grantFor = async who => { const c = await connect(env, who, { core, via: 'script:e2e', runId: RUN }); clients.push(c); return c.session; };
 const mkItem = async (title, extra = {}) => {
@@ -204,6 +204,12 @@ async function cleanup() {
     const a = await MK.rest('PATCH', 'lists?id=eq.' + l.id, { archived_at: new Date().toISOString() }, { Prefer: 'return=representation' });
     rows.push(`| cleanup | ${l.slug || l.id}: ${d.ok ? d.json.length : 'n/a'} items soft-deleted, list archived | ${a.ok && a.json.length === 1 ? 'pass' : 'FAIL'} | |`);
     if (l !== ST) leftovers.push(`archived test list ${l.slug} (${l.name})`);
+  }
+  // round 3: test tag lists (Tags window) are archived; nothing is deleted
+  for (const tl of testTagLists) {
+    const r = await MK.rest('POST', 'rpc/set_tag_list_archived', { p_tag_list: tl.id, p_archived: true });
+    rows.push(`| cleanup | tag list ${tl.name}: archived | ${r.ok ? 'pass' : 'FAIL'} | ${r.ok ? '' : r.err.message} |`);
+    leftovers.push(`archived test tag list ${tl.name}`);
   }
 }
 
@@ -567,6 +573,19 @@ async function gUi() {
     check(G, `${who}: General settings hold display name and time zone`, await T.wait('!!document.getElementById("s-name")&&!!document.getElementById("s-tz")&&!document.getElementById("s-lim")', 5000));
     await T.ev('document.querySelector("dialog[open]")?.close(),true');
     await T.click('[data-view=matrix]');
+    // round 3, adjustments 5 and 6: Account menu → Tags (trays, ★ on my default first) and the task window's tags grouped by tag list
+    await T.click('#profile'); await T.click('[data-menu=tags]');
+    check(G, `${who}: Tags shows my tag lists as trays, my default first with ★`, await T.wait('!!document.querySelector("dialog[open] .tgl:first-child .tgl-star.on")', 5000));
+    for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-tags-${who}-${w}x${h}-${theme}`); }
+    await T.size(1440, 900); await closeDialogs(T);
+    const anyCard = await T.ev('document.querySelector("[data-card]")?.dataset.card||""');
+    if (anyCard) {
+      await T.click(`[data-card="${anyCard}"]`);
+      check(G, `${who}: the task window groups tags under their tag lists, my default first; the title wraps (two lines at most)`, await T.wait('!!document.querySelector("dialog[open] .tgg:first-child .tgg-h .star")', 5000) &&
+        await T.ev(`getComputedStyle(document.querySelector('dialog[open] #ft')).whiteSpace!=='nowrap'`));
+      for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-task-${who}-${w}x${h}-${theme}`); }
+      await T.size(1440, 900); await closeDialogs(T);
+    } else skip(G, `${who}: the task window's grouped tags`, 'no card on the board');
     // counts on the chips equal the database (open, live items on lists that are not archived)
     const c = who === 'maksym' ? MK : AN;
     const lists = (await c.rest('GET', 'lists?select=id,name&archived_at=is.null')).json;
@@ -594,6 +613,9 @@ async function gUi() {
   check(G, 'the same name again (case, spaces): "You already have a list named …", no RPC sent', await T.wait('/You already have a list named/.test(document.getElementById("nl-e")?.textContent||"")', 5000) && rpcs() === sent);
   await T.shot('ui-newlist-clash-maksym-1440x900');
   await closeDialogs(T);
+  await gUiTags(G, T);
+  // the items edited just now stay shown through filters until a reload (st.keep): start the next checks fresh
+  await T.reload(); await T.ready();
   const r = cli('add-task', '--as', 'homeos-agent', '--for', 'maksym', '--list', '_selftest', '--title', `${RUN} low confidence`, '--q', 'C', '--confidence', '0.42', '--needs-review', '--json');
   const low = r.status === 0 ? JSON.parse(r.stdout)[0] : null;
   check(G, 'CLI add-task as homeos-agent (needs review, confidence 0.42)', !!low, 'exit ' + r.status);
@@ -612,6 +634,80 @@ async function gUi() {
   await N.wait(`!!document.querySelector('[data-card="${tz.id}"]')`); await N.click(`[data-card="${tz.id}"]`);
   check(G, 'time zone override: the end shows in the browser zone (10:00 in New York for 15:00 UTC)', await N.wait('document.querySelector("dialog[open] #fd")?.value==="2026-11-20T10:00"'));
   await N.close();
+}
+
+// round 3, A5-A7 (Maksym's page): a test tag list through the Tags window (create, a tag, rename, delete = archive, Archived tags
+// read only with Restore); its header in the task window puts its tags on; Alt+arrows move a side-menu row into the next quadrant;
+// a first share of a test list to Anastasiia joins her at once with a note, and her Leave takes it away. Everything is archived.
+async function gUiTags(G, T) {
+  const name = `${RUN} tags`;
+  await T.click('#profile'); await T.click('[data-menu=tags]'); await T.wait('!!document.getElementById("tgl-new")', 5000);
+  await T.insert('#tgl-new', name); await T.click('#tgl-add');
+  const tl = await until(async () => (await MK.rest('GET', 'tag_lists?select=id,name,archived_at&name=eq.' + encodeURIComponent(name))).json[0]);
+  if (tl) testTagLists.push(tl);
+  check(G, 'Tags: Create list makes a tag list (create_tag_list) and shows its tray', !!tl && await T.wait(`!!document.querySelector('dialog[open] .tgl[data-tgl="${tl && tl.id}"]')`, 5000));
+  if (!tl) return;
+  await T.click(`[data-tl-addtag="${tl.id}"]`); await T.insert('dialog[open] .tgm-body input.tag-new', 'e2e-a');
+  await T.ev('document.querySelector("dialog[open] .tgm-body input.tag-new").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true})),true');
+  const tag = await until(async () => (await MK.rest('GET', `tags?select=id,name&tag_list_id=eq.${tl.id}&deleted_at=is.null`)).json[0]);
+  check(G, 'Tags: + in a tray adds a tag to that tag list', !!tag && await T.wait(`!!document.querySelector('dialog[open] .tgl[data-tgl="${tl.id}"] [data-tag-menu]')`, 5000));
+  await T.click(`dialog[open] [data-tag-menu="${tag && tag.id}"]`);
+  check(G, 'Tags: a tag opens its menu (Rename, Move to list, Count as Mine, Delete)', await T.wait('!!document.querySelector("dialog[open] .tgm-menu [data-m=mine]")', 3000) &&
+    await T.ev('!!document.querySelector("dialog[open] .tgm-menu [data-m=rename]")&&!!document.querySelector("dialog[open] .tgm-menu [data-m=delete]")&&!!document.querySelector("dialog[open] .tgm-menu [data-m=move]")'));
+  await T.shot('ui-tags-menu-maksym-1440x900');
+  await T.ev('document.querySelector("dialog[open] .tgm-menu")?.remove(),true');
+  await T.ev(`(()=>{const i=document.querySelector('dialog[open] [data-tgl-name="${tl.id}"]');i.value=${JSON.stringify(name + ' 2')};i.dispatchEvent(new Event('change'));return true})()`);
+  check(G, 'Tags: renaming a tray renames the tag list', !!(await until(async () => (await MK.rest('GET', 'tag_lists?select=id&name=eq.' + encodeURIComponent(name + ' 2'))).json[0])));
+  tl.name = name + ' 2';
+  await closeDialogs(T);
+  // the task window: the test tag list's header puts its tag on; Save writes item_tags
+  const it = await mkItem('tags header');
+  await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200); await pick(T, ST.id);
+  await T.wait(`!!document.querySelector('[data-card="${it.id}"]')`, 8000); await T.click(`[data-card="${it.id}"]`);
+  await T.wait(`!!document.querySelector('dialog[open] [data-bulk="${tl.id}"]')`, 5000); await T.click(`dialog[open] [data-bulk="${tl.id}"]`);
+  check(G, 'task window: a tag list header click puts all of its tags on', await T.ev(`document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')?.getAttribute('aria-pressed')==='true'`));
+  await T.click('dialog[open] #fs');
+  check(G, 'task window: Save writes the tag (item_tags)', !!(await until(async () => (await MK.rest('GET', `item_tags?select=tag_id&item_id=eq.${it.id}&tag_id=eq.${tag && tag.id}&removed_at=is.null`)).json[0])));
+  // Delete list = archive: its chip leaves the card; Archived tags shows it read only with Restore
+  await T.click('#profile'); await T.click('[data-menu=tags]'); await T.wait(`!!document.querySelector('dialog[open] [data-tl-del="${tl.id}"]')`, 5000);
+  await T.click(`dialog[open] [data-tl-del="${tl.id}"]`); await T.wait('!!document.getElementById("cf-ok")', 3000); await T.click('#cf-ok');
+  check(G, 'Tags: Delete list archives the tag list (set_tag_list_archived)', !!(await until(async () => (await MK.rest('GET', `tag_lists?select=id&id=eq.${tl.id}&archived_at=not.is.null`)).json[0])));
+  await closeDialogs(T); await sleep(300);
+  check(G, 'its tags leave the cards', await T.ev(`![...document.querySelectorAll('[data-card="${it.id}"] .tagtxt')].some(x=>x.textContent==='e2e-a')`));
+  await T.click('#profile'); await T.click('[data-menu=tags]'); await T.wait('!!document.getElementById("tgm-switch")', 5000); await T.click('#tgm-switch');
+  check(G, 'Archived tags: the list read only (chips disabled, no rename) with Restore', await T.wait(`!!document.querySelector('dialog[open] [data-tl-restore="${tl.id}"]')`, 5000) &&
+    await T.ev(`[...document.querySelectorAll('dialog[open] .tgl[data-tgl="${tl.id}"] .tagchip')].every(b=>b.disabled) && !document.querySelector('dialog[open] [data-tgl-name="${tl.id}"]')`));
+  for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-tags-archived-maksym-${w}x${h}`); }
+  await T.size(1440, 900);
+  await T.click(`dialog[open] [data-tl-restore="${tl.id}"]`);
+  check(G, 'Restore brings the tag list back', !!(await until(async () => (await MK.rest('GET', `tag_lists?select=id&id=eq.${tl.id}&archived_at=is.null`)).json[0])));
+  await closeDialogs(T);
+  // side menu: Alt+Down past the end of Plan moves the row into Delegate (C), like a card drag
+  const mv = await mkItem('menu move', { quadrant: 'B' });
+  await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200); await pick(T, ST.id);
+  if (await T.wait(`!!document.querySelector('.mrow[data-open="${mv.id}"]')`, 6000)) {
+    for (let i = 0; i < 40 && (await T.ev(`document.querySelector('.mrow[data-open="${mv.id}"]')?.dataset.mq`)) === 'B'; i++) {
+      await T.ev(`document.querySelector('.mrow[data-open="${mv.id}"]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',altKey:true,bubbles:true})),true`); await sleep(150);
+    }
+    check(G, 'side menu: Alt+Down past the end of Plan moves the row into Delegate (stored quadrant C)', !!(await until(async () => (await MK.rest('GET', `items?select=id&id=eq.${mv.id}&quadrant=eq.C`)).json[0])));
+  } else skip(G, 'side menu: Alt+arrows', 'the Plan group is collapsed in the preferences');
+  // first share without Accept (db/012): a test list to Anastasiia joins her at once; her note offers Keep, Leave, Block; Leave ends it
+  const sl = await mkList(MK, `${RUN} shared`, true);
+  const sh = await MK.rest('POST', 'rpc/share_list', { p_list: sl.id, p_email: env.TASKSDB_ANASTASIIA_EMAIL, p_role: 'viewer', p_join: true });
+  check(G, 'first share: share_list with p_join answers ok', sh.ok, sh.ok ? '' : sh.err.message);
+  const A = await tab(B, await ctx(B)); await A.theme('dark');
+  await open(A, await grantFor('anastasiia'));
+  const seen = await A.wait(`[...document.querySelectorAll('#notices .ntc p')].some(p=>p.textContent.includes(${JSON.stringify(sl.name)}))`, 10000);
+  check(G, 'first share: Anastasiia joined without Accept and sees "… shared the list … with you" with Keep, Leave and Block', seen &&
+    await A.ev('!!document.querySelector("#notices [data-ntc=seen]")&&!!document.querySelector("#notices [data-ntc=leave]")&&!!document.querySelector("#notices [data-ntc=block]")') && await A.has(`.lists [data-list="${sl.id}"], #more`));
+  for (const [w, h] of [[1440, 900], [390, 844]]) { await A.size(w, h); await sleep(400); await A.shot(`ui-notice-anastasiia-${w}x${h}-dark`); }
+  if (seen) {
+    await A.ev(`[...document.querySelectorAll('#notices .ntc')].find(n=>n.textContent.includes(${JSON.stringify(sl.name)})).querySelector('[data-ntc=leave]').click(),true`);
+    check(G, 'first share: Leave takes the list away and closes the note', !!(await until(async () => !(await AN.rest('GET', `list_members?select=list_id&list_id=eq.${sl.id}&profile_id=eq.${AN.uid}`)).json.length)) &&
+      await A.wait(`![...document.querySelectorAll('#notices .ntc p')].some(p=>p.textContent.includes(${JSON.stringify(sl.name)}))`, 5000));
+  }
+  check(G, 'anastasiia (notice page): no console errors', !A.errors.length, A.errors.slice(0, 2).join(' / '));
+  await A.close();
 }
 
 async function gSmoke() {
