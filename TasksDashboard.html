@@ -442,7 +442,7 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   --ink:#13121F;--ink2:#383650;--ink3:#64627A;
   --hover:rgba(80,60,240,.06);--well:rgba(28,26,52,.045);
   --accent:#5235F0;--accent2:#5235F0;--accent-ink:#3F22D9;--accent-bg:rgba(82,53,240,.09);--accent-line:rgba(82,53,240,.4);--glow:rgba(82,53,240,.28);
-  --cyan:#0891B2;
+  --cyan:#0891B2;--week:#C2410C;
   --wm:.13;--aura:14%;
 }
 :root[data-theme="dark"]{
@@ -456,7 +456,7 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   --ink:#ECEBFA;--ink2:#C3C1DD;--ink3:#9593B5;
   --hover:rgba(150,140,255,.08);--well:rgba(170,180,255,.05);
   --accent:#8E7BFF;--accent2:#8E7BFF;--accent-ink:#B8ADFF;--accent-bg:rgba(142,123,255,.14);--accent-line:rgba(142,123,255,.5);--glow:rgba(142,123,255,.45);
-  --cyan:#22D3EE;
+  --cyan:#22D3EE;--week:#FB923C;
   --wm:.2;--aura:24%;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
@@ -470,7 +470,7 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   --ink:#ECEBFA;--ink2:#C3C1DD;--ink3:#9593B5;
   --hover:rgba(150,140,255,.08);--well:rgba(170,180,255,.05);
   --accent:#8E7BFF;--accent2:#8E7BFF;--accent-ink:#B8ADFF;--accent-bg:rgba(142,123,255,.14);--accent-line:rgba(142,123,255,.5);--glow:rgba(142,123,255,.45);
-  --cyan:#22D3EE;
+  --cyan:#22D3EE;--week:#FB923C;
   --wm:.2;--aura:24%;
 }}
 
@@ -593,12 +593,55 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .tl-d.we{background:repeating-linear-gradient(90deg,transparent 0 3px,var(--well) 3px 4px)}
 .tl-bar{border-radius:var(--r-sm);background:var(--c);height:14px;min-height:14px}
 #tl-prev,#tl-next{border-radius:var(--r)}
-/* round 3: weekly review as a rail view (A9 redesigns it); rows open their task */
-.rvw{background:var(--solid);border:1px solid var(--hair);border-radius:var(--r-xl);box-shadow:var(--depth);padding:var(--s3) var(--s4) var(--s4)}
-.rvw .rv:first-of-type{margin-top:var(--s2)}
-.rvw .rr{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);border-radius:var(--r-sm);cursor:pointer;font:inherit;font-size:13px}
-.rvw button.rr:hover{background:var(--hover)}
-.rvw .rr .k{font-family:var(--mono);color:var(--ink3)}
+/* round 3, adjustments 8 and 9: Weekly review as a rail view. Weeks are instrument tiles under an orange week line (--week);
+   this week carries a "now" tag, picked weeks the accent underline. Tasks by quadrant (its colour as a top rule), then list. */
+.rvw{background:var(--solid);border:1px solid var(--hair);border-radius:var(--r-xl);box-shadow:var(--depth);padding:var(--s4) var(--s5) var(--s5);min-width:0}
+.rv-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:var(--s2) var(--s4)}
+.rv-head h2{margin:0;font:600 22px var(--serif);color:var(--ink)}
+.rv-per{font:500 13px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink2)}
+.rv-head .sp{flex:1}
+#rv-dl{display:inline-flex;align-items:center;gap:6px;border-radius:var(--r);align-self:center}
+#rv-dl svg{width:15px;height:15px}
+.rv-weeks{display:flex;align-items:stretch;gap:var(--s2);margin-top:var(--s4)}
+.rv-nav{flex:none;width:32px;min-height:0;padding:0;border-radius:var(--r-sm)}
+.rv-strip{position:relative;display:flex;gap:var(--s2);flex:1;min-width:0;overflow-x:auto;padding:3px 1px 4px;user-select:none;scrollbar-width:thin}
+.rvw .wk{position:relative;flex:1 0 88px;display:grid;gap:1px;justify-items:start;text-align:left;min-height:0;padding:9px 10px 6px;border:1px solid var(--hair);border-radius:var(--r-sm);background:var(--solid);color:var(--ink2);font:inherit;cursor:pointer;box-shadow:none}
+.rvw .wk::before{content:"";position:absolute;left:-1px;right:-1px;top:-1px;height:3px;border-radius:var(--r-sm) var(--r-sm) 0 0;background:var(--week)}
+.wk-w{display:flex;align-items:center;gap:6px;font:600 13px var(--ui);color:var(--ink);letter-spacing:.02em}
+.wk-now{font:500 10px var(--ui);padding:0 5px;border-radius:var(--r-sm);color:var(--week);border:1px solid var(--week);line-height:15px}
+.wk-d{font:400 11px var(--mono);color:var(--ink3);white-space:nowrap}
+.wk-n{font:500 12px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink2)}
+.rvw .wk.now{border-color:var(--week)}
+.rvw .wk:hover{background:var(--hover);border-color:var(--accent-line)}
+.rvw .wk[aria-pressed="true"]{background:var(--accent-bg);color:var(--ink);border-color:var(--accent-line);box-shadow:inset 0 -2px 0 var(--accent)}
+.rvw .wk[aria-pressed="true"] .wk-n{color:var(--accent-ink)}
+.rv-hint{margin:var(--s2) 0 0 40px;font-size:12px;color:var(--ink3)}
+.rv-lists{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s4)}
+.rv-lists button{min-height:28px;padding:0 10px;border-radius:var(--r-sm);font:500 12px var(--ui)}
+.rv-lists button[aria-pressed="true"]{background:var(--accent-bg);color:var(--accent-ink);box-shadow:inset 0 -2px 0 var(--accent);border-color:var(--accent-line)}
+.rv-lists button.arch{border-style:dashed;color:var(--ink3)}
+.rv-qs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s5) var(--s6);margin-top:var(--s5)}
+.rvq{border-top:2px solid var(--c);padding-top:var(--s3);min-width:0}
+.rvq h3{display:flex;align-items:center;gap:8px;margin:0 0 var(--s2);font:600 15px var(--ui);color:var(--ink)}
+.rvq h3 .n,.rvl h4 .n{font:400 12px var(--mono);color:var(--ink3)}
+.rvl h4{margin:var(--s3) 0 2px;font:500 12px var(--ui);color:var(--ink3)}
+.rvw .rv-r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--s3);align-items:baseline;width:100%;min-height:0;padding:4px 6px;border:0;border-bottom:1px solid var(--hair);border-radius:0;background:transparent;color:var(--ink);text-align:left;font:inherit;font-size:13px;box-shadow:none}
+.rvw button.rv-r:hover{background:var(--hover)}
+.rvw .rv-r .k{font-family:var(--mono);color:var(--ink3)}
+.rv-tt{min-width:0;overflow-wrap:anywhere}
+.rv-tg{font-size:12px;color:var(--ink3)}
+.rv-k{font-size:12px;color:var(--ink2);white-space:nowrap}
+.rv-k .n{font-family:var(--mono)}
+.rv-r.overdue .rv-k,.rv-r.late .rv-k{color:var(--danger)}
+.rv-r.done .rv-tt,.rv-r.cancelled .rv-tt{color:var(--ink2)}
+.rv-none,.rv-empty,.kpi-wait{margin:var(--s2) 0;font-size:13px;color:var(--ink3)}
+.rv-empty{margin-top:var(--s5)}
+.kpi{margin-top:var(--s6);border-top:1px solid var(--hair2);padding-top:var(--s3)}
+.kpi > summary{cursor:pointer;font:600 17px var(--serif);color:var(--ink);list-style-position:inside;padding:var(--s2) 0}
+.kpi > summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpi-pl li.on{color:var(--ink);font-weight:600}
+@media (max-width:900px){.rv-qs{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:700px){.rvw{padding:var(--s3)}.rv-hint{margin-left:0}.rv-head h2{font-size:19px}.rvw .wk{flex-basis:84px}}
 /* round 3: "due soon" (less than threshold % of the urgency window left): a hairline in the Delegate yellow, as overdue has one in red */
 .card.soon .meta{border-radius:var(--r-sm);border:1px solid color-mix(in srgb,var(--qc) 70%,transparent);padding:1px 6px;font-family:var(--mono);color:var(--ink)}
 .mrow.soon{box-shadow:inset 2px 0 0 var(--qc)}
@@ -1506,6 +1549,171 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return dir < 0 ? { q: next, targetId: other.length ? other[other.length - 1] : null, before: false } : { q: next, targetId: other.length ? other[0] : null, before: true };
   }
 
+  // ---- round 3, adjustment 8: weekly review. ISO weeks in local time: Monday to Sunday, week 1 holds 4 January.
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const addDays = (ms, n) => { const d = new Date(ms); d.setDate(d.getDate() + n); return d.getTime(); }; // DST-safe
+  function weekStart(ms) { const d = new Date(ms); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+  function isoWeek(ms) {
+    const start = weekStart(ms), end = addDays(start, 7), year = new Date(addDays(start, 3)).getFullYear();
+    const week = 1 + Math.round((start - weekStart(new Date(year, 0, 4).getTime())) / (7 * DAY));
+    return { key: year + '-W' + String(week).padStart(2, '0'), year, week, start, end };
+  }
+  // '2026-W44' -> the week; null for anything else
+  function weekFromKey(key) {
+    const m = /^(\d{4})-W(\d{2})$/.exec(String(key || ''));
+    if (!m || +m[2] < 1 || +m[2] > 53) return null;
+    const w = isoWeek(addDays(weekStart(new Date(+m[1], 0, 4).getTime()), (+m[2] - 1) * 7));
+    return w.key === key ? w : null;
+  }
+  // 'W44 · 26 Oct–1 Nov', 'W45 · 2–8 Nov'
+  function weekLabel(w) {
+    const a = new Date(w.start), b = new Date(addDays(w.end, -1));
+    return 'W' + w.week + ' · ' + (a.getMonth() === b.getMonth() ? a.getDate() + '–' + b.getDate() + ' ' + MONTHS[b.getMonth()]
+      : a.getDate() + ' ' + MONTHS[a.getMonth()] + '–' + b.getDate() + ' ' + MONTHS[b.getMonth()]);
+  }
+  // count weeks in a row from the week of fromMs
+  function weekRange(fromMs, count) { const out = []; let s = weekStart(fromMs); for (let i = 0; i < count; i++) { out.push(isoWeek(s)); s = addDays(s, 7); } return out; }
+  // Windows logic. A click picks one week; Ctrl toggles one (the last one stays picked) and moves the anchor; Shift picks the
+  // range from the anchor (at most WEEKS_MAX weeks), Ctrl+Shift adds that range. state = { sel: [keys], anchor }; keys come back sorted
+  const WEEKS_MAX = 104;
+  function weekSelect(state, key, mods) {
+    const m = mods || {}, sel = new Set((state && state.sel) || []), w = weekFromKey(key);
+    if (!w) return { sel: [...sel].sort(), anchor: state && state.anchor };
+    const anchor = weekFromKey(state && state.anchor) ? state.anchor : key;
+    if (m.shift) {
+      const a = weekFromKey(anchor).start, lo = Math.min(a, w.start), hi = Math.max(a, w.start), range = [];
+      for (let s = lo; s <= hi && range.length < WEEKS_MAX; s = addDays(s, 7)) range.push(isoWeek(s).key);
+      return { sel: [...new Set(m.ctrl ? [...sel, ...range] : range)].sort(), anchor };
+    }
+    if (m.ctrl) { if (!sel.has(key)) sel.add(key); else if (sel.size > 1) sel.delete(key); return { sel: [...sel].sort(), anchor: key }; }
+    return { sel: [key], anchor: key };
+  }
+  // the weeks' span: { from, to } (to exclusive), null for no week
+  function reviewPeriod(keys) {
+    const ws = (keys || []).map(weekFromKey).filter(Boolean);
+    return ws.length ? { from: Math.min(...ws.map(w => w.start)), to: Math.max(...ws.map(w => w.end)) } : null;
+  }
+  // the tasks of the weeks: completed (done or cancelled) in one of them, else due in one of them. kind: done | cancelled |
+  // overdue (due in a week, passed while still open) | due. late: closed after its end, or open past it. at: the day it is listed by
+  function reviewEntries(tasks, keys, now) {
+    const ws = (keys || []).map(weekFromKey).filter(Boolean);
+    const inWeeks = ms => ms !== null && ws.some(w => ms >= w.start && ms < w.end);
+    const out = [];
+    (tasks || []).forEach(t => {
+      if (!t || t.deleted) return;
+      const due = t.deadline ? t.deadline.getTime() : null, done = t.doneAt ? t.doneAt.getTime() : null;
+      const late = due !== null && due < (done === null ? now : done);
+      if (inWeeks(done)) out.push({ t, kind: t.status === 'cancelled' ? 'cancelled' : 'done', at: done, late });
+      else if (inWeeks(due)) out.push({ t, kind: done === null && due < now ? 'overdue' : 'due', at: due, late });
+    });
+    return out;
+  }
+  // grouped by quadrant (A-D, all four), then list (in listOrder, unknown lists last); rows by day, then number
+  function reviewGroups(entries, listOrder, quadOf) {
+    const qOf = quadOf || (e => e.t.q), order = l => { const i = (listOrder || []).indexOf(l); return i < 0 ? 1e9 : i; };
+    return QS.map(q => {
+      const mine = (entries || []).filter(e => qOf(e) === q);
+      const lists = [...new Set(mine.map(e => e.t.list))].sort((a, b) => order(a) - order(b) || String(a).localeCompare(String(b)));
+      return { q, count: mine.length, lists: lists.map(l => ({ list: l, rows: mine.filter(e => e.t.list === l).sort((a, b) => a.at - b.at || (a.t.num || 0) - (b.t.num || 0)) })) };
+    });
+  }
+  // tasks-review-2026-W44.html, tasks-review-2026-W40-2026-W44.html (first and last week)
+  function reviewFileName(keys) {
+    const k = (keys || []).filter(x => weekFromKey(x)).sort();
+    return 'tasks-review-' + (k.length ? k[0] + (k.length > 1 ? '-' + k[k.length - 1] : '') : 'empty') + '.html';
+  }
+
+  // ---- round 3, adjustment 9: KPI, rebuilt backwards from item_events. An item's state at a time is its current row with the
+  // diffs ({ column: { old, new } }, db/002 items_after_write) of every later event undone. An event may carry the diff as
+  // { diff } or as flat columns (the page selects diff->column only). Before created_at the item does not exist.
+  const KPI_COLUMNS = ['quadrant', 'status', 'due_at', 'urgent_pin', 'priority', 'category', 'deleted_at', 'list_id'];
+  const kpiState = r => { const s = {}; KPI_COLUMNS.forEach(k => { s[k] = r[k] === undefined ? null : r[k]; }); if (!s.status) s.status = 'open'; return s; };
+  function kpiHistory(rows, events) {
+    const by = {};
+    (events || []).forEach(e => { if (e && e.item_id) (by[e.item_id] = by[e.item_id] || []).push(e); });
+    return (rows || []).map(r => {
+      const evs = (by[r.id] || []).slice().sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || (b.id || 0) - (a.id || 0));
+      let s = kpiState(r);
+      const changes = [];
+      evs.forEach(e => {
+        const d = e.diff || e, keys = KPI_COLUMNS.filter(k => d[k] && typeof d[k] === 'object' && 'old' in d[k]);
+        if (!keys.length) return;
+        changes.push({ at: Date.parse(e.at), state: s });
+        s = Object.assign({}, s);
+        keys.forEach(k => { s[k] = d[k].old === undefined ? null : d[k].old; });
+        if (!s.status) s.status = 'open';
+      });
+      const created = Date.parse(r.created_at);
+      changes.push({ at: created, state: s });
+      return { id: r.id, created, changes: changes.reverse() };
+    });
+  }
+  // the state at time T (the last change at or before T); null before the item existed
+  function kpiStateAt(h, T) {
+    if (T < h.created) return null;
+    let s = h.changes[0].state;
+    for (const c of h.changes) { if (c.at <= T) s = c.state; else break; }
+    return s;
+  }
+  // open | closed | archived | deleted | none. archived = still open in a list archived by then (o.archived: { list id: ms })
+  function kpiStatus(s, T, archived) {
+    if (!s) return 'none';
+    if (s.deleted_at) return 'deleted';
+    if (CLOSED.includes(s.status)) return 'closed';
+    const a = (archived || {})[s.list_id];
+    return a !== undefined && a !== null && a <= T ? 'archived' : 'open';
+  }
+  // stored quadrant, else derived (deriveQuadrant) at that time with the person's urgency settings
+  const kpiQuadrant = (s, settings, T) => deriveQuadrant({ qStored: s.quadrant, priority: s.priority, category: s.category, pin: s.urgent_pin,
+    deadline: s.due_at ? new Date(s.due_at) : null }, settings, T);
+  // sample times: `from`, then every day for a span up to KPI_DAILY_MAX days, else every week; the last point is `to`
+  const KPI_DAILY_MAX = 62;
+  function kpiTimes(from, to) {
+    const step = (to - from) <= KPI_DAILY_MAX * DAY ? 1 : 7, out = [from];
+    for (let t = addDays(from, step); t < to; t = addDays(t, step)) out.push(t);
+    out.push(to);
+    return { step, times: out };
+  }
+  // open items per quadrant over time: [{ at, A, B, C, D }]; o = { settings, archived }
+  function kpiSeries(hists, from, to, o) {
+    const opt = o || {}, { step, times } = kpiTimes(from, to);
+    return { step, points: times.map(T => {
+      const p = { at: T, A: 0, B: 0, C: 0, D: 0 };
+      (hists || []).forEach(h => { const s = kpiStateAt(h, T); if (kpiStatus(s, T, opt.archived) === 'open') p[kpiQuadrant(s, opt.settings, T)]++; });
+      return p;
+    }) };
+  }
+  // the items of a period: open at some point in it (open at `from`, or created inside it)
+  const kpiInPeriod = (h, from, to, archived) => h.created < to && (h.created >= from || kpiStatus(kpiStateAt(h, from), from, archived) === 'open');
+  // the period's items still live at its end, per quadrant, open and closed apart. A closed item counts in its quadrant as it was
+  // when it closed. { A: { open, closed }, …, total }
+  function kpiPie(hists, from, to, o) {
+    const opt = o || {}, out = { total: 0 };
+    QS.forEach(q => { out[q] = { open: 0, closed: 0 }; });
+    (hists || []).filter(h => kpiInPeriod(h, from, to, opt.archived)).forEach(h => {
+      const s = kpiStateAt(h, to), k = kpiStatus(s, to, opt.archived);
+      if (k === 'open') { out[kpiQuadrant(s, opt.settings, to)].open++; out.total++; }
+      if (k === 'closed') {
+        let at = null; for (const c of h.changes) { if (c.at > to) break; if (!CLOSED.includes(c.state.status)) at = null; else if (at === null) at = c.at; }
+        const when = at === null ? to : at;
+        out[kpiQuadrant(kpiStateAt(h, when) || s, opt.settings, when)].closed++; out.total++;
+      }
+    });
+    return out;
+  }
+  // how the period's items ended: closed (done or cancelled), archived (open when their list was archived), deleted; open = still open
+  function kpiClosure(hists, from, to, o) {
+    const opt = o || {}, out = { closed: 0, archived: 0, deleted: 0, open: 0, total: 0 };
+    (hists || []).filter(h => kpiInPeriod(h, from, to, opt.archived)).forEach(h => { const k = kpiStatus(kpiStateAt(h, to), to, opt.archived); if (out[k] !== undefined) { out[k]++; out.total++; } });
+    return out;
+  }
+  // Overall: from the day the first item was made to now; null for no items
+  function kpiOverall(hists, now) {
+    if (!(hists || []).length) return null;
+    const d = new Date(Math.min(...hists.map(h => h.created))); d.setHours(0, 0, 0, 0);
+    return { from: d.getTime(), to: now };
+  }
+
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
@@ -1515,7 +1723,9 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, cardTagIds,
-    TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove };
+    TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
+    weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
+    KPI_COLUMNS, kpiHistory, kpiStateAt, kpiStatus, kpiQuadrant, KPI_DAILY_MAX, kpiTimes, kpiSeries, kpiPie, kpiClosure, kpiOverall };
 });
 </script>
 <script>
@@ -1527,6 +1737,7 @@ const QN = { A: 'Do', B: 'Plan', C: 'Delegate', D: 'Eliminate' };
 const svg = p => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + p + '</svg>';
 const I = {
   search: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+  dl: svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   moon: svg('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
   chevR: svg('<path d="m9 6 6 6-6 6"/>'),
@@ -2856,19 +3067,224 @@ function dialogShell(html, opener) {
   return dlg;
 }
 
-// weekly review (round 3: a rail view; its redesign with weeks, prefilter and export is A9): the 7 days around today of the
-// selected list (All = every list), ignoring search and filters; a row opens its task
-function reviewHtml() {
-  const from = new Date(TODAY.getTime() - 7 * DAY), to = new Date(TODAY.getTime() + 7 * DAY);
-  const mine = all().filter(inList);
-  const open = mine.filter(t => !t.doneAt);
-  const sec = (title, list) => '<section class="rv"><strong>' + title + ' <span class="n">' + list.length + '</span></strong>' + (list.length ? list.map(t => '<button type="button" class="rr" data-open="' + t.id + '"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + (t.deadline ? ' <span class="n">' + rel(t) + '</span>' : '') + '</button>').join('') : '<div class="rr n">0</div>') + '</section>';
-  return '<div class="rvw"><div class="ar-tools"><span class="n">' + fmtDay(from) + ' – ' + fmtDay(to) + '</span></div>' +
-    sec('Overdue', open.filter(overdue)) +
-    sec('Due soon', open.filter(t => C.dueSoon(t, settings, TODAY.getTime()))) +
-    sec('Completed in the last 7 days', mine.filter(t => t.doneAt && t.doneAt >= from)) +
-    sec('Due in the next 7 days', open.filter(t => t.deadline && t.deadline >= TODAY && t.deadline <= to)) + '</div>';
+// round 3, adjustment 8: Weekly review (a rail view). A strip of ISO weeks under an orange week line (--week), this week marked,
+// picked like files in Windows (C.weekSelect: click, Ctrl-click, Shift-click); its own list chips; the picked weeks' tasks
+// (C.reviewEntries: done, cancelled, overdue or due in them) by quadrant, then list (C.reviewGroups); rows open their task.
+// Download saves the view and the KPI as one self-contained HTML file (reviewDownload). Search and board filters do not apply.
+const RV_SHOWN = 10, RV_BACK = 7, RV_STEP = 4; // the strip: seven weeks before this one, this one, two after; ‹ › move four weeks
+const RV_KIND = { done: 'Done', cancelled: 'Cancelled', overdue: 'Overdue', due: 'Due' };
+const shortDay = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const longDay = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const spanText = (from, to) => longDay(from) + ' – ' + longDay(to - 1); // to is exclusive
+const rvPeriodText = p => p ? spanText(p.from, p.to) + ' · ' + st.rvSel.length + (st.rvSel.length === 1 ? ' week' : ' weeks') : '';
+function rvInit() {
+  const now = TODAY.getTime(), cur = C.isoWeek(now).key;
+  if (!st.rvSel) { st.rvSel = [cur]; st.rvAnchor = cur; st.rvLists = new Set(); st.kpiLists = new Set(); }
+  if (!st.rvFirst) st.rvFirst = C.weekStart(now - RV_BACK * 7 * DAY);
+  return cur;
 }
+function reviewData() {
+  rvInit();
+  const tasks = all().filter(t => !st.rvLists.size || st.rvLists.has(t.list));
+  const entries = C.reviewEntries(tasks, st.rvSel, TODAY.getTime());
+  return { tasks, entries, groups: C.reviewGroups(entries, LISTS), period: C.reviewPeriod(st.rvSel) };
+}
+// one task row: number, title, tags, what happened and when; a button that opens the task, a plain row in the export
+function rvRow(e, exp) {
+  const t = e.t, tags = shownTags(t).map(x => LABEL[x]).join(', '), cls = 'rr rv-r ' + e.kind + (e.late ? ' late' : '');
+  const inner = '<span class="k">' + ref(t) + '</span><span class="rv-tt">' + esc(plain(t.title)) + (tags ? ' <span class="rv-tg">' + esc(tags) + '</span>' : '') + '</span>' +
+    '<span class="rv-k">' + RV_KIND[e.kind] + (e.late && e.kind !== 'overdue' ? ', late' : '') + ' <span class="n">' + shortDay(e.at) + '</span></span>';
+  return exp ? '<div class="' + cls + '">' + inner + '</div>' : '<button type="button" class="' + cls + '" data-open="' + t.id + '">' + inner + '</button>';
+}
+function rvBody(d, exp) {
+  if (!d.entries.length) return '<p class="rv-empty">No task was due, done or overdue in ' + (st.rvSel.length > 1 ? 'these weeks' : 'this week') + '.</p>';
+  return '<div class="rv-qs">' + d.groups.map(g => '<section class="rvq" data-q="' + g.q + '"><h3><span class="sq" aria-hidden="true"></span>' + QN[g.q] + ' <span class="n">' + g.count + '</span></h3>' +
+    (g.lists.map(l => '<div class="rvl"><h4>' + esc(label(l.list)) + ' <span class="n">' + l.rows.length + '</span></h4>' + l.rows.map(e => rvRow(e, exp)).join('') + '</div>').join('') || '<p class="rv-none">Nothing here</p>') + '</section>').join('') + '</div>';
+}
+function reviewHtml() {
+  const cur = rvInit(), d = reviewData(), sel = new Set(st.rvSel), now = TODAY.getTime();
+  const tile = w => {
+    const n = C.reviewEntries(d.tasks, [w.key], now).length, lab = C.weekLabel(w);
+    return '<button type="button" class="wk' + (w.key === cur ? ' now' : '') + '" data-wk="' + w.key + '" aria-pressed="' + sel.has(w.key) + '" aria-label="' + lab + ', ' + n + (n === 1 ? ' task' : ' tasks') + (w.key === cur ? ', this week' : '') + '">' +
+      '<span class="wk-w">W' + w.week + (w.key === cur ? '<span class="wk-now">now</span>' : '') + '</span><span class="wk-d">' + lab.split(' · ')[1] + '</span><span class="wk-n">' + n + '</span></button>';
+  };
+  const chips = ['all'].concat(LISTS).map(l => '<button type="button" data-rvl="' + esc(l) + '" aria-pressed="' + (l === 'all' ? !st.rvLists.size : st.rvLists.has(l)) + '">' + (l === 'all' ? 'All lists' : esc(label(l))) + '</button>').join('');
+  return '<div class="rvw">' +
+    '<div class="rv-head"><h2>Weekly review</h2><span class="rv-per">' + rvPeriodText(d.period) + '</span><span class="sp"></span><button type="button" id="rv-dl">' + I.dl + 'Download</button></div>' +
+    '<div class="rv-weeks"><button type="button" class="rv-nav" id="rv-prev" aria-label="Earlier weeks">' + I.left + '</button>' +
+    '<div class="rv-strip" role="group" aria-label="Weeks">' + C.weekRange(st.rvFirst, RV_SHOWN).map(tile).join('') + '</div>' +
+    '<button type="button" class="rv-nav" id="rv-next" aria-label="Later weeks">' + I.right + '</button></div>' +
+    '<p class="rv-hint">Ctrl-click or Shift-click to pick several weeks.</p>' +
+    '<div class="rv-lists" role="group" aria-label="Lists in the review">' + chips + '</div>' +
+    rvBody(d) + kpiHtml() + '</div>';
+}
+
+// round 3, adjustment 9: KPI, a collapsible section under the review with its own list chips (archived lists too). Two groups:
+// Selected period (the picked weeks, up to now) and Overall (the first item's day to now). Per group: open items per quadrant
+// over time (stacked area), the period's items per quadrant with closed ones as a lighter shade (donut), and how they ended
+// (Closed, Archived, Deleted). The chosen lists' items (deleted ones too) and their item_events are read once per list set and
+// kept for the session (KPI_CACHE); the history is rebuilt backwards from the diffs (C.kpiHistory). Hover: a <title> on every
+// mark (also in the export), plus the donut's centre in the page.
+let KPI_LISTS = null; // every list I can read, archived ones too: [{ id, name, archived_at }]
+const KPI_CACHE = {}; // sorted list ids -> { status: 'loading' | 'ok' | 'error', hists, ms, items, events, error }
+const KPI_ITEM_COLS = 'id,list_id,quadrant,status,due_at,urgent_pin,priority,category,deleted_at,created_at';
+const KPI_EVENT_COLS = 'id,item_id,at,' + C.KPI_COLUMNS.map(k => k + ':diff->' + k).join(',') + ',items!inner(list_id)';
+let KPI_RPC = null; // db/013 kpi_events: null = not tried yet, false = not there (404), true = in use
+const KPI_WAVE = 4; // REST pages read at once
+// paged GET like getAll, KPI_WAVE pages at a time (order=id), until a short page
+async function getAllWaves(path) {
+  const out = [];
+  for (let off = 0; ; off += KPI_WAVE * C.PAGE) {
+    const rs = await Promise.all([...Array(KPI_WAVE)].map((_, i) => rest('GET', path + '&' + C.pageParams(off + i * C.PAGE))));
+    for (const r of rs) { if (!r.ok) return r; out.push(...r.json); if (r.json.length < C.PAGE) return { ok: true, json: out }; }
+  }
+}
+const kpiIds = () => (KPI_LISTS || []).map(l => l.id).filter(id => !st.kpiLists.size || st.kpiLists.has(id)).sort();
+const kpiArchived = () => Object.fromEntries((KPI_LISTS || []).filter(l => l.archived_at).map(l => [l.id, Date.parse(l.archived_at)]));
+async function kpiLoad() {
+  rvInit();
+  if (!KPI_LISTS) {
+    const r = await getAll('lists?select=id,name,archived_at');
+    KPI_LISTS = r.ok ? r.json.sort((a, b) => !!a.archived_at - !!b.archived_at || (LISTS.indexOf(a.id) + 1 || 1e9) - (LISTS.indexOf(b.id) + 1 || 1e9) || a.name.localeCompare(b.name)) : [];
+  }
+  const ids = kpiIds(), key = ids.join();
+  if (KPI_CACHE[key] && KPI_CACHE[key].status === 'error') delete KPI_CACHE[key]; // a failed read is tried again
+  if (!ids.length || KPI_CACHE[key]) return render();
+  const c = KPI_CACHE[key] = { status: 'loading' };
+  render();
+  const t0 = performance.now(), within = 'in.(' + ids.join(',') + ')';
+  performance.mark('td:kpi-start');
+  // db/013 kpi_events: one jsonb answer; without it (404), REST pages, KPI_WAVE at a time
+  let items = null, events = null, via = 'rest';
+  if (KPI_RPC !== false) {
+    const r = await rpc('kpi_events', { p_lists: ids });
+    if (r.ok && r.json && Array.isArray(r.json.items)) { items = { ok: true, json: r.json.items }; events = { ok: true, json: r.json.events || [] }; via = 'rpc'; KPI_RPC = true; }
+    else if (r.status === 404) KPI_RPC = false;
+    else { Object.assign(c, { status: 'error', error: r.err.message }); return render(); }
+  }
+  if (!items) [items, events] = await Promise.all([getAllWaves('items?select=' + KPI_ITEM_COLS + '&list_id=' + within),
+    getAllWaves('item_events?select=' + KPI_EVENT_COLS + '&items.list_id=' + within + '&action=neq.create')]);
+  if (!items.ok || !events.ok) { Object.assign(c, { status: 'error', error: (items.err || events.err).message }); return render(); }
+  performance.mark('td:kpi-fetched');
+  Object.assign(c, { hists: C.kpiHistory(items.json, events.json), items: items.json.length, events: events.json.length, via, status: 'ok' });
+  c.ms = Math.round(performance.now() - t0);
+  performance.mark('td:kpi-ready');
+  render();
+}
+function kpiHtml(exp) {
+  if (!exp && !st.kpiOpen) return '<details class="kpi" id="kpi"><summary>KPI</summary></details>';
+  const c = KPI_CACHE[kpiIds().join()], L = KPI_LISTS || [], arch = L.filter(l => l.archived_at), showArch = !!st.kpiArch || arch.some(l => st.kpiLists.has(l.id));
+  // archived lists (their tasks count in All lists) fold behind one chip
+  const kpiChip = ls => ls.map(l => '<button type="button" data-kpil="' + esc(l.id) + '" aria-pressed="' + st.kpiLists.has(l.id) + '"' + (l.archived_at ? ' class="arch" title="Archived ' + fmtDay(new Date(l.archived_at)) + '"' : '') + '>' + esc(l.name) + '</button>').join('');
+  const chips = exp ? '<p class="rv-meta">Lists: ' + esc(st.kpiLists.size ? (KPI_LISTS || []).filter(l => st.kpiLists.has(l.id)).map(l => l.name).join(', ') : 'all lists, archived ones too') + '</p>'
+    : '<div class="rv-lists kpi-lists" role="group" aria-label="Lists in the KPI"><button type="button" data-kpil="all" aria-pressed="' + !st.kpiLists.size + '">All lists</button>' +
+      kpiChip(L.filter(l => !l.archived_at)) + (arch.length ? '<button type="button" class="quiet" id="kpi-arch" aria-expanded="' + showArch + '">' + (showArch ? 'Hide archived lists' : 'Archived lists (' + arch.length + ')') + '</button>' + (showArch ? kpiChip(arch) : '') : '') + '</div>';
+  const body = !KPI_LISTS || !c || c.status === 'loading' ? '<p class="kpi-wait">Reading the history…</p>'
+    : c.status === 'error' ? '<p class="kpi-wait">Could not read the history: ' + esc(c.error) + '</p>' : kpiGroups(c);
+  return exp ? '<section class="kpi"><h2>KPI</h2>' + chips + body + '</section>' : '<details class="kpi" id="kpi" open' + (c && c.status === 'ok' ? ' data-read="' + c.ms + ',' + c.items + ',' + c.events + ',' + KPI_LISTS.length + ',' + c.via + '"' : '') + '><summary>KPI</summary>' + chips + body + '</details>';
+}
+function kpiGroups(c) {
+  const now = TODAY.getTime(), o = { settings, archived: kpiArchived() }, p = C.reviewPeriod(st.rvSel);
+  const legend = '<p class="kpi-leg">' + C.QS.map(q => '<span data-q="' + q + '"><i class="sw"></i>' + QN[q] + '</span>').join('') + '<span><i class="sw closed"></i>lighter: closed</span></p>';
+  return legend + [['Selected period', 'period', p && p.from < now ? { from: p.from, to: Math.min(p.to, now) } : null, p ? 'These weeks have not started yet.' : 'Pick a week.'],
+    ['Overall', 'overall', C.kpiOverall(c.hists, now), 'No items in these lists.']].map(([name, id, r, none]) =>
+    '<section class="kpi-g" data-kpi="' + id + '"><h3>' + name + (r ? ' <span class="kpi-per">' + spanText(r.from, r.to) + '</span>' : '') + '</h3>' +
+      (r ? '<div class="kpi-c">' + kpiArea(C.kpiSeries(c.hists, r.from, r.to, o)) + kpiDonut(C.kpiPie(c.hists, r.from, r.to, o), id) + kpiBars(C.kpiClosure(c.hists, r.from, r.to, o)) + '</div>' : '<p class="kpi-wait">' + none + '</p>') + '</section>').join('');
+}
+const KW = 520, KH = 176, KP = { l: 30, r: 92, t: 10, b: 22 };
+const f1 = v => (Math.round(v * 10) / 10).toString();
+// open items per quadrant over time; Do at the bottom; a hover column per point with its numbers; direct labels at the right end
+function kpiArea(s) {
+  const P = s.points, n = P.length, top = Math.max(2, Math.ceil(Math.max(...P.map(p => p.A + p.B + p.C + p.D)) / 2) * 2);
+  const x = i => KP.l + (n < 2 ? 0 : i * (KW - KP.l - KP.r) / (n - 1)), y = v => KP.t + (KH - KP.t - KP.b) * (1 - v / top);
+  let base = P.map(() => 0);
+  const layers = C.QS.map(q => { const lo = base, hi = base.map((b, i) => b + P[i][q]); base = hi; return { q, lo, hi }; });
+  const pt = (i, v) => f1(x(i)) + ',' + f1(y(v));
+  const area = L => '<path class="ka" data-q="' + L.q + '" d="M' + L.hi.map((v, i) => pt(i, v)).join('L') + 'L' + L.lo.map((v, i) => pt(i, v)).reverse().join('L') + 'Z"/>';
+  const grid = [0, top / 2, top].map(v => '<line class="kg" x1="' + KP.l + '" x2="' + (KW - KP.r) + '" y1="' + f1(y(v)) + '" y2="' + f1(y(v)) + '"/><text class="kt" x="' + (KP.l - 6) + '" y="' + f1(y(v) + 3.5) + '" text-anchor="end">' + v + '</text>').join('');
+  const xs = [...new Set([0, Math.floor((n - 1) / 2), n - 1])].map(i => '<text class="kt" x="' + f1(x(i)) + '" y="' + (KH - 6) + '" text-anchor="' + (i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle') + '">' + shortDay(P[i].at) + '</text>').join('');
+  // labels: the middle of each band at its last point, pushed apart to 12 px (top to bottom)
+  const last = n - 1, lab = layers.map(L => ({ q: L.q, v: P[last][L.q], y: (y(L.lo[last]) + y(L.hi[last])) / 2 })).reverse();
+  for (let i = 1; i < lab.length; i++) lab[i].y = Math.max(lab[i].y, lab[i - 1].y + 12);
+  const shift = Math.max(0, lab[lab.length - 1].y - (KH - KP.b)); lab.forEach(l => { l.y -= shift; });
+  const labels = lab.map(l => '<text class="kl" x="' + (KW - KP.r + 8) + '" y="' + f1(l.y + 3.5) + '">' + QN[l.q] + ' <tspan class="kv">' + l.v + '</tspan></text>').join('');
+  const w = n < 2 ? KW - KP.l - KP.r : (KW - KP.l - KP.r) / (n - 1);
+  const hover = P.map((p, i) => '<rect class="kh" x="' + f1(Math.max(KP.l, x(i) - w / 2)) + '" y="' + KP.t + '" width="' + f1(Math.min(w, KW - KP.r - Math.max(KP.l, x(i) - w / 2))) + '" height="' + (KH - KP.t - KP.b) + '"><title>' +
+    (s.step === 7 ? 'Week to ' : '') + longDay(p.at) + ': ' + C.QS.map(q => QN[q] + ' ' + p[q]).join(', ') + '</title></rect>').join('');
+  return '<figure class="kpi-area"><figcaption>Open tasks by quadrant, ' + (s.step === 7 ? 'weekly' : 'daily') + '</figcaption><svg viewBox="0 0 ' + KW + ' ' + KH + '" role="img" aria-label="Open tasks by quadrant over time; at the end: ' +
+    C.QS.map(q => QN[q] + ' ' + P[last][q]).join(', ') + '">' + grid + layers.map(area).join('') + xs + labels + hover + '</svg></figure>';
+}
+// a donut ring segment from angle a to b (radians, 0 = 12 o'clock); a full ring is drawn as two halves
+function ring(cx, cy, R, r, a, b) {
+  if (b - a >= 2 * Math.PI - 1e-6) return ring(cx, cy, R, r, a, a + Math.PI) + ring(cx, cy, R, r, a + Math.PI, b);
+  const p = (rad, t) => f1(cx + rad * Math.sin(t)) + ',' + f1(cy - rad * Math.cos(t)), big = b - a > Math.PI ? 1 : 0;
+  return 'M' + p(R, a) + 'A' + R + ',' + R + ' 0 ' + big + ' 1 ' + p(R, b) + 'L' + p(r, b) + 'A' + r + ',' + r + ' 0 ' + big + ' 0 ' + p(r, a) + 'Z';
+}
+function kpiDonut(p, id) {
+  const pct = n => p.total ? Math.round(100 * n / p.total) : 0;
+  let a = 0;
+  const segs = p.total ? C.QS.flatMap(q => ['open', 'closed'].map(k => ({ q, k, n: p[q][k] }))).filter(s => s.n).map(s => {
+    const b = a + 2 * Math.PI * s.n / p.total, d = ring(70, 70, 64, 40, a, b); a = b;
+    const text = QN[s.q] + ', ' + s.k + ': ' + s.n + ' (' + pct(s.n) + '%)';
+    return '<path class="kp ' + s.k + '" data-q="' + s.q + '" data-n="' + s.n + '" data-pct="' + pct(s.n) + '" d="' + d + '"><title>' + esc(text) + '</title></path>';
+  }).join('') : '<circle class="kp-none" cx="70" cy="70" r="52"/>';
+  const rows = C.QS.map(q => { const v = p[q], n = v.open + v.closed; return '<li data-q="' + q + '"><i class="sw"></i><i class="sw closed"></i><span class="kn">' + QN[q] + ' <span class="kv">' + pct(n) + '%</span></span><span class="ks">' + v.open + ' open, ' + v.closed + ' closed</span></li>'; }).join('');
+  return '<figure class="kpi-pie"><figcaption>Tasks by quadrant, closed lighter</figcaption><div class="kpi-pw"><svg viewBox="0 0 140 140" role="img" aria-label="Tasks by quadrant: ' +
+    C.QS.map(q => QN[q] + ' ' + p[q].open + ' open, ' + p[q].closed + ' closed').join('; ') + '">' + segs +
+    '<text class="kc" x="70" y="68" text-anchor="middle" id="kc-' + id + '">' + p.total + '</text><text class="kc2" x="70" y="84" text-anchor="middle" id="kc2-' + id + '">' + (p.total === 1 ? 'task' : 'tasks') + '</text></svg>' +
+    '<ul class="kpi-pl">' + rows + '</ul></div></figure>';
+}
+// how the period's tasks ended; one bar per outcome, the number beside it; still open ones as a note
+function kpiBars(c) {
+  const max = Math.max(1, c.closed, c.archived, c.deleted);
+  const bar = (name, n, i) => '<g><title>' + name + ': ' + n + '</title><text class="kl" x="0" y="' + (i * 30 + 12) + '">' + name + '</text>' +
+    '<rect class="kb-t" x="72" y="' + (i * 30 + 3) + '" width="150" height="10" rx="3"/><rect class="kb" x="72" y="' + (i * 30 + 3) + '" width="' + f1(Math.max(n ? 3 : 0, 150 * n / max)) + '" height="10" rx="3"/>' +
+    '<text class="kv" x="230" y="' + (i * 30 + 12) + '">' + n + '</text></g>';
+  return '<figure class="kpi-bars"><figcaption>How they ended</figcaption><svg viewBox="0 0 260 84" role="img" aria-label="Closed ' + c.closed + ', archived ' + c.archived + ', deleted ' + c.deleted + '">' +
+    bar('Closed', c.closed, 0) + bar('Archived', c.archived, 1) + bar('Deleted', c.deleted, 2) + '</svg><p class="kpi-note">Still open: <span class="kv">' + c.open + '</span> of ' + c.total + '</p></figure>';
+}
+
+// Download: the review as shown (weeks, lists, groups) and the KPI as one HTML file with its own light and print styles, no script
+// and nothing loaded from the network; made in memory (Blob) and saved through <a download>. The KPI is read first if needed.
+const RV_EXPORT_CSS = ':root{--qa:#E5484D;--qb:#14A35A;--qc:#F2B500;--qd:#6B7491;--ink:#13121F;--ink2:#383650;--ink3:#64627A;--hair:rgba(28,26,52,.14);--solid:#FFFFFF;--accent:#5235F0;--week:#C2410C;--danger:#D93036;' +
+  '--ui:"Bahnschrift","DIN Alternate","Segoe UI",system-ui,sans-serif;--mono:"Cascadia Mono",Consolas,ui-monospace,monospace;--serif:"Sitka Display",Georgia,serif}' +
+  '[data-q="A"]{--c:var(--qa)}[data-q="B"]{--c:var(--qb)}[data-q="C"]{--c:var(--qc)}[data-q="D"]{--c:var(--qd)}' +
+  '*{box-sizing:border-box}body{margin:0;background:#F3F1EA;color:var(--ink);font:14px/1.45 var(--ui)}.rvw{max-width:1100px;margin:24px auto;padding:24px 28px;background:var(--solid);border:1px solid var(--hair);border-top:3px solid var(--week);border-radius:6px}' +
+  'h1{margin:0;font:600 26px var(--serif)}h2{font:600 20px var(--serif);margin:28px 0 4px}h3{font:600 15px var(--ui);margin:0 0 6px;display:flex;align-items:center;gap:8px}h4{font:500 12px var(--ui);color:var(--ink3);margin:10px 0 2px}' +
+  '.n,.kv,.k{font-family:var(--mono);font-variant-numeric:tabular-nums}.n{color:var(--ink3);font-size:12px}.rv-per{font:500 14px var(--mono);margin:4px 0}.rv-meta{color:var(--ink3);font-size:12px;margin:6px 0 0}' +
+  '.sq{width:9px;height:9px;border-radius:50%;background:var(--c)}.rv-qs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 28px;margin-top:18px}.rvq{border-top:2px solid var(--c);padding-top:8px;break-inside:avoid}' +
+  '.rr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;padding:3px 0;font-size:13px;border-bottom:1px solid var(--hair)}.k{color:var(--ink3)}.rv-tg{color:var(--ink3);font-size:12px}.rv-k{color:var(--ink2);font-size:12px;white-space:nowrap}.rv-r.overdue .rv-k,.rv-r.late .rv-k{color:var(--danger)}.rv-r.done .rv-tt,.rv-r.cancelled .rv-tt{color:var(--ink2)}' +
+  '.rv-none,.rv-empty,.kpi-wait{color:var(--ink3);font-size:13px}' + '@@KPI@@' +
+  '@media (max-width:700px){.rv-qs,.kpi-c{grid-template-columns:1fr}.rvw{margin:0;border-radius:0;padding:16px}}' +
+  '@media print{body{background:#fff}.rvw{margin:0;max-width:none;border:0;padding:0}.rvq,.kpi-g,figure{break-inside:avoid}.kh{display:none}}';
+// KPI styles shared by the page (injected into its <style id="kpi-css">) and the export, so the charts look the same in both
+const KPI_CSS = '.kpi-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0;font-size:12px;color:var(--ink2)}.kpi-leg span{display:inline-flex;align-items:center;gap:5px}' +
+  '.sw{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c,var(--ink3))}.sw.closed{background:color-mix(in srgb,var(--c,var(--ink3)) 40%,var(--solid))}' +
+  '.kpi-g{margin-top:16px;padding-top:10px;border-top:1px solid var(--hair)}.kpi-g h3{font:600 15px var(--ui);margin:0 0 8px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}.kpi-per{font:400 12px var(--mono);color:var(--ink3)}' +
+  '.kpi-c{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1.2fr) minmax(0,1fr);gap:14px 22px;align-items:start}.kpi-c figure{margin:0;min-width:0}.kpi-c figcaption{font:500 12px var(--ui);color:var(--ink3);margin-bottom:4px}.kpi-c svg{display:block;width:100%;height:auto;overflow:visible}' +
+  '.kg{stroke:var(--hair);stroke-width:1}.kt{font:10px var(--mono);fill:var(--ink3)}.kl{font:11px var(--ui);fill:var(--ink2)}.kv{font-family:var(--mono);font-variant-numeric:tabular-nums;fill:var(--ink);color:var(--ink)}' +
+  '.ka{fill:var(--c);stroke:var(--solid);stroke-width:1.5;stroke-linejoin:round}.kh{fill:transparent}.kh:hover{fill:color-mix(in srgb,var(--ink) 7%,transparent)}' +
+  '.kpi-pw{display:grid;grid-template-columns:minmax(96px,128px) minmax(0,1fr);gap:12px;align-items:center}.kp{fill:var(--c);stroke:var(--solid);stroke-width:2}.kp.closed{fill:color-mix(in srgb,var(--c) 40%,var(--solid))}.kp:hover{stroke:var(--ink);stroke-width:1.5}.kp-none{fill:none;stroke:var(--hair);stroke-width:22}' +
+  '.kc{font:600 20px var(--mono);fill:var(--ink)}.kc2{font:11px var(--ui);fill:var(--ink3)}.kpi-pl{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:12px;color:var(--ink2)}.kpi-pl li{display:grid;grid-template-columns:10px 10px minmax(0,1fr);gap:0 6px;align-items:center}.kpi-pl .kn .kv{font-size:11px;color:var(--ink2);margin-left:4px}.kpi-pl .ks{grid-column:3;font:11px var(--mono);color:var(--ink3);white-space:nowrap}' +
+  '.kb-t{fill:var(--hair)}.kb{fill:var(--accent)}.kpi-note{margin:4px 0 0;font-size:12px;color:var(--ink3)}' +
+  '@media (max-width:1000px){.kpi-c{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.kpi-area{grid-column:1 / -1}}@media (max-width:560px){.kpi-c{grid-template-columns:minmax(0,1fr)}}';
+async function reviewDownload() {
+  rvInit();
+  if (!st.kpiLists) st.kpiLists = new Set();
+  if (!(KPI_CACHE[kpiIds().join()] || {}).hists) await kpiLoad();
+  const d = reviewData(), lists = st.rvLists.size ? [...st.rvLists].map(label).join(', ') : 'all lists';
+  const now = new Date(), stamp = longDay(now.getTime()) + ' ' + ymd(now).slice(11);
+  const doc = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weekly review ' + esc(rvPeriodText(d.period)) + '</title>' +
+    '<style>' + RV_EXPORT_CSS.replace('@@KPI@@', KPI_CSS) + '</style></head><body><main class="rvw">' +
+    '<h1>Weekly review</h1><p class="rv-per">' + esc(rvPeriodText(d.period)) + '</p><p class="rv-meta">' + st.rvSel.map(k => esc(C.weekLabel(C.weekFromKey(k)))).join(', ') + '<br>Lists: ' + esc(lists) +
+    '<br>Saved ' + esc(stamp) + ' by ' + esc(me.display_name) + '</p>' + rvBody(d, true) + kpiHtml(true) + '</main></body></html>';
+  const url = URL.createObjectURL(new Blob([doc], { type: 'text/html;charset=utf-8' })), a = document.createElement('a');
+  a.href = url; a.download = C.reviewFileName(st.rvSel);
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('Saved ' + a.download);
+}
+document.head.insertAdjacentHTML('beforeend', '<style id="kpi-css">' + KPI_CSS + '</style>');
 
 // settings are saved per person in the preferences row; display name and time zone are the profile's own columns
 // round 3: two windows. General (people): display name, time zone. Urgency: window, due soon %, Do limit (SETTINGS_DEFAULTS).
@@ -3541,6 +3957,36 @@ function bind() {
   const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', mine: false, lowc: false, sel: -1 }); st.tags.clear(); st.cats.clear(); st.quads.clear(); render(); };
   app.querySelectorAll('.grp').forEach(b => b.onclick = () => { const q = b.dataset.q; st.collapsed.has(q) ? st.collapsed.delete(q) : st.collapsed.add(q); render(); });
   app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openTask(b.dataset.open));
+  // round 3, adjustments 8 and 9: Weekly review (weeks like files in Windows; ‹ › move the strip; list chips) and its KPI
+  app.querySelectorAll('[data-wk]').forEach(b => {
+    b.onmousedown = e => { if (e.shiftKey) e.preventDefault(); }; // no text selection on Shift-click
+    b.onclick = e => {
+      const r = C.weekSelect({ sel: st.rvSel, anchor: st.rvAnchor }, b.dataset.wk, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey });
+      st.rvSel = r.sel; st.rvAnchor = r.anchor; render(); document.querySelector('[data-wk="' + b.dataset.wk + '"]')?.focus();
+    };
+  });
+  const rvMove = (id, n) => { const b = document.getElementById(id); if (b) b.onclick = () => { st.rvFirst = C.weekStart(st.rvFirst + n * 7 * DAY + 3 * DAY); st.rvScroll = null; render(); document.getElementById(id)?.focus(); }; };
+  rvMove('rv-prev', -RV_STEP); rvMove('rv-next', RV_STEP);
+  const dl = document.getElementById('rv-dl'); if (dl) dl.onclick = () => reviewDownload();
+  const pickIn = (set, all, attr) => b => b.onclick = () => { const v = b.dataset[attr]; if (v === 'all') set().clear(); else set().has(v) ? set().delete(v) : set().add(v); all(); document.querySelector('[data-' + attr + '="' + CSS.escape(v) + '"]')?.focus(); };
+  app.querySelectorAll('[data-rvl]').forEach(pickIn(() => st.rvLists, render, 'rvl'));
+  app.querySelectorAll('[data-kpil]').forEach(pickIn(() => st.kpiLists, kpiLoad, 'kpil'));
+  const strip = app.querySelector('.rv-strip');
+  if (strip) {
+    const now = strip.querySelector('.wk.now');
+    strip.scrollLeft = st.rvScroll !== null && st.rvScroll !== undefined ? st.rvScroll : now ? now.offsetLeft - (strip.clientWidth - now.offsetWidth) / 2 : 0;
+    strip.onscroll = () => { st.rvScroll = strip.scrollLeft; };
+  }
+  const ka = document.getElementById('kpi-arch'); if (ka) ka.onclick = () => { st.kpiArch = ka.getAttribute('aria-expanded') !== 'true'; render(); document.getElementById('kpi-arch')?.focus(); };
+  const kd = document.getElementById('kpi');
+  if (kd) kd.ontoggle = () => { if (!!st.kpiOpen === kd.open) return; st.kpiOpen = kd.open; kd.open ? kpiLoad() : render(); };
+  app.querySelectorAll('.kpi-pie').forEach(f => {
+    const svg = f.querySelector('svg'), c = svg.querySelector('.kc'), c2 = svg.querySelector('.kc2'), t = [c.textContent, c2.textContent];
+    f.querySelectorAll('.kp').forEach(p => {
+      p.onmouseenter = () => { c.textContent = p.dataset.n; c2.textContent = p.dataset.pct + '%'; f.querySelector('li[data-q="' + p.dataset.q + '"]')?.classList.add('on'); };
+      p.onmouseleave = () => { c.textContent = t[0]; c2.textContent = t[1]; f.querySelectorAll('li.on').forEach(li => li.classList.remove('on')); };
+    });
+  });
   app.querySelectorAll('[data-hl]').forEach(b => { b.onmouseenter = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.add('hl'); b.onmouseleave = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.remove('hl'); });
   // round 3, adjustment 10: side-menu rows drag between quadrant groups (Plan → Eliminate) and within one, like cards (moveTask,
   // placeIn); a drop on a group's heading puts the row at that group's end. Alt+Up / Alt+Down move a row one step (C.menuMove).
