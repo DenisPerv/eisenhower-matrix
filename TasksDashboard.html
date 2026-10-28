@@ -1774,6 +1774,8 @@ let LISTS = [], LIST = {}, ROLE = {}, CATS = {};
 // multi-user: lists hidden for me, names of people I share something with, tag lists, tags and their chip labels, my invitations
 let HIDDEN_LISTS = [], NAMES = {}, TAG_LISTS = {}, TAG = {}, LABEL = {}, TAG_NAME = {}, INVITES = [], maxTagSeen = 0;
 let NOTICES = []; // round 3: open notes of a first share (shared_notices, seen_at null)
+const NOTICE_TRIED = new Set(); // notes whose unknown target made the poll reload the lists once
+const noticeKnown = (n) => n.list_id ? !!LIST[n.list_id] || HIDDEN_LISTS.some(l => l.id === n.list_id) : !!TAG_LISTS[n.tag_list_id];
 let tasks = [], maxSeen = 0;
 let settings = C.readSettings(null);
 const ymd = (x) => x ? new Date(x.getTime() - x.getTimezoneOffset() * 6e4).toISOString().slice(0, 16).replace('T', ' ') : '';
@@ -2082,7 +2084,7 @@ async function loadMeta() {
   noteTagDefMax(tags.json);
   relabel();
   INVITES = inv.json || [];
-  NOTICES = ntc.json || [];
+  NOTICES = (ntc.json || []).filter(noticeKnown);
   if (st.list !== 'all' && !LIST[st.list]) st.list = 'all';
   return { ok: true, added: LISTS.filter(id => !order.includes(id)) };
 }
@@ -2326,7 +2328,13 @@ async function poll(meta) {
     else {
       // round 3: a first share joins at once and leaves a note; a note on a list or tag list the page does not know loads it
       const nr = await rest('GET', NOTICES_PATH);
-      if (nr.ok) { NOTICES = nr.json; if (NOTICES.some(n => n.list_id ? !LIST[n.list_id] && !HIDDEN_LISTS.some(l => l.id === n.list_id) : !TAG_LISTS[n.tag_list_id])) await refreshMeta(); }
+      // once per note: a note whose target stays unknown (revoked, removed, archived before it was seen) is not shown and
+      // does not reload the lists on every poll
+      if (nr.ok) {
+        const fresh = nr.json.filter(n => !noticeKnown(n) && !NOTICE_TRIED.has(n.id));
+        if (fresh.length) { fresh.forEach(n => NOTICE_TRIED.add(n.id)); await refreshMeta(); }
+        NOTICES = nr.json.filter(noticeKnown);
+      }
     }
     drawNotices();
     const r = await getAll('items?select=*&' + C.pollFilter(maxSeen || Date.now()));
@@ -3271,7 +3279,11 @@ const KPI_CSS = '.kpi-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0
 async function reviewDownload() {
   rvInit();
   if (!st.kpiLists) st.kpiLists = new Set();
-  if (!(KPI_CACHE[kpiIds().join()] || {}).hists) await kpiLoad();
+  if (!(KPI_CACHE[kpiIds().join()] || {}).hists) {
+    // a read already running returns from kpiLoad at once: wait for it, so the file never holds "Reading the history…"
+    await kpiLoad();
+    while ((KPI_CACHE[kpiIds().join()] || {}).status === 'loading') await new Promise(r => setTimeout(r, 100));
+  }
   const d = reviewData(), lists = st.rvLists.size ? [...st.rvLists].map(label).join(', ') : 'all lists';
   const now = new Date(), stamp = longDay(now.getTime()) + ' ' + ymd(now).slice(11);
   const doc = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weekly review ' + esc(rvPeriodText(d.period)) + '</title>' +

@@ -22,6 +22,9 @@ const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',')
 const OUT = path.resolve(args.out || path.join(os.tmpdir(), 'td-e2e-' + Date.now()));
 const PAGE = path.resolve(args.page || APP_HTML);
 const RUN = 'e2e-' + new Date().toISOString().replace(/\D/g, '').slice(2, 12);
+// a Cyrillic name new on every run (no ASCII letters or digits, so the slug is list-xxxxxx): since db/012 a same name as an
+// archived list of an earlier run is refused with Restore, so a fixed name would fail from the second run on
+const CYR_LIST = 'Тестовий список ' + RUN.slice(4).replace(/\d/g, (d) => 'абвгдежзик'[d]);
 const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rows = [], leftovers = [], kpiTimes = [];
@@ -389,7 +392,7 @@ async function gData() {
   await undo(T);
   check(G, 'undo cancel: back to proposed', await until(async () => (await item(p.id)).status === 'proposed'));
   // list move (new num), into the Cyrillic test list made in errors, or a fresh one
-  const target = testLists[0] || await newTestList(T, 'Тестовий список');
+  const target = testLists[0] || await newTestList(T, CYR_LIST);
   await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1500); await pick(T, ST.id);
   await T.wait(`!!document.querySelector('[data-card="${b.id}"]')`); await T.click(`[data-card="${b.id}"]`);
   await dialogSave(T, { list: target.id });
@@ -491,7 +494,8 @@ async function gArchive() {
   check(G, 'it shows under Archived lists with Restore', await T.wait(`!!document.querySelector('[data-restore-list="${ST.id}"]')`));
   await T.click(`[data-restore-list="${ST.id}"]`);
   const rt = await T.wait(`!!document.querySelector('.lists [data-list="${ST.id}"]') || !!document.getElementById('more')`, 10000);
-  check(G, 'Restore brings it back', rt && !(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + ST.id)).json[0].archived_at, (await toastText(T)) + ' | dialogs ' + (await T.ev('document.querySelectorAll("dialog").length')) + ' | ' + T.errors.slice(-2).join(' / '));
+  // #more is there already when many lists overflow the chips, so wait for the database rather than the page alone
+  check(G, 'Restore brings it back', rt && await until(async () => !(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + ST.id)).json[0].archived_at),(await toastText(T)) + ' | dialogs ' + (await T.ev('document.querySelectorAll("dialog").length')) + ' | ' + T.errors.slice(-2).join(' / '));
   await pick(T, ST.id);
   await T.click('#listmenu'); await T.click('[data-archive-list]'); await T.wait('!!document.getElementById("cf-ok")'); await T.click('#cf-ok');
   check(G, 'archived again', await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + ST.id)).json[0].archived_at));
@@ -509,7 +513,7 @@ async function gErrors() {
   check(G, 'a card number in the body: the window stays open with the database\'s message', msg && await T.ev('/4111/.test(document.querySelector("dialog[open] #fn").textContent)'));
   await T.shot('errors-sensitive-maksym-1440x900');
   await T.ev('document.querySelector("dialog[open]")?.close(),true');
-  const l = testLists[0] || await newTestList(T, 'Тестовий список');
+  const l = testLists[0] || await newTestList(T, CYR_LIST);
   check(G, 'a Cyrillic list name works (slug list-xxxxxx), the new list is selected', !!l && /^list-[a-z0-9]{6}$/.test(l.slug) && await T.wait(`document.querySelector('[data-list="${l.id}"]')?.getAttribute('aria-pressed')==="true"`, 8000), l && l.slug);
   // role-limited: Anastasiia as viewer on _selftest sees no add, done or drag controls there
   const A = gSync.A || await (async () => { const x = await tab(B, await ctx(B)); await open(x, await grantFor('anastasiia')); return x; })();
