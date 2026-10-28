@@ -27,6 +27,8 @@ const RUN = 'e2e-' + new Date().toISOString().replace(/\D/g, '').slice(2, 12);
 const CYR_LIST = 'Тестовий список ' + RUN.slice(4).replace(/\d/g, (d) => 'абвгдежзик'[d]);
 const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// real key presses (CDP Input): implicit form submission and the dialog's Escape only follow trusted keys. Modifiers: Alt 1
+const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 } };
 const rows = [], leftovers = [], kpiTimes = [];
 let pass = 0, fail = 0, skipped = 0;
 const check = (group, what, ok, note) => { ok ? pass++ : fail++; rows.push(`| ${group} | ${what} | ${ok ? 'pass' : 'FAIL'} | ${String(note || '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 160)} |`); console.log(`${ok ? 'pass' : 'FAIL'} ${group}: ${what}`); };
@@ -105,8 +107,20 @@ async function tab(B, ctxId, opts = {}) {
   T.theme = v => s('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: v }] });
   T.shot = async name => { const r = await s('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(OUT, name + '.png'), Buffer.from(r.data, 'base64')); return name + '.png'; };
   T.insert = async (sel, text) => { await T.ev(`document.querySelector(${JSON.stringify(sel)}).focus()`); await s('Input.insertText', { text }); };
+  T.key = async (key, modifiers = 0) => {
+    const k = KEYS[key], base = { modifiers, key, code: k.code, windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk };
+    await s('Input.dispatchKeyEvent', Object.assign({ type: 'keyDown' }, base, k.text ? { text: k.text, unmodifiedText: k.text } : {}));
+    await s('Input.dispatchKeyEvent', Object.assign({ type: 'keyUp' }, base));
+  };
   // round 3: the first-login welcome is closed with Later unless a test keeps it (T.keepWelcome)
-  T.ready = async () => { const ok = await T.wait('!document.querySelector(".gate") && !!document.querySelector(".matrix, .ar, .tl, .rvw")', 20000); if (ok && !T.keepWelcome) await T.ev('(document.getElementById("wl-later")?.click(),true)'); return ok; };
+  // every page starts on the Matrix: a person's saved view (prefs.view, e.g. Review, maybe set by someone using the app meanwhile)
+  // has no quadrant + buttons and no cards. Preferences are put back in cleanup
+  T.ready = async () => {
+    const ok = await T.wait('!document.querySelector(".gate") && !!document.querySelector(".matrix, .ar, .tl, .rvw")', 20000);
+    if (ok && !T.keepWelcome) await T.ev('(document.getElementById("wl-later")?.click(),true)');
+    if (ok && !(await T.has('.matrix'))) { await T.click('[data-view=matrix]'); await T.wait('!!document.querySelector(".matrix")', 5000); }
+    return ok;
+  };
   T.close = () => B.send('Target.closeTarget', { targetId });
   await T.size(opts.width || 1440, opts.height || 900);
   return T;
@@ -329,7 +343,7 @@ const pick = async (T, listId) => { if (!(await T.has(`.lists [data-list="${list
 const undo = T => T.click('.toast button');
 const toastText = T => T.text('.toast span');
 async function dialogSave(T, fields) {
-  await T.wait('!!document.querySelector("dialog[open] #fs")');
+  if (!(await T.wait('!!document.querySelector("dialog[open] #fs")'))) throw new Error('the task window did not open; page errors: ' + (T.errors.slice(-2).join(' / ') || 'none'));
   await T.ev(`(()=>{const d=document.querySelector('dialog[open]');const f=${JSON.stringify(fields)};
     if(f.title!==undefined)d.querySelector('#ft').textContent=f.title; if(f.notes!==undefined)d.querySelector('#fn').textContent=f.notes;
     if(f.list)d.querySelector('#fl').value=f.list; if(f.q)d.querySelector('#fq').value=f.q; d.querySelector('#fs').click();return true})()`);
@@ -636,7 +650,21 @@ async function gUi() {
       await T.click(`[data-card="${anyCard}"]`);
       check(G, `${who}: the task window groups tags under their tag lists, my default first; the title wraps (two lines at most)`, await T.wait('!!document.querySelector("dialog[open] .tgg:first-child .tgg-h .star")', 5000) &&
         await T.ev(`getComputedStyle(document.querySelector('dialog[open] #ft')).whiteSpace!=='nowrap'`));
-      for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-task-${who}-${w}x${h}-${theme}`); }
+      // round 3 P1: no "Tags" label, a search box (U1, U6); names above chips, not buttons (U2, U4); wider window (U5); the tag box
+      // scrolls inside about 40% of the height and Save stays in view (U8); at 1440 Title and End are in view too
+      for (const [w, h] of [[1440, 900], [390, 844]]) {
+        await T.size(w, h); await sleep(400); await T.shot(`ui-task-${who}-${w}x${h}-${theme}`);
+        const m = await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),r=d.getBoundingClientRect(),b=d.querySelector('.tagbox'),cs=getComputedStyle(b),inV=e=>{if(!e)return false;const x=e.getBoundingClientRect();return x.top>=r.top-1&&x.bottom<=r.bottom+1&&x.bottom<=innerHeight+1};
+          const g=d.querySelector('.tgg:not(.shut)'),gh=g&&g.querySelector('.tgg-h').getBoundingClientRect(),gc=g&&g.querySelector('.tgg-c').getBoundingClientRect();
+          return {w:Math.round(r.width),maxH:parseFloat(cs.maxHeight),oy:cs.overflowY,vh:innerHeight,save:inV(d.querySelector('#fs')||d.querySelector('.actions button:last-child')),title:inV(d.querySelector('#ft')),end:inV(d.querySelector('#fd')),
+            noX:d.scrollWidth<=d.clientWidth&&document.documentElement.scrollWidth<=innerWidth,label:[...d.querySelectorAll('.flabel')].some(x=>x.textContent.trim()==='Tags'),search:!!d.querySelector('#tg-q'),
+            bulk:!!d.querySelector('[data-bulk]'),nameBtn:!!d.querySelector('.tgg-h > button:not(.tgg-t)'),above:!g||gc.top>=gh.bottom-1}})()`);
+        const at = `${who} ${w}x${h}`;
+        check(G, `${at}: the task window has no "Tags" label and a search box over the tags (U1, U6)`, !m.label && m.search);
+        check(G, `${at}: each tag list's name sits above its chips and is not a button (U2, U4)`, m.above && !m.bulk && !m.nameBtn);
+        check(G, `${at}: the task window is ${w > 700 ? 'about 720 px wide' : 'inside the screen'}, no horizontal scroll (U5)`, (w > 700 ? m.w >= 700 && m.w <= 730 : m.w <= w) && m.noX, m.w + ' px');
+        check(G, `${at}: the tag box scrolls inside ≤ 40% of the height; Save in view${w > 700 ? '; Title and End in view' : ''} (U8)`, m.oy === 'auto' && m.maxH <= 0.41 * m.vh && m.save && (w < 700 || (m.title && m.end)), `max-height ${m.maxH} of ${m.vh}, save ${m.save}, title ${m.title}, end ${m.end}`);
+      }
       await T.size(1440, 900); await closeDialogs(T);
     } else skip(G, `${who}: the task window's grouped tags`, 'no card on the board');
     // counts on the chips equal the database (open, live items on lists that are not archived)
@@ -666,6 +694,16 @@ async function gUi() {
   check(G, 'the same name again (case, spaces): "You already have a list named …", no RPC sent', await T.wait('/You already have a list named/.test(document.getElementById("nl-e")?.textContent||"")', 5000) && rpcs() === sent);
   await T.shot('ui-newlist-clash-maksym-1440x900');
   await closeDialogs(T);
+  // round 3 P1, F1: Enter in the name (a real key press) creates the list like Create, instead of closing the window
+  await T.click('#newlist'); await T.wait('!!document.getElementById("nl-name")');
+  await T.ev('(document.getElementById("nl-shared")&&(document.getElementById("nl-shared").checked=false),true)');
+  const enterName = `${RUN} enter`;
+  await T.insert('#nl-name', enterName); await T.key('Enter');
+  const el = await until(async () => (await MK.rest('GET', 'lists?select=id,slug,name&archived_at=is.null&name=eq.' + encodeURIComponent(enterName))).json[0]);
+  if (el) testLists.push(el);
+  check(G, 'New list: Enter in the name creates the list, closes the window and selects it (F1)', !!el && await T.wait('!document.querySelector("dialog[open]")', 5000) &&
+    await T.wait(`document.querySelector('[data-list="${el && el.id}"]')?.getAttribute('aria-pressed')==="true"`, 5000));
+  await closeDialogs(T);
   await gUiTags(G, T);
   // the items edited just now stay shown through filters until a reload (st.keep): start the next checks fresh
   await T.reload(); await T.ready();
@@ -690,8 +728,9 @@ async function gUi() {
 }
 
 // round 3, A5-A7 (Maksym's page): a test tag list through the Tags window (create, a tag, rename, delete = archive, Archived tags
-// read only with Restore); its header in the task window puts its tags on; Alt+arrows move a side-menu row into the next quadrant;
-// a first share of a test list to Anastasiia joins her at once with a note, and her Leave takes it away. Everything is archived.
+// read only with Restore); in the task window (P1) a closed group, the search, the chevron and its saved state, Alt+Up and drag on
+// two test tag lists; Alt+arrows move a side-menu row into the next quadrant; a first share of a test list to Anastasiia joins her at
+// once with a note, Maksym's open Share window drops her after her Leave. Everything is archived.
 async function gUiTags(G, T) {
   const name = `${RUN} tags`;
   await T.click('#profile'); await T.click('[data-menu=tags]'); await T.wait('!!document.getElementById("tgl-new")', 5000);
@@ -712,15 +751,52 @@ async function gUiTags(G, T) {
   await T.ev(`(()=>{const i=document.querySelector('dialog[open] [data-tgl-name="${tl.id}"]');i.value=${JSON.stringify(name + ' 2')};i.dispatchEvent(new Event('change'));return true})()`);
   check(G, 'Tags: renaming a tray renames the tag list', !!(await until(async () => (await MK.rest('GET', 'tag_lists?select=id&name=eq.' + encodeURIComponent(name + ' 2'))).json[0])));
   tl.name = name + ' 2';
+  // a second test tag list, right after the first, for the moves in the task window (U3)
+  await T.insert('#tgl-new', `${RUN} tags b`); await T.click('#tgl-add');
+  const bl = await until(async () => (await MK.rest('GET', 'tag_lists?select=id,name,sort&name=eq.' + encodeURIComponent(`${RUN} tags b`))).json[0]);
+  if (bl) testTagLists.push(bl);
   await closeDialogs(T);
-  // the task window: the test tag list's header puts its tag on; Save writes item_tags
+  // round 3 P1 (U3, U6, U7): the task window. The test tag list is not used on the task: it starts closed as one row
   const it = await mkItem('tags header');
   await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200); await pick(T, ST.id);
   await T.wait(`!!document.querySelector('[data-card="${it.id}"]')`, 8000); await T.click(`[data-card="${it.id}"]`);
-  await T.wait(`!!document.querySelector('dialog[open] [data-bulk="${tl.id}"]')`, 5000); await T.click(`dialog[open] [data-bulk="${tl.id}"]`);
-  check(G, 'task window: a tag list header click puts all of its tags on', await T.ev(`document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')?.getAttribute('aria-pressed')==='true'`));
+  const G1 = `dialog[open] .tgg[data-tgg="${tl.id}"]`, GB = `dialog[open] .tgg[data-tgg="${bl && bl.id}"]`;
+  await T.wait(`!!document.querySelector('${G1}')`, 5000);
+  check(G, 'task window: a tag list the task does not use starts closed: one row "name · 1" and a chevron, no chips (U7)', await T.ev(`(()=>{const g=document.querySelector('${G1}');return !!g&&g.classList.contains('shut')&&!g.querySelector('.tagchip')&&g.querySelector('[data-tgg-open]').getAttribute('aria-expanded')==='false'&&/· 1$/.test(g.querySelector('.tgg-k').textContent)&&g.getBoundingClientRect().height<=48})()`));
+  check(G, 'task window: my default list starts open (U7)', await T.ev(`!document.querySelector('dialog[open] .tgg:first-child').classList.contains('shut')`));
+  await T.insert('dialog[open] #tg-q', 'e2e-a');
+  check(G, 'task window: the search shows only matching chips, across groups, closed ones included (U6)', await T.wait(`(()=>{const c=[...document.querySelectorAll('dialog[open] .tagbox .tagchip')];return c.length>0&&c.every(b=>b.textContent.includes('e2e-a'))&&!!document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')})()`, 3000));
+  await T.shot('ui-task-search-maksym-1440x900');
+  await T.key('Enter');
+  check(G, 'task window: Enter in the search picks the first hit; the window stays open (U6)', await T.wait(`!!document.querySelector('dialog[open]')&&document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')?.getAttribute('aria-pressed')==='true'`, 3000));
+  await T.key('Escape');
+  check(G, 'task window: Escape clears the search, the window stays, the picked tag\'s list stays open (U6)', await T.wait(`!!document.querySelector('dialog[open]')&&document.querySelector('dialog[open] #tg-q').value===''&&!document.querySelector('${G1}').classList.contains('shut')&&document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')?.getAttribute('aria-pressed')==='true'`, 3000));
+  await T.click(`${G1} [data-tgg-open]`);
+  const closed = await T.ev(`document.querySelector('${G1}').classList.contains('shut')`);
+  await T.click(`${G1} [data-tgg-open]`);
+  const prefsOpen = async () => { const r = await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard'); return r.ok && r.json[0] && (r.json[0].prefs.tagListsOpen || {})[tl.id] === true; };
+  check(G, 'task window: the chevron closes and opens a list; the open state is saved (prefs tagListsOpen) (U7)', closed && await T.ev(`!document.querySelector('${G1}').classList.contains('shut')`) && !!(await until(prefsOpen)));
+  // U3: Alt+Up on the second list's chevron puts it above the first (tag_lists.sort, the order of the Tags window); only those two change
+  const sorts = async () => Object.fromEntries((await MK.rest('GET', 'tag_lists?select=id,sort&archived_at=is.null&owner_id=eq.' + MK.uid)).json.map(r => [r.id, r.sort]));
+  const s0 = await sorts();
+  if (bl) {
+    await T.ev(`document.querySelector('${GB} [data-tgg-open]').focus()`); await T.key('ArrowUp', 1);
+    const s1 = await until(async () => { const s = await sorts(); return s[bl.id] < s[tl.id] ? s : null; });
+    const same = !!s1 && Object.keys(s0).filter(k => k !== tl.id && k !== bl.id).every(k => s1[k] === s0[k]);
+    check(G, 'task window: Alt+Up moves my tag list up (tag_lists.sort); no other list changes (U3)', !!s1 && same && await T.wait(`(()=>{const a=[...document.querySelectorAll('dialog[open] .tgg[data-tgg]')].map(g=>g.dataset.tgg);return a.indexOf('${bl.id}')===a.indexOf('${tl.id}')-1})()`, 3000),
+      s1 ? `${s0[tl.id]},${s0[bl.id]} → ${s1[tl.id]},${s1[bl.id]}` : 'no change');
+    await T.ev(`(()=>{const dt=new DataTransfer(),g=document.querySelector('${G1} [data-tgg-grip]'),t=document.querySelector('${GB}'),r=t.getBoundingClientRect(),o={bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+20,clientY:r.top+2};g.dispatchEvent(new DragEvent('dragstart',o));t.dispatchEvent(new DragEvent('dragover',o));t.dispatchEvent(new DragEvent('drop',o));g.dispatchEvent(new DragEvent('dragend',o));return true})()`);
+    check(G, 'task window: dragging a list by its grip onto another moves it back above (U3)', !!(await until(async () => { const s = await sorts(); return s[tl.id] < s[bl.id]; })));
+  } else skip(G, 'task window: moving tag lists (U3)', 'the second test tag list was not made');
   await T.click('dialog[open] #fs');
   check(G, 'task window: Save writes the tag (item_tags)', !!(await until(async () => (await MK.rest('GET', `item_tags?select=tag_id&item_id=eq.${it.id}&tag_id=eq.${tag && tag.id}&removed_at=is.null`)).json[0])));
+  // U7: the next task opens the first test list as I left it (open) and the second one closed
+  const it2 = await mkItem('tags open');
+  await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200);
+  await T.wait(`!!document.querySelector('[data-card="${it2.id}"]')`, 8000); await T.click(`[data-card="${it2.id}"]`);
+  check(G, 'task window: the next task opens the list as I left it (open) and the other test list closed (U7)', await T.wait(`!!document.querySelector('${G1}')&&!document.querySelector('${G1}').classList.contains('shut')&&!!document.querySelector('${GB}.shut')`, 5000));
+  for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-task-groups-maksym-${w}x${h}`); }
+  await T.size(1440, 900); await closeDialogs(T);
   // Delete list = archive: its chip leaves the card; Archived tags shows it read only with Restore
   await T.click('#profile'); await T.click('[data-menu=tags]'); await T.wait(`!!document.querySelector('dialog[open] [data-tl-del="${tl.id}"]')`, 5000);
   await T.click(`dialog[open] [data-tl-del="${tl.id}"]`); await T.wait('!!document.getElementById("cf-ok")', 3000); await T.click('#cf-ok');
@@ -748,6 +824,11 @@ async function gUiTags(G, T) {
   const sl = await mkList(MK, `${RUN} shared`, true);
   const sh = await MK.rest('POST', 'rpc/share_list', { p_list: sl.id, p_email: env.TASKSDB_ANASTASIIA_EMAIL, p_role: 'viewer', p_join: true });
   check(G, 'first share: share_list with p_join answers ok', sh.ok, sh.ok ? '' : sh.err.message);
+  // F2: Maksym's Share window of that list, open while Anastasiia leaves, drops her without a click (read on every tick while open)
+  await T.reload(); await T.ready();
+  await T.click('#profile'); await T.click('[data-menu=sharing]'); await T.wait(`!!document.querySelector('dialog[open] [data-share-list="${sl.id}"]')`, 5000);
+  await T.click(`dialog[open] [data-share-list="${sl.id}"]`);
+  const shareShows = await T.wait(`!!document.querySelector('#sh-people [data-remove="${AN.uid}"]')`, 8000);
   const A = await tab(B, await ctx(B)); await A.theme('dark');
   await open(A, await grantFor('anastasiia'));
   const seen = await A.wait(`[...document.querySelectorAll('#notices .ntc p')].some(p=>p.textContent.includes(${JSON.stringify(sl.name)}))`, 10000);
@@ -758,7 +839,10 @@ async function gUiTags(G, T) {
     await A.ev(`[...document.querySelectorAll('#notices .ntc')].find(n=>n.textContent.includes(${JSON.stringify(sl.name)})).querySelector('[data-ntc=leave]').click(),true`);
     check(G, 'first share: Leave takes the list away and closes the note', !!(await until(async () => !(await AN.rest('GET', `list_members?select=list_id&list_id=eq.${sl.id}&profile_id=eq.${AN.uid}`)).json.length)) &&
       await A.wait(`![...document.querySelectorAll('#notices .ntc p')].some(p=>p.textContent.includes(${JSON.stringify(sl.name)}))`, 5000));
-  }
+    const t0 = Date.now(), gone = await T.wait(`!!document.getElementById('sh-people')&&!document.querySelector('#sh-people [data-remove="${AN.uid}"]')`, 15000);
+    check(G, 'Share window: it showed Anastasiia; after she leaves it drops her while open, no click (F2)', shareShows && gone, gone ? `${Math.round((Date.now() - t0) / 1000)} s` : 'still shown');
+  } else skip(G, 'Share window refresh (F2)', 'the first-share note did not show');
+  await closeDialogs(T);
   check(G, 'anastasiia (notice page): no console errors', !A.errors.length, A.errors.slice(0, 2).join(' / '));
   await A.close();
 }
