@@ -8,12 +8,15 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 | `privacy.html` | the privacy page (static, no script), the Google consent screen's privacy policy link; deployed beside `index.html` |
 | `request.html` | the public access-request page (`/request`): Google sign-in, then `rpc/my_access_request` / `rpc/request_access`; no board data; exactly one inline script (its hash is in the deploy's `_headers`) |
 | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`, public values, committed |
-| `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `009_multiuser_schema.sql`, `010_multiuser_functions.sql`, `011_multiuser_rls.sql`, `012_round3.sql`, `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `900_selftest.sql`, `901_selftest_multiuser.sql`, `902_selftest_round3.sql`, `903_selftest_access.sql` | the database, applied in file order (README "Set up") |
+| `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `009_multiuser_schema.sql`, `010_multiuser_functions.sql`, `011_multiuser_rls.sql`, `012_round3.sql`, `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `900_selftest.sql`, `901_selftest_multiuser.sql`, `902_selftest_round3.sql`, `903_selftest_access.sql`, `904_selftest_review_report.sql` | the database, applied in file order (README "Set up") |
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
 | `cli/access.mjs` | access requests (`db/015`) to the Cloudflare Access guests policy: `list`, `add`, `remove`, `setup`, `process`; dry run unless `--apply` |
-| `test/core.test.js`, `test/multiuser.test.js`, `test/round3.test.js`, `test/round3-tags.test.js`, `test/round3-review.test.js`, `test/round3-p1.test.js`, `test/round4.test.js`, `test/access.test.js`, `test/cli.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
+| `test/core.test.js`, `test/multiuser.test.js`, `test/round3.test.js`, `test/round3-tags.test.js`, `test/round3-review.test.js`, `test/round3-p1.test.js`, `test/round4.test.js`, `test/access.test.js`, `test/cli.test.js`, `test/api-doc.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
 | `README.md`, `CLAUDE.md`, `dependencies-doc.md` | documentation |
+| `docs/README.md`, `docs/architecture.md`, `docs/database.md`, `docs/auth.md`, `docs/hosting.md`, `docs/testing-and-release.md` | the documentation pages (index in `docs/README.md`); README stays the technical reference |
+| `docs/api/openapi.yaml`, `docs/api/README.md` | the read API: OpenAPI 3.1 description and curl examples (weekly review report `rpc/review_report`, `db/016`); `test/api-doc.test.js` checks them against `db/` |
 | `docs/deployment/` | deployment of the hosted copy (Cloudflare Pages): `README.md`, `1-version-check.md`, `2-deploy.md`, `3-post-deploy-check.md` |
+| `docs/access-requests.md` | access requests: the flow, `db/015`, `cli/access.mjs`, the Cloudflare setup, seats, switch-off |
 
 `config/profiles.js` and `config/<id>.prefs.json` belong to the file-based app (`release_maxden_filesbased`); this app does not read them. Nothing else belongs here.
 
@@ -57,7 +60,7 @@ Public values only: the project URL, the publishable key, the poll interval. Nev
 
 ## Database
 
-- Changes only as a new `db/NNN_*.sql` file, never by editing an applied one. After one: re-run `003_rls.sql`, `011_multiuser_rls.sql`, the policy block at the end of `012_round3.sql` (it replaces 011's tag policies), then `900_selftest.sql`, `901_selftest_multiuser.sql`, `902_selftest_round3.sql` and `903_selftest_access.sql` (each must report every assertion passed; 901 has two expected failures since 012, G34a and G35a, see README Set up).
+- Changes only as a new `db/NNN_*.sql` file, never by editing an applied one. After one: re-run `003_rls.sql`, `011_multiuser_rls.sql`, the policy block at the end of `012_round3.sql` (it replaces 011's tag policies), then `900_selftest.sql`, `901_selftest_multiuser.sql`, `902_selftest_round3.sql`, `903_selftest_access.sql` and `904_selftest_review_report.sql` (each must report every assertion passed; 901 has two expected failures since 012, G34a and G35a, see README Set up).
 - `006_archived_lists.sql` and then `010_multiuser_functions.sql` replace the trigger function from `002`: re-running `002` means re-running `006` and `010`.
 
 ## Tests
