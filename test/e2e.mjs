@@ -599,22 +599,51 @@ async function gUi() {
     check(G, `${who}: tasks of the picked weeks by quadrant (four sections), rows open their task`, await T.ev('document.querySelectorAll(".rvq").length===4||!!document.querySelector(".rv-empty")') &&
       (await T.ev('!document.querySelector(".rv-r")') || (await T.click('.rv-r'), await T.wait('!!document.querySelector("dialog[open] #ft")', 5000))));
     await closeDialogs(T);
+    // round 3 P1: U9 compact week tiles (one line, short); F3 no test list in the review; F4 list chips like files in Windows
+    check(G, `${who}: week tiles are one compact line (≤ 34 px high) and keep the orange line (U9)`, await T.ev(`[...document.querySelectorAll('.rvw .wk')].every(b=>b.getBoundingClientRect().height<=34&&getComputedStyle(b,'::before').height==='2px')`),
+      await T.ev(`Math.round(document.querySelector('.rvw .wk').getBoundingClientRect().height)+' px'`));
+    check(G, `${who}: the review's list chips leave out test lists (_selftest) (F3)`, await T.ev(`![...document.querySelectorAll('[data-rvl]')].some(b=>b.dataset.rvl==='${ST.id}')`));
+    const rvl = await T.ev(`[...document.querySelectorAll('[data-rvl]')].map(b=>b.dataset.rvl).filter(v=>v!=='all')`);
+    if (rvl.length >= 3) {
+      const clickL = (k, m) => T.ev(`(document.querySelector('[data-rvl="${k}"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:${!!m.ctrl},shiftKey:${!!m.shift}})),true)`);
+      const pickedL = () => T.ev(`[...document.querySelectorAll('[data-rvl][aria-pressed=true]')].map(b=>b.dataset.rvl).join()`);
+      await clickL(rvl[0], {}); await clickL(rvl[2], { shift: true });
+      const range = await pickedL();
+      await clickL(rvl[1], { ctrl: true });
+      const less = await pickedL();
+      check(G, `${who}: list chips: a click picks one, Shift-click the range, Ctrl-click drops one (F4)`, range === rvl.slice(0, 3).join() && less === [rvl[0], rvl[2]].join(), `${range} / ${less}`);
+      await T.click('[data-rvl="all"]');
+    } else skip(G, `${who}: list chips Shift-click (F4)`, 'fewer than 3 lists');
     // round 3, adjustment 9: KPI (collapsed until opened; reads the lists' items and item_events once per session)
     check(G, `${who}: KPI starts collapsed`, await T.ev('!document.getElementById("kpi").open'));
     await T.ev('(document.querySelector("#kpi summary").click(),true)');
-    check(G, `${who}: KPI opens with Selected period and Overall, each with dates, an area, a donut and the outcome bars`, await T.wait('document.querySelectorAll(".kpi-g").length===2 && document.querySelectorAll(".kpi-g .kpi-area svg, .kpi-g .kpi-pie, .kpi-g .kpi-bars").length>=4', 30000) &&
-      await T.ev(`[...document.querySelectorAll('.kpi-g')].every(g=>!g.querySelector('.kpi-c')||(/\\d{4}/.test(g.querySelector('.kpi-per').textContent)&&!!g.querySelector('.kpi-pie')&&!!g.querySelector('.kpi-bars')))`));
+    // round 3 P1, U11: one block; Period | All time (or "All time = the same days"); three charts under their questions
+    check(G, `${who}: KPI is one block with three charts under their questions, the dates beside the range (U11)`, await T.wait('document.querySelectorAll(".kpi-g").length===1 && !!document.querySelector(".kpi-g .kpi-area svg") && !!document.querySelector(".kpi-g .kpi-qs") && !!document.querySelector(".kpi-g .kpi-left")', 30000) &&
+      await T.ev(`[...document.querySelectorAll('.kpi-qn')].map(f=>f.textContent).join('|')==='Is my open work growing, and where?|Where is my work, and how much is done?|How did tasks leave the board?'&&/\\d{4}/.test(document.querySelector('.kpi-per').textContent)&&!document.querySelector('.kpi-pie')`));
+    const seg = await T.ev('document.querySelectorAll("[data-kpir]").length');
+    if (seg) {
+      await T.click('[data-kpir=all]');
+      check(G, `${who}: the Period | All time switch shows All time (U11)`, await T.wait('document.querySelector(".kpi-g")?.dataset.kpi==="all"&&document.querySelector("[data-kpir=all]").getAttribute("aria-pressed")==="true"', 5000));
+    } else check(G, `${who}: without a switch the KPI says "All time = the same days" (U11)`, await T.ev('/All time = the same days/.test(document.querySelector(".kpi-same")?.textContent||"")||!document.querySelector(".kpi-top .kpi-seg")'));
+    check(G, `${who}: the line chart's date ticks are unique (F6)`, await T.ev(`(()=>{const t=[...document.querySelectorAll('.kpi-area .kx')].map(x=>x.textContent);return t.length>0&&new Set(t).size===t.length})()`),
+      await T.ev(`[...document.querySelectorAll('.kpi-area .kx')].map(x=>x.textContent).join(', ')`));
+    check(G, `${who}: the KPI's list chips leave out test lists, archived ones too (F3)`, await T.ev(`(document.getElementById('kpi-arch')?.getAttribute('aria-expanded')==='false'&&document.getElementById('kpi-arch').click(),true)`) &&
+      await T.ev(`!document.querySelector('[data-kpil="${ST.id}"]')`));
     // the read time (ms), items, events and lists of the KPI, from the section's data-read (set once the read is done)
     const kt = await T.ev(`(()=>{const d=document.getElementById('kpi').dataset.read;if(!d)return null;const p=d.split(',');return {ms:+p[0],items:+p[1],events:+p[2],lists:+p[3],via:p[4]}})()`);
     kpiTimes.push(Object.assign({ who }, kt || {}));
     check(G, `${who}: KPI read (items and item_events, all lists) under 2 s`, !!kt && kt.ms < 2000, kt ? `${kt.ms} ms, ${kt.items} items, ${kt.events} events, ${kt.lists} lists, via ${kt.via}` : 'no data');
-    check(G, `${who}: the donut's slices carry number and % on hover`, await T.ev(`(()=>{const p=document.querySelector('.kp');if(!p)return !!document.querySelector('.kp-none');p.dispatchEvent(new MouseEvent('mouseenter'));const c=p.closest('svg').querySelector('.kc2').textContent;p.dispatchEvent(new MouseEvent('mouseleave'));return /%$/.test(c)&&/\\(\\d+%\\)/.test(p.querySelector('title').textContent)})()`));
+    check(G, `${who}: each quadrant row reads "Plan · n open · n closed · n%" and carries the exact numbers on hover (U11)`, await T.ev(`[...document.querySelectorAll('.kq')].length===4&&[...document.querySelectorAll('.kq')].every(r=>/· \\d+ open · \\d+ closed · \\d+%/.test(r.textContent)&&/\\d+ open, \\d+ closed; \\d+ of \\d+ \\(\\d+%\\)/.test(r.title))`));
     for (const [w, h] of [[1440, 900], [390, 844]]) {
       await T.size(w, h); await sleep(500); await T.shot(`ui-review-${who}-${w}x${h}-${theme}`);
       await T.ev('(document.getElementById("kpi").scrollIntoView(),true)'); await sleep(200); await T.shot(`ui-kpi-${who}-${w}x${h}-${theme}`);
       await T.ev('scrollTo(0,0),true');
     }
     await T.size(1440, 900);
+    // U10: the KPI starts closed again after the view changes
+    await T.click('[data-view=matrix]'); await T.click('[data-view=review]');
+    check(G, `${who}: KPI is closed again after leaving the Review and coming back (U10)`, await T.wait('!!document.getElementById("kpi")', 5000) && await T.ev('!document.getElementById("kpi").open'));
+    await T.ev('(document.querySelector("#kpi summary").click(),true)'); await T.wait('!!document.querySelector(".kpi-g")', 30000);
     if (who === 'maksym') {
       // Download: one self-contained HTML file (no script, no network) with the review and the KPI charts
       const dlDir = OUT; // flat: the saved file lands next to the report
@@ -624,6 +653,7 @@ async function gUi() {
       for (let i = 0; i < 60 && !file; i++) { await sleep(250); file = fs.readdirSync(dlDir).find(f => /^tasks-review-.*\.html$/.test(f)); }
       const html = file ? fs.readFileSync(path.join(dlDir, file), 'utf8') : '';
       check(G, 'Download saves one HTML file: the review, the KPI charts as SVG, print styles, no script, no network', !!file && /<h1>Weekly review<\/h1>/.test(html) && /class="kpi-g"/.test(html) && /<svg/.test(html) && /@media print/.test(html) && !/<script/i.test(html) && !/(src|href)="https?:/i.test(html), file || 'no file');
+      check(G, 'the saved file has the redesigned KPI (the three questions, quadrant rows) and no test list rows (U11, F3)', /Is my open work growing, and where\?/.test(html) && /class="kpi-qs"/.test(html) && !html.includes('kpi-pie') && !html.includes('_selftest'));
       if (file) {
         const E = await tab(B, await ctx(B));
         await E.go(pathToFileURL(path.join(dlDir, file)).href); await sleep(300);
@@ -645,6 +675,8 @@ async function gUi() {
     check(G, `${who}: Tags shows my tag lists as trays, my default first with ★`, await T.wait('!!document.querySelector("dialog[open] .tgl:first-child .tgl-star.on")', 5000));
     for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-tags-${who}-${w}x${h}-${theme}`); }
     await T.size(1440, 900); await closeDialogs(T);
+    // a saved list with no open card (prefs.list, maybe set by someone using the app meanwhile): look in All
+    if (!(await T.has('[data-card]')) && await T.has('[data-list="all"]')) { await T.click('[data-list="all"]'); await sleep(400); }
     const anyCard = await T.ev('document.querySelector("[data-card]")?.dataset.card||""');
     if (anyCard) {
       await T.click(`[data-card="${anyCard}"]`);
@@ -704,6 +736,24 @@ async function gUi() {
   check(G, 'New list: Enter in the name creates the list, closes the window and selects it (F1)', !!el && await T.wait('!document.querySelector("dialog[open]")', 5000) &&
     await T.wait(`document.querySelector('[data-list="${el && el.id}"]')?.getAttribute('aria-pressed')==="true"`, 5000));
   await closeDialogs(T);
+  // round 3 P1, F5: a cancelled task is listed in the Weekly review by when it was cancelled (its item_events row), not by a later
+  // write that moved updated_at. On the test list made above (the review leaves _selftest out, F3)
+  if (nl) {
+    const ci = (await MK.rest('POST', 'items', { list_id: nl.id, category: 'task', title: `${RUN} cancel date`, quadrant: 'B', sort_key: 1000 }, { Prefer: 'return=representation' })).json[0];
+    await MK.rest('PATCH', 'items?id=eq.' + ci.id, { status: 'cancelled' });
+    await sleep(2500);
+    await MK.rest('PATCH', 'items?id=eq.' + ci.id, { title: `${RUN} cancel date (edited later)` });
+    const ev = (await MK.rest('GET', `item_events?select=at&item_id=eq.${ci.id}&diff->status->>new=eq.cancelled`)).json[0];
+    const upd = (await item(ci.id)).updated_at;
+    await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1500);
+    await T.click('[data-view=review]'); await T.click('[data-rvl="all"]');
+    // the cancel times are read after the first render of the row (loadCancelTimes), which then renders again
+    await T.wait(`!!document.querySelector('.rv-r[data-open="${ci.id}"]')`, 10000);
+    if (ev) await T.wait(`+document.querySelector('.rv-r[data-open="${ci.id}"]')?.dataset.at===${Date.parse(ev.at)}`, 8000);
+    const shown = await T.ev(`+(document.querySelector('.rv-r[data-open="${ci.id}"]')?.dataset.at||0)||null`);
+    check(G, 'Weekly review: a cancelled task is listed at its cancel event, not at a later updated_at (F5)', !!ev && shown === Date.parse(ev.at) && Date.parse(upd) - Date.parse(ev.at) >= 2000, `shown ${shown}, event ${ev && Date.parse(ev.at)}, updated ${Date.parse(upd)}`);
+    await T.click('[data-view=matrix]');
+  } else skip(G, 'Weekly review cancel date (F5)', 'the test list was not made');
   await gUiTags(G, T);
   // the items edited just now stay shown through filters until a reload (st.keep): start the next checks fresh
   await T.reload(); await T.ready();

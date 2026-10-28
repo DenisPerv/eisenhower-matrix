@@ -620,6 +620,13 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .rv-lists button{min-height:28px;padding:0 10px;border-radius:var(--r-sm);font:500 12px var(--ui)}
 .rv-lists button[aria-pressed="true"]{background:var(--accent-bg);color:var(--accent-ink);box-shadow:inset 0 -2px 0 var(--accent);border-color:var(--accent-line)}
 .rv-lists button.arch{border-style:dashed;color:var(--ink3)}
+/* round 3 P1, U9: compact week tiles, one line each ("W44 · 26 Oct–1 Nov" and the count); the orange week line stays */
+.rvw .rv-strip .wk{flex:0 0 auto;display:flex;align-items:baseline;gap:6px;padding:6px 10px 5px;white-space:nowrap}
+.rvw .rv-strip .wk::before{height:2px}
+.rv-strip .wk-w{font:600 12.5px var(--ui)}
+.rv-strip .wk-d{font:400 11px var(--mono)}
+.rv-strip .wk-n{min-width:2ch;margin-left:2px;text-align:right;font:500 11.5px var(--mono)}
+.rv-strip .wk.now .wk-w{color:var(--week)}
 .rv-qs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s5) var(--s6);margin-top:var(--s5)}
 .rvq{border-top:2px solid var(--c);padding-top:var(--s3);min-width:0}
 .rvq h3{display:flex;align-items:center;gap:8px;margin:0 0 var(--s2);font:600 15px var(--ui);color:var(--ink)}
@@ -1653,19 +1660,48 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return ws.length ? { from: Math.min(...ws.map(w => w.start)), to: Math.max(...ws.map(w => w.end)) } : null;
   }
   // the tasks of the weeks: completed (done or cancelled) in one of them, else due in one of them. kind: done | cancelled |
-  // overdue (due in a week, passed while still open) | due. late: closed after its end, or open past it. at: the day it is listed by
-  function reviewEntries(tasks, keys, now) {
+  // overdue (due in a week, passed while still open) | due. late: closed after its end, or open past it. at: the day it is listed by.
+  // round 3 P1, F5: cancelAt = { item id: ms } (cancelTimes) is when a cancelled task was cancelled; doneAt (completed_at, else
+  // updated_at) is only the fallback, because a later write moves updated_at
+  function reviewEntries(tasks, keys, now, cancelAt) {
     const ws = (keys || []).map(weekFromKey).filter(Boolean);
     const inWeeks = ms => ms !== null && ws.some(w => ms >= w.start && ms < w.end);
     const out = [];
     (tasks || []).forEach(t => {
       if (!t || t.deleted) return;
-      const due = t.deadline ? t.deadline.getTime() : null, done = t.doneAt ? t.doneAt.getTime() : null;
+      const due = t.deadline ? t.deadline.getTime() : null;
+      const done = !t.doneAt ? null : t.status === 'cancelled' && cancelAt && Number.isFinite(cancelAt[t.id]) ? cancelAt[t.id] : t.doneAt.getTime();
       const late = due !== null && due < (done === null ? now : done);
       if (inWeeks(done)) out.push({ t, kind: t.status === 'cancelled' ? 'cancelled' : 'done', at: done, late });
       else if (inWeeks(due)) out.push({ t, kind: done === null && due < now ? 'overdue' : 'due', at: due, late });
     });
     return out;
+  }
+  // F5: { item id: ms } of the latest item_events row per item whose diff sets status to cancelled ({ status: { old, new } } as a
+  // column, or inside { diff }); other rows are ignored
+  function cancelTimes(events) {
+    const out = {};
+    (events || []).forEach(e => {
+      const s = e && ((e.diff && e.diff.status) || e.status), at = e ? Date.parse(e.at) : NaN;
+      if (!s || typeof s !== 'object' || s.new !== 'cancelled' || !Number.isFinite(at)) return;
+      if (!(out[e.item_id] >= at)) out[e.item_id] = at;
+    });
+    return out;
+  }
+  // F3: test lists (a slug starting with _, today _selftest) stay out of the Weekly review and the KPI
+  const isTestList = l => !!l && String(l.slug || '').startsWith('_');
+  // F4: list chips picked like files in Windows, in chip order (order: the chips' keys). A click picks one, Ctrl-click adds or drops
+  // one (none left = all lists), Shift-click picks the range from the anchor (with Ctrl: added to the picked ones). 'all' clears
+  function chipSelect(state, key, mods, order) {
+    const m = mods || {}, ord = order || [], sel = new Set((state && state.sel) || []);
+    if (key === 'all') return { sel: [], anchor: null };
+    const anchor = state && ord.includes(state.anchor) ? state.anchor : key;
+    if (m.shift && ord.includes(key)) {
+      const a = ord.indexOf(anchor), b = ord.indexOf(key), range = new Set(ord.slice(Math.min(a, b), Math.max(a, b) + 1));
+      return { sel: ord.filter(x => range.has(x) || (m.ctrl && sel.has(x))), anchor };
+    }
+    if (m.ctrl) { if (sel.has(key)) sel.delete(key); else sel.add(key); return { sel: ord.filter(x => sel.has(x)), anchor: key }; }
+    return { sel: [key], anchor: key };
   }
   // grouped by quadrant (A-D, all four), then list (in listOrder, unknown lists last); rows by day, then number
   function reviewGroups(entries, listOrder, quadOf) {
@@ -1706,6 +1742,16 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
       changes.push({ at: created, state: s });
       return { id: r.id, created, changes: changes.reverse() };
     });
+  }
+  // F6: the x ticks of a KPI line chart: the first, middle and last point, without two on the same day (on the same hour when the
+  // points span under 2 days, kind 'hour'). ats: the points' times in order. { kind: 'day' | 'hour', idx: [point indexes] }
+  function kpiTicks(ats) {
+    const n = (ats || []).length;
+    if (!n) return { kind: 'day', idx: [] };
+    const kind = ats[n - 1] - ats[0] < 2 * DAY ? 'hour' : 'day', seen = new Set(), idx = [];
+    const key = ms => { const d = new Date(ms); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + (kind === 'hour' ? ' ' + d.getHours() : ''); };
+    [...new Set([0, Math.floor((n - 1) / 2), n - 1])].forEach(i => { const k = key(ats[i]); if (!seen.has(k)) { seen.add(k); idx.push(i); } });
+    return { kind, idx };
   }
   // the state at time T (the last change at or before T); null before the item existed
   function kpiStateAt(h, T) {
@@ -1785,6 +1831,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
+    cancelTimes, isTestList, chipSelect, kpiTicks,
     KPI_COLUMNS, kpiHistory, kpiStateAt, kpiStatus, kpiQuadrant, KPI_DAILY_MAX, kpiTimes, kpiSeries, kpiPie, kpiClosure, kpiOverall };
 });
 </script>
@@ -3205,18 +3252,36 @@ function rvInit() {
   if (!st.rvFirst) st.rvFirst = C.weekStart(now - RV_BACK * 7 * DAY);
   return cur;
 }
+// round 3 P1, F3: test lists (C.isTestList) never show in the review; F5: cancelled tasks are listed by when they were cancelled
+const rvShownLists = () => LISTS.filter(l => !C.isTestList(LIST[l]));
 function reviewData() {
   rvInit();
-  const tasks = all().filter(t => !st.rvLists.size || st.rvLists.has(t.list));
-  const entries = C.reviewEntries(tasks, st.rvSel, TODAY.getTime());
+  const tasks = all().filter(t => !C.isTestList(LIST[t.list]) && (!st.rvLists.size || st.rvLists.has(t.list)));
+  loadCancelTimes(tasks).then(changed => { if (changed && st.view === 'review') render(); });
+  const entries = C.reviewEntries(tasks, st.rvSel, TODAY.getTime(), CANCEL_AT);
   return { tasks, entries, groups: C.reviewGroups(entries, LISTS), period: C.reviewPeriod(st.rvSel) };
+}
+// F5: when each cancelled task was cancelled, from its item_events (C.cancelTimes); read once per task and close time (a task
+// cancelled again is read again). A failed read is tried on the next render; until then the row uses doneAt
+const CANCEL_AT = {}, CANCEL_KEY = {};
+async function loadCancelTimes(tasks) {
+  const want = (tasks || []).filter(t => t.status === 'cancelled' && t.doneAt && CANCEL_KEY[t.id] !== t.doneAt.getTime());
+  if (!want.length) return false;
+  want.forEach(t => { CANCEL_KEY[t.id] = t.doneAt.getTime(); });
+  for (let i = 0; i < want.length; i += 80) {
+    const ids = want.slice(i, i + 80).map(t => t.id);
+    const r = await getAll('item_events?select=item_id,at,status:diff->status&item_id=in.(' + ids.join(',') + ')&diff->status->>new=eq.cancelled');
+    if (!r.ok) { want.slice(i).forEach(t => { delete CANCEL_KEY[t.id]; }); return i > 0; }
+    Object.assign(CANCEL_AT, C.cancelTimes(r.json));
+  }
+  return true;
 }
 // one task row: number, title, tags, what happened and when; a button that opens the task, a plain row in the export
 function rvRow(e, exp) {
   const t = e.t, tags = shownTags(t).map(x => LABEL[x]).join(', '), cls = 'rr rv-r ' + e.kind + (e.late ? ' late' : '');
   const inner = '<span class="k">' + ref(t) + '</span><span class="rv-tt">' + esc(plain(t.title)) + (tags ? ' <span class="rv-tg">' + esc(tags) + '</span>' : '') + '</span>' +
     '<span class="rv-k">' + RV_KIND[e.kind] + (e.late && e.kind !== 'overdue' ? ', late' : '') + ' <span class="n">' + shortDay(e.at) + '</span></span>';
-  return exp ? '<div class="' + cls + '">' + inner + '</div>' : '<button type="button" class="' + cls + '" data-open="' + t.id + '">' + inner + '</button>';
+  return exp ? '<div class="' + cls + '">' + inner + '</div>' : '<button type="button" class="' + cls + '" data-open="' + t.id + '" data-at="' + e.at + '">' + inner + '</button>';
 }
 function rvBody(d, exp) {
   if (!d.entries.length) return '<p class="rv-empty">No task was due, done or overdue in ' + (st.rvSel.length > 1 ? 'these weeks' : 'this week') + '.</p>';
@@ -3226,17 +3291,18 @@ function rvBody(d, exp) {
 function reviewHtml() {
   const cur = rvInit(), d = reviewData(), sel = new Set(st.rvSel), now = TODAY.getTime();
   const tile = w => {
-    const n = C.reviewEntries(d.tasks, [w.key], now).length, lab = C.weekLabel(w);
+    // U9: one compact line per week, "W44 · 26 Oct–1 Nov" and the count; this week's number in the week colour
+    const n = C.reviewEntries(d.tasks, [w.key], now, CANCEL_AT).length, lab = C.weekLabel(w);
     return '<button type="button" class="wk' + (w.key === cur ? ' now' : '') + '" data-wk="' + w.key + '" aria-pressed="' + sel.has(w.key) + '" aria-label="' + lab + ', ' + n + (n === 1 ? ' task' : ' tasks') + (w.key === cur ? ', this week' : '') + '">' +
-      '<span class="wk-w">W' + w.week + (w.key === cur ? '<span class="wk-now">now</span>' : '') + '</span><span class="wk-d">' + lab.split(' · ')[1] + '</span><span class="wk-n">' + n + '</span></button>';
+      '<span class="wk-w">W' + w.week + '</span><span class="wk-d">· ' + lab.split(' · ')[1] + '</span><span class="wk-n">' + n + '</span></button>';
   };
-  const chips = ['all'].concat(LISTS).map(l => '<button type="button" data-rvl="' + esc(l) + '" aria-pressed="' + (l === 'all' ? !st.rvLists.size : st.rvLists.has(l)) + '">' + (l === 'all' ? 'All lists' : esc(label(l))) + '</button>').join('');
+  const chips = ['all'].concat(rvShownLists()).map(l => '<button type="button" data-rvl="' + esc(l) + '" aria-pressed="' + (l === 'all' ? !st.rvLists.size : st.rvLists.has(l)) + '">' + (l === 'all' ? 'All lists' : esc(label(l))) + '</button>').join('');
   return '<div class="rvw">' +
     '<div class="rv-head"><h2>Weekly review</h2><span class="rv-per">' + rvPeriodText(d.period) + '</span><span class="sp"></span><button type="button" id="rv-dl">' + I.dl + 'Download</button></div>' +
     '<div class="rv-weeks"><button type="button" class="rv-nav" id="rv-prev" aria-label="Earlier weeks">' + I.left + '</button>' +
     '<div class="rv-strip" role="group" aria-label="Weeks">' + C.weekRange(st.rvFirst, RV_SHOWN).map(tile).join('') + '</div>' +
     '<button type="button" class="rv-nav" id="rv-next" aria-label="Later weeks">' + I.right + '</button></div>' +
-    '<p class="rv-hint">Ctrl-click or Shift-click to pick several weeks.</p>' +
+    '<p class="rv-hint">Ctrl-click or Shift-click to pick several weeks or lists.</p>' +
     '<div class="rv-lists" role="group" aria-label="Lists in the review">' + chips + '</div>' +
     rvBody(d) + kpiHtml() + '</div>';
 }
@@ -3266,8 +3332,8 @@ const kpiArchived = () => Object.fromEntries((KPI_LISTS || []).filter(l => l.arc
 async function kpiLoad() {
   rvInit();
   if (!KPI_LISTS) {
-    const r = await getAll('lists?select=id,name,archived_at');
-    KPI_LISTS = r.ok ? r.json.sort((a, b) => !!a.archived_at - !!b.archived_at || (LISTS.indexOf(a.id) + 1 || 1e9) - (LISTS.indexOf(b.id) + 1 || 1e9) || a.name.localeCompare(b.name)) : [];
+    const r = await getAll('lists?select=id,slug,name,archived_at');
+    KPI_LISTS = r.ok ? r.json.filter(l => !C.isTestList(l)).sort((a, b) => !!a.archived_at - !!b.archived_at || (LISTS.indexOf(a.id) + 1 || 1e9) - (LISTS.indexOf(b.id) + 1 || 1e9) || a.name.localeCompare(b.name)) : [];
   }
   const ids = kpiIds(), key = ids.join();
   if (KPI_CACHE[key] && KPI_CACHE[key].status === 'error') delete KPI_CACHE[key]; // a failed read is tried again
@@ -3302,68 +3368,76 @@ function kpiHtml(exp) {
     : '<div class="rv-lists kpi-lists" role="group" aria-label="Lists in the KPI"><button type="button" data-kpil="all" aria-pressed="' + !st.kpiLists.size + '">All lists</button>' +
       kpiChip(L.filter(l => !l.archived_at)) + (arch.length ? '<button type="button" class="quiet" id="kpi-arch" aria-expanded="' + showArch + '">' + (showArch ? 'Hide archived lists' : 'Archived lists (' + arch.length + ')') + '</button>' + (showArch ? kpiChip(arch) : '') : '') + '</div>';
   const body = !KPI_LISTS || !c || c.status === 'loading' ? '<p class="kpi-wait">Reading the history…</p>'
-    : c.status === 'error' ? '<p class="kpi-wait">Could not read the history: ' + esc(c.error) + '</p>' : kpiGroups(c);
+    : c.status === 'error' ? '<p class="kpi-wait">Could not read the history: ' + esc(c.error) + '</p>' : kpiGroups(c, exp);
   return exp ? '<section class="kpi"><h2>KPI</h2>' + chips + body + '</section>' : '<details class="kpi" id="kpi" open' + (c && c.status === 'ok' ? ' data-read="' + c.ms + ',' + c.items + ',' + c.events + ',' + KPI_LISTS.length + ',' + c.via + '"' : '') + '><summary>KPI</summary>' + chips + body + '</details>';
 }
-function kpiGroups(c) {
+// round 3 P1, U11: one block, minimal. A Period | All time switch (st.kpiRange) with the dates beside it, or only Period and
+// "All time = the same days" when both hold the same days; then three charts, each under its question: open tasks per quadrant
+// over time (thin lines, end labels, kpiLines), where the work is (a bar per quadrant, kpiQuads), how tasks left the board
+// (three numbers and one thin bar, kpiLeft). Quadrant colours are muted here; text stays in ink. Hover: a title on every mark
+function kpiGroups(c, exp) {
   const now = TODAY.getTime(), o = { settings, archived: kpiArchived() }, p = C.reviewPeriod(st.rvSel);
-  const legend = '<p class="kpi-leg">' + C.QS.map(q => '<span data-q="' + q + '"><i class="sw"></i>' + QN[q] + '</span>').join('') + '<span><i class="sw closed"></i>lighter: closed</span></p>';
-  return legend + [['Selected period', 'period', p && p.from < now ? { from: p.from, to: Math.min(p.to, now) } : null, p ? 'These weeks have not started yet.' : 'Pick a week.'],
-    ['Overall', 'overall', C.kpiOverall(c.hists, now), 'No items in these lists.']].map(([name, id, r, none]) =>
-    '<section class="kpi-g" data-kpi="' + id + '"><h3>' + name + (r ? ' <span class="kpi-per">' + spanText(r.from, r.to) + '</span>' : '') + '</h3>' +
-      (r ? '<div class="kpi-c">' + kpiArea(C.kpiSeries(c.hists, r.from, r.to, o)) + kpiDonut(C.kpiPie(c.hists, r.from, r.to, o), id) + kpiBars(C.kpiClosure(c.hists, r.from, r.to, o)) + '</div>' : '<p class="kpi-wait">' + none + '</p>') + '</section>').join('');
+  const per = p && p.from < now ? { from: p.from, to: Math.min(p.to, now) } : null, whole = C.kpiOverall(c.hists, now);
+  const same = !!per && !!whole && whole.from >= per.from;
+  const pick = !whole ? 'period' : !per ? 'all' : same || st.kpiRange !== 'all' ? 'period' : 'all';
+  const r = pick === 'all' ? whole : per;
+  const seg = same ? '<span class="kpi-same">All time = the same days</span>' : !per || !whole ? '' :
+    '<span class="kpi-seg" role="group" aria-label="Range">' + [['period', 'Period'], ['all', 'All time']].map(([k, n]) => exp ? (k === pick ? '<b>' + n + '</b>' : '') :
+      '<button type="button" data-kpir="' + k + '" aria-pressed="' + (k === pick) + '">' + n + '</button>').join('') + '</span>';
+  const head = '<div class="kpi-top">' + seg + (r ? '<span class="kpi-per">' + spanText(r.from, r.to) + '</span>' : '') + '</div>';
+  if (!r) return head + '<p class="kpi-wait">' + (!whole ? 'No items in these lists.' : p ? 'These weeks have not started yet.' : 'Pick a week.') + '</p>';
+  const fig = (cls, q, chart) => '<figure class="kpi-f ' + cls + '"><figcaption class="kpi-qn">' + q + '</figcaption>' + chart + '</figure>';
+  return head + '<section class="kpi-g" data-kpi="' + pick + '"><div class="kpi-c">' +
+    fig('kpi-area', 'Is my open work growing, and where?', kpiLines(C.kpiSeries(c.hists, r.from, r.to, o))) +
+    fig('kpi-where', 'Where is my work, and how much is done?', kpiQuads(C.kpiPie(c.hists, r.from, r.to, o))) +
+    fig('kpi-bars', 'How did tasks leave the board?', kpiLeft(C.kpiClosure(c.hists, r.from, r.to, o))) + '</div></section>';
 }
-const KW = 520, KH = 176, KP = { l: 30, r: 92, t: 10, b: 22 };
+const KW = 520, KH = 160, KP = { l: 4, r: 86, t: 14, b: 22 };
 const f1 = v => (Math.round(v * 10) / 10).toString();
-// open items per quadrant over time; Do at the bottom; a hover column per point with its numbers; direct labels at the right end
-function kpiArea(s) {
-  const P = s.points, n = P.length, top = Math.max(2, Math.ceil(Math.max(...P.map(p => p.A + p.B + p.C + p.D)) / 2) * 2);
-  const x = i => KP.l + (n < 2 ? 0 : i * (KW - KP.l - KP.r) / (n - 1)), y = v => KP.t + (KH - KP.t - KP.b) * (1 - v / top);
-  let base = P.map(() => 0);
-  const layers = C.QS.map(q => { const lo = base, hi = base.map((b, i) => b + P[i][q]); base = hi; return { q, lo, hi }; });
-  const pt = (i, v) => f1(x(i)) + ',' + f1(y(v));
-  const area = L => '<path class="ka" data-q="' + L.q + '" d="M' + L.hi.map((v, i) => pt(i, v)).join('L') + 'L' + L.lo.map((v, i) => pt(i, v)).reverse().join('L') + 'Z"/>';
-  const grid = [0, top / 2, top].map(v => '<line class="kg" x1="' + KP.l + '" x2="' + (KW - KP.r) + '" y1="' + f1(y(v)) + '" y2="' + f1(y(v)) + '"/><text class="kt" x="' + (KP.l - 6) + '" y="' + f1(y(v) + 3.5) + '" text-anchor="end">' + v + '</text>').join('');
-  const xs = [...new Set([0, Math.floor((n - 1) / 2), n - 1])].map(i => '<text class="kt" x="' + f1(x(i)) + '" y="' + (KH - 6) + '" text-anchor="' + (i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle') + '">' + shortDay(P[i].at) + '</text>').join('');
-  // labels: the middle of each band at its last point, pushed apart to 12 px (top to bottom)
-  const last = n - 1, lab = layers.map(L => ({ q: L.q, v: P[last][L.q], y: (y(L.lo[last]) + y(L.hi[last])) / 2 })).reverse();
-  for (let i = 1; i < lab.length; i++) lab[i].y = Math.max(lab[i].y, lab[i - 1].y + 12);
-  const shift = Math.max(0, lab[lab.length - 1].y - (KH - KP.b)); lab.forEach(l => { l.y -= shift; });
-  const labels = lab.map(l => '<text class="kl" x="' + (KW - KP.r + 8) + '" y="' + f1(l.y + 3.5) + '">' + QN[l.q] + ' <tspan class="kv">' + l.v + '</tspan></text>').join('');
+const hourText = ms => shortDay(ms) + ' ' + String(new Date(ms).getHours()).padStart(2, '0') + ':00';
+// open tasks per quadrant over time: four 2 px lines (steps and dots with 3 points or fewer), a faint baseline, the top value,
+// unique date ticks (C.kpiTicks), end labels pushed apart, and a hover column per point with its numbers
+function kpiLines(s) {
+  const P = s.points, n = P.length, top = Math.max(2, ...P.flatMap(pt => C.QS.map(q => pt[q])));
+  const x = i => KP.l + (n < 2 ? (KW - KP.l - KP.r) / 2 : i * (KW - KP.l - KP.r) / (n - 1)), y = v => KP.t + (KH - KP.t - KP.b) * (1 - v / top);
+  const steps = n <= 3;
+  const line = q => {
+    let d = 'M' + f1(x(0)) + ',' + f1(y(P[0][q]));
+    for (let i = 1; i < n; i++) d += steps ? 'H' + f1(x(i)) + 'V' + f1(y(P[i][q])) : 'L' + f1(x(i)) + ',' + f1(y(P[i][q]));
+    return '<path class="kln" data-q="' + q + '" d="' + d + '"/>' + (steps ? P.map((pt, i) => '<circle class="kdt" data-q="' + q + '" cx="' + f1(x(i)) + '" cy="' + f1(y(pt[q])) + '" r="4"/>').join('') : '');
+  };
+  const base = '<line class="kb0" x1="' + KP.l + '" x2="' + (KW - KP.r) + '" y1="' + f1(y(0)) + '" y2="' + f1(y(0)) + '"/><text class="kt" x="' + KP.l + '" y="' + (KP.t - 4) + '">' + top + '</text>';
+  const tk = C.kpiTicks(P.map(pt => pt.at));
+  const xs = tk.idx.map(i => '<text class="kt kx" x="' + f1(x(i)) + '" y="' + (KH - 6) + '" text-anchor="' + (n < 2 ? 'middle' : i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle') + '">' + (tk.kind === 'hour' ? hourText(P[i].at) : shortDay(P[i].at)) + '</text>').join('');
+  const last = n - 1, lab = C.QS.map(q => ({ q, v: P[last][q], y: y(P[last][q]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < lab.length; i++) lab[i].y = Math.max(lab[i].y, lab[i - 1].y + 13);
+  const over = Math.max(0, lab[lab.length - 1].y - (KH - KP.b)); lab.forEach(l => { l.y -= over; });
+  const labels = lab.map(l => '<line class="kln" data-q="' + l.q + '" x1="' + (KW - KP.r + 6) + '" x2="' + (KW - KP.r + 14) + '" y1="' + f1(l.y) + '" y2="' + f1(l.y) + '"/>' +
+    '<text class="kl" x="' + (KW - KP.r + 19) + '" y="' + f1(l.y + 3.5) + '">' + QN[l.q] + ' <tspan class="kv">' + l.v + '</tspan></text>').join('');
   const w = n < 2 ? KW - KP.l - KP.r : (KW - KP.l - KP.r) / (n - 1);
-  const hover = P.map((p, i) => '<rect class="kh" x="' + f1(Math.max(KP.l, x(i) - w / 2)) + '" y="' + KP.t + '" width="' + f1(Math.min(w, KW - KP.r - Math.max(KP.l, x(i) - w / 2))) + '" height="' + (KH - KP.t - KP.b) + '"><title>' +
-    (s.step === 7 ? 'Week to ' : '') + longDay(p.at) + ': ' + C.QS.map(q => QN[q] + ' ' + p[q]).join(', ') + '</title></rect>').join('');
-  return '<figure class="kpi-area"><figcaption>Open tasks by quadrant, ' + (s.step === 7 ? 'weekly' : 'daily') + '</figcaption><svg viewBox="0 0 ' + KW + ' ' + KH + '" role="img" aria-label="Open tasks by quadrant over time; at the end: ' +
-    C.QS.map(q => QN[q] + ' ' + P[last][q]).join(', ') + '">' + grid + layers.map(area).join('') + xs + labels + hover + '</svg></figure>';
+  const hover = P.map((pt, i) => { const x0 = Math.max(KP.l, x(i) - w / 2); return '<rect class="kh" x="' + f1(x0) + '" y="' + KP.t + '" width="' + f1(Math.min(w, KW - KP.r - x0)) + '" height="' + (KH - KP.t - KP.b) + '"><title>' +
+    (s.step === 7 ? 'Week to ' : '') + longDay(pt.at) + ': ' + C.QS.map(q => QN[q] + ' ' + pt[q]).join(', ') + '</title></rect>'; }).join('');
+  return '<svg viewBox="0 0 ' + KW + ' ' + KH + '" role="img" aria-label="Open tasks by quadrant over time; at the end: ' + C.QS.map(q => QN[q] + ' ' + P[last][q]).join(', ') + '">' +
+    base + C.QS.map(line).join('') + xs + labels + hover + '</svg>';
 }
-// a donut ring segment from angle a to b (radians, 0 = 12 o'clock); a full ring is drawn as two halves
-function ring(cx, cy, R, r, a, b) {
-  if (b - a >= 2 * Math.PI - 1e-6) return ring(cx, cy, R, r, a, a + Math.PI) + ring(cx, cy, R, r, a + Math.PI, b);
-  const p = (rad, t) => f1(cx + rad * Math.sin(t)) + ',' + f1(cy - rad * Math.cos(t)), big = b - a > Math.PI ? 1 : 0;
-  return 'M' + p(R, a) + 'A' + R + ',' + R + ' 0 ' + big + ' 1 ' + p(R, b) + 'L' + p(r, b) + 'A' + r + ',' + r + ' 0 ' + big + ' 0 ' + p(r, a) + 'Z';
+// where the work is: one row per quadrant, "Plan · 22 open · 1 closed · 48%" (the share of all the period's tasks) over a bar,
+// open solid and closed the same hue lighter, scaled to the largest quadrant; the row's title has the exact numbers
+function kpiQuads(p) {
+  const max = Math.max(1, ...C.QS.map(q => p[q].open + p[q].closed)), pct = n => p.total ? Math.round(100 * n / p.total) : 0, w = v => f1(100 * v / max) + '%';
+  return '<div class="kpi-qs" role="list" aria-label="Tasks by quadrant">' + C.QS.map(q => {
+    const v = p[q], n = v.open + v.closed;
+    return '<div class="kq" role="listitem" data-q="' + q + '" data-n="' + n + '" data-pct="' + pct(n) + '" title="' + esc(QN[q] + ': ' + v.open + ' open, ' + v.closed + ' closed; ' + n + ' of ' + p.total + ' (' + pct(n) + '%)') + '">' +
+      '<span class="kq-l"><b>' + QN[q] + '</b> · <span class="kv">' + v.open + '</span> open · <span class="kv">' + v.closed + '</span> closed · <span class="kv">' + pct(n) + '%</span></span>' +
+      '<span class="kq-b">' + (v.open ? '<i class="o" style="width:' + w(v.open) + '"></i>' : '') + (v.closed ? '<i class="c" style="width:' + w(v.closed) + '"></i>' : '') + '</span></div>';
+  }).join('') + '</div>';
 }
-function kpiDonut(p, id) {
-  const pct = n => p.total ? Math.round(100 * n / p.total) : 0;
-  let a = 0;
-  const segs = p.total ? C.QS.flatMap(q => ['open', 'closed'].map(k => ({ q, k, n: p[q][k] }))).filter(s => s.n).map(s => {
-    const b = a + 2 * Math.PI * s.n / p.total, d = ring(70, 70, 64, 40, a, b); a = b;
-    const text = QN[s.q] + ', ' + s.k + ': ' + s.n + ' (' + pct(s.n) + '%)';
-    return '<path class="kp ' + s.k + '" data-q="' + s.q + '" data-n="' + s.n + '" data-pct="' + pct(s.n) + '" d="' + d + '"><title>' + esc(text) + '</title></path>';
-  }).join('') : '<circle class="kp-none" cx="70" cy="70" r="52"/>';
-  const rows = C.QS.map(q => { const v = p[q], n = v.open + v.closed; return '<li data-q="' + q + '"><i class="sw"></i><i class="sw closed"></i><span class="kn">' + QN[q] + ' <span class="kv">' + pct(n) + '%</span></span><span class="ks">' + v.open + ' open, ' + v.closed + ' closed</span></li>'; }).join('');
-  return '<figure class="kpi-pie"><figcaption>Tasks by quadrant, closed lighter</figcaption><div class="kpi-pw"><svg viewBox="0 0 140 140" role="img" aria-label="Tasks by quadrant: ' +
-    C.QS.map(q => QN[q] + ' ' + p[q].open + ' open, ' + p[q].closed + ' closed').join('; ') + '">' + segs +
-    '<text class="kc" x="70" y="68" text-anchor="middle" id="kc-' + id + '">' + p.total + '</text><text class="kc2" x="70" y="84" text-anchor="middle" id="kc2-' + id + '">' + (p.total === 1 ? 'task' : 'tasks') + '</text></svg>' +
-    '<ul class="kpi-pl">' + rows + '</ul></div></figure>';
-}
-// how the period's tasks ended; one bar per outcome, the number beside it; still open ones as a note
-function kpiBars(c) {
-  const max = Math.max(1, c.closed, c.archived, c.deleted);
-  const bar = (name, n, i) => '<g><title>' + name + ': ' + n + '</title><text class="kl" x="0" y="' + (i * 30 + 12) + '">' + name + '</text>' +
-    '<rect class="kb-t" x="72" y="' + (i * 30 + 3) + '" width="150" height="10" rx="3"/><rect class="kb" x="72" y="' + (i * 30 + 3) + '" width="' + f1(Math.max(n ? 3 : 0, 150 * n / max)) + '" height="10" rx="3"/>' +
-    '<text class="kv" x="230" y="' + (i * 30 + 12) + '">' + n + '</text></g>';
-  return '<figure class="kpi-bars"><figcaption>How they ended</figcaption><svg viewBox="0 0 260 84" role="img" aria-label="Closed ' + c.closed + ', archived ' + c.archived + ', deleted ' + c.deleted + '">' +
-    bar('Closed', c.closed, 0) + bar('Archived', c.archived, 1) + bar('Deleted', c.deleted, 2) + '</svg><p class="kpi-note">Still open: <span class="kv">' + c.open + '</span> of ' + c.total + '</p></figure>';
+// how the period's tasks left the board: three numbers in a row, one thin bar of their shares, still open as a caption
+function kpiLeft(c) {
+  const parts = [['closed', 'Closed', c.closed], ['archived', 'Archived', c.archived], ['deleted', 'Deleted', c.deleted]], sum = c.closed + c.archived + c.deleted;
+  return '<div class="kpi-left"><p class="kl3">' + parts.map(([k, name, v]) => '<span class="kl-n" data-k="' + k + '" title="' + name + ': ' + v + '"><i class="sw"></i>' + name + ' <span class="kv">' + v + '</span></span>').join('') + '</p>' +
+    '<span class="kl-bar" role="img" aria-label="Closed ' + c.closed + ', archived ' + c.archived + ', deleted ' + c.deleted + '">' +
+    parts.filter(x => x[2]).map(([k, name, v]) => '<i data-k="' + k + '" style="width:' + f1(100 * v / sum) + '%" title="' + name + ': ' + v + '"></i>').join('') + '</span>' +
+    '<p class="kpi-note">Still open <span class="kv">' + c.open + '</span> of <span class="kv">' + c.total + '</span></p></div>';
 }
 
 // Download: the review as shown (weeks, lists, groups) and the KPI as one HTML file with its own light and print styles, no script
@@ -3380,15 +3454,19 @@ const RV_EXPORT_CSS = ':root{--qa:#E5484D;--qb:#14A35A;--qc:#F2B500;--qd:#6B7491
   '@media (max-width:700px){.rv-qs,.kpi-c{grid-template-columns:1fr}.rvw{margin:0;border-radius:0;padding:16px}}' +
   '@media print{body{background:#fff}.rvw{margin:0;max-width:none;border:0;padding:0}.rvq,.kpi-g,figure{break-inside:avoid}.kh{display:none}}';
 // KPI styles shared by the page (injected into its <style id="kpi-css">) and the export, so the charts look the same in both
-const KPI_CSS = '.kpi-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0;font-size:12px;color:var(--ink2)}.kpi-leg span{display:inline-flex;align-items:center;gap:5px}' +
-  '.sw{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c,var(--ink3))}.sw.closed{background:color-mix(in srgb,var(--c,var(--ink3)) 40%,var(--solid))}' +
-  '.kpi-g{margin-top:16px;padding-top:10px;border-top:1px solid var(--hair)}.kpi-g h3{font:600 15px var(--ui);margin:0 0 8px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}.kpi-per{font:400 12px var(--mono);color:var(--ink3)}' +
-  '.kpi-c{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1.2fr) minmax(0,1fr);gap:14px 22px;align-items:start}.kpi-c figure{margin:0;min-width:0}.kpi-c figcaption{font:500 12px var(--ui);color:var(--ink3);margin-bottom:4px}.kpi-c svg{display:block;width:100%;height:auto;overflow:visible}' +
-  '.kg{stroke:var(--hair);stroke-width:1}.kt{font:10px var(--mono);fill:var(--ink3)}.kl{font:11px var(--ui);fill:var(--ink2)}.kv{font-family:var(--mono);font-variant-numeric:tabular-nums;fill:var(--ink);color:var(--ink)}' +
-  '.ka{fill:var(--c);stroke:var(--solid);stroke-width:1.5;stroke-linejoin:round}.kh{fill:transparent}.kh:hover{fill:color-mix(in srgb,var(--ink) 7%,transparent)}' +
-  '.kpi-pw{display:grid;grid-template-columns:minmax(96px,128px) minmax(0,1fr);gap:12px;align-items:center}.kp{fill:var(--c);stroke:var(--solid);stroke-width:2}.kp.closed{fill:color-mix(in srgb,var(--c) 40%,var(--solid))}.kp:hover{stroke:var(--ink);stroke-width:1.5}.kp-none{fill:none;stroke:var(--hair);stroke-width:22}' +
-  '.kc{font:600 20px var(--mono);fill:var(--ink)}.kc2{font:11px var(--ui);fill:var(--ink3)}.kpi-pl{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:12px;color:var(--ink2)}.kpi-pl li{display:grid;grid-template-columns:10px 10px minmax(0,1fr);gap:0 6px;align-items:center}.kpi-pl .kn .kv{font-size:11px;color:var(--ink2);margin-left:4px}.kpi-pl .ks{grid-column:3;font:11px var(--mono);color:var(--ink3);white-space:nowrap}' +
-  '.kb-t{fill:var(--hair)}.kb{fill:var(--accent)}.kpi-note{margin:4px 0 0;font-size:12px;color:var(--ink3)}' +
+const KPI_CSS = '.kpi-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:12px}' +
+  '.kpi-seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--hair);border-radius:8px}.kpi-seg button{min-height:26px;padding:0 10px;border:0;border-radius:6px;background:transparent;box-shadow:none;font:500 12px var(--ui);color:var(--ink2);cursor:pointer}' +
+  '.kpi-seg button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}.kpi-seg b{padding:0 8px;font:600 12px var(--ui)}' +
+  '.kpi-same{font:500 12px var(--ui);color:var(--ink3)}.kpi-per{font:400 12px var(--mono);color:var(--ink3)}.kpi-g{margin-top:16px}' +
+  '.kpi-c{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr);gap:24px 40px;align-items:start}.kpi-f{margin:0;min-width:0}.kpi-qn{font:500 12.5px var(--ui);color:var(--ink3);margin:0 0 12px}' +
+  '.kpi-c svg{display:block;width:100%;height:auto;overflow:visible}.kpi [data-q]{--km:color-mix(in srgb,var(--c) 80%,var(--solid));--kl:color-mix(in srgb,var(--c) 32%,var(--solid))}' +
+  '.kb0{stroke:var(--hair);stroke-width:1}.kt{font:10px var(--mono);fill:var(--ink3)}.kl{font:11px var(--ui);fill:var(--ink2)}.kv{font-family:var(--mono);font-variant-numeric:tabular-nums;fill:var(--ink);color:var(--ink)}' +
+  '.kln{fill:none;stroke:var(--km);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.kdt{fill:var(--km);stroke:var(--solid);stroke-width:2}.kh{fill:transparent}.kh:hover{fill:color-mix(in srgb,var(--ink) 6%,transparent)}' +
+  '.kpi-qs{display:grid;gap:12px}.kq-l{display:block;margin-bottom:5px;font:12px var(--ui);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kq-l b{font-weight:600;color:var(--ink)}' +
+  '.kq-b{display:flex;gap:2px;height:8px}.kq-b i{display:block;height:100%;border-radius:2px}.kq-b i.o{background:var(--km)}.kq-b i.c{background:var(--kl)}' +
+  '.kl3{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 12px;font:12px var(--ui);color:var(--ink2)}.kl-n{display:inline-flex;align-items:baseline;gap:5px}.kl-n .kv{font-size:20px;font-weight:600}' +
+  '.kl-n .sw{display:inline-block;width:8px;height:8px;border-radius:2px;align-self:center}.kpi [data-k="closed"]{--kk:var(--accent)}.kpi [data-k="archived"]{--kk:color-mix(in srgb,var(--ink3) 55%,var(--solid))}.kpi [data-k="deleted"]{--kk:color-mix(in srgb,var(--danger) 50%,var(--solid))}' +
+  '.kl-n .sw,.kl-bar i{background:var(--kk)}.kl-bar{display:flex;gap:2px;height:6px;border-radius:3px;background:var(--hair);overflow:hidden}.kl-bar i{display:block;height:100%;border-radius:2px}.kpi-note{margin:10px 0 0;font-size:12px;color:var(--ink3)}' +
   '@media (max-width:1000px){.kpi-c{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.kpi-area{grid-column:1 / -1}}@media (max-width:560px){.kpi-c{grid-template-columns:minmax(0,1fr)}}';
 async function reviewDownload() {
   rvInit();
@@ -3398,6 +3476,7 @@ async function reviewDownload() {
     await kpiLoad();
     while ((KPI_CACHE[kpiIds().join()] || {}).status === 'loading') await new Promise(r => setTimeout(r, 100));
   }
+  await loadCancelTimes(all().filter(t => !C.isTestList(LIST[t.list])));
   const d = reviewData(), lists = st.rvLists.size ? [...st.rvLists].map(label).join(', ') : 'all lists';
   const now = new Date(), stamp = longDay(now.getTime()) + ' ' + ymd(now).slice(11);
   const doc = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weekly review ' + esc(rvPeriodText(d.period)) + '</title>' +
@@ -4108,9 +4187,18 @@ function bind() {
   const rvMove = (id, n) => { const b = document.getElementById(id); if (b) b.onclick = () => { st.rvFirst = C.weekStart(st.rvFirst + n * 7 * DAY + 3 * DAY); st.rvScroll = null; render(); document.getElementById(id)?.focus(); }; };
   rvMove('rv-prev', -RV_STEP); rvMove('rv-next', RV_STEP);
   const dl = document.getElementById('rv-dl'); if (dl) dl.onclick = () => reviewDownload();
-  const pickIn = (set, all, attr) => b => b.onclick = () => { const v = b.dataset[attr]; if (v === 'all') set().clear(); else set().has(v) ? set().delete(v) : set().add(v); all(); document.querySelector('[data-' + attr + '="' + CSS.escape(v) + '"]')?.focus(); };
-  app.querySelectorAll('[data-rvl]').forEach(pickIn(() => st.rvLists, render, 'rvl'));
-  app.querySelectorAll('[data-kpil]').forEach(pickIn(() => st.kpiLists, kpiLoad, 'kpil'));
+  // round 3 P1, F4: list chips like files in Windows (C.chipSelect, in the chips' order on the page): click, Ctrl-click, Shift-click
+  const pickIn = (key, attr, after) => b => {
+    b.onmousedown = e => { if (e.shiftKey) e.preventDefault(); };
+    b.onclick = e => {
+      const v = b.dataset[attr], order = [...app.querySelectorAll('[data-' + attr + ']')].map(x => x.dataset[attr]).filter(x => x !== 'all');
+      const r = C.chipSelect({ sel: [...st[key]], anchor: st[key + 'Anchor'] }, v, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey }, order);
+      st[key] = new Set(r.sel); st[key + 'Anchor'] = r.anchor; after(); document.querySelector('[data-' + attr + '="' + CSS.escape(v) + '"]')?.focus();
+    };
+  };
+  app.querySelectorAll('[data-rvl]').forEach(pickIn('rvLists', 'rvl', render));
+  app.querySelectorAll('[data-kpil]').forEach(pickIn('kpiLists', 'kpil', kpiLoad));
+  app.querySelectorAll('[data-kpir]').forEach(b => b.onclick = () => { st.kpiRange = b.dataset.kpir; render(); document.querySelector('[data-kpir="' + st.kpiRange + '"]')?.focus(); });
   const strip = app.querySelector('.rv-strip');
   if (strip) {
     const now = strip.querySelector('.wk.now');
@@ -4120,13 +4208,7 @@ function bind() {
   const ka = document.getElementById('kpi-arch'); if (ka) ka.onclick = () => { st.kpiArch = ka.getAttribute('aria-expanded') !== 'true'; render(); document.getElementById('kpi-arch')?.focus(); };
   const kd = document.getElementById('kpi');
   if (kd) kd.ontoggle = () => { if (!!st.kpiOpen === kd.open) return; st.kpiOpen = kd.open; kd.open ? kpiLoad() : render(); };
-  app.querySelectorAll('.kpi-pie').forEach(f => {
-    const svg = f.querySelector('svg'), c = svg.querySelector('.kc'), c2 = svg.querySelector('.kc2'), t = [c.textContent, c2.textContent];
-    f.querySelectorAll('.kp').forEach(p => {
-      p.onmouseenter = () => { c.textContent = p.dataset.n; c2.textContent = p.dataset.pct + '%'; f.querySelector('li[data-q="' + p.dataset.q + '"]')?.classList.add('on'); };
-      p.onmouseleave = () => { c.textContent = t[0]; c2.textContent = t[1]; f.querySelectorAll('li.on').forEach(li => li.classList.remove('on')); };
-    });
-  });
+
   app.querySelectorAll('[data-hl]').forEach(b => { b.onmouseenter = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.add('hl'); b.onmouseleave = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.remove('hl'); });
   // round 3, adjustment 10: side-menu rows drag between quadrant groups (Plan → Eliminate) and within one, like cards (moveTask,
   // placeIn); a drop on a group's heading puts the row at that group's end. Alt+Up / Alt+Down move a row one step (C.menuMove).
@@ -4190,7 +4272,8 @@ function bind() {
   app.querySelectorAll('[data-expand]').forEach(b => b.onclick = () => { const q = b.dataset.expand; st.expanded = st.expanded === q ? null : q; render(); document.querySelector('[data-expand="' + q + '"]')?.focus(); });
   app.querySelectorAll('[data-done]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.done); const r = edit(t, x => { x.status = 'done'; }); toast('Completed: ' + plain(t.title), undoEdit(t, r)); render(); });
   app.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openTask(null, b.dataset.add));
-  app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { st.view = b.dataset.view; st.expanded = null; render(); document.querySelector('[role=tab][data-view="' + st.view + '"]')?.focus(); });
+  // U10: the KPI starts closed in every view it is shown in; only a click opens it, until the view changes
+  app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { if (b.dataset.view !== st.view) st.kpiOpen = false; st.view = b.dataset.view; st.expanded = null; render(); document.querySelector('[role=tab][data-view="' + st.view + '"]')?.focus(); });
   const tabs = [...app.querySelectorAll('[role=tab]')];
   tabs.forEach((b, i) => b.onkeydown = e => { const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight', back = e.key === 'ArrowUp' || e.key === 'ArrowLeft'; if (fwd || back) { e.preventDefault(); tabs[(i + (fwd ? 1 : tabs.length - 1)) % tabs.length].click(); } });
   const ars = document.getElementById('ar-sort'); if (ars) ars.onchange = () => { st.arSort = ars.value; render(); };
