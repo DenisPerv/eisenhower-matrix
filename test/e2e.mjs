@@ -28,7 +28,7 @@ const rows = [], leftovers = [];
 let pass = 0, fail = 0, skipped = 0;
 const check = (group, what, ok, note) => { ok ? pass++ : fail++; rows.push(`| ${group} | ${what} | ${ok ? 'pass' : 'FAIL'} | ${String(note || '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 160)} |`); console.log(`${ok ? 'pass' : 'FAIL'} ${group}: ${what}`); };
 // a check that cannot run here (a login missing from the env): reported, never counted as passed or failed
-const skip = (group, what, note) => { skipped++; rows.push(`| ${group} | ${what} | skipped | ${String(note || '').replace(/|/g, '/')} |`); console.log(`skip ${group}: ${what} (${note})`); };
+const skip = (group, what, note) => { skipped++; rows.push(`| ${group} | ${what} | skipped | ${String(note || '').replace(/\|/g, '/')} |`); console.log(`skip ${group}: ${what} (${note})`); };
 
 // ---- browser ----
 function findBrowser() {
@@ -688,6 +688,7 @@ async function gGuests() {
   await AP.shot('guests-a-sharing-1440x900');
   if (inv1) await AP.click(`[data-accept="${inv1.id}"]`);
   xA.lists.add(L1.id);
+  guestUndo.push(() => MK.rest('DELETE', `list_members?list_id=eq.${L1.id}&profile_id=eq.${A.uid}`));
   check(G, 'guest A: after Accept, the list and its item', await until(async () => ((await A.rest('GET', 'items?select=id&list_id=eq.' + L1.id)).json || []).length === 1));
   check(G, 'guest A: none of Maksym\'s tags on the shared item', ((await A.rest('GET', 'item_tags?select=tag_id&item_id=eq.' + it1.id)).json || [1]).length === 0, mTag ? 'the item carries one of his tags' : 'Maksym has no tag to put on it');
   await guestCheck(G, 'guest A', A, xA, 'after Accept: still no household row, only the shared list added');
@@ -757,8 +758,11 @@ async function gGuests() {
   if (!Bc) return;
   const bEmail = Bc.session.user.email, xB = { lists: new Set(), tagLists: new Set() };
   await guestCheck(G, 'guest B', Bc, xB, 'reads nothing of A or the household');
-  const LA = await mkList(A, 'Guests e2e A ' + RUN, false);
-  guestUndo.push(async () => { await A.rest('PATCH', `items?list_id=eq.${LA.id}&deleted_at=is.null`, { deleted_at: new Date().toISOString() }); await A.rest('PATCH', 'lists?id=eq.' + LA.id, { archived_at: new Date().toISOString() }); leftovers.push(`archived guest A test list ${LA.slug}`); });
+  // one list for every run (slug guests-e2e-a), restored here and archived again by cleanup: guest_lists_total stays untouched
+  let LA = ((await A.rest('GET', `lists?select=id,slug,name,archived_at&slug=eq.guests-e2e-a&owner_id=eq.${A.uid}`)).json || [])[0];
+  if (LA && LA.archived_at) await A.rest('PATCH', 'lists?id=eq.' + LA.id, { archived_at: null });
+  if (!LA) { const r = await A.rest('POST', 'rpc/create_list', { p_name: 'Guests e2e A', p_slug: 'guests-e2e-a', p_shared: false }); if (!r.ok) throw new Error('create_list failed: ' + r.err.message); LA = { id: r.json, slug: 'guests-e2e-a', name: 'Guests e2e A' }; }
+  guestUndo.push(async () => { await A.rest('PATCH', `items?list_id=eq.${LA.id}&deleted_at=is.null`, { deleted_at: new Date().toISOString() }); await A.rest('PATCH', 'lists?id=eq.' + LA.id, { archived_at: new Date().toISOString() }); });
   const itA = (await A.rest('POST', 'items', { list_id: LA.id, category: 'task', title: `${RUN} A to B`, quadrant: 'B' }, { Prefer: 'return=representation' })).json[0];
   if (aTag) await A.rest('POST', 'item_tags', { item_id: itA.id, tag_id: aTag.id });
   const AP2 = await tab(B, await ctx(B));
@@ -766,13 +770,14 @@ async function gGuests() {
   await openListShare(AP2, LA.id); await shareInDialog(AP2, bEmail, 'viewer');
   const invB = await until(async () => ((await rpcOf(Bc, 'my_invitations')) || []).find(i => i.target_name === LA.name));
   guestUndo.push(async () => { for (const p of await people(A, LA.id)) if (p.state === 'pending') await rpcOf(A, 'revoke_invite', { p_invite: p.invite_id }); });
-  check(G, 'guest B: A\'s invitation arrives; before Accept nothing of the list', !!invB && ((await Bc.rest('GET', 'items?select=id&list_id=eq.' + LA.id)).json || [1]).length === 0);
+  check(G, 'guest B: A\'s invitation arrives; before Accept nothing of the list', !!invB && ((await Bc.rest('GET', 'items?select=id&list_id=eq.' + LA.id)).json || [1]).length === 0 && ((await Bc.rest('GET', 'lists?select=id&id=eq.' + LA.id)).json || [1]).length === 0);
   const BP = await tab(B, await ctx(B), { width: 390, height: 844 });
   check(G, 'guest B: opens signed in at 390×844', await open(BP, await grantFor('guest-b')));
   check(G, 'guest B: Accept in Account menu, Sharing', !!invB && await openSharingMenu(BP, invB.id));
   if (invB) await BP.click(`[data-accept="${invB.id}"]`);
   xB.lists.add(LA.id);
-  check(G, 'guest B: after Accept, A\'s list and item, and none of A\'s tags', await until(async () => ((await Bc.rest('GET', 'items?select=id&list_id=eq.' + LA.id)).json || []).length === 1) && ((await Bc.rest('GET', 'item_tags?select=tag_id&item_id=eq.' + itA.id)).json || [1]).length === 0);
+  guestUndo.push(() => A.rest('DELETE', `list_members?list_id=eq.${LA.id}&profile_id=eq.${Bc.uid}`));
+  check(G, 'guest B: after Accept, A\'s list and item, and none of A\'s tags', await until(async () => ((await Bc.rest('GET', 'items?select=id&deleted_at=is.null&list_id=eq.' + LA.id)).json || []).length === 1) && ((await Bc.rest('GET', 'item_tags?select=tag_id&item_id=eq.' + itA.id)).json || [1]).length === 0);
   await guestCheck(G, 'guest B', Bc, xB, 'only A\'s shared list added');
   await rpcOf(A, 'share_tag_list', { p_tag_list: aDef.id, p_email: bEmail, p_role: 'viewer' });
   const invBt = await until(async () => ((await rpcOf(Bc, 'my_invitations')) || []).find(i => i.kind === 'tag_list'));
