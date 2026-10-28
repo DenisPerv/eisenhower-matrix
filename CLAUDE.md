@@ -14,6 +14,7 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 | `test/core.test.js`, `test/multiuser.test.js`, `test/round3.test.js`, `test/round3-tags.test.js`, `test/round3-review.test.js`, `test/round3-p1.test.js`, `test/round4.test.js`, `test/access.test.js`, `test/cli.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
 | `README.md`, `CLAUDE.md`, `dependencies-doc.md` | documentation |
 | `docs/deployment/` | deployment of the hosted copy (Cloudflare Pages): `README.md`, `1-version-check.md`, `2-deploy.md`, `3-post-deploy-check.md` |
+| `docs/access-requests.md` | access requests: the flow, `db/015`, `cli/access.mjs`, the Cloudflare setup, seats, switch-off |
 
 `config/profiles.js` and `config/<id>.prefs.json` belong to the file-based app (`release_maxden_filesbased`); this app does not read them. Nothing else belongs here.
 
