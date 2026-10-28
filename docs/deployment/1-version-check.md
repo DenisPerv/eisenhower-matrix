@@ -20,7 +20,7 @@ Before every deploy: compare what is live with what `release_maxden` holds, and 
    | 6 | unreachable, timed out, or the gate refused the service token (a redirect) |
    | 2 | usage error, or `TASKSDB_PAGES_PROJECT` (or `TASKSDB_PAGES_URL`) missing |
 
-3. **What changed.** `git -C <repo> log --oneline <hosted sha>..origin/release_maxden -- TasksDashboard.html config/tasksdashboard.config.js privacy.html`. Only these three files reach the hosted page; other commits (db, cli, tests, docs) change nothing there.
+3. **What changed.** `git -C <repo> log --oneline <hosted sha>..origin/release_maxden -- TasksDashboard.html config/tasksdashboard.config.js privacy.html request.html`. Only these four files reach the hosted page; other commits (db, cli, tests, docs) change nothing there.
 4. **Decide.**
    - **Current:** nothing to deploy. Say so and stop, unless the person asked for a rollback.
    - **Behind, page files changed:** list the commits for the person, then go to step 2.

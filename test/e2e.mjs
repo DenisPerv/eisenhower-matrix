@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|guests|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|guests|request|smoke] [--page <html>]
 //   [--url <https origin> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/, and sessions are seeded on <origin>/version.json
 // (same origin, same storage); --access-env adds the Cloudflare Access service-token headers to requests for that origin only.
@@ -8,6 +8,9 @@
 // dummy credentials while Fetch interception answers it, so no real password is ever typed into the page. Writes stay in the
 // _selftest list (and test lists it creates and archives; guests: see gGuests). The transport never logs CDP parameters.
 import fs from 'node:fs';
+import http from 'node:http';
+import crypto from 'node:crypto';
+import vm from 'node:vm';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -17,8 +20,10 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, ACCESS = null; // --url and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'guests'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
+// the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
+const OFFLINE = want.every(g => g === 'request');
 const OUT = path.resolve(args.out || path.join(os.tmpdir(), 'td-e2e-' + Date.now()));
 const PAGE = path.resolve(args.page || APP_HTML);
 const RUN = 'e2e-' + new Date().toISOString().replace(/\D/g, '').slice(2, 12);
@@ -169,12 +174,12 @@ if (args['access-env'] !== undefined) {
   ACCESS = a;
 }
 const env = readEnv(args.env);
-const miss = missingEnv(env, 'maksym').concat(missingEnv(env, 'anastasiia'), missingEnv(env, 'homeos-agent')).filter((x, i, a) => a.indexOf(x) === i);
+const miss = OFFLINE ? [] : missingEnv(env, 'maksym').concat(missingEnv(env, 'anastasiia'), missingEnv(env, 'homeos-agent')).filter((x, i, a) => a.indexOf(x) === i);
 if (miss.length) { console.error('env missing: ' + miss.join(', ')); process.exit(2); }
 fs.mkdirSync(OUT, { recursive: true });
 if (!ORIGIN) fs.writeFileSync(path.join(OUT, 'seed.html'), '<!doctype html><title>seed</title>');
 const core = loadCore(PAGE);
-const SUPA = new URL(env.TASKSDB_URL).host;
+const SUPA = env.TASKSDB_URL ? new URL(env.TASKSDB_URL).host : null;
 const cli = (...a) => spawnSync(process.execPath, [path.join(HERE, '..', 'cli', 'tasks.mjs'), ...a, '--env', args.env, '--run-id', RUN], { encoding: 'utf8' });
 
 let B, MK, AN, ST, prefsSnap = {}, testLists = [], testTagLists = [];
@@ -189,6 +194,7 @@ const item = async id => (await MK.rest('GET', 'items?select=*&id=eq.' + id)).js
 const until = async (fn, ms = 12000) => { const end = Date.now() + ms; let v; while (Date.now() < end) { v = await fn(); if (v) return v; await sleep(400); } return v; };
 
 async function setup() {
+  if (OFFLINE) return;
   MK = await connect(env, 'maksym', { core, via: 'script:e2e', runId: RUN });
   AN = await connect(env, 'anastasiia', { core, via: 'script:e2e', runId: RUN });
   clients.push(MK, AN);
@@ -1182,13 +1188,192 @@ async function gGuests() {
   await BP.close(); await AP2.close();
 }
 
+// ---- request: the public access-request page (request.html, access-backup-plan A1-A3) ----
+// Every state, with Supabase Auth and the two RPCs answered by Fetch interception: nothing reaches the database and no login is
+// needed. Without --url the page is served from 127.0.0.1 (Google sign-in needs an http(s) origin) with the deploy's CSP for
+// request.html, so a second inline script or a stray host shows up as a security error.
+const REQ_EMAIL = 'stranger@example.invalid';
+const REQ_AT = '2026-10-28T21:41:00.000Z', REQ_DECIDED = '2026-10-29T08:05:00.000Z';
+const reqDir = () => path.dirname(PAGE);
+// the host the page talks to: the config next to the page (the same values the deploy publishes)
+function reqSupaHost() {
+  const box = { window: {} };
+  vm.runInNewContext(fs.readFileSync(path.join(reqDir(), 'config', 'tasksdashboard.config.js'), 'utf8'), box, { timeout: 1000 });
+  return new URL(box.window.TD_CONFIG.supabaseUrl).host;
+}
+function serveRequestPage(supa) {
+  const html = fs.readFileSync(path.join(reqDir(), 'request.html'), 'utf8');
+  const hashes = [...html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script\s*>/gi)].filter(m => !/\ssrc\s*=/i.test(m[1] || ''))
+    .map(m => `'sha256-${crypto.createHash('sha256').update(m[2].replace(/\r\n?/g, '\n'), 'utf8').digest('base64')}'`);
+  const csp = `default-src 'none'; script-src 'self' ${hashes.join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; connect-src https://${supa}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`;
+  const files = { '/request': ['request.html', 'text/html; charset=utf-8'], '/request.html': ['request.html', 'text/html; charset=utf-8'],
+    '/config/tasksdashboard.config.js': [path.join('config', 'tasksdashboard.config.js'), 'text/javascript; charset=utf-8'] };
+  const srv = http.createServer((q, r) => {
+    const f = files[new URL(q.url, 'http://x').pathname];
+    if (!f) { r.writeHead(404); return r.end(); }
+    r.writeHead(200, { 'Content-Type': f[1], 'Content-Security-Policy': csp, 'Cache-Control': 'no-store' });
+    r.end(fs.readFileSync(path.join(reqDir(), f[0])));
+  });
+  return new Promise(res => srv.listen(0, '127.0.0.1', () => res({ srv, origin: 'http://127.0.0.1:' + srv.address().port, scripts: hashes.length })));
+}
+// S: { back, token(), mine(), request(), hold, calls } - each answer is [status, body]; body undefined = empty
+async function stubRequestApi(T, S, supa) {
+  await T.send('Fetch.enable', { patterns: fetchPatterns(`https://${supa}/*`) });
+  T.paused = async p => {
+    const cors = [{ name: 'Access-Control-Allow-Origin', value: '*' }];
+    if (p.request.method === 'OPTIONS') return T.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 204, body: '', responseHeaders: cors.concat([
+      { name: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' }, { name: 'Access-Control-Allow-Headers', value: 'apikey,authorization,content-type' }, { name: 'Access-Control-Max-Age', value: '0' }]) }).catch(() => {});
+    const reply = ([status, body], extra = []) => T.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: status,
+      responseHeaders: cors.concat(body === undefined ? [] : [{ name: 'Content-Type', value: 'application/json' }], extra),
+      ...(body === undefined ? {} : { body: Buffer.from(JSON.stringify(body)).toString('base64') }) }).catch(() => {});
+    const u = new URL(p.request.url), h = p.request.headers || {};
+    S.calls.push({ path: u.pathname, search: u.search, body: p.request.postData || '', bearer: h.Authorization || h.authorization || '', apikey: !!(h.apikey || h.Apikey) });
+    if (u.pathname === '/auth/v1/authorize') { S.authorize = u; return reply([302], [{ name: 'Location', value: S.back + '?code=e2e-code' }]); }
+    if (u.pathname === '/auth/v1/token') return reply(S.token());
+    if (u.pathname === '/auth/v1/logout') return reply([204]);
+    if (u.pathname === '/rest/v1/rpc/my_access_request') return reply(S.mine());
+    if (u.pathname === '/rest/v1/rpc/request_access') { if (S.hold) await S.hold; return reply(S.request()); }
+    return reply([404, { message: 'not stubbed in e2e' }]);
+  };
+}
+// the local time the page prints (same machine, same zone)
+const reqLocal = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+async function reqShots(T, G, name) {
+  const wide = [];
+  for (const theme of ['light', 'dark']) {
+    await T.theme(theme);
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      await T.size(w, h); await sleep(250);
+      await T.shot(`request-${name}-${theme}-${w}x${h}`);
+      if (w === 390 && !(await T.ev('document.documentElement.scrollWidth<=innerWidth'))) wide.push(theme + ' ' + await T.ev('document.documentElement.scrollWidth'));
+    }
+  }
+  await T.theme('light'); await T.size(1440, 900);
+  check(G, `${name}: screenshots at 1440x900 and 390x844, light and dark; no horizontal scroll at 390 px`, !wide.length, wide.join(', '));
+}
+async function gRequest() {
+  const G = 'request';
+  const supa = reqSupaHost();
+  const local = ORIGIN ? null : await serveRequestPage(supa);
+  const base = ORIGIN || local.origin, page = base + '/request';
+  const is = s => `document.getElementById("app")?.dataset.state===${JSON.stringify(s)}`;
+  const T = await tab(B, await ctx(B));
+  const pending = { id: '00000000-0000-4000-8000-00000000a001', status: 'pending', email: REQ_EMAIL, requested_at: REQ_AT, decided_at: null };
+  const grant = { access_token: 'e2e-access', refresh_token: 'e2e-refresh', token_type: 'bearer', expires_in: 3600, user: { id: '00000000-0000-4000-8000-0000000000e2', email: REQ_EMAIL } };
+  const rpcs = () => S.calls.filter(c => c.path.startsWith('/rest/v1/rpc/')).map(c => c.path.slice(13));
+  const S = { back: page, calls: [], hold: null, token: () => [200, grant], mine: () => [200, []], request: () => [200, pending] };
+  // my_access_request answers none until request_access ran, then the pending row
+  const fresh = () => { let made = false; S.mine = () => [200, made ? [pending] : []]; S.request = () => { made = true; return [200, pending]; }; };
+  const signIn = async () => { S.calls.length = 0; await T.click('[data-act=google]'); };
+  try {
+    await stubRequestApi(T, S, supa);
+    await T.go(page);
+    check(G, 'signed out: Ask for access and an enabled Continue with Google', await T.wait(is('signedout')) && await T.ev('!document.querySelector("[data-act=google]").disabled'));
+    if (local) check(G, 'the page has exactly one inline script, and it runs under the deploy\'s CSP', local.scripts === 1 && !T.errors.length, T.errors.slice(0, 2).join(' / '));
+    await T.theme('dark'); await sleep(150);
+    check(G, 'dark: the system theme switches the page to the dark tokens', (await T.ev('getComputedStyle(document.documentElement).getPropertyValue("--bg").trim()')).toUpperCase() === '#05060C');
+    await T.theme('light');
+    await reqShots(T, G, 'signed-out');
+
+    // sign in; request_access is held so the sending state can be photographed
+    fresh();
+    let release; S.hold = new Promise(r => { release = r; });
+    await signIn();
+    const sending = await T.wait(is('sending'), 15000);
+    const a = S.authorize;
+    check(G, 'Continue with Google: /auth/v1/authorize with provider google, redirect_to /request and an s256 challenge',
+      !!a && a.searchParams.get('provider') === 'google' && a.searchParams.get('redirect_to') === page && a.searchParams.get('code_challenge_method') === 's256' && /^[A-Za-z0-9_-]{43}$/.test(a.searchParams.get('code_challenge') || ''),
+      a ? 'redirect_to ' + a.searchParams.get('redirect_to') : 'no authorize request');
+    const tok = S.calls.find(c => c.path === '/auth/v1/token');
+    let body = {}; try { body = JSON.parse(tok ? tok.body : '{}'); } catch (e) {}
+    check(G, 'the code is swapped with grant_type=pkce and the verifier, and leaves the address bar', !!tok && /grant_type=pkce/.test(tok.search) && body.auth_code === 'e2e-code' && /^[A-Za-z0-9_-]{43,128}$/.test(body.code_verifier || '') && await T.ev('location.search===""&&location.pathname==="/request"'));
+    check(G, 'sending: shown while request_access is on its way', sending);
+    await reqShots(T, G, 'sending');
+    release(); S.hold = null;
+    const sent = await T.wait(is('sent'), 15000);
+    const txt = await T.text('#app');
+    check(G, 'sent: the coffee break, "Your request is sent. We\'ll let you in soon." and the request time', sent && await T.has('#app svg.coffee') && txt.includes('Your request is sent. We\'ll let you in soon.') && txt.includes(reqLocal(REQ_AT)) && txt.includes(REQ_EMAIL), txt.slice(0, 120));
+    check(G, 'sent: my_access_request, request_access, my_access_request, each with the user\'s token and the publishable key',
+      rpcs().join() === 'my_access_request,request_access,my_access_request' && S.calls.filter(c => c.path.startsWith('/rest/')).every(c => c.bearer === 'Bearer e2e-access' && c.apikey), rpcs().join());
+    check(G, 'no board data is read (only auth and the two access RPCs)', S.calls.every(c => /^\/auth\/v1\/(authorize|token|logout)$/.test(c.path) || /^\/rest\/v1\/rpc\/(my_access_request|request_access)$/.test(c.path)), S.calls.map(c => c.path).join(' '));
+    await reqShots(T, G, 'sent');
+
+    // a reload keeps the session (this tab) and writes nothing
+    S.calls.length = 0; S.mine = () => [200, [pending]];
+    await T.reload();
+    check(G, 'reload: the pending request again, without a second request_access', await T.wait(is('sent')) && rpcs().join() === 'my_access_request', rpcs().join());
+
+    S.mine = () => [200, Object.assign({}, pending, { status: 'approved', decided_at: REQ_DECIDED })];
+    await T.reload();
+    const appr = await T.wait(is('approved'));
+    check(G, 'approved (a row, not an array): You\'re in, the approval time and a link to /', appr && (await T.text('#app h1')) === 'You\'re in' && (await T.text('#app')).includes(reqLocal(REQ_DECIDED)) && await T.ev(`document.querySelector("[data-act=open]").getAttribute("href")===${JSON.stringify('/')}`));
+    await reqShots(T, G, 'approved');
+
+    S.mine = () => [200, [Object.assign({}, pending, { status: 'declined', decided_at: REQ_DECIDED })]];
+    await T.reload();
+    check(G, 'declined: Request declined with the decision time', await T.wait(is('declined')) && (await T.text('#app')).includes(reqLocal(REQ_DECIDED)));
+    await reqShots(T, G, 'declined');
+
+    // Use another account: logout, the tab forgets the session
+    S.calls.length = 0;
+    await T.click('[data-act=signout]');
+    check(G, 'Use another account: signed out, logout sent, the session gone from this tab', await T.wait(is('signedout')) && await until(async () => S.calls.some(c => c.path === '/auth/v1/logout'), 5000) && await T.ev('sessionStorage.getItem("td.request.auth")===null'));
+
+    // the caps of db/015 (54000): try later
+    S.mine = () => [200, []]; S.request = () => [400, { code: '54000', message: 'access requests are capped', details: null, hint: null }];
+    await signIn();
+    check(G, 'cap reached (54000): Try again later', await T.wait(is('cap'), 15000) && /Try again tomorrow/.test(await T.text('#app')));
+    await reqShots(T, G, 'cap');
+
+    // db/015 answers null when there is no request; a household member is refused with 22023
+    await T.click('[data-act=signout]'); await T.wait(is('signedout'));
+    S.mine = () => [200, null]; S.request = () => [400, { code: '22023', message: 'household members already have access', details: null, hint: null }];
+    await signIn();
+    check(G, 'a household member (22023 "already have access", my_access_request null): You\'re in', await T.wait(is('approved'), 15000) && rpcs().join() === 'my_access_request,request_access', rpcs().join());
+
+    // a server error, then Try again
+    await T.click('[data-act=signout]'); await T.wait(is('signedout'));
+    S.request = () => [500, { code: 'XX000', message: 'e2e server error' }];
+    await signIn();
+    check(G, 'error: the server\'s message and Try again', await T.wait(is('error'), 15000) && (await T.text('#app .msg')).includes('e2e server error') && await T.has('[data-act=retry]'));
+    await reqShots(T, G, 'error');
+    fresh();
+    await T.click('[data-act=retry]');
+    check(G, 'Try again: the request goes through and shows as sent', await T.wait(is('sent'), 15000));
+
+    // refusals on the way back from Google
+    await T.click('[data-act=signout]'); await T.wait(is('signedout'));
+    await T.go(page + '?error=access_denied&error_description=The+user+cancelled+the+sign-in');
+    check(G, 'Google cancelled: signed out with the reason, the address cleaned', await T.wait(is('signedout')) && /cancelled/.test(await T.text('#app .msg')) && await T.ev('location.search===""'));
+    await T.go(page + '?error=server_error&error_code=unexpected_failure&error_description=TasksDashboard+is+full+right+now');
+    check(G, 'the sign-up cap of the hook: Try again later with its message', await T.wait(is('cap')) && /full right now/.test(await T.text('#app')));
+    await T.go(page + '?code=stale-code');
+    check(G, 'a code without a verifier in this tab: signed out, sign-in expired', await T.wait(is('signedout')) && /expired/.test(await T.text('#app .msg')));
+
+    check(G, 'no console errors or CSP violations', !T.errors.length, T.errors.slice(0, 2).join(' / '));
+    const hosts = [...T.hosts].filter(h => h !== supa && h !== new URL(base).host);
+    check(G, `only ${supa} and the page origin are contacted`, !hosts.length, hosts.join(', '));
+  } finally {
+    await unintercept(T).catch(() => {});
+    if (!ORIGIN) {
+      // file://: no origin to come back to, so the button is off and the page says where to open it
+      try {
+        await T.go(pathToFileURL(path.join(reqDir(), 'request.html')).href);
+        check(G, 'file://: Continue with Google is off, with the https hint', await T.wait(is('signedout')) && await T.ev('document.querySelector("[data-act=google]").disabled') && /https address/.test(await T.text('#app')));
+      } catch (e) { check(G, 'file:// page opens', false, e.message); }
+    }
+    await T.close().catch(() => {});
+    if (local) local.srv.close();
+  }
+}
+
 const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, guests: gGuests, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'guests'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }
