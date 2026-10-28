@@ -103,3 +103,19 @@ test('e2e --url and --access-env: arguments, https origin only, CF-Access header
     assert.deepEqual(L.accessCreds(f), { missing: [], id: 'abc', secret: 'def' });
   } finally { fs.unlinkSync(f); }
 });
+
+test('multi-user (HomeOS multi-user-plan.md T13): owner tags set the owner, OWNER/slug, limit is exit 9', () => {
+  assert.deepEqual(T.ownerFromTags(['Maksym', 'car']), { tags: ['car'], owner: 'maksym' });
+  assert.deepEqual(T.ownerFromTags(['shared', 'home']), { tags: ['home'], owner: null });
+  assert.deepEqual(T.ownerFromTags(['maksym', 'anastasiia']), { tags: [], owner: null });
+  assert.equal(T.ownerFromTags(['home']).owner, undefined);
+  const people = { M: { handle: 'maksym', is_household: true }, G: { handle: 'guesta', is_household: false }, H: { handle: 'guestb', is_household: false } };
+  const ls = { l1: { id: 'l1', slug: 'groceries', owner_id: 'M' }, l2: { id: 'l2', slug: 'groceries', owner_id: 'G' },
+    l3: { id: 'l3', slug: 'trip', owner_id: 'G' }, l4: { id: 'l4', slug: 'trip', owner_id: 'H' } };
+  assert.equal(T.findList(ls, 'groceries', people).id, 'l1');
+  assert.equal(T.findList(ls, 'guesta/groceries', people).id, 'l2');
+  assert.equal(T.findList(ls, 'nobody/groceries', people), undefined);
+  assert.throws(() => T.findList(ls, 'trip', people), /OWNER\/trip/);
+  assert.equal(L.EXIT.limit, 9);
+  assert.equal(L.errorExit(L.loadCore().restError(400, { code: '54000', message: 'item limit reached' })), 9);
+});

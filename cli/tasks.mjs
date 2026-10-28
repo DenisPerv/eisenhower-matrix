@@ -9,14 +9,16 @@ const TZ = 'Europe/Lisbon';
 const COMMANDS = ['add-task', 'add-reminder', 'overdue', 'do', 'restore-list'];
 const FLAGS = new Set(['json', 'dry-run', 'needs-review', 'help']);
 const USAGE = `usage: node cli/tasks.mjs <command> [options]
-  add-task      --title T [--list slug] [--q A|B|C|D] [--due WHEN] [--tags a,b] [--body MD] [--priority 0-5] [--confidence 0-1] [--needs-review]
-  add-reminder  --title T --due WHEN [--list slug] [--notify 09:00,18:00] [--body MD]
+  add-task      --title T [--list LIST] [--q A|B|C|D] [--due WHEN] [--tags a,b] [--owner HANDLE|none] [--notify a,b] [--body MD] [--priority 0-5] [--confidence 0-1] [--needs-review]
+  add-reminder  --title T --due WHEN [--list LIST] [--owner HANDLE|none] [--notify a,b] [--body MD]
   overdue       [--limit 10] [--list slug]
   do            [--list slug] [--limit N]
   restore-list  --list slug                      (people only: --as maksym or anastasiia)
 common: --env FILE  --as HANDLE (default homeos-agent)  --for HANDLE  --via CHANNEL (default script:tasks-cli)  --run-id ID  --json  --dry-run
 WHEN: YYYY-MM-DD (09:00) or YYYY-MM-DD HH:mm in ${TZ}, or ISO with an offset
-exit: 0 ok, 1 error, 2 env missing, 3 conflict, 4 duplicate, 5 sensitive, 6 unreachable, 7 auth failed, 8 list archived or not restorable`;
+LIST: a slug, or OWNER/slug when two owners use the same slug (slugs are unique per owner)
+who: --owner and --notify take people's handles; maksym, anastasiia or shared in --tags set the owner instead (shared = none)
+exit: 0 ok, 1 error, 2 env missing, 3 conflict, 4 duplicate, 5 sensitive, 6 unreachable, 7 auth failed, 8 list archived or not restorable, 9 limit reached`;
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -38,13 +40,38 @@ export function line(t, lists) {
 const asJson = (t, lists) => ({ ref: ((lists[t.list] || {}).name || '?')[0].toUpperCase() + t.num, id: t.id, title: t.title, due_at: t.deadline ? t.deadline.toISOString() : null,
   list: (lists[t.list] || {}).slug || null, quadrant: t.q, status: t.status, sort_key: t.sortKey });
 export function tagsOf(s) { return s ? [...new Set(String(s).split(',').map(x => x.trim()).filter(Boolean))] : []; }
+// who an item is for is never a tag (multi-user: tags are private per person): maksym or anastasiia → owner, shared or
+// both → no owner (both are told); returns { tags, owner } with owner undefined when no such tag was given
+export const OWNER_TAGS = ['maksym', 'anastasiia', 'shared'];
+export function ownerFromTags(tags) {
+  const low = tags.map(t => String(t).toLowerCase());
+  const people = ['maksym', 'anastasiia'].filter(p => low.includes(p));
+  const owner = low.includes('shared') || people.length > 1 ? null : people.length === 1 ? people[0] : undefined;
+  return { tags: tags.filter(t => !OWNER_TAGS.includes(String(t).toLowerCase())), owner };
+}
+// a list by slug, or owner/slug; several owners with that slug: household lists win, else an error naming owner/slug
+export function findList(ls, ref, people) {
+  const all = Object.values(ls);
+  const m = String(ref).match(/^([^/]+)\/(.+)$/);
+  const slug = m ? m[2] : String(ref), owner = m ? m[1].toLowerCase() : null;
+  let hits = all.filter(l => l.slug === slug);
+  if (owner) hits = hits.filter(l => ((people[l.owner_id] || {}).handle || '').toLowerCase() === owner);
+  if (hits.length > 1) { const h = hits.filter(l => (people[l.owner_id] || {}).is_household); if (h.length) hits = h; }
+  if (hits.length > 1) throw new TdError(EXIT.error, `several lists are called ${slug}: use OWNER/${slug} (${hits.map(l => ((people[l.owner_id] || {}).handle || '?') + '/' + l.slug).join(', ')})`);
+  return hits[0];
+}
 
 async function lists(c) {
-  const r = await c.getAll('lists?select=id,slug,name,default_category,archived_at');
+  const r = await c.getAll('lists?select=id,slug,name,default_category,archived_at,owner_id');
   if (!r.ok) throw new TdError(errorExit(r.err), r.err.message);
   return Object.fromEntries(r.json.map(l => [l.id, l]));
 }
-const bySlug = (ls, slug) => Object.values(ls).find(l => l.slug === slug);
+// profiles this login may read (own, household; 011 F2), by id
+async function people(c) {
+  const r = await c.rest('GET', 'profiles?select=id,handle,kind,is_household');
+  if (!r.ok) throw new TdError(errorExit(r.err), r.err.message);
+  return Object.fromEntries(r.json.map(p => [p.id, p]));
+}
 // every write first reads its list: an archived list is exit 8 and nothing is sent
 function writable(l, slug) {
   if (!l) throw new TdError(EXIT.error, `list not found or not yours: ${slug}`);
@@ -63,11 +90,11 @@ async function topKey(c, ls, listId, item, now) {
   const keys = items.filter(t => c.core.deriveQuadrant(t, null, now) === q && t.sortKey !== null).map(t => t.sortKey);
   return keys.length ? c.core.sortBetween(null, Math.min(...keys)) : 0;
 }
-async function profileId(c, handle) {
+async function profileId(c, handle, flag = '--for') {
   if (!handle) return null;
-  const r = await c.rest('GET', 'profiles?select=id,kind&handle=eq.' + encodeURIComponent(handle));
+  const r = await c.rest('GET', 'profiles?select=id,kind&handle=eq.' + encodeURIComponent(String(handle).toLowerCase()));
   if (!r.ok) throw new TdError(errorExit(r.err), r.err.message);
-  if (!r.json.length || r.json[0].kind !== 'human') throw new TdError(EXIT.error, `--for needs a person's handle: ${handle}`);
+  if (!r.json.length || r.json[0].kind !== 'human') throw new TdError(EXIT.error, `${flag} needs a person's handle: ${handle}`);
   return r.json[0].id;
 }
 async function insert(c, body, opts, ls) {
@@ -92,6 +119,8 @@ export async function run(argv, out = console.log) {
 async function command(a, cmd, c, out) {
   const core = c.core, now = Date.now();
   const ls = await lists(c);
+  const ppl = await people(c);
+  const bySlug = (_, ref) => findList(ls, ref, ppl);
   const print = (items, title) => {
     if (a.json) out(JSON.stringify(items.map(t => asJson(t, ls)), null, 2));
     else { if (title) out(title); items.forEach(t => out(line(t, ls))); if (!items.length) out('(none)'); }
@@ -116,11 +145,16 @@ async function command(a, cmd, c, out) {
     const conf = a.confidence === undefined ? null : Number(a.confidence);
     if (conf !== null && !(conf >= 0 && conf <= 1)) throw new TdError(EXIT.error, '--confidence is 0 to 1');
     const draft = { qStored: a.q || null, priority, category: cat, deadline: due, pin: undefined };
+    const who = ownerFromTags(tagsOf(a.tags));
+    const ownerArg = a.owner !== undefined ? a.owner : who.owner === null ? 'none' : who.owner;
+    const owner_id = ownerArg === undefined || /^none$/i.test(ownerArg) ? null : await profileId(c, ownerArg, '--owner');
+    const notify = [];
+    for (const h of tagsOf(a.notify)) { await profileId(c, h, '--notify'); notify.push(h.toLowerCase()); }
     const body = await common({
-      category: cat, title: String(a.title).trim(), body_md: a.body || '', tags: tagsOf(a.tags), quadrant: a.q || null, priority,
+      category: cat, title: String(a.title).trim(), body_md: a.body || '', tags: who.tags, quadrant: a.q || null, priority, owner_id,
       due_at: due ? due.toISOString() : null, start_at: new Date(now).toISOString(), sort_key: await topKey(c, ls, l.id, draft, now),
       dedup_key: reminder ? reminderKey(new Date(now)) : taskKey(String(a.title).trim(), due, l.slug),
-      details: reminder && a.notify ? { notify: tagsOf(a.notify) } : {},
+      details: notify.length ? { notify: [...new Set(notify)] } : {},
     }, l);
     if (conf !== null) body.ai_confidence = conf;
     if (a['needs-review']) body.review_state = 'needs_review';

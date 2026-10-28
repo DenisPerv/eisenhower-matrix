@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const APP_HTML = path.join(HERE, '..', 'TasksDashboard.html');
-export const EXIT = { ok: 0, error: 1, env: 2, conflict: 3, duplicate: 4, sensitive: 5, unreachable: 6, auth: 7, archived: 8 };
+export const EXIT = { ok: 0, error: 1, env: 2, conflict: 3, duplicate: 4, sensitive: 5, unreachable: 6, auth: 7, archived: 8, limit: 9 };
 
 // <script id="core"> from TasksDashboard.html, run in a sandbox: the CLI and the tests use the page's own rules
 export function loadCore(htmlPath = APP_HTML) {
@@ -48,7 +48,8 @@ export class TdError extends Error {
   constructor(exit, message) { super(message); this.exit = exit; }
 }
 const exitFor = err => ({ network: EXIT.unreachable, server: EXIT.unreachable, credentials: EXIT.auth, auth: EXIT.auth, session: EXIT.auth, rate: EXIT.auth,
-  duplicate: EXIT.duplicate, sensitive: EXIT.sensitive }[err.kind] || (err.kind === 'denied' && /archived/i.test(err.message) ? EXIT.archived : EXIT.error));
+  duplicate: EXIT.duplicate, sensitive: EXIT.sensitive }[err.kind] || (err.code === '54000' ? EXIT.limit   // a D-g limit (db/010)
+  : err.kind === 'denied' && /archived/i.test(err.message) ? EXIT.archived : EXIT.error));
 export const errorExit = err => exitFor(err);
 
 // a client for one login: password grant, then REST with apikey + bearer and the audit headers
