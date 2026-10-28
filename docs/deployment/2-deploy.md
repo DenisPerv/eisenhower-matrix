@@ -30,7 +30,7 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
 
 ## What the script does (also the manual way)
 
-1. **Read the files** without touching any checkout: `git -C <repo> show <ref>:TasksDashboard.html` and `git -C <repo> show <ref>:config/tasksdashboard.config.js`.
+1. **Read the files** without touching any checkout: `git -C <repo> show <ref>:TasksDashboard.html`, `git -C <repo> show <ref>:config/tasksdashboard.config.js`, and `privacy.html` and `request.html` when the ref has them.
 2. **Build the folder** `pages-dist/`:
 
    | File | From |
@@ -38,15 +38,16 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
    | `index.html` | `TasksDashboard.html` as is |
    | `config/tasksdashboard.config.js` | as is |
    | `privacy.html` | as is, when the release has it; it must hold no script |
+   | `request.html` | as is, when the release has it (Pages serves it at `/request`); exactly one inline script, and no external script but the config |
    | `_headers` | generated, below |
    | `version.json` | `{ "sha": "<ref sha>", "builtAt": "<now>" }` |
 
-   Nothing else goes in.
-3. **Generate `_headers`.** The CSP lists the sha256 of the body of each inline `<script>` (base64, `'sha256-…'`), and `connect-src` is the `supabaseUrl` from the config:
+   Nothing else goes in. The config must set only `supabaseUrl`, `publishableKey` and `pollMs` (any other key: exit 3).
+3. **Generate `_headers`.** One CSP for every path: it lists the sha256 of the body of each inline `<script>` of `TasksDashboard.html` and of `request.html` (base64, `'sha256-…'`; `--dry-run` prints them per page), and `connect-src` is the `supabaseUrl` from the config:
 
    ```
    /*
-     Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-<each inline script>'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src <supabaseUrl>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
+     Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-<each inline script of index.html>' 'sha256-<the inline script of request.html>'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src <supabaseUrl>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
      Referrer-Policy: no-referrer
      X-Content-Type-Options: nosniff
      X-Frame-Options: DENY
@@ -58,6 +59,10 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
      Cache-Control: no-cache
    /index.html
      Cache-Control: no-cache
+   /request
+     Cache-Control: no-cache
+   /request.html
+     Cache-Control: no-cache
    /config/*
      Cache-Control: no-cache
    /version.json
@@ -66,7 +71,8 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
 
    - `style-src 'unsafe-inline'`: the timeline writes `style` attributes.
    - `img-src data:`: the favicon and the background are `data:` SVGs.
-   - A new inline script, an external script or a new network host in `TasksDashboard.html` needs this template changed first.
+   - A new inline script, an external script or a new network host in `TasksDashboard.html` or `request.html` needs this template changed first.
+   - `privacy.html` stays script-free: its CSP is the same policy, and it needs no hash.
 4. **Deploy:**
 
    ```

@@ -6,6 +6,7 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 |---|---|
 | `TasksDashboard.html` | the whole app, one file, no build |
 | `privacy.html` | the privacy page (static, no script), the Google consent screen's privacy policy link; deployed beside `index.html` |
+| `request.html` | the public access-request page (`/request`): Google sign-in, then `rpc/my_access_request` / `rpc/request_access`; no board data; exactly one inline script (its hash is in the deploy's `_headers`) |
 | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`, public values, committed |
 | `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `009_multiuser_schema.sql`, `010_multiuser_functions.sql`, `011_multiuser_rls.sql`, `012_round3.sql`, `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `900_selftest.sql`, `901_selftest_multiuser.sql`, `902_selftest_round3.sql`, `903_selftest_access.sql` | the database, applied in file order (README "Set up") |
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
@@ -22,11 +23,11 @@ When the person asks to deploy, publish, update or roll back the hosted page, or
 - Deploy only on the person's request in chat, only `origin/release_maxden` (or an older commit of it for a rollback), and only the files the docs list.
 - A failed post-deployment check means a rollback and a report.
 - Until hosting is set up (status in `docs/deployment/README.md`), say so and stop after the version check.
-- A change that adds an inline script, an external script or a network host to `TasksDashboard.html` also updates the `_headers` template in `docs/deployment/2-deploy.md`, in the same commit.
+- A change that adds an inline script, an external script or a network host to `TasksDashboard.html` or `request.html` also updates the `_headers` template in `docs/deployment/2-deploy.md`, in the same commit. `request.html` keeps exactly one inline script (the deploy refuses more).
 
 ## README is the documentation: update it with every change
 
-Every change to `TasksDashboard.html`, `cli/`, `db/` or `test/e2e.mjs` updates `README.md` in the same commit. No exceptions, including small fixes.
+Every change to `TasksDashboard.html`, `request.html`, `cli/`, `db/` or `test/e2e.mjs` updates `README.md` in the same commit. No exceptions, including small fixes.
 
 - Before committing, check each README section against the change: Database, Config, Sign-in, Data and sync, Preferences and Settings, Storage, Features, CLI, Tests, Limits.
 - Values in the README come from the code (`PREFS_DEFAULTS`, `SETTINGS_DEFAULTS`, `restError`, `*_KEY`, `PAGE`, `POLL_OVERLAP_MS`, `EXIT`), never from memory.
