@@ -211,7 +211,7 @@ The keys `td.profile`, `td.axes` and `td.lists` of the file-based app are remove
 | `node test/e2e.mjs --env <file> --out <dir> [--group auth,data,sync,archive,errors,ui,guests] [--smoke] [--page <html>] [--url <https origin> [--access-env <file>]]` | the page against the live database in headless Chrome or Edge (or Playwright's chromium) over DevTools; report `e2e-report.md` and screenshots in `<dir>`; without `--group`, every group but smoke | live, Node 22+ |
 
 - The e2e runner signs in over REST in Node and seeds `td.auth`; the form is only fed dummy credentials while Fetch interception answers it, so no real password is typed into the page.
-- Writes stay in the `_selftest` list and the test lists the run creates (one Cyrillic-named; `guests`: below); it soft-deletes its items, archives both lists and puts both people's preferences back at the end. Leftovers are listed in the report.
+- Writes stay in the `_selftest` list and the test lists the run creates (one Cyrillic-named; `ui`: one named `<run> list`; `guests`: below); it soft-deletes its items, archives both lists and puts both people's preferences back at the end. Leftovers are listed in the report.
 - Every session the run made is logged out at the end.
 - **Group `guests`** (multi-user, `db/009-011`), with Maksym as the household side:
   - **Always:** Maksym opens Share from a test list's chip menu; his own address is refused; an address nobody has shows as "Viewer, pending" with Revoke, and Revoke withdraws it; Anastasiia (not on the list) sees nobody on it.
