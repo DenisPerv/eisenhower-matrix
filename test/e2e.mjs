@@ -401,9 +401,11 @@ async function gData() {
 }
 async function newTestList(T, name) {
   await T.click('#newlist'); await T.wait('!!document.getElementById("nl-name")');
-  await T.insert('#nl-name', name); await T.ev('document.getElementById("nl-shared").checked=false;document.getElementById("nl-go").click();true');
+  await T.insert('#nl-name', name); await T.ev('performance.clearMarks();document.getElementById("nl-shared").checked=false;document.getElementById("nl-go").click();true');
   const l = await until(async () => (await MK.rest('GET', 'lists?select=id,slug,name&archived_at=is.null&order=created_at.desc&limit=1&name=eq.' + encodeURIComponent(name))).json[0]);
   if (l) testLists.push(l);
+  // round 3: the page marks the RPC's answer (td:list-rpc) and the first frame after the chip is drawn (td:list-shown)
+  if (l && await T.wait('performance.getEntriesByName("td:list-shown").length>0', 5000)) l.ms = await T.ev('Math.round(performance.getEntriesByName("td:list-shown")[0].startTime-performance.getEntriesByName("td:list-rpc")[0].startTime)');
   return l;
 }
 
@@ -546,6 +548,15 @@ async function gUi() {
   }
   // a low-confidence item from the CLI as homeos-agent: marker and filter
   const T = await maksymPage();
+  // round 3, adjustments 1 and 2: the new list is selected at once from the RPC's answer; the same name again is refused here
+  const nl = await newTestList(T, `${RUN} list`);
+  check(G, 'new list: selected, its chip drawn ≤ 300 ms after the RPC answers', !!nl && nl.ms !== undefined && nl.ms <= 300 && await T.ev(`document.querySelector('[data-list="${nl && nl.id}"]')?.getAttribute('aria-pressed')==="true"`), nl ? nl.ms + ' ms' : 'no list');
+  await T.click('#newlist'); await T.wait('!!document.getElementById("nl-name")');
+  const rpcs = () => T.requests.filter(u => /rpc\/create_list/.test(u)).length, sent = rpcs();
+  await T.insert('#nl-name', `${RUN} LIST `); await T.click('#nl-go');
+  check(G, 'the same name again (case, spaces): "You already have a list named …", no RPC sent', await T.wait('/You already have a list named/.test(document.getElementById("nl-e")?.textContent||"")', 5000) && rpcs() === sent);
+  await T.shot('ui-newlist-clash-maksym-1440x900');
+  await closeDialogs(T);
   const r = cli('add-task', '--as', 'homeos-agent', '--for', 'maksym', '--list', '_selftest', '--title', `${RUN} low confidence`, '--q', 'C', '--confidence', '0.42', '--needs-review', '--json');
   const low = r.status === 0 ? JSON.parse(r.stdout)[0] : null;
   check(G, 'CLI add-task as homeos-agent (needs review, confidence 0.42)', !!low, 'exit ' + r.status);

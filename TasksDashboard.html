@@ -1249,6 +1249,26 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     if (cat && cat.default_list_id && lists.includes(cat.default_list_id) && may(cat.default_list_id)) return cat.default_list_id;
     return lists.find(l => may(l) && byId[l] && byId[l].owner_id === o.meId) || lists.find(may) || '';
   }
+  // round 3, adjustment 2: the list rpc/create_list made, inserted locally at once. The RPC returns a uuid (db/010) or
+  // { id, slug, name, sort } (db/012, as an object or a one-row array); what it leaves out comes from the request
+  function createdList(json, req) {
+    const r = Array.isArray(json) ? json[0] : json, q = req || {};
+    const o = typeof r === 'string' ? { id: r } : isObj(r) ? r : {};
+    if (typeof o.id !== 'string' || !o.id) return null;
+    return { id: o.id, slug: typeof o.slug === 'string' ? o.slug : q.slug || null, name: typeof o.name === 'string' ? o.name : String(q.name || '').trim(),
+      default_category: o.default_category !== undefined ? o.default_category : 'task', sort: typeof o.sort === 'number' ? o.sort : (typeof q.sort === 'number' ? q.sort : 0), owner_id: q.ownerId || null };
+  }
+  // adjustment 1: one owner's lists that clash with a name (case and outer spaces ignored), live and archived
+  function listNameClash(name, lists, ownerId) {
+    const k = String(name || '').trim().toLowerCase();
+    const mine = (lists || []).filter(l => l && l.owner_id === ownerId && String(l.name || '').trim().toLowerCase() === k);
+    return { live: mine.find(l => !l.archived_at) || null, archived: mine.find(l => !!l.archived_at) || null };
+  }
+  // "X (2)", "X (3)", … the first that none of the names take
+  function freeListName(name, names) {
+    const taken = new Set((names || []).map(n => String(n).trim().toLowerCase())), base = String(name || '').trim();
+    for (let i = 2; ; i++) { const n = base + ' (' + i + ')'; if (!taken.has(n.toLowerCase())) return n; }
+  }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
@@ -1256,7 +1276,8 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, forgetAccount, accountFor,
-    LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList };
+    LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
+    createdList, listNameClash, freeListName };
 });
 </script>
 <script>
@@ -2590,27 +2611,75 @@ function openSettings() {
 }
 
 // New list: rpc/create_list, private unless "Share with the household" (household members only, D-d of the multi-user plan).
-// A name without ASCII letters or digits (Cyrillic, say) gets a slug list-<6 random>.
+// A name without ASCII letters or digits (Cyrillic, say) gets a slug list-<6 random>; so does a retry after a slug clash (db/010
+// makes the slug from the name; db/012 adds -2, -3 itself). Round 3: Create is off while it runs, and the new list is put in
+// locally from the RPC's answer and selected at once (no reload of lists, items or item_tags: an empty list has none; the next
+// poll reconciles). A name I already use: "You already have a list named X"; an archived one offers Restore or "X (2)".
+const randomSlug = () => 'list-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
 function openNewList() {
   const hh = !!me.is_household;
-  const dlg = dialogShell('<form method="dialog"><strong>New list</strong><label>Name<input id="nl-name" maxlength="60" autocomplete="off"></label><div class="err" id="nl-e" aria-live="polite"></div>' +
+  const dlg = dialogShell('<form method="dialog"><strong>New list</strong><label>Name<input id="nl-name" maxlength="60" autocomplete="off"></label><div class="err" id="nl-e" aria-live="polite"></div><div class="actions nl-x" id="nl-x" hidden></div>' +
     (hh ? '<label class="cb"><input id="nl-shared" type="checkbox" checked> Share with the household and the HomeOS agent</label>' : '<p class="sh-note">Only you see it until you share it (list menu, Share).</p>') +
     '<div class="actions"><button value="cancel">Cancel</button><button id="nl-go" value="create">Create</button></div></form>', '#newlist');
-  const name = dlg.querySelector('#nl-name'), err = dlg.querySelector('#nl-e');
-  name.focus(); name.oninput = () => { err.textContent = ''; };
-  dlg.querySelector('#nl-go').onclick = async e => {
+  const name = dlg.querySelector('#nl-name'), err = dlg.querySelector('#nl-e'), go = dlg.querySelector('#nl-go'), x = dlg.querySelector('#nl-x');
+  // my archived lists, read while the person types (they are not in LIST)
+  let archived = [];
+  const readArchived = () => rest('GET', 'lists?select=id,name,owner_id,archived_at&archived_at=not.is.null&owner_id=eq.' + me.id).then(r => { if (r.ok) archived = r.json; return r; });
+  const pending = readArchived();
+  const say = (text, actions) => {
+    err.textContent = text; x.innerHTML = ''; x.hidden = !actions;
+    (actions || []).forEach(([label, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = fn; x.append(b); });
+  };
+  name.focus(); name.oninput = () => say('');
+  const mineNow = () => Object.values(LIST).concat(HIDDEN_LISTS, archived);
+  const create = async n => {
+    const body = { p_name: n, p_shared: hh && dlg.querySelector('#nl-shared').checked };
+    if (!/[a-z0-9]/i.test(n)) body.p_slug = randomSlug();
+    let r = await rest('POST', 'rpc/create_list', body);
+    if (!r.ok && r.err.kind === 'duplicate') {
+      // a slug or name clash the page did not know about: look again; a different name with the same slug gets a slug of its own
+      await readArchived(); await refreshMeta();
+      const c = C.listNameClash(n, mineNow(), me.id);
+      if (!c.live && !c.archived) { body.p_slug = randomSlug(); r = await rest('POST', 'rpc/create_list', body); }
+    }
+    performance.mark('td:list-rpc');
+    if (!r.ok) return r;
+    const l = C.createdList(r.json, { name: n, slug: body.p_slug, ownerId: me.id, sort: Math.max(0, ...Object.values(LIST).filter(y => y.owner_id === me.id).map(y => y.sort || 0)) + 1 });
+    if (!l) return { ok: false, err: { message: 'The list was made, but the answer was not understood. Reload the page.' } };
+    LIST[l.id] = l; ROLE[l.id] = 'owner';
+    if (!LISTS.includes(l.id)) LISTS.push(l.id);
+    st.list = l.id; st.expanded = null; if (st.view !== 'matrix' && st.view !== 'archive') st.view = 'matrix';
+    return { ok: true, list: l };
+  };
+  const run = async (n, ignoreArchived) => {
+    if (go.disabled) return;
+    go.disabled = true; go.textContent = 'Creating…'; name.readOnly = true; say('');
+    await pending;
+    const c = C.listNameClash(n, mineNow(), me.id);
+    let r = null;
+    if (c.live) say('You already have a list named ' + c.live.name + '.');
+    else if (c.archived && !ignoreArchived) {
+      const two = C.freeListName(n, mineNow().map(l => l.name));
+      say('You already have an archived list named ' + c.archived.name + '.', [
+        ['Restore it', async () => { if (await restoreList(c.archived.id)) { st.list = c.archived.id; dlg.close(); } }],
+        ['Create “' + two + '”', () => { name.value = two; run(two, true); }]]);
+    } else r = await create(n);
+    go.disabled = false; go.textContent = 'Create'; name.readOnly = false;
+    if (!r) return;
+    if (!r.ok) {
+      const again = C.listNameClash(n, mineNow(), me.id);
+      say(r.err.kind === 'duplicate' && (again.live || again.archived) ? 'You already have a list named ' + n + '.' : r.err.message);
+      name.focus(); return;
+    }
+    if (dlg.open) dlg.close(); else render(); // the close handler renders, with the new list selected
+    toast('List created: ' + r.list.name);
+    requestAnimationFrame(() => performance.mark('td:list-shown'));
+  };
+  go.onclick = e => {
     e.preventDefault();
     const n = name.value.trim();
-    if (!n) { err.textContent = 'Enter a name'; name.focus(); return; }
-    const body = { p_name: n, p_shared: hh && dlg.querySelector('#nl-shared').checked };
-    if (!/[a-z]/i.test(n)) body.p_slug = 'list-' + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
-    const r = await rest('POST', 'rpc/create_list', body);
-    if (!r.ok) { err.textContent = r.err.kind === 'duplicate' ? 'A list with this name exists' : r.err.message; name.focus(); return; }
-    dlg.close();
-    await refreshMeta();
-    st.list = typeof r.json === 'string' && LIST[r.json] ? r.json : st.list;
-    toast('List created: ' + n);
-    render();
+    if (!n) { say('Enter a name'); name.focus(); return; }
+    run(n, false);
   };
 }
 // Archive a list (owners, people only): it leaves the chips, All and search; nothing in it can be edited until it is restored
