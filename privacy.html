@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TasksBoard privacy</title>
+<style>
+  :root { --bg: #f7f7f5; --fg: #1d1d1b; --muted: #5c5c57; --link: #1f5fbf; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161615; --fg: #ececea; --muted: #a7a7a1; --link: #8ab4ff; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 40rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.1rem; margin: 1.75rem 0 .4rem; }
+  p, li { color: var(--fg); }
+  .muted { color: var(--muted); }
+  a { color: var(--link); }
+</style>
+</head>
+<body>
+<main>
+  <h1>TasksBoard privacy</h1>
+  <p class="muted">HomeOS TasksBoard, a small task board run privately by Maksym Denysiuk. Last updated 2026-10-28.</p>
+
+  <h2>What we store</h2>
+  <p>We store your email, name and the items you create. When you sign in with Google we receive only your email address, your name and your profile picture (the <code>openid</code>, <code>email</code> and <code>profile</code> scopes). We do not read your Gmail, contacts, calendar or files.</p>
+
+  <h2>Who sees it</h2>
+  <p>Only people you share a list with see them. A new account starts with its own private list. Nobody else sees your lists, items or tags until you share a list or a tag list with them and they accept.</p>
+
+  <h2>Where it lives</h2>
+  <p>Your data is stored in a Supabase database and the page is served by Cloudflare Pages. Sign-in uses Google and Supabase. Nothing is sold, used for advertising or shared with anyone else.</p>
+
+  <h2>Deleting your account</h2>
+  <p>Ask Maksym to delete your account: <a href="mailto:maximdenisuk034@gmail.com">maximdenisuk034@gmail.com</a>. Your account, your lists and your items are then removed.</p>
+
+  <p><a href="./">Back to TasksBoard</a></p>
+</main>
+</body>
+</html>

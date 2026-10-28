@@ -37,6 +37,7 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
    |---|---|
    | `index.html` | `TasksDashboard.html` as is |
    | `config/tasksdashboard.config.js` | as is |
+   | `privacy.html` | as is, when the release has it; it must hold no script |
    | `_headers` | generated, below |
    | `version.json` | `{ "sha": "<ref sha>", "builtAt": "<now>" }` |
 

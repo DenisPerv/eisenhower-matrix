@@ -16,7 +16,7 @@ How the AI deploys TasksDashboard to its hosted copy on Cloudflare Pages when th
 
 - **Who and when.** The AI deploys only when the person asks in chat ("deploy", "publish", "update the hosted page", "roll back the hosted page"). Never on its own initiative, never from a scheduled run. A release to `release_maxden` does not deploy by itself.
 - **What.** Only what is on `origin/release_maxden`, never a working tree, `development_maxden` or a local branch. A rollback deploys an older commit of `release_maxden`.
-- **Files uploaded.** `TasksDashboard.html` (as `index.html`), `config/tasksdashboard.config.js`, a generated `_headers`, and `version.json`. Never `db/`, `cli/`, `test/`, `docs/`, `config/profiles.js`, `config/*.prefs.json` or the Markdown files.
+- **Files uploaded.** `TasksDashboard.html` (as `index.html`), `config/tasksdashboard.config.js`, `privacy.html` (when present, no script), a generated `_headers`, and `version.json`. Never `db/`, `cli/`, `test/`, `docs/`, `config/profiles.js`, `config/*.prefs.json` or the Markdown files.
 - **Where it runs.** Only on the machine that holds the Cloudflare tokens (in the household: Maksym's PC, `localConfigs/.env` in HomeOS). The tokens are never printed, never committed, and never sent anywhere but Cloudflare.
 - **`file://` stays.** The local page is not affected by a deploy.
 - **Report.** After step 3, one short report: old and new version, what changed, the check results. A failed check means a rollback (step 2, Rollback) and a report.

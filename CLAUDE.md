@@ -5,6 +5,7 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 | Path | What |
 |---|---|
 | `TasksDashboard.html` | the whole app, one file, no build |
+| `privacy.html` | the privacy page (static, no script), the Google consent screen's privacy policy link; deployed beside `index.html` |
 | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`, public values, committed |
 | `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `009_multiuser_schema.sql`, `010_multiuser_functions.sql`, `011_multiuser_rls.sql`, `900_selftest.sql`, `901_selftest_multiuser.sql` | the database, applied in file order (README "Set up") |
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
