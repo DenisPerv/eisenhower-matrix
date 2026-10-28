@@ -1318,6 +1318,12 @@ async function gRequest() {
     check(G, 'cap reached (54000): Try again later', await T.wait(is('cap'), 15000) && /Try again tomorrow/.test(await T.text('#app')));
     await reqShots(T, G, 'cap');
 
+    // db/015 answers null when there is no request; a household member is refused with 22023
+    await T.click('[data-act=signout]'); await T.wait(is('signedout'));
+    S.mine = () => [200, null]; S.request = () => [400, { code: '22023', message: 'household members already have access', details: null, hint: null }];
+    await signIn();
+    check(G, 'a household member (22023 "already have access", my_access_request null): You\'re in', await T.wait(is('approved'), 15000) && rpcs().join() === 'my_access_request,request_access', rpcs().join());
+
     // a server error, then Try again
     await T.click('[data-act=signout]'); await T.wait(is('signedout'));
     S.request = () => [500, { code: 'XX000', message: 'e2e server error' }];

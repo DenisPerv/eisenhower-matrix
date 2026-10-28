@@ -257,6 +257,8 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
   // ---- flow ----
   function failed(r) {
     if (r.code === '54000') return view('cap');
+    // db/015: a household member has the board already
+    if (r.code === '22023' && /already have access/i.test(r.message)) return view('approved', { row: {} });
     if (r.status === 401 || r.code === 'session' || r.code === 'PGRST301' || r.code === 'PGRST303') { forget(); return view('signedout', { message: 'Session ended. Sign in again.' }); }
     if (!r.status) return view('error', { message: 'Can\'t reach the server. Check the connection and try again.' });
     if (r.status === 429) return view('error', { message: 'Too many attempts. Wait a minute, then try again.' });

@@ -92,7 +92,7 @@ Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intende
   | `signedout` | no session in this tab | "Ask for access", Continue with Google (off on `file://`, with "Open this page on its https address to sign in."), what is kept (email, name, time) |
   | `sending` | an RPC is on its way | a scan line |
   | `sent` | status `pending` | the coffee break (inline SVG; the steam stops moving with reduced motion), "Your request is sent. We'll let you in soon.", Requested (local `yyyy-mm-dd HH:MM`), Account, Status |
-  | `approved` | status `approved` | "You're in", the approval time, Open TasksDashboard (`/`) |
+  | `approved` | status `approved`, or `request_access` refuses a household member (`22023` "already have access") | "You're in", the approval time, Open TasksDashboard (`/`) |
   | `declined` | status `declined` | "Request declined", the decision time |
   | `cap` | `54000` from `request_access`, or the sign-up hook's "full right now" | "Try again later" |
   | `error` | any other failure, no network, 429 | the reason and Try again |
