@@ -643,7 +643,8 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .rv-r.done .rv-tt,.rv-r.cancelled .rv-tt{color:var(--ink2)}
 .rv-none,.rv-empty,.kpi-wait{margin:var(--s2) 0;font-size:13px;color:var(--ink3)}
 .rv-empty{margin-top:var(--s5)}
-.kpi{margin-top:var(--s6);border-top:1px solid var(--hair2);padding-top:var(--s3)}
+.kpi{margin-top:var(--s5)}
+.rv-sep{border:0;border-top:1px solid var(--hair2);margin:var(--s5) 0 0}
 .kpi > summary{cursor:pointer;font:600 17px var(--serif);color:var(--ink);list-style-position:inside;padding:var(--s2) 0}
 .kpi > summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .kpi-pl li.on{color:var(--ink);font-weight:600}
@@ -918,9 +919,6 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .who-am strong{color:var(--ink);font:600 13px var(--ui)}
 .who-am span{overflow-wrap:anywhere}
 .menu-pop .vh{padding:4px 10px 2px}
-.acct{display:flex;align-items:center;gap:2px}
-.acct button:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.menu-pop .acct-x{flex:none;width:30px;padding:0;justify-content:center;color:var(--ink3)}
 #profile .badge,.menu-pop .badge{margin-left:4px}
 .al-who{min-width:0;overflow-wrap:anywhere}
 .al-b{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
@@ -941,8 +939,13 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 @media (max-width:700px){.al{flex-wrap:wrap}.al-b{justify-content:flex-start}.sh-form{grid-template-columns:1fr}}
 
 /* cards: status, category and "check" badges; the low-confidence marker uses the Delegate yellow */
-.card.compact{grid-template-columns:minmax(0,1fr) auto auto auto auto}
+.card.compact{grid-template-columns:auto minmax(0,1fr) auto auto auto auto}
 .card.full{grid-template-columns:auto minmax(0,1fr) auto auto auto auto auto}
+/* round 4: a small card's second line (Card layout facts and tags), Show more under a cut description */
+.card .sub{grid-column:1/-1;display:flex;gap:4px 12px;align-items:center;min-width:0;overflow:hidden;white-space:nowrap;font:12px var(--mono);color:var(--ink3)}
+.card .sub > *{flex:none}.card .sub .tagtxt{line-height:18px;font-family:var(--ui)}
+.card .more{justify-self:start;min-height:22px;padding:0 4px;border:0;background:transparent;box-shadow:none;font:500 12px var(--ui);color:var(--accent);cursor:pointer}
+.card .more:hover{text-decoration:underline}
 .tbs{display:inline-flex;gap:4px;align-items:center}
 .tb{display:inline-flex;align-items:center;min-height:18px;padding:0 6px;border:1px solid var(--hair2);border-radius:var(--r-sm);font:500 11.5px/1 var(--ui);color:var(--ink2);white-space:nowrap;letter-spacing:.01em}
 .tb.ai{border-color:color-mix(in srgb,var(--qc) 75%,transparent);background:color-mix(in srgb,var(--qc) 18%,transparent);color:var(--ink)}
@@ -1197,9 +1200,10 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   // the rail's tabs are matrix, archive and review; timeline opens from the account menu ("Timeline (draft)")
   const VIEWS = ['matrix', 'archive', 'review', 'timeline'];
   // round 3, adjustment 13: what a card shows (Account menu → Card layout). The defaults are today's card. tags: 'all', 'lists'
-  // (only the tag lists in tagLists) or 'off'; autoCollapse: an expanded-mode card whose description is longer starts collapsed (0 = off)
-  const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, tags: 'all', tagLists: [], autoCollapse: 100 };
-  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'owner'];
+  // (only the tag lists in tagLists) or 'off'; autoCollapse: an expanded-mode card whose description is longer starts collapsed (0 = off).
+  // Round 4: source = the category badge on cards and Sources in the task window (off by default; never with one list selected)
+  const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, source: false, tags: 'all', tagLists: [], autoCollapse: 100 };
+  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'owner', 'source'];
   // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
     cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, tagListOrder: [], tagListsOpen: {} };
@@ -1247,12 +1251,42 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     if (Number.isInteger(raw.autoCollapse) && raw.autoCollapse >= 0 && raw.autoCollapse <= 5000) c.autoCollapse = raw.autoCollapse;
     return c;
   }
-  // a card is expanded when the mode says so (and, in expanded mode, its description is not over autoCollapse), unless flipped
+  // a card is expanded when the mode says so, unless flipped. Round 4, item 4: autoCollapse no longer collapses a card (it only
+  // acted in Expanded mode, and the default is Collapsed); it cuts the description of an open card instead (descClip)
   function cardExpanded(t, mode, layout, flipped) {
-    const l = layout || CARD_LAYOUT_DEFAULTS;
-    const long = l.autoCollapse > 0 && String(t.notes || '').length > l.autoCollapse;
-    return (mode === 'expanded' && !long) !== !!(flipped && flipped.has(t.id));
+    return (mode === 'expanded') !== !!(flipped && flipped.has(t.id));
   }
+  // the first n characters of a markdown description: cut at the last whitespace (a single long word is cut hard), and never
+  // inside a ** or * pair of the last line (the markers pair within a line in mdInline): an unclosed marker is dropped. A bullet
+  // left alone on the last line goes too. n = 0 or a short text: the whole text
+  function descClip(md, n) {
+    const s = String(md || '');
+    if (!(n > 0) || s.length <= n) return { text: s, clipped: false };
+    let cut = s.slice(0, n);
+    const sp = cut.search(/\s\S*$/);
+    if (sp > 0 && /\S/.test(s[n])) cut = cut.slice(0, sp);
+    for (;;) {
+      const start = cut.lastIndexOf('\n') + 1, bullet = (cut.slice(start).match(/^\s*[-*]\s+/) || [''])[0].length, line = cut.slice(start + bullet);
+      const two = [...line.matchAll(/\*\*/g)];
+      if (two.length % 2) { const i = start + bullet + two[two.length - 1].index; cut = cut.slice(0, i) + cut.slice(i + 2); continue; }
+      const one = [...line.replace(/\*\*/g, '  ').matchAll(/\*/g)];
+      if (one.length % 2) { const i = start + bullet + one[one.length - 1].index; cut = cut.slice(0, i) + cut.slice(i + 1); continue; }
+      break;
+    }
+    return { text: cut.replace(/\n\s*([-*]|\d+[.)])?\s*$/, '').replace(/\s+$/, ''), clipped: true };
+  }
+  // round 4, item 5: the facts Card layout switches on, in card order, for small and open cards and the task window.
+  // { k: 'end' | 'created', at: Date } or { k: 'creator' | 'owner', id }; a fact the item lacks is left out
+  function cardFacts(t, layout) {
+    const l = layout || CARD_LAYOUT_DEFAULTS, out = [];
+    if (l.end && t.deadline) out.push({ k: 'end', at: t.deadline });
+    if (l.created && t.createdAt) out.push({ k: 'created', at: t.createdAt });
+    if (l.creator && t.createdBy) out.push({ k: 'creator', id: t.createdBy });
+    if (l.owner && t.ownerId) out.push({ k: 'owner', id: t.ownerId });
+    return out;
+  }
+  // round 4, item 3: where an item came from (its category badge, Sources) shows only when switched on and the board shows All lists
+  const showSource = (layout, listSelected) => !!(layout || CARD_LAYOUT_DEFAULTS).source && !listSelected;
   // the tag ids a card shows: all, none, or those whose tag list is chosen; tagListOf = { tag id: tag list id }
   function cardTagIds(ids, layout, tagListOf) {
     const l = layout || CARD_LAYOUT_DEFAULTS;
@@ -1362,7 +1396,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return b64url(new Uint8Array(d));
   }
   // GET /auth/v1/authorize: provider google, back to redirectTo (origin + path) with ?code=; method s256.
-  // loginHint and selectAccount come from "Accounts on this browser".
+  // loginHint (optional) prefills Google's form; selectAccount shows its account chooser.
   function authorizeUrl(supabaseUrl, o) {
     if (!o || !isHostedOrigin(String(o.redirectTo || '').replace(/^(https?:\/\/[^/]+).*$/i, '$1'))) throw new Error('Google sign-in needs an https or localhost page');
     if (!/^[A-Za-z0-9_-]{43}$/.test(o.challenge || '')) throw new Error('bad PKCE challenge');
@@ -1414,7 +1448,6 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return out.slice(0, ACCOUNTS_MAX);
   }
   const rememberAccount = (list, a) => readAccounts([a].concat((list || []).filter(x => !isObj(a) || x.handle !== a.handle)));
-  const forgetAccount = (list, handle) => readAccounts((list || []).filter(x => x.handle !== handle));
   const accountFor = (list, handle) => (list || []).find(a => a.handle === handle) || null;
 
   // ---- sharing and tags (multi-user T9, review §6, §7) ----
@@ -1473,10 +1506,11 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return { tags: out, changed, unknownLists: [...unknownLists] };
   }
   const tagDefsFilter = maxSeen => 'updated_at=gte.' + encodeURIComponent(new Date(maxSeen - POLL_OVERLAP_MS).toISOString());
-  // what the caller may do with a list or a tag list: owners share (and archive or rename); members hide and leave.
+  // what the caller may do with a list or a tag list: owners share (and archive or rename); members see the people, hide and leave.
+  // Round 4: an owner's Share window already lists the people, so owners get no separate People entry
   // Round 3: editors of a tag list share it too (up to editor)
   function membershipActions(role, kind) {
-    if (role === 'owner') return kind === 'list' ? ['share', 'people', 'archive'] : ['share', 'people', 'rename'];
+    if (role === 'owner') return kind === 'list' ? ['share', 'archive'] : ['share', 'rename'];
     if (!role) return [];
     if (kind !== 'list' && role === 'editor') return ['share', 'hide', 'leave'];
     return kind === 'list' ? ['people', 'hide', 'leave'] : ['hide', 'leave'];
@@ -1824,10 +1858,10 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     deriveQuadrant, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
-    ACCOUNTS_MAX, readAccounts, rememberAccount, forgetAccount, accountFor,
+    ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, cardTagIds,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
@@ -1891,7 +1925,7 @@ const label = l => LIST[l] ? LIST[l].name : '?';
 const initial = l => (label(l)[0] || '?').toUpperCase();
 const all = () => tasks.filter(t => !t.deleted && LIST[t.list]);
 const find = id => tasks.find(t => t.id === id);
-const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
+const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), more: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
 const THEMES = ['light', 'dark'];
 let toastTimer = null, lastUndo = null, dragId = null;
 const overdue = t => t.deadline && t.deadline < TODAY;
@@ -2085,13 +2119,13 @@ async function signIn(email, password, stay) {
   return null;
 }
 // Continue with Google: a PKCE verifier in sessionStorage td.pkce (this tab only), then Supabase's authorize page.
-// hint (an email) and pick (Google's account chooser) come from "Accounts on this browser".
-async function startGoogle(hint, pick) {
+// pick: Google's account chooser, when an account already signed in on this browser (td.accounts).
+async function startGoogle(pick) {
   const box = document.getElementById('si-stay');
   const verifier = C.pkceVerifier(crypto.getRandomValues(new Uint8Array(48)));
   const challenge = await C.pkceChallenge(verifier, crypto.subtle);
   ss.set(PKCE_KEY, JSON.stringify({ verifier, stay: box ? box.checked : true }));
-  location.assign(C.authorizeUrl(CFG.supabaseUrl, { redirectTo: location.origin + location.pathname, challenge, loginHint: hint || '', selectAccount: !!pick }));
+  location.assign(C.authorizeUrl(CFG.supabaseUrl, { redirectTo: location.origin + location.pathname, challenge, selectAccount: !!pick }));
 }
 // back from Google: the code is swapped at once (token?grant_type=pkce), the address loses it, the verifier is deleted
 async function finishGoogle(cb) {
@@ -2112,7 +2146,7 @@ async function finishGoogle(cb) {
   await loadAll();
 }
 let signOutArmed = false;
-async function signOut(prefillHandle) {
+async function signOut() {
   if (Q.size) {
     flushAll();
     for (let i = 0; i < 30 && Q.size; i++) await new Promise(r => setTimeout(r, 100));
@@ -2128,7 +2162,7 @@ async function signOut(prefillHandle) {
   Q.clear(); tasks = []; clearInterval(pollTimer);
   document.getElementById('welcome')?.remove(); welcomeOn = false;
   NOTICES = []; drawNotices();
-  showSignIn('', emailOf(prefillHandle));
+  showSignIn('', '');
 }
 
 async function start() {
@@ -2541,7 +2575,7 @@ function gate(kind) {
     const g = document.getElementById('si-google');
     if (g) g.onclick = async () => {
       g.disabled = true; msg.textContent = '';
-      try { await startGoogle('', accounts().length > 0); }
+      try { await startGoogle(accounts().length > 0); }
       catch (err) { g.disabled = false; msg.textContent = 'Google sign-in could not start: ' + err.message; msg.focus(); }
     };
     (boot.msg ? msg : boot.prefill && otherOpen ? document.getElementById('si-pass') : g && !boot.prefill ? g : document.getElementById('si-email')).focus();
@@ -2580,19 +2614,27 @@ function cardHtml(t, q) {
   const done = editable ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>' : '<span></span>';
   const badges = '<span class="tbs">' + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
     (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
-    (t.category !== 'task' ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
-  if (!expanded) return open + '<span class="t">' + mdInline(t.title) + '</span>' + badges + meta + arrow + done + '</div>';
-  const pin = t.pin === undefined ? '<span></span>' : '<button class="pin" data-unpin="' + t.id + '"' + (editable ? '' : ' disabled') + ' aria-label="' + (t.pin ? 'Urgent, set by hand. Clear' : 'Not urgent, set by hand. Clear') + '">' + (t.pin ? 'urgent (manual)' : 'not urgent (manual)') + '</button>';
+    (t.category !== 'task' && C.showSource(L, st.list !== 'all') ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
+  const num = L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>';
   const tagListOf = {}; shownTags(t).forEach(x => { tagListOf[x] = TAG[x] && TAG[x].tag_list_id; });
   const tagIds = C.cardTagIds(shownTags(t), L, tagListOf);
-  const facts = [L.end && t.deadline ? 'End ' + ymd(t.deadline) : '', L.created && t.createdAt ? 'Created ' + ymd(t.createdAt) : '',
-    L.creator && t.createdBy ? 'By ' + displayName(t.createdBy) : '', L.owner && t.ownerId ? 'For ' + displayName(t.ownerId) : ''].filter(Boolean);
+  const facts = C.cardFacts(t, L).map(factText);
+  // round 4, item 5: a small card shows what Card layout switches on too: the number in front, then one thin line of facts and tags
+  if (!expanded) {
+    const sub = facts.map(x => '<span>' + esc(x) + '</span>').join('') + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('');
+    return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + meta + arrow + done + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
+  }
+  const pin = t.pin === undefined ? '<span></span>' : '<button class="pin" data-unpin="' + t.id + '"' + (editable ? '' : ' disabled') + ' aria-label="' + (t.pin ? 'Urgent, set by hand. Clear' : 'Not urgent, set by hand. Clear') + '">' + (t.pin ? 'urgent (manual)' : 'not urgent (manual)') + '</button>';
+  // round 4, item 4: an open card shows the first autoCollapse characters of the description, then Show more (st.more, this session)
+  const more = st.more.has(t.id), clip = C.descClip(t.notes, L.autoCollapse), cut = clip.clipped && !more;
   const body = (facts.length ? '<div class="row">' + facts.map(x => '<span>' + esc(x) + '</span>').join('') + '</div>' : '') +
     (tagIds.length ? '<div class="tags">' + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '') +
-    (L.description && t.notes ? '<div class="md">' + mdToHtml(t.notes) + '</div>' : '');
-  return open + (L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>') + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
+    (L.description && t.notes ? '<div class="md">' + mdToHtml(cut ? clip.text + ' …' : t.notes) + '</div>' +
+      (clip.clipped ? '<button type="button" class="more" data-more="' + t.id + '" aria-expanded="' + more + '">' + (more ? 'Show less' : 'Show more') + '</button>' : '') : '');
+  return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
     (body ? '<div class="details">' + body + '</div>' : '') + '</div>';
 }
+const factText = f => ({ end: 'End ' + ymd(f.at), created: 'Created ' + ymd(f.at), creator: 'By ' + displayName(f.id), owner: 'For ' + displayName(f.id) })[f.k];
 
 const archivedIn = () => all().filter(t => t.doneAt && inList(t));
 const fmtDay = x => ymd(x).slice(0, 10);
@@ -2765,8 +2807,7 @@ function render() {
     dd = '<div class="dd" role="listbox" id="dd">' + html + '</div>';
   } else st.rows = [];
   const human = me.kind === 'human';
-  // the account menu (review §7): nothing from other people's profiles; other accounts of this browser as email only
-  const others = accounts().filter(a => a.handle !== me.handle);
+  // the account menu (review §7): nothing from other people's profiles. Round 4: no other accounts, no Add account; Sign out only
   const listActs = st.list !== 'all' ? C.membershipActions(ROLE[st.list], 'list') : [];
   const pops = {
     profile: () => '<div class="who-am" role="none"><strong>' + esc(me.display_name) + '</strong>' + (session.user.email ? '<span>' + esc(session.user.email) + '</span>' : '') + '</div>' +
@@ -2774,9 +2815,7 @@ function render() {
       (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
       '<hr><button data-menu="timeline">Timeline (draft)</button><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
       (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : '') +
-      '<hr>' + (others.length ? '<div class="vh" role="none">Accounts on this browser</div>' : '') +
-      others.map(a => '<span class="acct"><button data-switch="' + esc(a.handle) + '" title="Sign out, then sign in as ' + esc(a.email) + '">' + esc(a.email) + (a.provider === 'google' ? ' <span class="n">Google</span>' : '') + '</button><button class="acct-x" data-forget="' + esc(a.handle) + '" aria-label="Forget ' + esc(a.email) + ' on this browser">' + I.x + '</button></span>').join('') +
-      '<button data-addaccount>Add account</button><button data-signout>Sign out</button>',
+      '<hr><button data-signout>Sign out</button>',
     more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
     listmenu: () => (human && listActs.includes('share') ? '<button data-share-list="' + esc(st.list) + '">Share ' + esc(label(st.list)) + '…</button>' : '') +
       (listActs.includes('people') ? '<button data-people-list="' + esc(st.list) + '">People</button>' : '') +
@@ -2953,6 +2992,8 @@ function openTask(id, quad, opts) {
   // what the window showed: Save sends only what the person changed, and checks it against changes made meanwhile
   const shown = t ? { version: t.version, title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q } : null;
   const ro = editable ? '' : ' disabled';
+  const src = C.showSource(cardLayout, st.list !== 'all'); // round 4, item 3: Sources follow Card layout's Source switch
+  const wfacts = t ? (cardLayout.number ? [refText(t)] : []).concat(C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText)) : [];
   const dlg = document.createElement('dialog');
   dlg.className = 'tk';
   dlg.innerHTML = '<form method="dialog"><strong>' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</strong>' +
@@ -2965,17 +3006,18 @@ function openTask(id, quad, opts) {
     '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
     (t ? '<div><label>Quadrant<select id="fq"' + ro + '>' + QS.map(q => '<option value="' + q + '"' + (t.q === q ? ' selected' : '') + '>' + q + ' ' + QN[q] + '</option>').join('') + '</select></label></div>' : '') +
     '<div><label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div></div></div>' +
-    (t && (t.ownerId || t.createdBy) ? '<p class="fwho" id="fwho">' + (t.ownerId ? 'For ' + esc(displayName(t.ownerId)) : 'For nobody in particular') + (t.createdBy && t.createdBy !== t.ownerId ? '. Created by ' + esc(displayName(t.createdBy)) : '') + '.</p>' : '') +
+    // round 4, item 5: the read-only facts follow Card layout (number, created, who created it, who it is for); End is a field
+    (t && wfacts.length ? '<p class="fwho" id="fwho">' + wfacts.map(esc).join(' · ') + '</p>' : '') +
     // U1, U6, U8: no "Tags" label; a search box over the groups; the groups scroll inside a box of about 40% of the window's height
     '<div class="tagpick"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' +
     '<div class="tagbox" role="group" aria-label="Tags"></div></div>' +
-    (t ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
+    (t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
     '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
     '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
   document.body.append(dlg); dlg.showModal();
   if (o.error) dlg.querySelector('#ft').focus();
   // where the item came from (item_refs), read only and loaded when the window opens; links are shown as text
-  if (t) rest('GET', 'item_refs?select=kind,target,note&item_id=eq.' + t.id + '&order=created_at').then(r => {
+  if (t && src) rest('GET', 'item_refs?select=kind,target,note&item_id=eq.' + t.id + '&order=created_at').then(r => {
     const box = dlg.querySelector('#srcs'); if (!box) return;
     box.innerHTML = r.ok && r.json.length ? r.json.map(x => '<div><span class="k">' + esc(x.kind) + '</span> ' + esc(x.target) + (x.note ? ' <span class="n">' + esc(x.note) + '</span>' : '') + '</div>').join('') : r.ok ? 'None' : esc(r.err.message);
   });
@@ -3304,10 +3346,11 @@ function reviewHtml() {
     '<button type="button" class="rv-nav" id="rv-next" aria-label="Later weeks">' + I.right + '</button></div>' +
     '<p class="rv-hint">Ctrl-click or Shift-click to pick several weeks or lists.</p>' +
     '<div class="rv-lists" role="group" aria-label="Lists in the review">' + chips + '</div>' +
-    rvBody(d) + kpiHtml() + '</div>';
+    // round 4, item 6: Visuals (the KPI) on top of the tasks, a --- line between them
+    kpiHtml() + '<hr class="rv-sep">' + rvBody(d) + '</div>';
 }
 
-// round 3, adjustment 9: KPI, a collapsible section under the review with its own list chips (archived lists too). Two groups:
+// round 3, adjustment 9: KPI (round 4: named Visuals, above the tasks, open by default), a collapsible section with its own list chips (archived lists too). Two groups:
 // Selected period (the picked weeks, up to now) and Overall (the first item's day to now). Per group: open items per quadrant
 // over time (stacked area), the period's items per quadrant with closed ones as a lighter shade (donut), and how they ended
 // (Closed, Archived, Deleted). The chosen lists' items (deleted ones too) and their item_events are read once per list set and
@@ -3319,6 +3362,7 @@ const KPI_ITEM_COLS = 'id,list_id,quadrant,status,due_at,urgent_pin,priority,cat
 const KPI_EVENT_COLS = 'id,item_id,at,' + C.KPI_COLUMNS.map(k => k + ':diff->' + k).join(',') + ',items!inner(list_id)';
 let KPI_RPC = null; // db/013 kpi_events: null = not tried yet, false = not there (404), true = in use
 const KPI_WAVE = 4; // REST pages read at once
+let kpiAuto = false; // round 4: a read started by opening the Review is running
 // paged GET like getAll, KPI_WAVE pages at a time (order=id), until a short page
 async function getAllWaves(path) {
   const out = [];
@@ -3360,16 +3404,16 @@ async function kpiLoad() {
   render();
 }
 function kpiHtml(exp) {
-  if (!exp && !st.kpiOpen) return '<details class="kpi" id="kpi"><summary>KPI</summary></details>';
+  if (!exp && st.kpiOpen === false) return '<details class="kpi" id="kpi"><summary>Visuals</summary></details>';
   const c = KPI_CACHE[kpiIds().join()], L = KPI_LISTS || [], arch = L.filter(l => l.archived_at), showArch = !!st.kpiArch || arch.some(l => st.kpiLists.has(l.id));
   // archived lists (their tasks count in All lists) fold behind one chip
   const kpiChip = ls => ls.map(l => '<button type="button" data-kpil="' + esc(l.id) + '" aria-pressed="' + st.kpiLists.has(l.id) + '"' + (l.archived_at ? ' class="arch" title="Archived ' + fmtDay(new Date(l.archived_at)) + '"' : '') + '>' + esc(l.name) + '</button>').join('');
   const chips = exp ? '<p class="rv-meta">Lists: ' + esc(st.kpiLists.size ? (KPI_LISTS || []).filter(l => st.kpiLists.has(l.id)).map(l => l.name).join(', ') : 'all lists, archived ones too') + '</p>'
-    : '<div class="rv-lists kpi-lists" role="group" aria-label="Lists in the KPI"><button type="button" data-kpil="all" aria-pressed="' + !st.kpiLists.size + '">All lists</button>' +
+    : '<div class="rv-lists kpi-lists" role="group" aria-label="Lists in the Visuals"><button type="button" data-kpil="all" aria-pressed="' + !st.kpiLists.size + '">All lists</button>' +
       kpiChip(L.filter(l => !l.archived_at)) + (arch.length ? '<button type="button" class="quiet" id="kpi-arch" aria-expanded="' + showArch + '">' + (showArch ? 'Hide archived lists' : 'Archived lists (' + arch.length + ')') + '</button>' + (showArch ? kpiChip(arch) : '') : '') + '</div>';
   const body = !KPI_LISTS || !c || c.status === 'loading' ? '<p class="kpi-wait">Reading the history…</p>'
     : c.status === 'error' ? '<p class="kpi-wait">Could not read the history: ' + esc(c.error) + '</p>' : kpiGroups(c, exp);
-  return exp ? '<section class="kpi"><h2>KPI</h2>' + chips + body + '</section>' : '<details class="kpi" id="kpi" open' + (c && c.status === 'ok' ? ' data-read="' + c.ms + ',' + c.items + ',' + c.events + ',' + KPI_LISTS.length + ',' + c.via + '"' : '') + '><summary>KPI</summary>' + chips + body + '</details>';
+  return exp ? '<section class="kpi"><h2>Visuals</h2>' + chips + body + '</section>' : '<details class="kpi" id="kpi" open' + (c && c.status === 'ok' ? ' data-read="' + c.ms + ',' + c.items + ',' + c.events + ',' + KPI_LISTS.length + ',' + c.via + '"' : '') + '><summary>Visuals</summary>' + chips + body + '</details>';
 }
 // round 3 P1, U11: one block, minimal. A Period | All time switch (st.kpiRange) with the dates beside it, or only Period and
 // "All time = the same days" when both hold the same days; then three charts, each under its question: open tasks per quadrant
@@ -3450,7 +3494,7 @@ const RV_EXPORT_CSS = ':root{--qa:#E5484D;--qb:#14A35A;--qc:#F2B500;--qd:#6B7491
   '.n,.kv,.k{font-family:var(--mono);font-variant-numeric:tabular-nums}.n{color:var(--ink3);font-size:12px}.rv-per{font:500 14px var(--mono);margin:4px 0}.rv-meta{color:var(--ink3);font-size:12px;margin:6px 0 0}' +
   '.sq{width:9px;height:9px;border-radius:50%;background:var(--c)}.rv-qs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 28px;margin-top:18px}.rvq{border-top:2px solid var(--c);padding-top:8px;break-inside:avoid}' +
   '.rr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;padding:3px 0;font-size:13px;border-bottom:1px solid var(--hair)}.k{color:var(--ink3)}.rv-tg{color:var(--ink3);font-size:12px}.rv-k{color:var(--ink2);font-size:12px;white-space:nowrap}.rv-r.overdue .rv-k,.rv-r.late .rv-k{color:var(--danger)}.rv-r.done .rv-tt,.rv-r.cancelled .rv-tt{color:var(--ink2)}' +
-  '.rv-none,.rv-empty,.kpi-wait{color:var(--ink3);font-size:13px}' + '@@KPI@@' +
+  '.rv-none,.rv-empty,.kpi-wait{color:var(--ink3);font-size:13px}.rv-sep{border:0;border-top:1px solid var(--hair);margin:24px 0 0}' + '@@KPI@@' +
   '@media (max-width:700px){.rv-qs,.kpi-c{grid-template-columns:1fr}.rvw{margin:0;border-radius:0;padding:16px}}' +
   '@media print{body{background:#fff}.rvw{margin:0;max-width:none;border:0;padding:0}.rvq,.kpi-g,figure{break-inside:avoid}.kh{display:none}}';
 // KPI styles shared by the page (injected into its <style id="kpi-css">) and the export, so the charts look the same in both
@@ -3482,7 +3526,7 @@ async function reviewDownload() {
   const doc = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weekly review ' + esc(rvPeriodText(d.period)) + '</title>' +
     '<style>' + RV_EXPORT_CSS.replace('@@KPI@@', KPI_CSS) + '</style></head><body><main class="rvw">' +
     '<h1>Weekly review</h1><p class="rv-per">' + esc(rvPeriodText(d.period)) + '</p><p class="rv-meta">' + st.rvSel.map(k => esc(C.weekLabel(C.weekFromKey(k)))).join(', ') + '<br>Lists: ' + esc(lists) +
-    '<br>Saved ' + esc(stamp) + ' by ' + esc(me.display_name) + '</p>' + rvBody(d, true) + kpiHtml(true) + '</main></body></html>';
+    '<br>Saved ' + esc(stamp) + ' by ' + esc(me.display_name) + '</p>' + kpiHtml(true) + '<hr class="rv-sep">' + rvBody(d, true) + '</main></body></html>';
   const url = URL.createObjectURL(new Blob([doc], { type: 'text/html;charset=utf-8' })), a = document.createElement('a');
   a.href = url; a.download = C.reviewFileName(st.rvSel);
   document.body.append(a); a.click(); a.remove();
@@ -3529,13 +3573,13 @@ function openSettings(kind) {
 // round 3, adjustment 13: Card layout (prefs.cardLayout and cards.mode). Defaults are today's card.
 function openCardLayout() {
   const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
-  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', owner: 'Who it is for' };
+  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', owner: 'Who it is for', source: 'Source (category, Sources)' };
   const lists = Object.values(TAG_LISTS).filter(l => !l.hidden).sort((a, b) => (a.owner_id !== (me && me.id)) - (b.owner_id !== (me && me.id)) || (a.sort || 0) - (b.sort || 0));
   const radio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' +
     '<fieldset><legend>Cards open</legend>' + radio('cl-mode', 'collapsed', 'Collapsed', st.cardMode === 'collapsed') + radio('cl-mode', 'expanded', 'Expanded', st.cardMode === 'expanded') + '</fieldset>' +
-    '<label>Collapse when the description is longer than, characters<input id="cl-auto" type="number" min="0" max="5000" value="' + L.autoCollapse + '" aria-describedby="cl-auto-h"></label>' +
-    '<p class="s-hint" id="cl-auto-h">For cards that open expanded. 0 turns it off; default ' + D.autoCollapse + '. The arrow still opens a card.</p>' +
+    '<label>Shorten descriptions longer than, characters<input id="cl-auto" type="number" min="0" max="5000" value="' + L.autoCollapse + '" aria-describedby="cl-auto-h"></label>' +
+    '<p class="s-hint" id="cl-auto-h">An open card shows this many characters of the description, then Show more. 0 shows the whole description; default ' + D.autoCollapse + '.</p>' +
     '<fieldset><legend>A card shows</legend><div class="cl-grid">' + C.CARD_FIELDS.map(k => '<label class="cb"><input type="checkbox" data-cl="' + k + '"' + (L[k] ? ' checked' : '') + '> ' + names[k] + '</label>').join('') + '</div></fieldset>' +
     '<fieldset><legend>Tags</legend>' + radio('cl-tags', 'all', 'All tags', L.tags === 'all') + radio('cl-tags', 'lists', 'Only from these tag lists', L.tags === 'lists') +
     '<div class="cl-lists">' + (lists.length ? lists.map(l => '<label class="cb"><input type="checkbox" data-cl-list="' + esc(l.id) + '"' + (L.tagLists.includes(l.id) ? ' checked' : '') + '> ' + esc(l.name) + (l.owner_id !== me.id ? ' <span class="n">' + esc(personName(l.owner_id)) + '</span>' : '') + '</label>').join('') : '<p class="s-hint">No tag lists yet.</p>') + '</div>' +
@@ -4127,16 +4171,6 @@ function openTags(archivedView) {
   draw();
 }
 
-// Accounts on this browser: picking one signs out here, then opens Google with that email (login_hint, account picker) or
-// the password form with it filled in. Tokens of other accounts are never kept.
-async function switchAccount(handle) {
-  const a = C.accountFor(accounts(), handle);
-  await signOut(handle);
-  if (boot.gate === 'signin' && a && a.provider === 'google' && HOSTED) {
-    try { await startGoogle(a.email, true); } catch (e) { showSignIn('Google sign-in could not start: ' + e.message, ''); }
-  }
-}
-
 function bind() {
   const app = document.getElementById('app');
   bindLogo();
@@ -4166,11 +4200,9 @@ function bind() {
   app.querySelectorAll('#pop [data-share-list], #pop [data-people-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); openShare('list', b.dataset.shareList || b.dataset.peopleList, '#listmenu'); });
   app.querySelectorAll('#pop [data-hide-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); hideList(b.dataset.hideList, true); });
   app.querySelectorAll('#pop [data-leave-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); leaveList(b.dataset.leaveList); });
-  app.querySelectorAll('[data-flip]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.flip; st.flip.has(id) ? st.flip.delete(id) : st.flip.add(id); render(); document.querySelector('[data-flip="' + id + '"]')?.focus(); });
+  app.querySelectorAll('[data-flip]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.flip; st.flip.has(id) ? st.flip.delete(id) : st.flip.add(id); st.more.delete(id); render(); document.querySelector('[data-flip="' + id + '"]')?.focus(); });
   // accounts on this browser: sign out here (local scope), then Google with that email, or the form with it filled in
-  app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; switchAccount(b.dataset.switch); });
-  app.querySelectorAll('[data-forget]').forEach(b => b.onclick = e => { e.stopPropagation(); saveAccounts(C.forgetAccount(accounts(), b.dataset.forget)); render(); document.querySelector('[data-addaccount]')?.focus(); });
-  app.querySelectorAll('[data-addaccount]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; signOut(); });
+  app.querySelectorAll('[data-more]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.more; st.more.has(id) ? st.more.delete(id) : st.more.add(id); render(); document.querySelector('[data-more="' + id + '"]')?.focus(); });
   app.querySelectorAll('[data-signout]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; signOut(); });
   document.getElementById('mine').onclick = () => { st.mine = !st.mine; render(); };
   const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', mine: false, lowc: false, sel: -1 }); st.tags.clear(); st.cats.clear(); st.quads.clear(); render(); };
@@ -4207,7 +4239,9 @@ function bind() {
   }
   const ka = document.getElementById('kpi-arch'); if (ka) ka.onclick = () => { st.kpiArch = ka.getAttribute('aria-expanded') !== 'true'; render(); document.getElementById('kpi-arch')?.focus(); };
   const kd = document.getElementById('kpi');
-  if (kd) kd.ontoggle = () => { if (!!st.kpiOpen === kd.open) return; st.kpiOpen = kd.open; kd.open ? kpiLoad() : render(); };
+  if (kd) kd.ontoggle = () => { if ((st.kpiOpen !== false) === kd.open) return; st.kpiOpen = kd.open; kd.open ? kpiLoad() : render(); };
+  // round 4, item 6: Visuals open by default, so the first render of an open section reads the history (once; kpiAuto)
+  if (kd && kd.open && !kpiAuto && (!KPI_LISTS || kpiIds().length) && !KPI_CACHE[kpiIds().join()]) { kpiAuto = true; kpiLoad().finally(() => { kpiAuto = false; }); }
 
   app.querySelectorAll('[data-hl]').forEach(b => { b.onmouseenter = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.add('hl'); b.onmouseleave = () => document.querySelector('[data-card="' + b.dataset.hl + '"]')?.classList.remove('hl'); });
   // round 3, adjustment 10: side-menu rows drag between quadrant groups (Plan → Eliminate) and within one, like cards (moveTask,
@@ -4272,8 +4306,8 @@ function bind() {
   app.querySelectorAll('[data-expand]').forEach(b => b.onclick = () => { const q = b.dataset.expand; st.expanded = st.expanded === q ? null : q; render(); document.querySelector('[data-expand="' + q + '"]')?.focus(); });
   app.querySelectorAll('[data-done]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.done); const r = edit(t, x => { x.status = 'done'; }); toast('Completed: ' + plain(t.title), undoEdit(t, r)); render(); });
   app.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openTask(null, b.dataset.add));
-  // U10: the KPI starts closed in every view it is shown in; only a click opens it, until the view changes
-  app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { if (b.dataset.view !== st.view) st.kpiOpen = false; st.view = b.dataset.view; st.expanded = null; render(); document.querySelector('[role=tab][data-view="' + st.view + '"]')?.focus(); });
+  // round 4, item 6 (replaces U10): Visuals open again whenever the view changes; folding them lasts until then
+  app.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { if (b.dataset.view !== st.view) st.kpiOpen = true; st.view = b.dataset.view; st.expanded = null; render(); document.querySelector('[role=tab][data-view="' + st.view + '"]')?.focus(); });
   const tabs = [...app.querySelectorAll('[role=tab]')];
   tabs.forEach((b, i) => b.onkeydown = e => { const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight', back = e.key === 'ArrowUp' || e.key === 'ArrowLeft'; if (fwd || back) { e.preventDefault(); tabs[(i + (fwd ? 1 : tabs.length - 1)) % tabs.length].click(); } });
   const ars = document.getElementById('ar-sort'); if (ars) ars.onchange = () => { st.arSort = ars.value; render(); };

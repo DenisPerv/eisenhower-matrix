@@ -305,7 +305,8 @@ async function gAuth() {
   await U.ev('dispatchEvent(new Event("focus")),true'); await sleep(3000); await unintercept(U);
   check(G, 'a duplicated tab (copied sessionStorage) opens, and the first tab still refreshes after it', dupOk && !(await U.has('#signin')));
   await U2.close(); await U.close();
-  // switch: Anastasiia signed in once on this browser (td.emails), then Maksym switches to her: the form prefilled
+  // round 4, item 1: Anastasiia signed in once on this browser, then Maksym: the account menu has no other accounts and no
+  // Add account (only Sign out), and Sign out shows the sign-in form
   const c3 = await ctx(B), S = await tab(B, c3);
   await open(S, await grantFor('anastasiia'));
   await S.wait('!!document.getElementById("profile")');
@@ -313,10 +314,10 @@ async function gAuth() {
   await S.wait('!!document.getElementById("signin")');
   await open(S, await grantFor('maksym'));
   await S.click('#profile');
-  await S.wait('!!document.querySelector("[data-switch=anastasiia]")');
-  await S.click('[data-switch=anastasiia]');
-  const anEmail = (await AN.rest('GET', 'profiles?select=id&id=eq.' + AN.uid)).ok && AN.session.user.email;
-  check(G, 'switch: sign-out, then the form prefilled with the other person\'s email', await S.wait('!!document.getElementById("signin")') && await S.ev(`document.getElementById("si-email").value===${JSON.stringify(anEmail)}`));
+  await S.wait('!!document.querySelector("[data-signout]")');
+  check(G, 'account menu: no Accounts on this browser, no Add account, Sign out only (round 4)', await S.ev('!document.querySelector("[data-switch],[data-forget],[data-addaccount]") && !/Accounts on this browser|Add account/.test(document.getElementById("pop")?.textContent||"")'));
+  await S.click('[data-signout]');
+  check(G, 'Sign out shows the sign-in form', await S.wait('!!document.getElementById("signin")'));
   check(G, 'sign-out removes td.auth', await S.ev('!localStorage.getItem("td.auth") && !sessionStorage.getItem("td.auth")'));
   // a second context stays signed in after the first signs out
   await T.click('#profile'); await T.click('[data-signout]');
@@ -545,6 +546,9 @@ async function gErrors() {
 
 async function gUi() {
   const G = 'ui';
+  // round 4: a reminder with a long description (Show more at 300), an end date (the small card's End line), a category badge
+  const r4 = await mkItem('round 4 long description', { category: 'reminder', body_md: ('Round four ' + 'word '.repeat(90)).trim(), due_at: new Date(Date.now() + 3 * 864e5).toISOString() });
+  const r4c = `document.querySelector('[data-card="${r4.id}"]')`;
   for (const [who, theme] of [['maksym', 'light'], ['anastasiia', 'dark']]) {
     const T = await tab(B, await ctx(B));
     await T.theme(theme);
@@ -568,11 +572,41 @@ async function gUi() {
     await T.shot(`ui-cardlayout-${who}-1440x900-${theme}`);
     await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('input[name=cl-mode][value=expanded]').checked=true;d.querySelector('[data-cl=owner]').checked=true;d.querySelector('#cl-auto').value='300';d.querySelector('#cl-save').click();return true})()`);
     check(G, `${who}: Card layout expanded: cards open; "For <name>" on cards with an owner`, await T.wait(`!document.querySelector('[data-card]') || document.querySelectorAll('[data-card].full').length>0`, 5000), 'For-lines: ' + await T.ev(`[...document.querySelectorAll('.card.full .details .row span')].filter(s=>/^For /.test(s.textContent)).length`));
+    // round 4, item 4: an open card cuts the long description at 300 characters with Show more (and Show less); item 3: no category badge
+    check(G, `${who}: an open card cuts a 400-character description at 300, Show more shows the rest (round 4, item 4)`, await T.wait(`!!${r4c}?.querySelector('[data-more]')`, 8000) &&
+      await T.ev(`${r4c}.querySelector('.md').textContent.length<=302`) && (await T.click(`[data-more="${r4.id}"]`), await T.wait(`${r4c}.querySelector('.md').textContent.length>390&&/Show less/.test(${r4c}.querySelector('[data-more]').textContent)`, 3000)),
+      await T.ev(`${r4c}?.querySelector('.md')?.textContent.length`));
+    check(G, `${who}: no category badge on a card while Source is off (round 4, item 3)`, await T.ev(`!!${r4c}&&!${r4c}.querySelector('.tbs .tb:not(.ai)')`));
     await sleep(2000);
     await T.reload(); await T.ready();
     check(G, `${who}: the welcome does not come back after a reload`, await T.ev('!document.getElementById("welcome")'));
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     check(G, `${who}: Card layout survives a reload`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.querySelector('input[name=cl-mode][value=expanded]').checked&&d.querySelector('[data-cl=owner]').checked&&d.querySelector('#cl-auto').value==='300'})()`));
+    await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
+    // round 4, item 5: a small card shows its number and a second line with what Card layout switches on (by default End)
+    check(G, `${who}: a small card shows its number and an End line (round 4, item 5)`, await T.wait(`!!${r4c}?.classList.contains('compact')&&!!${r4c}.querySelector('.ref')&&/End \\d{4}-/.test(${r4c}.querySelector('.sub')?.textContent||'')`, 5000),
+      await T.ev(`${r4c}?.querySelector('.sub')?.textContent`));
+    await T.ev(`(${r4c}.click(),true)`); await T.wait('!!document.querySelector("dialog[open] #ft")', 5000);
+    check(G, `${who}: the task window shows the number (Card layout) and no Sources while Source is off (round 4, items 3, 5)`,
+      await T.ev(`(document.getElementById('fwho')?.textContent||'')===${r4c}.querySelector('.ref').textContent&&!document.querySelector('dialog[open] #srcs')`), await T.ev(`document.getElementById('fwho')?.textContent`));
+    await closeDialogs(T);
+    // round 4, item 3: Source on shows the category badge and Sources with All lists, never with one list selected
+    await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+    await T.ev('(document.querySelector("dialog[open] [data-cl=source]").checked=true,document.querySelector("dialog[open] #cl-save").click(),true)');
+    check(G, `${who}: Source on, All lists: the card shows "Reminder" and the task window shows Sources (round 4, item 3)`, await T.wait(`/Reminder/.test(${r4c}?.querySelector('.tbs')?.textContent||'')`, 5000) &&
+      (await T.ev(`(${r4c}.click(),true)`), await T.wait('!!document.querySelector("dialog[open] #srcs")', 5000)));
+    await closeDialogs(T);
+    await T.ev(`(st.list='${ST.id}',st.pop=null,render(),true)`);
+    check(G, `${who}: Source on, one list selected: no badge and no Sources (round 4, item 3)`, await T.wait(`!!${r4c}&&!${r4c}.querySelector('.tbs .tb:not(.ai)')`, 5000) &&
+      (await T.ev(`(${r4c}.click(),true)`), await T.wait('!!document.querySelector("dialog[open] #ft")', 5000)) && await T.ev('!document.querySelector("dialog[open] #srcs")'));
+    await closeDialogs(T);
+    // round 4, item 2: an owner's list menu has Share and no People; a member's has People and no Share
+    const owns = await T.ev(`ROLE['${ST.id}']==='owner'`);
+    await T.click('#listmenu');
+    check(G, `${who}: the _selftest list menu shows ${owns ? 'Share and no People (owner)' : 'People and no Share (member)'} (round 4, item 2)`,
+      await T.ev(owns ? `!!document.querySelector('#pop [data-share-list]')&&!document.querySelector('#pop [data-people-list]')` : `!!document.querySelector('#pop [data-people-list]')&&!document.querySelector('#pop [data-share-list]')`));
+    await T.ev(`(st.pop=null,st.list='all',render(),true)`);
+    await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
     await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
     check(G, `${who}: settings and preferences survive a reload (Do limit ${lim})`, await T.ev(`document.getElementById('s-lim').value==='${lim}'`));
@@ -614,9 +648,8 @@ async function gUi() {
       check(G, `${who}: list chips: a click picks one, Shift-click the range, Ctrl-click drops one (F4)`, range === rvl.slice(0, 3).join() && less === [rvl[0], rvl[2]].join(), `${range} / ${less}`);
       await T.click('[data-rvl="all"]');
     } else skip(G, `${who}: list chips Shift-click (F4)`, 'fewer than 3 lists');
-    // round 3, adjustment 9: KPI (collapsed until opened; reads the lists' items and item_events once per session)
-    check(G, `${who}: KPI starts collapsed`, await T.ev('!document.getElementById("kpi").open'));
-    await T.ev('(document.querySelector("#kpi summary").click(),true)');
+    // round 4, item 6 (replaces round 3 U10): Visuals (the KPI) are open on entering the Review, above the tasks, a --- line between
+    check(G, `${who}: Visuals open on entering the Review, named Visuals, above the tasks with a line between (round 4, item 6)`, await T.ev(`(()=>{const k=document.getElementById('kpi'),hr=document.querySelector('.rvw hr.rv-sep'),t=document.querySelector('.rvw .rvq,.rvw .rv-empty,.rvw .rv-none');return !!k&&k.open&&/^Visuals/.test(k.querySelector('summary').textContent)&&!!hr&&!!(k.compareDocumentPosition(hr)&Node.DOCUMENT_POSITION_FOLLOWING)&&(!t||!!(hr.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING))})()`));
     // round 3 P1, U11: one block; Period | All time (or "All time = the same days"); three charts under their questions
     check(G, `${who}: KPI is one block with three charts under their questions, the dates beside the range (U11)`, await T.wait('document.querySelectorAll(".kpi-g").length===1 && !!document.querySelector(".kpi-g .kpi-area svg") && !!document.querySelector(".kpi-g .kpi-qs") && !!document.querySelector(".kpi-g .kpi-left")', 30000) &&
       await T.ev(`[...document.querySelectorAll('.kpi-qn')].map(f=>f.textContent).join('|')==='Is my open work growing, and where?|Where is my work, and how much is done?|How did tasks leave the board?'&&/\\d{4}/.test(document.querySelector('.kpi-per').textContent)&&!document.querySelector('.kpi-pie')`));
@@ -640,10 +673,10 @@ async function gUi() {
       await T.ev('scrollTo(0,0),true');
     }
     await T.size(1440, 900);
-    // U10: the KPI starts closed again after the view changes
+    // round 4, item 6: folded Visuals open again after the view changes
+    await T.ev('(document.querySelector("#kpi summary").click(),true)'); await T.wait('!document.getElementById("kpi").open', 3000);
     await T.click('[data-view=matrix]'); await T.click('[data-view=review]');
-    check(G, `${who}: KPI is closed again after leaving the Review and coming back (U10)`, await T.wait('!!document.getElementById("kpi")', 5000) && await T.ev('!document.getElementById("kpi").open'));
-    await T.ev('(document.querySelector("#kpi summary").click(),true)'); await T.wait('!!document.querySelector(".kpi-g")', 30000);
+    check(G, `${who}: folded Visuals are open again after leaving the Review and coming back (round 4, item 6)`, await T.wait('!!document.getElementById("kpi")?.open', 5000) && await T.wait('!!document.querySelector(".kpi-g")', 30000));
     if (who === 'maksym') {
       // Download: one self-contained HTML file (no script, no network) with the review and the KPI charts
       const dlDir = OUT; // flat: the saved file lands next to the report
@@ -654,6 +687,7 @@ async function gUi() {
       const html = file ? fs.readFileSync(path.join(dlDir, file), 'utf8') : '';
       check(G, 'Download saves one HTML file: the review, the KPI charts as SVG, print styles, no script, no network', !!file && /<h1>Weekly review<\/h1>/.test(html) && /class="kpi-g"/.test(html) && /<svg/.test(html) && /@media print/.test(html) && !/<script/i.test(html) && !/(src|href)="https?:/i.test(html), file || 'no file');
       check(G, 'the saved file has the redesigned KPI (the three questions, quadrant rows) and no test list rows (U11, F3)', /Is my open work growing, and where\?/.test(html) && /class="kpi-qs"/.test(html) && !html.includes('kpi-pie') && !html.includes('_selftest'));
+      check(G, 'the saved file puts Visuals first, then the line, then the tasks (round 4, item 6)', /<h2>Visuals<\/h2>/.test(html) && html.indexOf('class="kpi"') < html.indexOf('rv-sep') && (html.indexOf('class="rvq') < 0 || html.indexOf('rv-sep') < html.indexOf('class="rvq')));
       if (file) {
         const E = await tab(B, await ctx(B));
         await E.go(pathToFileURL(path.join(dlDir, file)).href); await sleep(300);
@@ -710,6 +744,8 @@ async function gUi() {
     await T.size(390, 844); await sleep(400);
     for (const v of ['matrix', 'review']) { await T.click(`[data-view=${v}]`); await sleep(300); check(G, `${who}: no horizontal scroll at 390 px (${v})`, await T.ev('document.documentElement.scrollWidth<=innerWidth'), await T.ev('document.documentElement.scrollWidth+" / "+innerWidth')); }
     await T.click('[data-view=matrix]');
+    check(G, `${who}: no card overflows at 390 px (round 4: the small card's second line)`, await T.ev('[...document.querySelectorAll(".card")].every(c=>c.scrollWidth<=c.clientWidth+1)'),
+      await T.ev(`(()=>{const c=${r4c};return c?Math.round(c.getBoundingClientRect().height)+' px high (round-4 card)':'no round-4 card'})()`));
     await T.size(1440, 900);
     check(G, `${who}: ${onlyHosts()}`, !strayHosts(T.hosts, SUPA, ORIGIN).length, [...T.hosts].join(', '));
     check(G, `${who}: no console errors`, !T.errors.length, T.errors.slice(0, 2).join(' / '));

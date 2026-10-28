@@ -71,7 +71,7 @@ test('mergeTagDefs: new tag, rename, delete, unknown tag list', () => {
 test('prefs: cardLayout and welcomeSeen, defaults are today\'s card', () => {
   const p = C.prefsFromRow(null);
   assert.equal(p.welcomeSeen, false);
-  assert.deepEqual(p.cardLayout, { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, tags: 'all', tagLists: [], autoCollapse: 100 });
+  assert.deepEqual(p.cardLayout, { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, source: false, tags: 'all', tagLists: [], autoCollapse: 100 }, 'round 4 adds source, off');
   const q = C.prefsFromRow({ welcomeSeen: true, cardLayout: { owner: true, number: 'yes', tags: 'lists', tagLists: ['TL1', 'gone'], autoCollapse: 250, extra: 1 } }, { tagListIds: ['TL1'] });
   assert.equal(q.welcomeSeen, true);
   assert.equal(q.cardLayout.owner, true); assert.equal(q.cardLayout.number, true, 'a wrong type keeps the default');
@@ -83,14 +83,13 @@ test('prefs: cardLayout and welcomeSeen, defaults are today\'s card', () => {
   assert.deepEqual(back.cardLayout, q.cardLayout, 'round trip through the row');
 });
 
-test('cardExpanded: mode, auto-collapse over N characters, flipped', () => {
+test('cardExpanded: mode and flipped only (round 4: autoCollapse cuts the description instead, descClip)', () => {
   const L = C.readCardLayout(null), short = { id: 'a', notes: 'x'.repeat(100) }, long = { id: 'b', notes: 'x'.repeat(101) };
   assert.equal(C.cardExpanded(short, 'expanded', L, new Set()), true);
-  assert.equal(C.cardExpanded(long, 'expanded', L, new Set()), false);
-  assert.equal(C.cardExpanded(long, 'expanded', L, new Set(['b'])), true, 'the arrow still opens it');
+  assert.equal(C.cardExpanded(long, 'expanded', L, new Set()), true, 'a long description no longer collapses the card');
+  assert.equal(C.cardExpanded(long, 'expanded', L, new Set(['b'])), false, 'the arrow closes it');
   assert.equal(C.cardExpanded(long, 'collapsed', L, new Set()), false);
   assert.equal(C.cardExpanded(short, 'collapsed', L, new Set(['a'])), true);
-  assert.equal(C.cardExpanded(long, 'expanded', Object.assign({}, L, { autoCollapse: 0 }), new Set()), true, '0 turns it off');
 });
 
 test('cardTagIds: all, chosen tag lists, off', () => {

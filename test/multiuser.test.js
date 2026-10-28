@@ -92,13 +92,13 @@ test('oauthMessage: hook refusals, closed sign-ups, cancel and expiry in plain w
   assert.equal(C.oauthMessage(null), 'Google sign-in failed.');
 });
 
-test('td.accounts: handle, email, provider only; td.emails migrated; most recent first; at most 8; forget', () => {
+test('td.accounts: handle, email, provider only; td.emails migrated; most recent first; at most 8 (round 4: no forget)', () => {
   const a = C.readAccounts(null, { maksym: 'm@x.pt', anastasiia: 'a@x.pt', 'bad handle': 'z@x.pt', nomail: 'nope' });
   assert.deepEqual(a.map(x => ({ ...x })), [{ handle: 'maksym', email: 'm@x.pt', provider: 'email' }, { handle: 'anastasiia', email: 'a@x.pt', provider: 'email' }]);
   const b = C.rememberAccount(a, { handle: 'anastasiia', email: 'a@x.pt', provider: 'google', refresh_token: 'never' });
   assert.deepEqual({ ...b[0] }, { handle: 'anastasiia', email: 'a@x.pt', provider: 'google' }, 'moved first, no token kept');
   assert.equal(b.length, 2);
-  assert.deepEqual(C.forgetAccount(b, 'anastasiia').map(x => x.handle), ['maksym']);
+  assert.equal(C.forgetAccount, undefined, 'round 4: Accounts on this browser (switch, forget) is gone');
   assert.equal(C.accountFor(b, 'maksym').email, 'm@x.pt'); assert.equal(C.accountFor(b, 'x'), null);
   const many = Array.from({ length: 12 }, (_, i) => ({ handle: 'u-' + i, email: i + '@x.pt', provider: 'google' }));
   assert.equal(C.readAccounts(many).length, C.ACCOUNTS_MAX);
@@ -136,7 +136,8 @@ test('mergeTagRows and tagDiff: adds, soft removals, pending items skipped, unkn
 });
 
 test('membershipActions, canEditTags, defaultAddList (A6)', () => {
-  assert.deepEqual(C.membershipActions('owner', 'list'), ['share', 'people', 'archive']);
+  assert.deepEqual(C.membershipActions('owner', 'list'), ['share', 'archive'], 'round 4: no People beside Share');
+  assert.deepEqual(C.membershipActions('owner', 'tag_list'), ['share', 'rename']);
   assert.deepEqual(C.membershipActions('viewer', 'list'), ['people', 'hide', 'leave']);
   // round 3: an editor of a tag list shares it; a contributor adds and renames tags
   assert.deepEqual(C.membershipActions('editor', 'tag_list'), ['share', 'hide', 'leave']);
