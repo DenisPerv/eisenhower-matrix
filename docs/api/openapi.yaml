@@ -1,0 +1,504 @@
+openapi: 3.1.0
+info:
+  title: TasksDashboard read API
+  version: "2026-10-28"
+  summary: The weekly review report and the read endpoints of TasksDashboardDB (Supabase, PostgREST).
+  description: |
+    Read endpoints of the database behind TasksDashboard. Every call runs as a signed-in login: Supabase Auth issues the
+    access token, PostgREST runs the request as the role `authenticated`, and row level security (RLS) decides which rows
+    come back. A login sees exactly what the app shows it: its own lists, lists shared with it, and for household members
+    the household's lists. `anon` (the publishable key alone, no token) reads nothing.
+
+    Writes (create, update, done, cancel) are not part of this document: they stay with the app and the CLI (`cli/`).
+    Google sign-in is browser-only (PKCE redirect); scripts sign in with a password login (`/auth/v1/token`).
+
+    How to call it, with curl examples and error codes: `docs/api/README.md`. Database functions: `docs/database.md`.
+    Values in angle brackets are placeholders; never commit a real key, token, email or project ref.
+servers:
+  - url: https://{project_ref}.supabase.co
+    variables:
+      project_ref:
+        default: your-project-ref
+        description: the Supabase project ref (Project Settings → General)
+security:
+  - publishableKey: []
+    bearerToken: []
+tags:
+  - name: auth
+    description: sign in with a password login, refresh a session (Supabase Auth)
+  - name: report
+    description: the weekly review as data (`db/016_review_report.sql`)
+  - name: rpc
+    description: other read RPCs the app uses
+  - name: tables
+    description: plain table reads through PostgREST (RLS applies)
+paths:
+  /auth/v1/token:
+    post:
+      tags: [auth]
+      operationId: token
+      summary: Get an access token (password) or a new one (refresh_token)
+      description: |
+        `grant_type=password` with the login's email and password, or `grant_type=refresh_token` with the last refresh
+        token. Access tokens live `expires_in` seconds (3600 by default); refresh tokens rotate (a used one is refused
+        after a short reuse interval, 10 s by default): keep the new one from each answer. Only the publishable key is sent as `apikey`, no bearer token.
+      security:
+        - publishableKey: []
+      parameters:
+        - name: grant_type
+          in: query
+          required: true
+          schema: { type: string, enum: [password, refresh_token] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [email, password]
+                  properties:
+                    email: { type: string, format: email }
+                    password: { type: string, format: password }
+                - type: object
+                  required: [refresh_token]
+                  properties:
+                    refresh_token: { type: string }
+      responses:
+        "200":
+          description: a session
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Session" }
+        "400":
+          description: "`invalid_credentials` (wrong email or password), `refresh_token_not_found` or `refresh_token_already_used`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthError" }
+        "429":
+          description: "`over_request_rate_limit`: too many sign-ins; wait and retry"
+  /rest/v1/rpc/review_report:
+    post:
+      tags: [report]
+      operationId: review_report
+      summary: The weekly review for one or more ISO weeks
+      description: |
+        The report the app's Review view shows, as data. A task is listed once: by the day it was closed (`done`, or
+        `cancelled` at its latest cancel event) when that day is in a picked week; else by its end date (`due_at`) when
+        that is in a picked week, as `overdue` (still open and the end has passed) or `due`. Deleted tasks, archived lists
+        and test lists (slug starting with `_`) never appear. `late` = the end is before the close (or before now while
+        open). Groups are the four quadrants A-D (Do, Plan, Delegate, Eliminate), always all four; inside a group the
+        lists follow the caller's list order (the app's `listOrder` preference, else the list's `sort`, then name); rows
+        are sorted by `at`, then `num`. The quadrant is the stored one, else derived like the app: important = priority
+        3 or more or category reminder, tbd or decision; urgent = the pin when set, else an end within the caller's
+        urgency window (`windowDays`, default 7). Weeks start on Monday 00:00 in the caller's `profiles.timezone`.
+
+        Security invoker: RLS decides, so a login only gets rows of lists it can read. Read only; no rate limit of its
+        own (writes have one), bounded by its caps. The Visuals (KPI charts) are not in it: read `rpc/kpi_events` and
+        compute them as the app's core functions do.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_weeks]
+              properties:
+                p_weeks:
+                  type: array
+                  minItems: 1
+                  maxItems: 26
+                  items: { type: string, pattern: "^[0-9]{4}-W[0-9]{2}$" }
+                  description: ISO week keys, e.g. `2026-W44`; duplicates are ignored
+                p_lists:
+                  type: [array, "null"]
+                  maxItems: 50
+                  items: { type: string, format: uuid }
+                  description: only these lists; null or left out = every list the app shows the caller (not hidden by it)
+                p_now:
+                  type: [string, "null"]
+                  format: date-time
+                  description: tests only; the time `overdue` and `late` are measured against (default now)
+            example: { p_weeks: ["2026-W43", "2026-W44"] }
+      responses:
+        "200":
+          description: the report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewReport" }
+        "400":
+          description: "22023: a bad week key, no week or more than 26, more than 50 lists"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostgrestError" }
+        "401":
+          description: missing, expired or invalid access token (PGRST301, PGRST303), or no token (anon has no execute)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostgrestError" }
+  /rest/v1/rpc/kpi_events:
+    post:
+      tags: [rpc]
+      operationId: kpi_events
+      summary: The KPI history of some lists (items and their KPI events)
+      description: |
+        `db/013_kpi.sql`, security invoker. The lists' items (deleted ones too) and the `item_events` whose `diff`
+        touches a KPI column (`quadrant status due_at urgent_pin priority category deleted_at list_id`), one jsonb
+        answer. The app rebuilds the Visuals from it in the browser (core `kpiHistory`, `kpiSeries`, `kpiPie`,
+        `kpiClosure`); the charts are not computed in the database.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_lists]
+              properties:
+                p_lists: { type: array, items: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: "`{ items, events }`"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        list_id: { type: string, format: uuid }
+                        quadrant: { type: [string, "null"], enum: [A, B, C, D, null] }
+                        status: { type: string }
+                        due_at: { type: [string, "null"], format: date-time }
+                        urgent_pin: { type: [boolean, "null"] }
+                        priority: { type: [integer, "null"] }
+                        category: { type: string }
+                        deleted_at: { type: [string, "null"], format: date-time }
+                        created_at: { type: string, format: date-time }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        item_id: { type: string, format: uuid }
+                        at: { type: string, format: date-time }
+                        diff:
+                          type: object
+                          description: "`{ column: { old, new } }`, KPI columns only"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/rpc/urgency_settings:
+    post:
+      tags: [rpc]
+      operationId: urgency_settings
+      summary: A person's urgency settings (window, due-soon threshold, Do limit)
+      description: |
+        `db/014_urgency_app.sql`, security definer. The caller's own settings, or (for a household member) another
+        household member's. A value the person never set is `null` (the app then uses its defaults: windowDays 7,
+        threshold 50, doLimit 5).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                p_profile: { type: [string, "null"], format: uuid, description: "default: the caller" }
+      responses:
+        "200":
+          description: the settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile_id: { type: string, format: uuid }
+                  windowDays: { type: [number, "null"] }
+                  threshold: { type: [number, "null"] }
+                  doLimit: { type: [number, "null"] }
+        "403":
+          description: "42501: not allowed (another person's settings without being in the household)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostgrestError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/rpc/list_people:
+    post:
+      tags: [rpc]
+      operationId: list_people
+      summary: Who is on a list (members; pending invitations for its owner)
+      description: "`db/010_multiuser_functions.sql`, security definer. Members are shown to any member; pending invitations only to the owner."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_list]
+              properties:
+                p_list: { type: string, format: uuid }
+      responses:
+        "200":
+          description: one row per member or pending invitation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    profile_id: { type: [string, "null"], format: uuid }
+                    display_name: { type: [string, "null"] }
+                    email: { type: [string, "null"], description: "pending invitations only" }
+                    role: { type: string, enum: [owner, editor, contributor, viewer] }
+                    state: { type: string, enum: [member, pending] }
+                    invite_id: { type: [string, "null"], format: uuid }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/rpc/my_invitations:
+    post:
+      tags: [rpc]
+      operationId: my_invitations
+      summary: Open invitations addressed to the caller
+      description: "`db/012_round3.sql`, security definer. Invitations to a list or tag list that are not accepted, declined, revoked, expired or blocked, newest first."
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: the invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    kind: { type: string, enum: [list, tag_list] }
+                    target_name: { type: string }
+                    inviter_name: { type: string }
+                    role: { type: string }
+                    created_at: { type: string, format: date-time }
+                    expires_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/lists:
+    get:
+      tags: [tables]
+      operationId: get_lists
+      summary: The lists the caller can read
+      description: PostgREST table read; RLS returns only lists the caller is a member of (and household lists for the household).
+      parameters:
+        - { $ref: "#/components/parameters/select" }
+        - name: archived_at
+          in: query
+          schema: { type: string }
+          example: is.null
+          description: "`is.null` = live lists only"
+        - { $ref: "#/components/parameters/order" }
+      responses:
+        "200":
+          description: list rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    slug: { type: string }
+                    name: { type: string }
+                    owner_id: { type: string, format: uuid }
+                    sort: { type: integer }
+                    default_category: { type: [string, "null"] }
+                    archived_at: { type: [string, "null"], format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/items:
+    get:
+      tags: [tables]
+      operationId: get_items
+      summary: Items (tasks, reminders, TBD items) of the caller's lists
+      description: |
+        PostgREST table read with filters (`column=op.value`). RLS returns only items of lists the caller can read.
+        At most 1000 rows per answer: page with `limit` and `offset` or the `Range` header. Tags live in `item_tags`
+        (embed `item_tags(tag_id)`).
+      parameters:
+        - { $ref: "#/components/parameters/select" }
+        - name: list_id
+          in: query
+          schema: { type: string }
+          example: eq.<list-uuid>
+        - name: status
+          in: query
+          schema: { type: string }
+          example: in.(open,in_progress,waiting)
+          description: "one of inbox, open, in_progress, waiting, proposed, agreed, done, cancelled"
+        - name: deleted_at
+          in: query
+          schema: { type: string }
+          example: is.null
+        - name: due_at
+          in: query
+          schema: { type: string }
+          example: lt.2026-11-02T00:00:00Z
+        - name: category
+          in: query
+          schema: { type: string }
+          example: eq.reminder
+        - { $ref: "#/components/parameters/order" }
+        - name: limit
+          in: query
+          schema: { type: integer, maximum: 1000 }
+        - name: offset
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: item rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Item" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+components:
+  securitySchemes:
+    publishableKey:
+      type: apiKey
+      in: header
+      name: apikey
+      description: the project's publishable key (`sb_publishable_…`), public, also in `config/tasksdashboard.config.js`. Never the secret or service key.
+    bearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "`Authorization: Bearer <access_token>` from `/auth/v1/token`"
+  parameters:
+    select:
+      name: select
+      in: query
+      schema: { type: string }
+      example: id,num,title,status,due_at
+      description: columns to return (PostgREST `select`)
+    order:
+      name: order
+      in: query
+      schema: { type: string }
+      example: due_at.asc.nullslast
+  responses:
+    Unauthorized:
+      description: missing, expired or invalid access token (PGRST301, PGRST303); refresh it and retry
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/PostgrestError" }
+  schemas:
+    Session:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, const: bearer }
+        expires_in: { type: integer, example: 3600 }
+        expires_at: { type: integer }
+        refresh_token: { type: string }
+        user:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            email: { type: string }
+    AuthError:
+      type: object
+      properties:
+        code: { type: [integer, string] }
+        error_code: { type: string, example: invalid_credentials }
+        msg: { type: string }
+    PostgrestError:
+      type: object
+      properties:
+        code: { type: string, example: "22023" }
+        message: { type: string }
+        details: { type: [string, "null"] }
+        hint: { type: [string, "null"] }
+    ReviewReport:
+      type: object
+      required: [period, lists, groups]
+      properties:
+        period:
+          type: object
+          properties:
+            from: { type: string, format: date-time, description: "Monday 00:00 of the first week, in tz" }
+            to: { type: string, format: date-time, description: "Monday 00:00 after the last week (exclusive)" }
+            weeks: { type: array, items: { type: string } }
+            tz: { type: string, example: Europe/Lisbon }
+            now: { type: string, format: date-time }
+            windowDays: { type: number, example: 7 }
+        lists:
+          type: array
+          description: the lists the report covers, in the caller's order
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+        groups:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: object
+            properties:
+              q: { type: string, enum: [A, B, C, D] }
+              name: { type: string, enum: [Do, Plan, Delegate, Eliminate] }
+              count: { type: integer }
+              lists:
+                type: array
+                description: only lists with rows in this quadrant
+                items:
+                  type: object
+                  properties:
+                    list_id: { type: string, format: uuid }
+                    name: { type: string }
+                    rows:
+                      type: array
+                      items: { $ref: "#/components/schemas/ReviewRow" }
+    ReviewRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        num: { type: integer, description: "the item's number in its list" }
+        title: { type: string }
+        kind: { type: string, enum: [done, cancelled, overdue, due] }
+        at: { type: string, format: date-time, description: "the time the row is listed by: closed, else the end" }
+        due_at: { type: [string, "null"], format: date-time }
+        late: { type: boolean }
+        status: { type: string }
+        tags:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+    Item:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        list_id: { type: string, format: uuid }
+        num: { type: integer }
+        title: { type: string }
+        body_md: { type: [string, "null"] }
+        category: { type: string }
+        status: { type: string }
+        quadrant: { type: [string, "null"], enum: [A, B, C, D, null] }
+        urgent_pin: { type: [boolean, "null"] }
+        priority: { type: [integer, "null"] }
+        due_at: { type: [string, "null"], format: date-time }
+        completed_at: { type: [string, "null"], format: date-time }
+        owner_id: { type: [string, "null"], format: uuid }
+        created_by: { type: [string, "null"], format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        deleted_at: { type: [string, "null"], format: date-time }
+        version: { type: integer }

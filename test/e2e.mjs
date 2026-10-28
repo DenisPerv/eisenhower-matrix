@@ -34,7 +34,7 @@ const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // real key presses (CDP Input): implicit form submission and the dialog's Escape only follow trusted keys. Modifiers: Alt 1
 const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 } };
-const rows = [], leftovers = [], kpiTimes = [];
+const rows = [], leftovers = [], kpiTimes = [], reviewApiTimes = [];
 let pass = 0, fail = 0, skipped = 0;
 const check = (group, what, ok, note) => { ok ? pass++ : fail++; rows.push(`| ${group} | ${what} | ${ok ? 'pass' : 'FAIL'} | ${String(note || '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 160)} |`); console.log(`${ok ? 'pass' : 'FAIL'} ${group}: ${what}`); };
 // a check that cannot run here (a login missing from the env): reported, never counted as passed or failed
@@ -657,6 +657,19 @@ async function gUi() {
       check(G, `${who}: list chips: a click picks one, Shift-click the range, Ctrl-click drops one (F4)`, range === rvl.slice(0, 3).join() && less === [rvl[0], rvl[2]].join(), `${range} / ${less}`);
       await T.click('[data-rvl="all"]');
     } else skip(G, `${who}: list chips Shift-click (F4)`, 'fewer than 3 lists');
+    // round 4 wave B, item 7 (D6): the API rpc/review_report (db/016) for the picked weeks gives the rows the Review shows: the
+    // same ids, kinds and quadrants, as this person, in under 2 s. The page's rows come from the DOM (its state is in a closure);
+    // cancelled rows may move once the page has read their cancel times, so the comparison is retried for a few seconds
+    const rvWeeks = (await picked()).split(',').filter(Boolean);
+    const pageRows = () => T.ev(`[...document.querySelectorAll('.rvw .rvq')].flatMap(s=>[...s.querySelectorAll('.rv-r')].map(b=>s.dataset.q+':'+b.dataset.open+':'+['done','cancelled','overdue','due'].find(k=>b.classList.contains(k)))).sort()`);
+    const t0r = Date.now(), rr = await c0.rest('POST', 'rpc/review_report', { p_weeks: rvWeeks }), rpcMs = Date.now() - t0r;
+    const apiRows = rr.ok ? rr.json.groups.flatMap(g => g.lists.flatMap(l => (l.rows || []).map(r => g.q + ':' + r.id + ':' + r.kind))).sort() : null;
+    const same = async () => { const p = await pageRows(); return apiRows && JSON.stringify(p) === JSON.stringify(apiRows) ? p : null; };
+    const pr0 = await until(same, 8000);
+    const diff = apiRows && !pr0 ? (pg => { const a = new Set(apiRows), b = new Set(pg); return 'api only: ' + apiRows.filter(x => !b.has(x)).slice(0, 4).join(' ') + '; page only: ' + pg.filter(x => !a.has(x)).slice(0, 4).join(' '); })(await pageRows()) : '';
+    check(G, `${who}: rpc/review_report matches the Review for the picked weeks (ids, kinds, quadrants) in under 2 s (round 4 wave B, D6)`, !!pr0 && rpcMs < 2000,
+      rr.ok ? `${apiRows.length} rows, ${rvWeeks.join(' ')}, ${rpcMs} ms${diff ? '; ' + diff : ''}` : 'rpc failed: ' + (rr.err && rr.err.message));
+    reviewApiTimes.push({ who, ms: rpcMs, rows: apiRows ? apiRows.length : null, weeks: rvWeeks.join(' ') });
     // round 4, item 6 (replaces round 3 U10): Visuals (the KPI) are open on entering the Review, above the tasks, a --- line between
     check(G, `${who}: Visuals open on entering the Review, named Visuals, above the tasks with a line between (round 4, item 6)`, await T.ev(`(()=>{const k=document.getElementById('kpi'),hr=document.querySelector('.rvw hr.rv-sep'),t=document.querySelector('.rvw .rvq,.rvw .rv-empty,.rvw .rv-none');return !!k&&k.open&&/^Visuals/.test(k.querySelector('summary').textContent)&&!!hr&&!!(k.compareDocumentPosition(hr)&Node.DOCUMENT_POSITION_FOLLOWING)&&(!t||!!(hr.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING))})()`));
     // round 3 P1, U11: one block; Period | All time (or "All time = the same days"); three charts under their questions
@@ -1385,6 +1398,7 @@ try {
   for (const c of clients.reverse()) await c.close();
   const report = ['# TasksDashboard e2e', '', `Run \`${RUN}\`, ${new Date().toISOString()}, ${Math.round((Date.now() - t0) / 1000)} s. Page \`${ORIGIN ? ORIGIN + '/' + (ACCESS ? '` (Access service token)' : '`') : PAGE + '`'}. Groups: ${want.join(', ')}. Logins from the env file; no values printed.`, '',
     `**${pass} of ${pass + fail} passed${skipped ? `, ${skipped} skipped` : ''}.**`, '', '| Group | Check | Result | Note |', '|---|---|---|---|', ...rows, '', '## Leftovers', '', ...(leftovers.length ? leftovers.map(x => '- ' + x) : ['- none']), '',
+    ...(reviewApiTimes.length ? ['## Review API (rpc/review_report)', '', '| Login | ms | rows | weeks |', '|---|---|---|---|', ...reviewApiTimes.map(k => `| ${k.who} | ${k.ms} | ${k.rows} | ${k.weeks} |`), ''] : []),
     ...(kpiTimes.length ? ['## KPI read', '', '| Login | ms | items | events | lists | via |', '|---|---|---|---|---|---|', ...kpiTimes.map(k => `| ${k.who} | ${k.ms} | ${k.items} | ${k.events} | ${k.lists} | ${k.via} |`), ''] : []),
     'Screenshots: the `*.png` files next to this report.'].join('\n');
   fs.writeFileSync(path.join(OUT, 'e2e-report.md'), report + '\n');
