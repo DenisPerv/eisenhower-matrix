@@ -29,6 +29,15 @@ Setup in Supabase (once per hosted origin):
 
 The hosted copy sends `Referrer-Policy: no-referrer`, so the `?code=` in the address never leaks in a request the page makes before it swaps and removes it ([hosting.md](hosting.md)).
 
+## Sign-in in the phone app
+
+The installed app (`/app/`, [architecture.md](architecture.md)) signs in the same two ways, through `app/td-data.js`.
+
+- **Password:** the same grant; "Stay signed in on this phone" picks `localStorage` (on) or `sessionStorage`. The tokens are the page's own `td.auth`, so the web page on the same origin is signed in too, and the refresh lock and channel are shared.
+- **Google (PKCE):** like the page's, but it returns to `<origin>/app/` and keeps the verifier in `localStorage` under `td.app.pkce` as `{ verifier, stay, at }`, not in `sessionStorage`: an installed app on iPhone may come back from Google in a new page that has no session storage. The verifier is used once (deleted on first read) and refused after 10 minutes ("The Google sign-in expired. Try again."). Only on an https origin or `http://localhost`. **iPhone caveat: whether the installed app comes back from Google into the app or into Safari is to be confirmed on a device**; the fallback is the password.
+- **The gate:** after a sign-in the app asks whether this login may see the board. Household logins, approved access requests and members of a list someone else owns get the board; everyone else gets the request screen ("Ask for access"), which files the same request as `/request`. The gate is a courtesy: RLS and the sign-up hook still decide what a login can read and write.
+- **Session ended:** an expired or revoked refresh token shows "Session ended"; the unsent changes stay in the durable queue and are sent after the same person signs in. Signing out sends what it can, then clears the queue of that login.
+
 ## Who may get an account: the sign-up hook
 
 `hook_before_user_created` (`db/010`, tightened in `012`) runs inside Supabase Auth before any new user exists (Authentication → Hooks → Before User Created → Postgres function `public.hook_before_user_created`):
@@ -45,6 +54,7 @@ Auth settings that go with it: "Allow new users to sign up" **on** only behind t
 |---|---|---|
 | `td.auth` | `localStorage` (Stay signed in ticked) or `sessionStorage` (this tab only) | the refresh token and the login's id; the access token stays in memory |
 | `td.pkce` | `sessionStorage` | the PKCE verifier between the redirect and the callback |
+| `td.app.pkce` | `localStorage` | the phone app's PKCE verifier, `{ verifier, stay, at }`, valid 10 minutes, used once |
 | `td.accounts` | `localStorage` | which accounts this browser has seen (email, provider), for prefilling the form |
 | `td.theme`, `td.rail` | `localStorage` | look and rail state |
 
