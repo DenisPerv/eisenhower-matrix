@@ -34,7 +34,7 @@ const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // real key presses (CDP Input): implicit form submission and the dialog's Escape only follow trusted keys. Modifiers: Alt 1
 const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 },
-  ArrowLeft: { code: 'ArrowLeft', vk: 37 }, ArrowRight: { code: 'ArrowRight', vk: 39 }, PageUp: { code: 'PageUp', vk: 33 }, PageDown: { code: 'PageDown', vk: 34 } };
+  ArrowLeft: { code: 'ArrowLeft', vk: 37 }, ArrowRight: { code: 'ArrowRight', vk: 39 }, PageUp: { code: 'PageUp', vk: 33 }, PageDown: { code: 'PageDown', vk: 34 }, Tab: { code: 'Tab', vk: 9 } };
 const rows = [], leftovers = [], kpiTimes = [], reviewApiTimes = [], timelineTimes = [];
 let pass = 0, fail = 0, skipped = 0;
 const check = (group, what, ok, note) => { ok ? pass++ : fail++; rows.push(`| ${group} | ${what} | ${ok ? 'pass' : 'FAIL'} | ${String(note || '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 160)} |`); console.log(`${ok ? 'pass' : 'FAIL'} ${group}: ${what}`); };
@@ -581,37 +581,58 @@ async function gUi() {
   for (const [who, theme] of [['maksym', 'light'], ['anastasiia', 'dark']]) {
     const T = await tab(B, await ctx(B));
     await T.theme(theme);
-    // round 3, adjustment 12, then 2026-10-29: the two-panel welcome (Urgency, Card layout) shows once per person and version
-    // (prefs.welcomeVersion < 2; put back in cleanup)
+    // round 3, adjustment 12, then 2026-10-29 (version 3): the welcome is one card (what is new, then the Urgency and Card
+    // layout forms, then Later and Save); it shows once per person and version (prefs.welcomeVersion < 3; put back in cleanup)
     const c0 = who === 'maksym' ? MK : AN;
-    const pr = await c0.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c0.uid + '&app=eq.tasksdashboard');
-    if (pr.ok && pr.json.length) await c0.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c0.uid, Object.assign({}, pr.json[0].prefs, { welcomeSeen: true, welcomeVersion: 0 })), { Prefer: 'resolution=merge-duplicates,return=minimal' });
-    const S = core.readSettings(pr.ok && pr.json.length ? pr.json[0].prefs.settings : null); // the person's values
+    const readPrefs = async () => { const r = await c0.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c0.uid + '&app=eq.tasksdashboard'); return r.ok && r.json.length ? r.json[0].prefs : null; };
+    const p0 = await readPrefs();
+    if (p0) await c0.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c0.uid, Object.assign({}, p0, { welcomeSeen: true, welcomeVersion: 2 })), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    const P = core.prefsFromRow(p0), S = P.settings; // the person's values
+    const WL = `document.getElementById('welcome')`;
+    // the card's values as the page reads them, and where its parts sit
+    const wlState = `(()=>{const el=${WL};if(!el)return null;const q=s=>el.querySelector(s),leg=[...el.querySelectorAll('legend')].map(l=>l.textContent);return {win:+q('[data-u=win]').value,th:+q('[data-u=th]').value,lim:+q('[data-u=lim]').value,
+      sw:q('input[name=s-switch]:checked')?.value,mode:q('input[name=cl-mode]:checked')?.value,auto:+q('[data-cl-auto]').value,fields:${JSON.stringify(core.CARD_FIELDS)}.every(k=>q('[data-cl="'+k+'"]').checked===!!${JSON.stringify(P.cardLayout)}[k]),tags:q('input[name=cl-tags]:checked')?.value,
+      cards:[...el.querySelectorAll('.wl-card h3')].map(h=>h.textContent),order:leg.indexOf('Moving between tasks')<leg.indexOf('Cards open')&&leg.indexOf('Cards open')>=0,text:el.textContent,
+      focus:document.activeElement===q('[data-u=win]'),dialog:el.tagName==='DIALOG'||el.getAttribute('role')==='dialog',beacon:document.getElementById('profile').classList.contains('beacon'),old:!!q('#wl-next,#wl-back,#wl-urg,#wl-cl'),
+      ids:[...el.querySelectorAll('[id]')].every(x=>document.querySelectorAll('#'+CSS.escape(x.id)).length===1)}})()`;
     T.keepWelcome = true;
     check(G, `${who}: opens signed in`, await open(T, await grantFor(who)));
-    check(G, `${who}: the welcome shows on panel 1 Urgency with the person's values, highlights the profile menu, focus on its first button, not a dialog`, await T.wait('!!document.getElementById("welcome")', 5000) &&
-      await T.ev(`(()=>{const el=document.getElementById('welcome'),w=el.textContent,s=${JSON.stringify(S)};return el.dataset.step==='1'&&/1 of 2/.test(w)&&/Urgency window/.test(w)&&w.includes(s.windowDays+(s.windowDays===1?' day':' days'))&&w.includes(s.threshold+'%')&&/Do limit/.test(w)&&!!document.getElementById('wl-urg')&&!!document.getElementById('wl-later')&&document.activeElement===el.querySelector('button')&&el.getAttribute('role')!=='dialog'&&el.tagName!=='DIALOG'&&!!el.querySelector('[aria-live]')&&document.getElementById('profile').classList.contains('beacon')})()`));
-    await T.shot(`welcome-1-1440x900-${theme}`);
+    const w0 = (await T.wait(`!!${WL}`, 5000)) ? await T.ev(wlState) : null;
+    check(G, `${who}: someone who closed the two-panel note (welcomeVersion 2) sees the welcome card once`, !!w0);
+    check(G, `${who}: the welcome is one card: the new task window text, then Urgency and Card layout forms, no Next or Back, not a dialog, the profile menu highlighted`,
+      !!w0 && JSON.stringify(w0.cards) === '["Urgency","Card layout"]' && /previous or next task/.test(w0.text) && /Do, then Plan, Delegate, Eliminate/.test(w0.text) && /Unsaved changes ask first/.test(w0.text) && !w0.old && !w0.dialog && w0.beacon && w0.ids,
+      w0 && JSON.stringify({ cards: w0.cards, old: w0.old, dialog: w0.dialog, beacon: w0.beacon, ids: w0.ids }));
+    check(G, `${who}: the card's forms hold the person's values (Urgency window, Due soon, Do limit, Moving between tasks, Cards open, Shorten, A card shows, Tags)`,
+      !!w0 && w0.win === S.windowDays && w0.th === S.threshold && w0.lim === S.doLimit && w0.sw === P.taskSwitcher && w0.mode === P.cards.mode && w0.auto === P.cardLayout.autoCollapse && w0.fields && w0.tags === P.cardLayout.tags,
+      w0 && JSON.stringify({ win: w0.win, th: w0.th, lim: w0.lim, sw: w0.sw, mode: w0.mode, auto: w0.auto, fields: w0.fields, tags: w0.tags }));
+    await T.shot(`welcome-card-1440x900-${theme}`);
+    const wlRow = n => `(()=>{const t=[...${WL}.querySelectorAll('input[name=${n}]')].map(i=>i.closest('label').getBoundingClientRect());return t.length===2&&Math.abs(t[0].top-t[1].top)<=2&&t[1].left>t[0].right})()`;
+    check(G, `${who}: on the card Moving between tasks comes before Cards open, each radio group on one row; focus starts on the first field and Tab goes down`, !!w0 && w0.order && w0.focus &&
+      await T.ev(wlRow('s-switch')) && await T.ev(wlRow('cl-mode')) && (await T.key('Tab'), await T.ev(`document.activeElement===${WL}.querySelector('[data-u=th]')`)));
+    check(G, `${who}: at 1440 the card ends inside the screen, its body scrolls and Save stays in view`, await T.ev(`(()=>{const el=${WL},r=el.getBoundingClientRect(),b=el.querySelector('.wl-body'),s=el.querySelector('#wl-save').getBoundingClientRect();return r.bottom<=innerHeight&&s.bottom<=r.bottom&&s.top>=r.top&&(b.scrollHeight<=b.clientHeight||getComputedStyle(b).overflowY==='auto')})()`));
     await T.size(390, 844); await sleep(500);
-    check(G, `${who}: at 390 px the welcome fits the screen and nothing is wider than it`, await T.ev(`(()=>{const r=document.getElementById('welcome').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight+1&&document.documentElement.scrollWidth<=innerWidth})()`));
-    await T.shot(`welcome-390x844-${theme}`);
+    check(G, `${who}: at 390 px the card fits the screen, Save in view, nothing is wider than the screen or the card`, await T.ev(`(()=>{const el=${WL},r=el.getBoundingClientRect(),b=el.querySelector('.wl-body'),s=el.querySelector('#wl-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight+1&&s.bottom<=innerHeight&&document.documentElement.scrollWidth<=innerWidth&&b.scrollWidth<=b.clientWidth})()`));
+    await T.shot(`welcome-card-390x844-${theme}`);
     await T.size(1440, 900); await sleep(300);
-    await T.click('#wl-next');
-    check(G, `${who}: Next shows panel 2 Card layout (moving between tasks, Coverflow, Tasks Grouping), announces the step, focus on Open Card layout`,
-      await T.wait(`document.getElementById('welcome')?.dataset.step==='2'`, 2000) &&
-      await T.ev(`(()=>{const el=document.getElementById('welcome'),w=el.textContent;return /2 of 2/.test(w)&&/Card layout/.test(w)&&/previous or next task/.test(w)&&/Unsaved changes ask first/.test(w)&&/Coverflow carousel/.test(w)&&/Tasks Grouping/.test(w)&&document.getElementById('wl-live').textContent==='Step 2 of 2: Card layout'&&document.activeElement===document.getElementById('wl-cl')})()`));
-    await T.shot(`welcome-2-1440x900-${theme}`);
-    await T.click('#wl-back');
-    check(G, `${who}: Back shows panel 1 again`, await T.wait(`document.getElementById('welcome')?.dataset.step==='1'&&!!document.getElementById('wl-urg')`, 2000));
-    await T.click('#wl-next'); await T.wait(`!!document.getElementById('wl-cl')`, 2000);
-    await T.click('#wl-cl'); T.keepWelcome = false;
-    check(G, `${who}: Open Card layout opens Card layout, closes the welcome and the highlight goes`, await T.wait('!!document.querySelector("dialog[open] #cl-save")', 3000) &&
-      await T.ev('!document.getElementById("welcome")&&!document.getElementById("profile").classList.contains("beacon")'));
-    await T.ev('(document.querySelector("dialog[open]")?.close(),true)');
+    // the board stays usable behind it: the search box takes focus and text while the card is open
+    check(G, `${who}: the board stays usable while the card is open (search takes text)`, await T.ev(`(()=>{const s=document.querySelector('#q, input[type=search]');if(!s)return false;s.focus();return document.activeElement===s&&!!${WL}})()`));
+    // Tasks Grouping asks first on the card too; Cancel puts the tick back and the card stays
+    const grpWas = await T.ev(`${WL}.querySelector('[data-cl=group]').checked`);
+    await T.click('#welcome [data-cl=group]');
+    check(G, `${who}: changing Tasks Grouping on the card asks first; Cancel puts the tick back, the card stays`, await T.wait('!!document.querySelector("dialog[open] #grp-ok")', 2000) &&
+      (await T.click('#grp-cancel'), await T.wait(`!document.querySelector('dialog[open]')&&!!${WL}&&${WL}.querySelector('[data-cl=group]').checked===${grpWas}`, 2000)));
+    // a change on the card + Save is saved: settings and Card layout, read back from the database
+    const lim0 = who === 'maksym' ? 8 : 5, auto0 = 280, sw0 = P.taskSwitcher === 'coverflow' ? 'standard' : 'coverflow';
+    await T.ev(`(()=>{const el=${WL};el.querySelector('[data-u=lim]').value='${lim0}';el.querySelector('[data-cl-auto]').value='${auto0}';el.querySelector('input[name=s-switch][value=${sw0}]').checked=true;el.querySelector('#wl-save').click();return true})()`);
+    check(G, `${who}: Save closes the card and the highlight goes`, await T.wait(`!${WL}&&!document.getElementById('profile').classList.contains('beacon')`, 3000));
     await sleep(2000);
-    const wp = await c0.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c0.uid + '&app=eq.tasksdashboard');
-    check(G, `${who}: closing the welcome saves it as seen (welcomeVersion 2, welcomeSeen true)`, !!(wp.ok && wp.json.length && wp.json[0].prefs.welcomeVersion === 2 && wp.json[0].prefs.welcomeSeen === true),
-      wp.ok && wp.json.length ? JSON.stringify({ welcomeVersion: wp.json[0].prefs.welcomeVersion, welcomeSeen: wp.json[0].prefs.welcomeSeen }) : 'no row');
+    const pS = await readPrefs();
+    check(G, `${who}: Save on the card saves both forms and marks it seen (Do limit ${lim0}, Shorten ${auto0}, ${sw0}, welcomeVersion 3, welcomeSeen true)`,
+      !!pS && pS.settings.doLimit === lim0 && pS.settings.windowDays === S.windowDays && pS.cardLayout.autoCollapse === auto0 && pS.taskSwitcher === sw0 && pS.welcomeVersion === 3 && pS.welcomeSeen === true,
+      pS ? JSON.stringify({ doLimit: pS.settings.doLimit, autoCollapse: pS.cardLayout.autoCollapse, taskSwitcher: pS.taskSwitcher, welcomeVersion: pS.welcomeVersion, welcomeSeen: pS.welcomeSeen }) : 'no row');
+    // back to the person's own switcher (cleanup puts all preferences back too)
+    await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+    await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('input[name=s-switch][value=${P.taskSwitcher}]').checked=true;d.querySelector('#cl-save').click();return true})()`);
     // the board opens on the person's last list (a preference); the round-4 card checks need All lists
     await pick(T, 'all');
     await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
@@ -620,6 +641,11 @@ async function gUi() {
     // round 3, adjustment 13: Card layout (cards open expanded, owner shown, auto-collapse 300)
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     await T.shot(`ui-cardlayout-${who}-1440x900-${theme}`);
+    // 2026-10-29: Moving between tasks above Cards open, and each radio group on one row
+    check(G, `${who}: Card layout: Moving between tasks comes before Cards open, each radio group on one row at 1440`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),leg=[...d.querySelectorAll('legend')].map(l=>l.textContent);
+      const row=n=>{const t=[...d.querySelectorAll('input[name='+n+']')].map(i=>i.closest('label').getBoundingClientRect());return t.length===2&&Math.abs(t[0].top-t[1].top)<=2&&t[1].left>t[0].right};
+      return leg.indexOf('Moving between tasks')===0&&leg.indexOf('Cards open')===1&&row('s-switch')&&row('cl-mode')})()`));
+    await T.shot(`cardlayout-order-1440x900-${theme}`);
     const archivedTl = ((await c0.rest('GET', 'tag_lists?select=id&archived_at=not.is.null')).json || []).map(x => x.id);
     check(G, `${who}: Card layout has no "Who it is for" and lists no archived tag list (edit window, items 3, 4; ${archivedTl.length} archived)`,
       await T.ev(`(()=>{const d=document.querySelector('dialog[open]');const a=new Set(${JSON.stringify(archivedTl)});return !d.querySelector('[data-cl=owner]')&&!/Who it is for/.test(d.textContent)&&![...d.querySelectorAll('[data-cl-list]')].some(b=>a.has(b.dataset.clList))})()`));
@@ -633,16 +659,22 @@ async function gUi() {
     await sleep(2000);
     await T.reload(); await T.ready();
     check(G, `${who}: the welcome does not come back after a reload`, await T.ev('!document.getElementById("welcome")'));
-    // General settings → Welcome note: Show again brings it back on panel 1; Open Urgency settings opens that window; Escape closes it
+    // General settings → Welcome card: Show again brings the card back with the values saved since; Later saves nothing; Escape closes it
     T.keepWelcome = true;
     await T.click('#profile'); await T.click('[data-menu=general]'); await T.wait('!!document.getElementById("s-welcome")'); await T.click('#s-welcome');
-    check(G, `${who}: Show again brings the welcome back on panel 1`, await T.wait(`document.getElementById('welcome')?.dataset.step==='1'`, 3000));
-    await T.click('#wl-urg');
-    check(G, `${who}: Open Urgency settings opens Urgency settings and closes the welcome`, await T.wait('!!document.querySelector("dialog[open] #s-lim")', 3000) && await T.ev('!document.getElementById("welcome")'));
-    await T.ev('(document.querySelector("dialog[open]")?.close(),true)');
+    const w1 = (await T.wait(`!!${WL}`, 3000)) ? await T.ev(wlState) : null;
+    check(G, `${who}: Show again brings the welcome card back, its forms holding the values saved since (Do limit ${lim}, Shorten 300, Expanded)`, !!w1 && w1.lim === lim && w1.auto === 300 && w1.mode === 'expanded' && w1.focus,
+      w1 && JSON.stringify({ lim: w1.lim, auto: w1.auto, mode: w1.mode, focus: w1.focus }));
+    await T.ev(`(()=>{const el=${WL};el.querySelector('[data-u=lim]').value='33';el.querySelector('[data-cl-auto]').value='111';return true})()`);
+    await T.click('#wl-later');
+    check(G, `${who}: Later closes the card`, await T.wait(`!${WL}`, 2000));
+    await sleep(2000);
+    const pL = await readPrefs();
+    check(G, `${who}: Later saves nothing from the card and marks it seen (Do limit ${lim}, Shorten 300, welcomeVersion 3)`, !!pL && pL.settings.doLimit === lim && pL.cardLayout.autoCollapse === 300 && pL.welcomeVersion === 3,
+      pL ? JSON.stringify({ doLimit: pL.settings.doLimit, autoCollapse: pL.cardLayout.autoCollapse, welcomeVersion: pL.welcomeVersion }) : 'no row');
     await T.click('#profile'); await T.click('[data-menu=general]'); await T.wait('!!document.getElementById("s-welcome")'); await T.click('#s-welcome');
-    await T.wait('!!document.getElementById("welcome")', 3000); await T.key('Escape');
-    check(G, `${who}: Escape closes the welcome`, await T.wait('!document.getElementById("welcome")', 2000));
+    await T.wait(`!!${WL}`, 3000); await T.key('Escape');
+    check(G, `${who}: Escape closes the welcome card`, await T.wait(`!${WL}`, 2000));
     T.keepWelcome = false;
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     check(G, `${who}: Card layout survives a reload`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.querySelector('input[name=cl-mode][value=expanded]').checked&&d.querySelector('[data-cl=creator]').checked&&d.querySelector('#cl-auto').value==='300'})()`));
@@ -956,6 +988,10 @@ async function gLinks() {
   const ps = await item(par.id);
   check(G, 'Start is saved (start_at)', !!ps.start_at && new Date(ps.start_at).getDate() === new Date(day(1)).getDate(), ps.start_at);
   // the board: badges, then Group by parent
+  // the badges need Waiting for and Subtask progress on and Tasks Grouping off, whatever the account stored (cleanup puts the preferences back);
+  // set without a click, so the grouping confirm does not open
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("dialog[open] #cl-save")', 4000);
+  await T.ev("(()=>{const d=document.querySelector('dialog[open]');d.querySelector('[data-cl=waiting]').checked=true;d.querySelector('[data-cl=progress]').checked=true;d.querySelector('[data-cl=group]').checked=false;d.querySelector('#cl-save').click();return true})()");
   await T.wait(`!!document.querySelector('[data-card="${par.id}"] .tb.pg')`, 8000);
   check(G, 'badges: no P badge and the progress 0/4 on the parent, "Waiting for 1" on a task with an open predecessor', await T.ev(`(()=>{const p=document.querySelector('[data-card="${par.id}"]');const w=document.querySelector('[data-card="${k2.id}"] .tb.wt');return !p.querySelector('.tb.pr')&&p.querySelector('.tb.pg').textContent==='0/4'&&!!w&&w.querySelector('.wl').textContent.trim()==='Waiting for'&&w.textContent.endsWith('1')})()`));
   await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("[data-cl=group]")', 4000);

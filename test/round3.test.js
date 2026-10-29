@@ -83,17 +83,18 @@ test('prefs: cardLayout and welcomeSeen, defaults are today\'s card', () => {
   assert.deepEqual(back.cardLayout, q.cardLayout, 'round trip through the row');
 });
 
-test('prefs: welcomeVersion, the two-panel welcome shows once per person for version 2', () => {
-  assert.equal(C.WELCOME_VERSION, 2);
+test('prefs: welcomeVersion, the one-card welcome shows once per person for version 3', () => {
+  assert.equal(C.WELCOME_VERSION, 3);
   assert.equal(C.prefsFromRow(null).welcomeVersion, 0);
   assert.equal(C.welcomeDue(C.prefsFromRow(null)), true, 'a new person sees it');
   const old = C.prefsFromRow({ welcomeSeen: true });
   assert.equal(old.welcomeVersion, 0); assert.equal(C.welcomeDue(old), true, 'someone who saw only the round-3 note sees it again');
   for (const bad of [-1, 1.5, '2', null, 1001]) assert.equal(C.prefsFromRow({ welcomeVersion: bad }).welcomeVersion, 0, 'a wrong value falls back to 0: ' + bad);
-  const seen = C.prefsFromRow({ welcomeSeen: true, welcomeVersion: 2 });
+  assert.equal(C.welcomeDue(C.prefsFromRow({ welcomeSeen: true, welcomeVersion: 2 })), true, 'someone who closed the two-panel note (version 2) sees the card once');
+  const seen = C.prefsFromRow({ welcomeSeen: true, welcomeVersion: 3 });
   assert.equal(C.welcomeDue(seen), false);
-  assert.equal(C.welcomeDue({ welcomeVersion: 3 }), false, 'a later version does not show this one');
-  assert.equal(C.prefsFromRow(C.rowFromPrefs('u', seen).prefs).welcomeVersion, 2, 'round trip through the row');
+  assert.equal(C.welcomeDue({ welcomeVersion: 4 }), false, 'a later version does not show this one');
+  assert.equal(C.prefsFromRow(C.rowFromPrefs('u', seen).prefs).welcomeVersion, 3, 'round trip through the row');
 });
 
 test('cardExpanded: mode and flipped only (round 4: autoCollapse cuts the description instead, descClip)', () => {
