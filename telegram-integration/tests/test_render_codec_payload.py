@@ -68,6 +68,17 @@ class Render(unittest.TestCase):
         self.assertIn("— Assignee —", labels)
         self.assertIn("Tags: car", text)
 
+    def test_due_line_language_and_one_pick(self):
+        c = apply(self.c, "d1", self.s, TODAY)  # tomorrow = Fri 2026-10-30
+        text, _ = self.r(c, "uk")
+        self.assertIn("Строк: Пт 2026-10-30 09:00", text)
+        from datetime import date
+        friday = date(2026, 10, 30)
+        c = apply(self.c, "d1", self.s, friday)  # Saturday: Tomorrow and Weekend are the same day
+        _, rows = render(c, self.s, prefix="tbc", token=self.tok, lang="en", today=friday)
+        marked = [b["text"] for r in rows for b in r if b["text"].startswith("• ") and b["callback_data"].split(":")[2].startswith("d")]
+        self.assertEqual(marked, ["• Tomorrow"])
+
     def test_problem_line(self):
         text, _ = render(self.c, self.s, prefix="tbc", token=self.tok, lang="en", today=TODAY, problem="needs_date")
         self.assertIn("A reminder needs a date", text)
@@ -113,6 +124,7 @@ class Payload(unittest.TestCase):
         c = change_card(o, self.s, owner_handle="maksym")
         c = apply(apply(c, "qA", self.s, TODAY), "o1", self.s, TODAY)
         self.assertEqual(change_patch(c, self.s, utc_plus0), {"quadrant": "A", "owner_id": AN})
+        self.assertEqual(change_patch(apply(c, "qauto", self.s, TODAY), self.s, utc_plus0), {"owner_id": AN})
         c = apply(replace(c, details="note"), f"l{self.s.list_by_slug('backlog')}", self.s, TODAY)
         p = change_patch(c, self.s, utc_plus0)
         self.assertEqual((p["list_id"], p["category"], p["body_md"]), ("L-bl", "task", "note"))

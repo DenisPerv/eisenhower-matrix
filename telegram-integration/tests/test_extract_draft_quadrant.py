@@ -3,7 +3,7 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 
-from fixtures import TODAY, now, scope
+from fixtures import TODAY, now, rpc, scope
 
 from tasksboard_telegram.draft import make_draft
 from tasksboard_telegram.extract import build_prompt, parse_reply
@@ -35,6 +35,8 @@ class Extract(unittest.TestCase):
         self.assertEqual((h.quadrant, h.list_index, h.owner, h.due_date, h.due_time, h.target, h.candidates),
                          (None, None, None, None, None, None, [1]))
         self.assertIsNone(parse_reply("no json here", self.s, handles=HANDLES))
+        h = parse_reply('{"target": true, "candidates": [true, 2]}', self.s, handles=HANDLES, item_count=3)
+        self.assertEqual((h.target, h.candidates), (None, [2]))
 
 
 class Draft(unittest.TestCase):
@@ -53,6 +55,19 @@ class Draft(unittest.TestCase):
         h = parse_reply('{"title":"buy a new chair","quadrant":"B"}', self.s, handles=HANDLES)
         d = make_draft(p, h, self.s, today=TODAY)
         self.assertEqual((d.quadrant, d.auto_pick, self.s.lists[d.list_index].slug, d.owner), ("auto", "B", "othertasks", "me"))
+        self.assertIn("quadrant", d.guessed)
+
+    def test_the_command_kind_holds(self):
+        p = parse("add a task tidy the garage", self.s)
+        h = parse_reply('{"list":"Reminders"}', self.s, handles=HANDLES)
+        self.assertEqual(self.s.lists[make_draft(p, h, self.s, today=TODAY).list_index].kind, "task")
+        data = rpc()
+        for x in data["lists"]:
+            if x["slug"] == "reminders":
+                x["slug"], x["name"] = "family-reminders", "Family reminders"
+        s = Scope.from_rpc(data, "p-mk")
+        d = make_draft(parse("remind me to call mum tomorrow", s), None, s, today=TODAY)
+        self.assertEqual(s.lists[d.list_index].slug, "family-reminders")
 
     def test_reminder_goes_to_reminders_and_past_dates_drop(self):
         p = parse("remind me to call mum", self.s)

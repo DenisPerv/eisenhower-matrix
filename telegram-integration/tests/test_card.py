@@ -74,6 +74,21 @@ class CardTaps(unittest.TestCase):
         self.assertEqual(c.changed(self.s), {"quadrant", "list"})
         self.assertIsInstance(c, Card)
 
+    def test_change_card_due_without_time_is_not_a_change(self):
+        o = Origin(item_id="i1", version=1, ref="R3", list_id="L-rm", quadrant="B", owner_id=MK, due_date=date(2026, 11, 2),
+                   due_time=None, title="bins", details="")
+        c = change_card(o, self.s, owner_handle="maksym")
+        self.assertEqual(c.due_time, "09:00")
+        self.assertEqual(c.problem(self.s), "nothing_changed")
+        self.assertEqual(apply(c, "qC", self.s, TODAY).changed(self.s), {"quadrant"})
+
+    def test_auto_clears_a_stored_quadrant(self):
+        o = Origin(item_id="i1", version=1, ref="T3", list_id="L-ot", quadrant="B", owner_id=MK, due_date=None,
+                   due_time=None, title="x", details="")
+        c = apply(change_card(o, self.s, owner_handle="maksym"), "qauto", self.s, TODAY)
+        self.assertEqual(c.changed(self.s), {"quadrant"})
+        self.assertIsNone(c.quadrant_to_write())
+
 
 if __name__ == "__main__":
     unittest.main()

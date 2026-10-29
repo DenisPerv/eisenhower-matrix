@@ -5,8 +5,12 @@
 -- guest-owned list is never returned, even with the bot and the person in it; T5 archived lists never, '_' lists only
 -- with p_include_test; T6 tag lists both are in, live tags only, a guest's tag list never; T7 members are household
 -- profiles only; T8 callers: a person, an unlinked bot, a person the bot is not linked to -> 42501; T9 a viewer list is
--- not offered for writing; T10 rights (definer, search_path, not for anon, ops.bot_links closed); T11 the seed (live DB).
--- Fixtures: H1, H2 (household people), B and B2 (agents), G (a Google guest). Run after 017, 003, 011, the 012 policy
+-- not offered for writing; T10 rights (definer, search_path, not for anon, ops.bot_links closed); T11 the seed (live DB);
+-- T12 (db/019) a removed bot stays out: an insert without a person behind it (a 017 re-run) is undone, a person adding it
+-- back clears the opt-out, the same for tag lists, Access requests opted out; T13 review_quadrant (db/016) gives the
+-- shared quadrant cases (the rows between the quadrant-cases markers equal telegram-integration/tests/quadrant_cases.json;
+-- test/telegram-parity.test.js checks that).
+-- Fixtures: H1, H2 (household people), B and B2 (agents), G (a Google guest). Run after 019, 003, 011, the 012 policy
 -- block and 900-904.
 
 do $do$
@@ -136,6 +140,58 @@ begin
                                                            and l.owner_id in (select id from public.profiles where handle in ('maksym','anastasiia'))
                                                            and not exists (select 1 from public.list_members m join public.profiles p on p.id = m.profile_id
                                                                             where m.list_id = l.id and p.handle = 'telegram-bot')), '0');
+
+  -- T12 a removed bot stays out (db/019)
+  perform public._tg_as(h1);
+  perform public._tg_chk('T12a owner removes the bot', public._tg(format('delete from public.list_members where list_id = %L and profile_id = %L', l1, b)), 'ok:1');
+  perform public._tg_as(null);
+  perform public._tg_chk('T12b opt-out recorded', (select count(*)::text from ops.bot_opt_out where bot_id = b and list_id = l1), '1');
+  insert into public.list_members (list_id, profile_id, role) values (l1, b, 'editor');   -- as a 017 re-run would
+  perform public._tg_chk('T12c admin insert undone', (select count(*)::text from public.list_members where list_id = l1 and profile_id = b), '0');
+  perform public._tg_as(b);
+  perform public._tg_chk('T12d out of scope', (position('TG private' in public._tg_names(public.telegram_scope(h1), 'lists')) > 0)::text, 'false');
+  perform public._tg_as(h1);
+  perform public._tg_chk('T12e a person adds it back', public._tg(format('insert into public.list_members (list_id, profile_id, role) values (%L, %L, ''editor'')', l1, b)), 'ok:1');
+  perform public._tg_as(null);
+  perform public._tg_chk('T12f opt-out cleared', (select count(*)::text from ops.bot_opt_out where bot_id = b and list_id = l1)
+                                                 || '/' || (select count(*) from public.list_members where list_id = l1 and profile_id = b), '0/1');
+  delete from public.tag_list_members where tag_list_id = t1 and profile_id = b;
+  insert into public.tag_list_members (tag_list_id, profile_id, role) values (t1, b, 'viewer');
+  perform public._tg_chk('T12g tag list stays out', (select count(*)::text from public.tag_list_members where tag_list_id = t1 and profile_id = b)
+                                                    || '/' || (select count(*) from ops.bot_opt_out where bot_id = b and tag_list_id = t1), '0/1');
+  perform public._tg_chk('T12h access requests opted out', (select count(*)::text from ops.bot_opt_out o join public.lists l on l.id = o.list_id
+                                                             join public.profiles p on p.id = o.bot_id
+                                                            where l.slug = 'access-requests' and p.handle = 'telegram-bot'), '1');
+  perform public._tg_chk('T12i guard rights', (select string_agg(p.proname || ':' || p.prosecdef || ':' || (coalesce(p.proconfig, '{}') @> array['search_path=""'])
+                                                                 || ':' || has_function_privilege('authenticated', p.oid, 'execute'), ',' order by p.proname)
+                                                 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                                                where n.nspname = 'public' and p.proname in ('bot_member_guard', 'by_person')),
+                         'bot_member_guard:true:true:false,by_person:true:true:false');
+
+  -- T13 review_quadrant (db/016) on the shared cases: n, stored, priority, category, pin, deadline in hours, window, expected
+  select coalesce(string_agg(format('%s=%s', n, got), ','), 'none') into v from (
+    select n, ex, public.review_quadrant(st, pr, ca, pin,
+             case when h is null then null else timestamptz '2026-10-29 10:00+00' + h * interval '1 hour' end,
+             timestamptz '2026-10-29 10:00+00', w) as got
+      from (values
+        -- >>> quadrant cases
+        (1, 'C', 5, 'reminder', true, 1, 7, 'C'),
+        (2, null, null, 'task', null, null, 7, 'D'),
+        (3, null, 3, 'task', null, null, 7, 'B'),
+        (4, null, 2, 'task', null, 24, 7, 'C'),
+        (5, null, null, 'reminder', null, 24, 7, 'A'),
+        (6, null, null, 'tbd', null, 400, 7, 'B'),
+        (7, null, null, 'decision', false, 1, 7, 'B'),
+        (8, null, null, 'task', true, null, 7, 'C'),
+        (9, null, 4, 'task', null, -48, 7, 'A'),
+        (10, null, null, 'task', null, 168, 7, 'C'),
+        (11, null, null, 'task', null, 169, 7, 'D'),
+        (12, null, null, 'task', null, 40, 1, 'D'),
+        (13, 'X', 3, 'task', null, null, 7, 'B')
+        -- <<< quadrant cases
+      ) c(n, st, pr, ca, pin, h, w, ex)
+  ) r where got is distinct from ex;
+  perform public._tg_chk('T13 review_quadrant', v, 'none');
 
   raise exception 'SELFTEST % of % passed (rolled back). Failures: %',
     current_setting('tg.total')::int - current_setting('tg.nf')::int,

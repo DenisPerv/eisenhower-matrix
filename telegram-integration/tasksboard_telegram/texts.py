@@ -48,6 +48,18 @@ _T: dict[str, dict[str, str]] = {
 }
 
 
+WEEKDAYS = {
+    "en": ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"),
+    "uk": ("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"),
+    "ru": ("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"),
+}
+
+
+def weekday(n: int, lang: str) -> str:
+    """Monday = 0, in the card's language (not the process locale)."""
+    return WEEKDAYS.get(lang, WEEKDAYS["en"])[n]
+
+
 def t(key: str, lang: str, **kw: object) -> str:
     row = _T[key]
     return row.get(lang, row["en"]).format(**kw)

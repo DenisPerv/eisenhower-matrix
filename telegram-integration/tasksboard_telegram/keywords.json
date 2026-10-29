@@ -1,40 +1,225 @@
 {
-  "_comment": "Markers the parser reads before any LLM. Lower case. A marker counts only as a #hashtag or at the end of the message (several may follow each other there); a list name also after one of list_prepositions. Add words here, not in code.",
+  "_comment": "Markers the parser reads before any LLM. Lower case. A marker counts only as a #hashtag or at the end of the message (several may follow each other there); a list name only after one of list_prepositions; a person only after people_prefixes. A quadrant phrase that starts with \"to \" does not count after a word of infinitive_before (\"I need to do\", \"want to plan\"). Add words here, not in code.",
   "commands": {
-    "task": ["add a task", "add task", "new task", "create a task", "create task", "task", "todo",
-             "добавь задачу", "добавить задачу", "создай задачу", "новая задача", "задача",
-             "додай задачу", "додати задачу", "створи задачу", "нова задача"],
-    "reminder": ["remind me to", "remind me", "remind us to", "remind us", "reminder", "remind",
-                 "напомни мне", "напомни нам", "напомни", "напоминание",
-                 "нагадай мені", "нагадай нам", "нагадай", "нагадування"]
+    "task": [
+      "add a task",
+      "add task",
+      "new task",
+      "create a task",
+      "create task",
+      "task",
+      "todo",
+      "добавь задачу",
+      "добавить задачу",
+      "создай задачу",
+      "новая задача",
+      "задача",
+      "додай задачу",
+      "додати задачу",
+      "створи задачу",
+      "нова задача"
+    ],
+    "reminder": [
+      "remind me to",
+      "remind me",
+      "remind us to",
+      "remind us",
+      "reminder",
+      "remind",
+      "напомни мне",
+      "напомни нам",
+      "напомни",
+      "напоминание",
+      "нагадай мені",
+      "нагадай нам",
+      "нагадай",
+      "нагадування"
+    ]
   },
   "quadrant": {
-    "A": ["to do", "do first", "do now", "urgent", "в do", "срочно", "сделать сейчас", "терміново", "зробити зараз"],
-    "B": ["to plan", "to plans", "to the plan", "into plan", "plan it", "в план", "в планы", "запланировать", "до плану", "в плани", "запланувати"],
-    "C": ["to delegate", "delegate", "делегировать", "делегувати"],
-    "D": ["to eliminate", "eliminate", "в eliminate", "исключить", "викреслити"]
+    "A": [
+      "to do",
+      "do first",
+      "do now",
+      "urgent",
+      "в do",
+      "срочно",
+      "сделать сейчас",
+      "терміново",
+      "зробити зараз"
+    ],
+    "B": [
+      "to plan",
+      "to plans",
+      "to the plan",
+      "into plan",
+      "plan it",
+      "в план",
+      "в планы",
+      "запланировать",
+      "до плану",
+      "в плани",
+      "запланувати"
+    ],
+    "C": [
+      "to delegate",
+      "delegate",
+      "делегировать",
+      "делегувати"
+    ],
+    "D": [
+      "to eliminate",
+      "eliminate",
+      "в eliminate",
+      "исключить",
+      "викреслити"
+    ]
   },
-  "quadrant_hashtags": {"A": ["do"], "B": ["plan"], "C": ["delegate"], "D": ["eliminate"]},
-  "list_prepositions": ["to", "into", "in", "в", "во", "у", "до"],
+  "quadrant_hashtags": {
+    "A": [
+      "do"
+    ],
+    "B": [
+      "plan"
+    ],
+    "C": [
+      "delegate"
+    ],
+    "D": [
+      "eliminate"
+    ]
+  },
+  "infinitive_before": [
+    "want",
+    "wants",
+    "wanted",
+    "need",
+    "needs",
+    "have",
+    "has",
+    "had",
+    "going",
+    "got",
+    "like",
+    "love",
+    "try",
+    "forgot",
+    "remember",
+    "must",
+    "should",
+    "would",
+    "could",
+    "able",
+    "how",
+    "learn",
+    "time",
+    "way",
+    "хочу",
+    "хочешь",
+    "надо",
+    "нужно",
+    "треба",
+    "потрібно",
+    "мушу"
+  ],
+  "list_prepositions": [
+    "to",
+    "into",
+    "в",
+    "во",
+    "у",
+    "до"
+  ],
   "list_aliases": {
-    "backlog": ["backlog", "бэклог", "беклог", "бэклоге", "беклозі"],
-    "othertasks": ["inbox", "other tasks", "othertasks", "входящие", "вхідні"],
-    "reminders": ["reminders", "напоминания", "нагадування"],
-    "homeos-tasks": ["homeos", "homeos tasks", "homeos-tasks"]
+    "backlog": [
+      "backlog",
+      "бэклог",
+      "беклог",
+      "бэклоге",
+      "беклозі"
+    ],
+    "othertasks": [
+      "inbox",
+      "other tasks",
+      "othertasks",
+      "входящие",
+      "вхідні"
+    ],
+    "reminders": [
+      "reminders",
+      "напоминания",
+      "нагадування"
+    ],
+    "homeos-tasks": [
+      "homeos tasks",
+      "homeos-tasks"
+    ]
   },
   "people": {
-    "me": ["for me", "для меня", "мне", "для мене", "мені"],
-    "shared": ["for us", "for both", "for us both", "both", "для нас", "нам", "обоим", "нам обоим", "для нас обох", "нам обом", "обом"],
-    "agent": ["for the agent", "for agent", "for claude", "агенту", "для агента", "агентові"]
+    "me": [
+      "for me",
+      "для меня",
+      "для мене"
+    ],
+    "shared": [
+      "for us",
+      "for both",
+      "for us both",
+      "для нас",
+      "для нас обоих",
+      "для нас обох",
+      "для обоих",
+      "для обох"
+    ],
+    "agent": [
+      "for the agent",
+      "for agent",
+      "for claude",
+      "для агента",
+      "для claude"
+    ]
   },
-  "people_prefixes": ["for", "для", "to"],
+  "people_prefixes": [
+    "for",
+    "для"
+  ],
   "people_aliases": {
-    "anastasiia": ["anastasiia", "anastasia", "nastia", "nastya", "настя", "насти", "насте", "настю", "анастасия", "анастасії", "насті"],
-    "maksym": ["maksym", "max", "макс", "максим", "максима", "максиму"]
+    "anastasiia": [
+      "anastasiia",
+      "anastasia",
+      "nastia",
+      "nastya",
+      "настя",
+      "насти",
+      "насте",
+      "настю",
+      "анастасия",
+      "анастасії",
+      "насті"
+    ],
+    "maksym": [
+      "maksym",
+      "max",
+      "макс",
+      "максим",
+      "максима",
+      "максиму"
+    ]
   },
   "dates": {
-    "today": ["today", "сегодня", "сьогодні"],
-    "tomorrow": ["tomorrow", "завтра"]
+    "today": [
+      "today",
+      "сегодня",
+      "сьогодні"
+    ],
+    "tomorrow": [
+      "tomorrow",
+      "завтра"
+    ]
   },
-  "date_prefixes": ["on", "на", "for"]
+  "date_prefixes": [
+    "on",
+    "на",
+    "for"
+  ]
 }

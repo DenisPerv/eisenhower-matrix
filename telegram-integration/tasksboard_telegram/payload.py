@@ -61,7 +61,7 @@ def change_patch(card: Card, scope: Scope, to_utc: ToUtc) -> dict[str, Any]:
         patch["list_id"] = lst.id
         patch["category"] = lst.kind
     if "quadrant" in ch:
-        patch["quadrant"] = card.quadrant
+        patch["quadrant"] = card.quadrant_to_write()  # None: back to Auto, the app's deriveQuadrant
     if "owner" in ch:
         patch["owner_id"] = card.owner_id(scope)
     if "due" in ch:

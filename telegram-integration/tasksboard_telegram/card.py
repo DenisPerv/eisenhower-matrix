@@ -91,14 +91,19 @@ class Card:
             return set()
         got = {
             "list": self.lst(scope).id != o.list_id,
-            "quadrant": self.quadrant != "auto" and self.quadrant != o.quadrant,
+            "quadrant": self.quadrant_to_write() != o.quadrant,  # Auto on a stored quadrant clears it: the app decides
             "owner": self.owner_id(scope) != o.owner_id,
-            "due": (self.due_date, self.due_time or (DEFAULT_TIME if self.due_date else None)) != (o.due_date, o.due_time),
+            "due": _due(self.due_date, self.due_time) != _due(o.due_date, o.due_time),
             "title": self.title != o.title,
             "details": self.details != o.details,
             "tags": self.tag_ids != o.tag_ids,
         }
         return {k for k, v in got.items() if v}
+
+
+def _due(day: date | None, time: str | None) -> tuple[date | None, str | None]:
+    """A due as written: no date = no time; a date without a time = the default time."""
+    return (day, (time or DEFAULT_TIME) if day else None)
 
 
 def owner_options(card: Card, scope: Scope) -> list[str]:
@@ -208,7 +213,8 @@ def change_card(o: Origin, scope: Scope, *, owner_handle: str | None, **kw: obje
     else:
         owner = owner_handle
     card = Card(mode="change", title=o.title, list_index=idx, quadrant=o.quadrant or "auto", owner=owner,
-                due_date=o.due_date, due_time=o.due_time, details=o.details, tag_ids=o.tag_ids, origin=o, **kw)  # type: ignore[arg-type]
+                due_date=o.due_date, due_time=_due(o.due_date, o.due_time)[1], details=o.details, tag_ids=o.tag_ids,
+                origin=o, **kw)  # type: ignore[arg-type]
     if owner == kw.get("agent_handle", "homeos-agent"):
         card = replace(card, owner="agent")
     return card

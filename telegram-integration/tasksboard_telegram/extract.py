@@ -74,9 +74,9 @@ def parse_reply(reply: str, scope: Scope, *, handles: set[str], item_count: int 
     if (name := s("list")) is not None:
         h.list_index = scope.list_by_name(name)
     t = v.get("target")
-    if isinstance(t, int) and 1 <= t <= item_count:
+    if type(t) is int and 1 <= t <= item_count:  # not isinstance: JSON true is a bool, and bool is an int
         h.target = t
     c = v.get("candidates")
     if isinstance(c, list):
-        h.candidates = [x for x in c if isinstance(x, int) and 1 <= x <= item_count][:5]
+        h.candidates = [x for x in c if type(x) is int and 1 <= x <= item_count][:5]
     return h

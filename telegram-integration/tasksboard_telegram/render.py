@@ -15,7 +15,7 @@ from .card import DUE_PICKS, LISTS_ON_MAIN, QUADRANTS, TAGS_PER_PAGE, Card, owne
 from .codec import encode
 from .quadrant import QN
 from .scope import Scope
-from .texts import t
+from .texts import t, weekday
 
 MAX_BUTTONS = 60
 Button = dict[str, str]
@@ -34,7 +34,7 @@ def _who(card: Card, who: str, lang: str, label: Callable[[str], str]) -> str:
 def _due_text(card: Card, lang: str) -> str:
     if card.due_date is None:
         return t("no_date", lang)
-    return f"{card.due_date:%a} {card.due_date.isoformat()} {card.due_time or ''}".strip()
+    return f"{weekday(card.due_date.weekday(), lang)} {card.due_date.isoformat()} {card.due_time or ''}".strip()
 
 
 def render(card: Card, scope: Scope, *, prefix: str, token: str, lang: str, today: date,
@@ -106,10 +106,9 @@ def render(card: Card, scope: Scope, *, prefix: str, token: str, lang: str, toda
     quads = [b(sel(card.quadrant == x, t("auto", lang) if x == "auto" else QN[x]), f"q{x}") for x in QUADRANTS]
     opts = owner_options(card, scope)
     owners = [b(sel(card.owner == o, _who(card, o, lang, label)), f"o{i}") for i, o in enumerate(opts)]
-    dues = []
-    for i, pick in enumerate(DUE_PICKS):
-        on = (card.due_date is None) if pick == "none" else (card.due_date is not None and pick_due(pick, today) == card.due_date)
-        dues.append(b(sel(on, t("d_" + pick, lang)), f"d{i}"))
+    # one pick at most is marked: the first whose date is the card's (on a Friday Tomorrow and Weekend are one day)
+    on_pick = next((p for p in DUE_PICKS if (card.due_date is None if p == "none" else pick_due(p, today) == card.due_date)), None)
+    dues = [b(sel(pick == on_pick, t("d_" + pick, lang)), f"d{i}") for i, pick in enumerate(DUE_PICKS)]
     extra = [b(t("tags_btn", lang, n=len(card.tag_ids)), "t"), b(t("desc_edit" if card.details else "desc_btn", lang), "e")]
     rows = _rows(lists, 4) + [quads] + _rows(owners, 4) + [dues, extra, [b(t("save", lang), "s"), b(t("cancel", lang), "x")]]
     return "\n".join(lines), rows

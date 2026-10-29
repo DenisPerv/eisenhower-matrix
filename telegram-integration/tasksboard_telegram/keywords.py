@@ -33,6 +33,27 @@ class Parsed:
         return {f for f, _ in self.matched}
 
 
+def _fold(s: str) -> str:
+    """Case-folded, one character per character, so an index into the folded text is an index into `s` (str.casefold
+    turns "ß" into "ss" and "İ" into two characters)."""
+    out = []
+    for c in s:
+        f = c.casefold()
+        out.append(f if len(f) == 1 else (c.lower() if len(c.lower()) == 1 else c))
+    return "".join(out)
+
+
+def _infinitive(low: str, phrase: str, words: dict[str, Any]) -> bool:
+    """"I need to do", "learn how to delegate": a quadrant phrase in "to <phrase>" right after one of these words is a
+    verb, not a marker."""
+    before = low[: len(low) - len(phrase)].split()
+    if not phrase.startswith("to "):  # "delegate" after "how to": the same verb, without its "to"
+        if not before or before[-1] != "to":
+            return False
+        before = before[:-1]
+    return bool(before) and before[-1] in words["infinitive_before"]
+
+
 def _ends_with(low: str, phrase: str) -> bool:
     if not low.endswith(phrase):
         return False
@@ -50,7 +71,7 @@ def _list_names(scope: Scope, words: dict[str, Any]) -> list[tuple[str, int]]:
     """(name as typed, list index) for every way to name a list in scope, longest first."""
     out: list[tuple[str, int]] = []
     for i, lst in enumerate(scope.lists):
-        out += [(lst.name.casefold(), i), (lst.slug.casefold(), i)]
+        out += [(_fold(lst.name), i), (_fold(lst.slug), i)]
         out += [(a, i) for a in words["list_aliases"].get(lst.slug, ())]
     return sorted(set(out), key=lambda x: -len(x[0]))
 
@@ -72,13 +93,13 @@ def parse(text: str, scope: Scope, *, handles: set[str] | None = None, words: di
     out = Parsed(title=s)
 
     # a leading command: "add a task …", "remind me to …"
-    low = s.casefold()
+    low = _fold(s)
     commands = sorted(((p, k) for k, ps in w["commands"].items() for p in ps), key=lambda x: -len(x[0]))
     for phrase, kind in commands:
         if _starts_with(low, phrase):
             out.kind = kind
             s = s[len(phrase):].lstrip(" :,-—–")
-            if s.casefold().startswith("to "):
+            if _fold(s).startswith("to "):
                 s = s[3:]
             break
 
@@ -87,7 +108,7 @@ def parse(text: str, scope: Scope, *, handles: set[str] | None = None, words: di
 
     # hashtags anywhere: #plan, #backlog, #nastia
     def tag(m: re.Match[str]) -> str:
-        word = m.group(1).casefold()
+        word = _fold(m.group(1))
         for q, tags in w["quadrant_hashtags"].items():
             if word in tags and out.quadrant is None:
                 out.quadrant = q
@@ -113,10 +134,10 @@ def parse(text: str, scope: Scope, *, handles: set[str] | None = None, words: di
                    for pre in [""] + w["date_prefixes"]), key=lambda x: -len(x[0]))
     while True:
         s = s.rstrip(_TRAIL)
-        low = s.casefold()
+        low = _fold(s)
         hit = None
         if out.quadrant is None:
-            hit = next((("quadrant", q, len(p)) for p, q in quadrants if _ends_with(low, p)), None)
+            hit = next((("quadrant", q, len(p)) for p, q in quadrants if _ends_with(low, p) and not _infinitive(low, p, w)), None)
         if hit is None and out.list_index is None:
             hit = next((("list", i, len(f"{pre} {n}")) for n, i in lists for pre in preps if _ends_with(low, f"{pre} {n}")), None)
         if hit is None and out.owner is None:

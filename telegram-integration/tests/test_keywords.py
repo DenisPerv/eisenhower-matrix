@@ -47,7 +47,7 @@ class Keywords(unittest.TestCase):
     def test_agent_and_list_names_from_scope(self):
         r = self.p("check the backup logs for the agent")
         self.assertEqual((r.owner, r.title), ("agent", "check the backup logs"))
-        r = self.p("renew the domain in HomeOS tasks")
+        r = self.p("renew the domain to HomeOS tasks")
         self.assertEqual((self.s.lists[r.list_index].slug, r.title), ("homeos-tasks", "renew the domain"))
 
     def test_a_list_outside_the_scope_stays_in_the_title(self):
@@ -59,6 +59,19 @@ class Keywords(unittest.TestCase):
     def test_never_eats_the_whole_title(self):
         self.assertEqual(self.p("to plan").title, "to plan")
         self.assertEqual(self.p("tomorrow").title, "tomorrow")
+
+    def test_natural_endings_stay_in_the_title(self):
+        for text in ("give the keys to Nastia", "things I want to do", "I need to plan", "learn how to delegate",
+                     "купи мне", "fix the bug in HomeOS", "send it to Max"):
+            r = self.p(text)
+            self.assertEqual((r.title, r.quadrant, r.list_index), (text, None, None), text)
+        self.assertEqual(self.p("give the keys to Nastia").owner, None)
+
+    def test_folding_keeps_the_length(self):
+        r = self.p("Straße kehren to plan")
+        self.assertEqual((r.quadrant, r.title), ("B", "Straße kehren"))
+        r = self.p("İzmir trip to plan")
+        self.assertEqual((r.quadrant, r.title), ("B", "İzmir trip"))
 
     def test_prefix_codes_kept(self):
         self.assertEqual(self.p("add a task ET buy filters to plan").title, "ET buy filters")

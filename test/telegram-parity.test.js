@@ -1,5 +1,6 @@
 // node --test test/  — the Telegram card's copy of the quadrant rule (telegram-integration/tasksboard_telegram/quadrant.py)
-// against the page: deriveQuadrant on the cases both read (telegram-integration/tests/quadrant_cases.json), and the
+// against the page: deriveQuadrant on the cases both read (telegram-integration/tests/quadrant_cases.json), the same rows in
+// the SQL selftest 905 (T13, review_quadrant of db/016), and the
 // quadrant names QN. CLAUDE.md "The task card has a twin in Telegram". No network.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -18,6 +19,15 @@ test('telegram-integration: deriveQuadrant gives the shared answers', () => {
                 deadline: c.deadline_h === null ? null : new Date(now + c.deadline_h * 3600e3) };
     assert.equal(C.deriveQuadrant(t, { windowDays: c.window }, now), c.expect, JSON.stringify(c));
   }
+});
+
+test('telegram-integration: the SQL copy (review_quadrant in 905 T13) runs the same cases', () => {
+  const sql = fs.readFileSync(path.join(ROOT, 'db', '905_selftest_telegram.sql'), 'utf8');
+  const block = sql.split('-- >>> quadrant cases')[1].split('-- <<< quadrant cases')[0];
+  const lit = v => (v === 'null' ? null : v === 'true' ? true : v === 'false' ? false : /^'.*'$/.test(v) ? v.slice(1, -1) : Number(v));
+  const rows = [...block.matchAll(/\(([^)]*)\)/g)].map(m => m[1].split(',').map(x => lit(x.trim())));
+  const want = CASES.cases.map((c, i) => [i + 1, c.stored, c.priority, c.category, c.pin, c.deadline_h, c.window, c.expect]);
+  assert.deepEqual(rows, want);
 });
 
 test('telegram-integration: quadrant names match the page', () => {
