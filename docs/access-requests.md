@@ -33,7 +33,7 @@ Dry run unless `--apply`. Env names only (values never printed): `CLOUDFLARE_ACC
 
 | Command | Use |
 |---|---|
-| `setup` | once: creates the guests policy, the bypass policy and the request app, attaches the guests policy to the production app (every existing policy kept; exit 3 if one would be lost), prints `CF_ACCESS_GUEST_POLICY_ID` |
+| `setup` | once: creates the guests policy, the bypass policy, the request app and the phone app, attaches the guests policy to the production app (every existing policy kept; exit 3 if one would be lost), prints `CF_ACCESS_GUEST_POLICY_ID` |
 | `list` | emails on the guests policy, seats, the production app's policies |
 | `add --email A` / `remove --email A` | by hand; `remove` also marks an approved request `removed`, so the person may ask again |
 | `process` | applies the decisions written in the tasks |
@@ -45,7 +45,7 @@ Dry run unless `--apply`. Env names only (values never printed): `CLOUDFLARE_ACC
 3. `node cli/access.mjs setup --env <file> --apply`; add the printed `CF_ACCESS_GUEST_POLICY_ID` to the env file.
 4. Check without a token: `<host>/request` and `<host>/config/tasksdashboard.config.js` answer `200`; `<host>/` still redirects to `*.cloudflareaccess.com`.
 
-What `setup` creates: the reusable policy **TasksDashboard guests** (allow, emails, session 730 h; it holds the placeholder `no-guests-yet@example.invalid` until the first guest, because a reusable policy needs one rule), the policy **TasksDashboard request (bypass)** (bypass, everyone) and the self-hosted app **TasksDashboard request** on `/request` and `/config/tasksdashboard.config.js`. The more specific path wins over the production app, so only those two paths are public. The config holds only public values (project URL, publishable key, poll interval). `privacy.html` is not on the bypass app; add its path there if a Google consent screen must link to it publicly.
+What `setup` creates: the reusable policy **TasksDashboard guests** (allow, emails, session 730 h; it holds the placeholder `no-guests-yet@example.invalid` until the first guest, because a reusable policy needs one rule), the policy **TasksDashboard request (bypass)** (bypass, everyone) the self-hosted app **TasksDashboard request** on `/request` and `/config/tasksdashboard.config.js`, and the self-hosted app **TasksDashboard phone app** on `/app` and `/app/*` (the phone app, which gates itself; [hosting.md](hosting.md) "The phone app on the same project"), both on the bypass policy. The more specific path wins over the production app, so only those paths are public. Run `setup` again on an older installation to add the phone app: it creates only what is missing. The config holds only public values (project URL, publishable key, poll interval). `privacy.html` is not on the bypass app; add its path there if a Google consent screen must link to it publicly.
 
 ## Seats
 
@@ -62,6 +62,7 @@ Zero Trust's free plan counts 50 users, the owners included. `add` and `process`
 | Symptom | Cause and fix |
 |---|---|
 | `/request` shows the Access login | `setup --apply` not run, or the request app was deleted |
+| `/app/` shows the Access login | `setup --apply` not run since the phone app was added, or the phone app was deleted |
 | "Try again later" | a cap (`54000`) or the sign-up hook's limit; raise the caps in `ops.settings` or decide open requests |
 | an approved person still sees the Access login | `process --apply` not run yet, or their Google email differs from the one Access receives (they must use the same account) |
 | `access.mjs` exit 2 | the env names it prints are missing |

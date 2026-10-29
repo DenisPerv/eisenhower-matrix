@@ -38,8 +38,8 @@ The phone app ([architecture.md](architecture.md), section Phone app) ships from
 
 **Person step: a path bypass for `/app/*`.** Access in front of the app breaks installing it: the browser fetches the manifest and icons without the Access cookie, and an iPhone's installed app does not share Safari's cookies. So `/app/*` is public at the edge and the app gates itself; the website at `/` keeps Access. It is the same pattern as `/request` ([access-requests.md](access-requests.md)):
 
-1. Zero Trust → Access → Applications → Add → Self-hosted; domain `<project>.pages.dev`, path `app/*` (the more specific path wins over the production application).
-2. Policy: action **Bypass**, include **Everyone**. (`cli/access.mjs setup` makes this kind of policy for `/request`; it does not know `/app/*`, so make the application by hand, or add the path to the request application.)
+1. `node cli/access.mjs setup --env <file>` (dry run), then with `--apply`: it creates, when missing, the self-hosted application **TasksDashboard phone app** for `<project>.pages.dev/app` and `<project>.pages.dev/app/*` with the bypass policy (action **Bypass**, include **Everyone**) it also uses for `/request`; the more specific path wins over the production application ([access-requests.md](access-requests.md)).
+2. By hand instead: Zero Trust → Access → Applications → Add → Self-hosted; domain `<project>.pages.dev`, paths `app` and `app/*`; policy Bypass, include Everyone.
 3. Check in a private window: `/app/` opens the app without the Access page; `/` still asks for Access.
 
 Bypass hides nothing that was hidden before: Access never protected the data, RLS does ([What Access does and does not do](#what-access-does-and-does-not-do)).
