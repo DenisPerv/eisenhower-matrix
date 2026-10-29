@@ -13,8 +13,9 @@ Run the files in the SQL editor (or with an admin tool), each file whole, in thi
 | 3 | `003_rls.sql`, `011_multiuser_rls.sql` | grants for 005-010; 011 replaces some of 003's household policies, so it always runs after 003 |
 | 4 | `012_round3.sql` | round 3; it ends with a policy block (`-- >>> 012 policies` … `-- <<< 012 policies`) that replaces 011's tag policies |
 | 5 | `003`, `011`, the 012 policy block | as after every new file |
-| 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql`, `019_bot_opt_out.sql` | KPI history RPC, urgency settings by app, access requests, the review report API, the chat bot's scope, task links, the bot's opt-out |
+| 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql`, `019_bot_opt_out.sql`, `020_priority_retired.sql` | KPI history RPC, urgency settings by app, access requests, the review report API, the chat bot's scope, task links, the bot's opt-out, functions without priority (priority by position) |
 | 7 | `003`, `011`, the 012 policy block | again |
+| 7a | `021_drop_priority.sql` | drops `items.priority`, only once every client runs a page without priority (the hosted copy, both household machines, the Telegram bot); then 7 and 8 again |
 | 8 | `900_selftest.sql` … `906_selftest_task_links.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
 
 Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`.
@@ -26,7 +27,7 @@ Every file is re-runnable. The trigger function `items_before_write` is replaced
 1. Add a new file `db/NNN_<name>.sql` with the next free number. Never edit an applied file.
 2. Make it idempotent (`create or replace`, `if not exists`) and end it with a final-check block that raises an exception when its own promise does not hold (see `013`, `014`, `016`: invoker or definer, `search_path`, no execute for `anon`).
 3. New functions: `revoke all … from public, anon` and an explicit `grant execute … to authenticated`. Default privileges revoke execute from everyone, so nothing is callable by accident.
-4. Re-run `003`, `011` and the 012 policy block, then every selftest (900-904).
+4. Re-run `003`, `011` and the 012 policy block, then every selftest (900-906).
 5. Update the root README (Set up table, the section the change touches) and, for an RPC that is part of the API, `docs/api/openapi.yaml` and `docs/api/README.md` (`test/api-doc.test.js` fails otherwise).
 6. Never click a table on the dashboard's Data API page: it replaces the explicit grants with defaults that include `anon`. If it happens, re-run `003_rls.sql`.
 

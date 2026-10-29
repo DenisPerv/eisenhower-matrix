@@ -477,7 +477,7 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   --ink:#13121F;--ink2:#383650;--ink3:#64627A;
   --hover:rgba(80,60,240,.06);--well:rgba(28,26,52,.045);
   --accent:#5235F0;--accent2:#5235F0;--accent-ink:#3F22D9;--accent-bg:rgba(82,53,240,.09);--accent-line:rgba(82,53,240,.4);--glow:rgba(82,53,240,.28);
-  --cyan:#0891B2;--week:#C2410C;
+  --cyan:#0891B2;--week:#C2410C;--lk-par:var(--accent);--lk-sub:var(--cyan);--lk-prev:#C2410C;--lk-next:#1D4ED8;
   --wm:.13;--aura:14%;
 }
 :root[data-theme="dark"]{
@@ -491,7 +491,7 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   --ink:#ECEBFA;--ink2:#C3C1DD;--ink3:#9593B5;
   --hover:rgba(150,140,255,.08);--well:rgba(170,180,255,.05);
   --accent:#8E7BFF;--accent2:#8E7BFF;--accent-ink:#B8ADFF;--accent-bg:rgba(142,123,255,.14);--accent-line:rgba(142,123,255,.5);--glow:rgba(142,123,255,.45);
-  --cyan:#22D3EE;--week:#FB923C;
+  --cyan:#22D3EE;--week:#FB923C;--lk-par:var(--accent);--lk-sub:var(--cyan);--lk-prev:#FB923C;--lk-next:#60A5FA;
   --wm:.2;--aura:24%;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
@@ -505,7 +505,7 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   --ink:#ECEBFA;--ink2:#C3C1DD;--ink3:#9593B5;
   --hover:rgba(150,140,255,.08);--well:rgba(170,180,255,.05);
   --accent:#8E7BFF;--accent2:#8E7BFF;--accent-ink:#B8ADFF;--accent-bg:rgba(142,123,255,.14);--accent-line:rgba(142,123,255,.5);--glow:rgba(142,123,255,.45);
-  --cyan:#22D3EE;--week:#FB923C;
+  --cyan:#22D3EE;--week:#FB923C;--lk-par:var(--accent);--lk-sub:var(--cyan);--lk-prev:#FB923C;--lk-next:#60A5FA;
   --wm:.2;--aura:24%;
 }}
 
@@ -979,9 +979,7 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .card .more:hover{text-decoration:underline}
 .tbs{display:inline-flex;gap:4px;align-items:center}
 .tb{display:inline-flex;align-items:center;min-height:18px;padding:0 6px;border:1px solid var(--hair2);border-radius:var(--r-sm);font:500 11.5px/1 var(--ui);color:var(--ink2);white-space:nowrap;letter-spacing:.01em}
-/* task links on cards: priority, waiting for open predecessors, a parent's progress (Card layout switches) */
-.tb.pr{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink3)}
-.tb.pr.hi{color:var(--ink);border-color:color-mix(in srgb,var(--c) 60%,transparent)}
+/* task links on cards: waiting for open predecessors, a parent's progress (Card layout switches) */
 .tb.wt{border-style:dashed;border-color:color-mix(in srgb,var(--qc) 75%,transparent);color:var(--ink2)}
 .tb.wt .ws{display:none}
 @media (max-width:700px){.tb.wt .wl{display:none}.tb.wt .ws{display:inline}.card.lk-kid{margin-left:calc(var(--lk-d,1) * 12px)}.card.lk-kid::after{left:-9px;width:7px}}
@@ -1046,6 +1044,28 @@ dialog input.tg-q{width:min(260px,100%);min-height:32px;padding:0 10px;font-size
 .lk-x{width:22px;height:22px;min-height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--ink3);flex:none}
 .lk-x:hover{background:var(--danger-bg);color:var(--danger-ink)}
 .lk-add{min-height:28px;font-size:12.5px;white-space:nowrap}
+/* priority by position round: one list of linked tasks, coloured by link type (glyph + tint, so colour is never the only cue), one row of add buttons */
+.lk-list{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 8px}
+.lk-parent{--lk-c:var(--lk-par)}.lk-child{--lk-c:var(--lk-sub)}.lk-pred{--lk-c:var(--lk-prev)}.lk-next{--lk-c:var(--lk-next)}
+.lk-list .lk-chip{border-color:color-mix(in srgb,var(--lk-c) 50%,transparent);background:color-mix(in srgb,var(--lk-c) 9%,var(--solid))}
+.lk-g{color:var(--lk-c);font-weight:700;margin-right:1px}
+.lk-adds{display:flex;flex-wrap:wrap;gap:6px;padding-top:8px;border-top:1px solid var(--hair)}
+.lk-adds .lk-g{margin-right:3px}
+/* previous / next task: buttons in the window header, faded ghost cards beside the window (top layer popovers) */
+dialog.tk form{position:relative}
+.tk-nav{position:absolute;top:0;right:0;display:flex;gap:4px}
+.tk-nav button{min-width:34px;min-height:32px;padding:0;font-size:18px;line-height:1}
+.tk-ghost{position:fixed;inset:auto;margin:0;width:220px;padding:12px 14px 12px 18px;border:1px solid var(--rim);border-radius:16px;background:var(--glass3);
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);color:var(--ink2);box-shadow:var(--depth);text-align:left;font:500 13px/1.35 var(--ui);opacity:.55;cursor:pointer;transition:opacity .15s}
+.tk-ghost::before{content:"";position:absolute;left:7px;top:12px;bottom:12px;width:3px;border-radius:3px;background:var(--c)}
+.tk-ghost.prev{transform:rotate(-2deg)}.tk-ghost.next{transform:rotate(2deg)}
+.tk-ghost:hover{opacity:.92}
+.tk-ghost .k{display:block;font:500 11.5px var(--mono);color:var(--ink3);margin-bottom:3px}
+.tk-ghost .t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.tk-ghost .d{display:block;margin-top:6px;font-size:11.5px;color:var(--ink3)}
+@media (prefers-reduced-motion:reduce){.tk-ghost{transition:none}}
+.tk-ask{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:var(--s3);padding:10px 12px;border:1px solid var(--accent-line);border-radius:var(--r);background:var(--accent-bg)}
+.tk-ask p{margin:0 auto 0 0;font-size:13px}
 .lk-pick{padding:6px 0 8px}
 dialog input.tg-q#lk-q{width:100%}
 .lk-opts{list-style:none;margin:4px 0 0;padding:0;max-height:240px;overflow-y:auto;border:1px solid var(--hair);border-radius:var(--r-sm);background:var(--solid)}
@@ -1248,14 +1268,14 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
       doneAt: closed ? date(r.completed_at || r.updated_at) : null,
       pin: r.urgent_pin === null || r.urgent_pin === undefined ? undefined : !!r.urgent_pin,
       sortKey: typeof r.sort_key === 'number' ? r.sort_key : null, category: r.category || 'task',
-      priority: typeof r.priority === 'number' ? r.priority : null, reviewState: r.review_state || 'none',
+      reviewState: r.review_state || 'none',
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
       createdAt: date(r.created_at),
     };
   }
   // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
-  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', priority: 'priority', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at' };
+  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at' };
   function taskToPatch(t, fields, nowIso) {
     const p = {};
     (fields || Object.keys(FIELD_COLUMNS)).forEach(f => {
@@ -1266,7 +1286,6 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
       else if (f === 'pin') p.urgent_pin = t.pin === undefined ? null : !!t.pin;
       else if (f === 'deadline') p.due_at = iso(t.deadline);
       else if (f === 'start') p.start_at = iso(t.start);
-      else if (f === 'priority') p.priority = Number.isInteger(t.priority) && t.priority >= 0 && t.priority <= 5 ? t.priority : null;
       else if (f === 'status') p.status = STATUSES.includes(t.status) ? t.status : 'open';
       else if (f === 'sortKey') p.sort_key = typeof t.sortKey === 'number' ? t.sortKey : null;
       else if (f === 'list') p.list_id = t.list;
@@ -1290,10 +1309,11 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   // round 3, adjustment 13: what a card shows (Account menu → Card layout). The defaults are today's card. tags: 'all', 'lists'
   // (only the tag lists in tagLists) or 'off'; autoCollapse: an expanded-mode card whose description is longer starts collapsed (0 = off).
   // Round 4: source = the category badge on cards and Sources in the task window (off by default; never with one list selected)
-  // task links: group (children under their parent; off by default), priority (P0-P5), waiting (open predecessors), progress (n/m)
+  // task links: group (children under their parent; off by default), waiting (open predecessors), progress (n/m). No priority:
+  // a task's priority is its position in its quadrant (priority by position, 2026-10-29)
   const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
-    group: false, priority: true, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
-  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'priority', 'waiting', 'progress'];
+    group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
+  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
   // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
     cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, tagListOrder: [], tagListsOpen: {} };
@@ -1394,7 +1414,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   function deriveQuadrant(t, settings, now) {
     if (QS.includes(t.qStored)) return t.qStored;
     const s = settings || SETTINGS_DEFAULTS;
-    const important = (typeof t.priority === 'number' && t.priority >= 3) || IMPORTANT_CATEGORIES.includes(t.category);
+    const important = IMPORTANT_CATEGORIES.includes(t.category); // priority by position: no priority number
     const urgent = t.pin !== undefined && t.pin !== null ? !!t.pin : !!(t.deadline && t.deadline.getTime() - now <= s.windowDays * DAY);
     return important ? (urgent ? 'A' : 'B') : (urgent ? 'C' : 'D');
   }
@@ -1849,7 +1869,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   // ---- round 3, adjustment 9: KPI, rebuilt backwards from item_events. An item's state at a time is its current row with the
   // diffs ({ column: { old, new } }, db/002 items_after_write) of every later event undone. An event may carry the diff as
   // { diff } or as flat columns (the page selects diff->column only). Before created_at the item does not exist.
-  const KPI_COLUMNS = ['quadrant', 'status', 'due_at', 'urgent_pin', 'priority', 'category', 'deleted_at', 'list_id'];
+  const KPI_COLUMNS = ['quadrant', 'status', 'due_at', 'urgent_pin', 'category', 'deleted_at', 'list_id'];
   const kpiState = r => { const s = {}; KPI_COLUMNS.forEach(k => { s[k] = r[k] === undefined ? null : r[k]; }); if (!s.status) s.status = 'open'; return s; };
   function kpiHistory(rows, events) {
     const by = {};
@@ -1897,7 +1917,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return a !== undefined && a !== null && a <= T ? 'archived' : 'open';
   }
   // stored quadrant, else derived (deriveQuadrant) at that time with the person's urgency settings
-  const kpiQuadrant = (s, settings, T) => deriveQuadrant({ qStored: s.quadrant, priority: s.priority, category: s.category, pin: s.urgent_pin,
+  const kpiQuadrant = (s, settings, T) => deriveQuadrant({ qStored: s.quadrant, category: s.category, pin: s.urgent_pin,
     deadline: s.due_at ? new Date(s.due_at) : null }, settings, T);
   // sample times: `from`, then every day for a span up to KPI_DAILY_MAX days, else every week; the last point is `to`
   const KPI_DAILY_MAX = 62;
@@ -2069,6 +2089,37 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     });
     return rows;
   }
+  // priority by position (2026-10-29): with Group by parent on, the board shows groupCards' order and that order is stored.
+  // groupedIds: the drawn order of one quadrant (no ghost rows)
+  const groupedIds = (cards, ix, byId) => groupCards(cards, ix, byId).filter(r => !r.ghost).map(r => r.t.id);
+  // placeGrouped: a drop with grouping on. order = the quadrant's cards as drawn without the moving ones; moving = the dragged card
+  // and its subtree as drawn; parentOf = ix.parentOf. The card goes among its siblings (same nearest ancestor in the quadrant):
+  // before the target's sibling block or after it; a drop inside another card's subtree lands after that subtree; under a parent
+  // it stays among that parent's children. Returns [{ id, sortKey }]: the moving rows between their new neighbours, or every row
+  // renumbered in drawn order when the keys there are missing, not increasing or too close. null: a drop on its own subtree
+  function placeGrouped(order, moving, targetId, before, parentOf) {
+    if (moving.some(t => t.id === targetId)) return null;
+    const ids = new Set(order.map(t => t.id).concat(moving.map(t => t.id)));
+    const anc = id => { const seen = new Set(); let p = parentOf[id]; while (p && !seen.has(p)) { if (ids.has(p)) return p; seen.add(p); p = parentOf[p]; } return null; };
+    const under = (id, a) => { for (let p = anc(id); p; p = anc(p)) if (p === a) return true; return false; };
+    const blockEnd = i => { let k = i + 1; while (k < order.length && under(order[k].id, order[i].id)) k++; return k; };
+    const pm = anc(moving[0].id), pmAt = pm ? order.findIndex(t => t.id === pm) : -1;
+    const sibs = order.map((t, i) => i).filter(i => anc(order[i].id) === pm);
+    const j = targetId ? order.findIndex(t => t.id === targetId) : -1;
+    const s = j < 0 ? undefined : sibs.filter(i => i <= j && j < blockEnd(i)).pop();
+    const at = s !== undefined ? (s === j && before ? s : blockEnd(s))
+      : pmAt >= 0 ? (j >= 0 && j <= pmAt ? pmAt + 1 : blockEnd(pmAt))
+      : sibs.length ? blockEnd(sibs[sibs.length - 1]) : order.length;
+    const next = order.slice(0, at).concat(moving, order.slice(at)), n = moving.length;
+    const lo = at > 0 ? order[at - 1].sortKey : null, hi = at < order.length ? order[at].sortKey : null;
+    const keys = order.map(t => t.sortKey);
+    const ok = keys.every((k, i) => k !== null && k !== undefined && (i === 0 || k > keys[i - 1])) && !(lo !== null && hi !== null && (hi - lo) / (n + 1) < 1e-6);
+    if (!ok) return renumber(next.map(t => t.id));
+    return moving.map((t, k) => ({ id: t.id, sortKey: lo === null && hi === null ? (k + 1) * SPACING : lo === null ? hi - (n - k) * SPACING
+      : hi === null ? lo + (k + 1) * SPACING : lo + (hi - lo) * (k + 1) / (n + 1) }));
+  }
+  // previous and next task of the task window: the neighbours in the quadrant's shown order (null at the ends)
+  const navNeighbours = (ids, id) => { const i = ids.indexOf(id); return i < 0 ? { prev: null, next: null } : { prev: ids[i - 1] || null, next: ids[i + 1] || null }; };
   // the Timeline: one row per task. base = the tasks the view picked (open, filters, a date in the window); their parent
   // trees join them (ancestors and children). Rows run depth first, siblings by start (or end), then number. A bar is in day
   // indexes from opts.start (a Date at local midnight) over opts.days; a parent gets a summary span over its tree. Edges go
@@ -2117,7 +2168,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
-    deriveQuadrant, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
+    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
@@ -2646,7 +2697,7 @@ async function refreshMeta() {
 // ---- writes: one serial queue per item, merged per item; every PATCH carries the version the last response returned ----
 // Q: item id -> { fields: Set of task fields waiting, base: their values before the first waiting change, create, inflight, origin }
 const Q = new Map();
-const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'priority', 'status', 'sortKey', 'list', 'deleted'];
+const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'status', 'sortKey', 'list', 'deleted'];
 const dbField = f => f === 'qStored' ? 'q' : f; // taskToPatch names the stored quadrant "q"
 const val = (t, f) => f === 'tags' ? t.tags.slice() : t[f];
 const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
@@ -2698,7 +2749,7 @@ async function flush(id) {
   e.inflight = true;
   let res, sending = null;
   if (e.create) {
-    const body = Object.assign({ id: t.id, list_id: t.list, category: t.category, owner_id: t.ownerId || null }, C.taskToPatch(t, ['title', 'notes', 'q', 'pin', 'deadline', 'start', 'priority', 'status', 'sortKey']));
+    const body = Object.assign({ id: t.id, list_id: t.list, category: t.category, owner_id: t.ownerId || null }, C.taskToPatch(t, ['title', 'notes', 'q', 'pin', 'deadline', 'start', 'status', 'sortKey']));
     res = await rest('POST', 'items', body, { Prefer: 'return=representation' });
     // a retry after a lost response: the client id is already stored, so a 409 / 23505 counts as success
     if (!res.ok && res.err.kind === 'duplicate') res = await rest('GET', 'items?select=*&id=eq.' + t.id);
@@ -2762,7 +2813,7 @@ async function conflict(t, e, sending) {
   }
   const draft = { title: t.title, notes: t.notes };
   applyRow(t, row, e.fields);
-  const names = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start', priority: 'priority' };
+  const names = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start' };
   const what = clash.map(f => names[f] || f).join(', ');
   if (e.origin === 'dialog') openTask(t.id, null, { draft, notice: 'Changed by someone else while you edited: ' + what + '. Their version is saved; your text is below. Save again to replace it.' });
   else toast('Changed by someone else: ' + what);
@@ -2772,7 +2823,7 @@ async function conflict(t, e, sending) {
 function failed(t, e, sending, err) {
   if (e.create) {
     Q.delete(t.id); tasks = tasks.filter(x => x !== t);
-    if (e.origin === 'dialog' && (err.kind === 'sensitive' || err.kind === 'invalid')) openTask(null, t.qStored, { draft: { title: t.title, notes: t.notes, list: t.list, tags: t.tags, deadline: t.deadline, start: t.start, priority: t.priority }, error: err.message });
+    if (e.origin === 'dialog' && (err.kind === 'sensitive' || err.kind === 'invalid')) openTask(null, t.qStored, { draft: { title: t.title, notes: t.notes, list: t.list, tags: t.tags, deadline: t.deadline, start: t.start }, error: err.message });
     else toast(err.message);
     render(); return;
   }
@@ -2945,10 +2996,9 @@ function cardHtml(t, q, g) {
   const open = '<div class="' + cls + '"' + (g && g.depth ? ' style="--lk-d:' + g.depth + '"' : '') + ' data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
   const meta = t.deadline ? '<span class="meta"' + (soon(t) ? ' title="Due soon: less than ' + settings.threshold + '% of the ' + settings.windowDays + '-day urgency window left"' : '') + '>' + rel(t) + (soon(t) ? '<span class="sr">, due soon</span>' : '') + '</span>' : '<span></span>';
   const done = editable ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>' : '<span></span>';
-  // task links: P0-P5, Waiting for N (open predecessors), a parent's done/total (Card layout priority, waiting, progress)
+  // task links: Waiting for N (open predecessors), a parent's done/total (Card layout waiting, progress)
   const lx = RLX, wt = L.waiting && lx ? C.waitingFor(t, lx.ix, lx.by) : [], pg = L.progress && lx ? C.subtaskProgress(t, lx.ix, lx.by) : null;
-  const linkBadges = (L.priority && Number.isInteger(t.priority) ? '<span class="tb pr' + (t.priority >= 3 ? ' hi' : '') + '" title="Priority ' + t.priority + ' of 5">P' + t.priority + '</span>' : '') +
-    (wt.length ? '<span class="tb wt" title="Waiting for ' + esc(wt.map(x => ref(x) + ' ' + plain(x.title)).join(', ')) + '"><span class="wl">Waiting for&nbsp;</span><span class="ws" aria-hidden="true">Wait&nbsp;</span>' + wt.length + '</span>' : '') +
+  const linkBadges = (wt.length ? '<span class="tb wt" title="Waiting for ' + esc(wt.map(x => ref(x) + ' ' + plain(x.title)).join(', ')) + '"><span class="wl">Waiting for&nbsp;</span><span class="ws" aria-hidden="true">Wait&nbsp;</span>' + wt.length + '</span>' : '') +
     (pg ? '<span class="tb pg" title="' + pg.done + ' of ' + pg.total + ' subtasks done">' + pg.done + '/' + pg.total + '<i style="--p:' + Math.round(100 * pg.done / pg.total) + '%"></i></span>' : '');
   const badges = '<span class="tbs">' + linkBadges + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
     (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
@@ -2975,6 +3025,10 @@ function cardHtml(t, q, g) {
 // the faded parent of children whose parent is in another quadrant (not a card: no drag, not counted); it opens the parent
 const ghostHtml = p => '<button type="button" class="lk-ghost ' + p.q + '" data-open="' + p.id + '" aria-label="Parent: ' + esc(plain(p.title)) + ', in ' + QN[p.q] + '"><span aria-hidden="true">↑</span><span class="t">' + mdInline(p.title) + '</span><span class="gq">' + QN[p.q] + '</span></button>';
 let RLX = null; // the link index of the current render (linkIx)
+// priority by position: with Group by parent on, a quadrant's cards in the order the board draws them (C.groupedIds)
+const byShownOrder = cards => { if (!(cardLayout.group && RLX)) return cards; const by = {}; cards.forEach(t => { by[t.id] = t; }); return C.groupedIds(cards, RLX.ix, RLX.by).map(id => by[id]); };
+// the task window's previous / next: the card's quadrant in the board's shown order (filters, grouping)
+const quadOrder = q => byShownOrder(all().filter(t => !t.doneAt && t.q === q && inList(t) && passFilters(t)).sort(C.byOrder)).map(t => t.id);
 const factText = f => ({ end: 'End ' + ymd(f.at), created: 'Created ' + ymd(f.at), creator: 'By ' + displayName(f.id) })[f.k];
 
 const archivedIn = () => all().filter(t => t.doneAt && inList(t));
@@ -3174,15 +3228,15 @@ function render() {
   const tagLabel = !st.tags.size ? 'Tag' : st.tags.size === 1 ? 'Tag: ' + tagKeyLabel([...st.tags][0]) : 'Tags: ' + st.tags.size;
   const catName = c => CATS[c] ? CATS[c].name : c;
   const catLabel = !st.cats.size ? 'Category' : st.cats.size === 1 ? catName([...st.cats][0]) : 'Categories: ' + st.cats.size;
+  RLX = LINKS_READY ? linkIx() : null;
   const menuGroups = QS.map(q => {
-    const rows = open.filter(t => inList(t) && t.q === q).sort(C.byOrder);
+    const rows = byShownOrder(open.filter(t => inList(t) && t.q === q).sort(C.byOrder));
     const col = st.collapsed.has(q);
     return '<button class="grp" data-q="' + q + '" aria-expanded="' + !col + '"><span>' + q + ' ' + QN[q] + '</span><span>' + rows.length + '</span></button>' +
       (col ? '' : rows.map(t => '<button class="mrow' + (overdue(t) ? ' overdue' : soon(t) ? ' soon' : '') + '" data-open="' + t.id + '" data-hl="' + t.id + '" data-mq="' + q + '"' +
         (canDo('edit', t) ? ' draggable="true" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
   }).join('');
   const addable = canAddSomewhere();
-  RLX = LINKS_READY ? linkIx() : null;
   const quad = q => {
     const cards = shown.filter(t => t.q === q);
     const body = cardLayout.group && RLX ? C.groupCards(cards, RLX.ix, RLX.by).map(r => r.ghost ? ghostHtml(r.t) : cardHtml(r.t, q, r)).join('') : cards.map(t => cardHtml(t, q)).join('');
@@ -3215,7 +3269,7 @@ function render() {
     profile: () => '<div class="who-am" role="none"><strong>' + esc(me.display_name) + '</strong>' + (session.user.email ? '<span>' + esc(session.user.email) + '</span>' : '') + '</div>' +
       (human ? '<button data-menu="tags">Tags</button><button data-menu="sharing">Sharing' + (INVITES.length ? ' <span class="badge" aria-label="' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '">' + INVITES.length + '</span>' : '') + '</button>' : '') +
       (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
-      '<hr><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
+      '<hr><button data-menu="timeline">Timeline</button><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
       (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : '') +
       '<hr><button data-signout>Sign out</button>',
     more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
@@ -3245,7 +3299,7 @@ function render() {
     '<button class="f" id="mine" aria-pressed="' + st.mine + '">Mine</button>' +
     (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop + '</header>' +
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
-    [['matrix', '▦'], ['archive', '▤'], ['review', '▬'], ['timeline', '☰']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
+    [['matrix', '▦'], ['archive', '▤'], ['review', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v || (v === 'matrix' && st.view === 'timeline') ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
     '</div><nav class="groups" aria-label="Items by quadrant">' + menuGroups + '</nav></aside>' +
     '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : esc(label(st.list))) + '</h1>' +
     (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : st.view === 'review' ? reviewHtml() : matrix) + '</main></div>';
@@ -3300,10 +3354,37 @@ const topKey = (list, q) => { const keys = all().filter(x => !x.doneAt && x.list
 function moveTask(id, q, targetId, before) {
   const t = find(id); if (!t || !canDo('edit', t)) return;
   const from = t.q;
+  if (cardLayout.group && RLX) return moveGrouped(t, q, targetId, before, from);
   const key = placeIn(t, q, targetId, before);
   const r = edit(t, x => { if (q !== from) { if (URGENT[q] !== URGENT[from]) x.pin = URGENT[q]; x.qStored = q; } x.sortKey = key; });
   st.keep.add(t.id);
   toast(q !== from ? 'Moved to ' + QN[q] : 'Order changed', undoEdit(t, r));
+  render();
+}
+
+// priority by position (2026-10-29): with Group by parent on, the stored order is the drawn order. The card and the rows drawn
+// under it in its quadrant move together (C.placeGrouped); one Undo puts every key, quadrant and pin back
+function moveGrouped(t, q, targetId, before, from) {
+  const drawn = x => byShownOrder(all().filter(y => !y.doneAt && y.list === t.list && y.q === x).sort(C.byOrder));
+  const src = drawn(from), i = src.indexOf(t);
+  const under = id => { const seen = new Set(); for (let p = RLX.ix.parentOf[id]; p && !seen.has(p); p = RLX.ix.parentOf[p]) { if (p === t.id) return true; seen.add(p); } return false; };
+  let k = i + 1; while (i >= 0 && k < src.length && under(src[k].id)) k++;
+  const moving = i >= 0 ? src.slice(i, k) : [t], order = drawn(q).filter(y => !moving.includes(y));
+  // a target from another list (the All board): the first card of this list after it
+  const tg = targetId ? find(targetId) : null;
+  if (tg && !order.includes(tg) && !moving.includes(tg)) { const nx = order.find(y => C.byOrder(tg, y) < 0); targetId = nx ? nx.id : null; before = !!nx; }
+  const w = C.placeGrouped(order, moving, targetId, before, RLX.ix.parentOf);
+  if (!w) return;
+  const done = [];
+  w.forEach(({ id, sortKey }) => {
+    const x = find(id), mv = moving.includes(x);
+    if (!x || (!mv && x.sortKey === sortKey)) return;
+    const r = edit(x, y => { if (mv && q !== from) { if (URGENT[q] !== URGENT[from]) y.pin = URGENT[q]; y.qStored = q; } y.sortKey = sortKey; });
+    if (r) done.push([x, r]);
+  });
+  moving.forEach(x => st.keep.add(x.id));
+  const kids = moving.length - 1;
+  toast((q !== from ? 'Moved to ' + QN[q] : 'Order changed') + (kids ? ' with ' + kids + (kids === 1 ? ' subtask' : ' subtasks') : ''), () => done.slice().reverse().forEach(([x, r]) => undoEdit(x, r)()));
   render();
 }
 
@@ -3379,7 +3460,6 @@ function openTask(id, quad, opts) {
   // task links: Start is a field (planned start); a new task starts blank. selfId is the new task's id before it exists, so
   // links picked in this window can be sent once its insert is through
   const start = dr.start !== undefined ? dr.start : t ? t.start || null : null;
-  const prio = dr.priority !== undefined ? dr.priority : t && Number.isInteger(t.priority) ? t.priority : null;
   const selfId = t ? t.id : crypto.randomUUID();
   const addLists = LISTS.filter(l => canDo('add', null, l));
   // A6: with All selected, a new item goes to the task category's default list when I may add there, else my own first list
@@ -3398,7 +3478,7 @@ function openTask(id, quad, opts) {
   const tagKey = a => JSON.stringify(a.slice().sort());
   // what the window showed: Save sends only what the person changed, and checks it against changes made meanwhile
   const shown = t ? { version: t.version, title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list,
-    start: t.start ? t.start.getTime() : null, priority: Number.isInteger(t.priority) ? t.priority : null } : null;
+    start: t.start ? t.start.getTime() : null } : null;
   const dtl = d => d ? new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '';
   const ro = editable ? '' : ' disabled';
   const src = C.showSource(cardLayout, st.list !== 'all'); // round 4, item 3: Sources follow Card layout's Source switch
@@ -3407,28 +3487,33 @@ function openTask(id, quad, opts) {
   const wnum = t && cardLayout.number ? refText(t) : '', wrest = t ? C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText) : [];
   const whoHtml = wnum || wrest.length ? '<p class="fwho" id="fwho">' + (wnum ? ['<span class="fref">' + esc(wnum) + '</span>'] : []).concat(wrest.map(x => '<span>' + esc(x) + '</span>')).join('<span class="sr"> · </span>') + '</p>' : '';
   const fmtHtml = editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '';
+  // previous / next task (2026-10-29): the neighbours in this quadrant's shown order; ‹ › in the header, Alt+PageUp / Alt+PageDown,
+  // a click beside the window, and from 1100 px faded ghost cards there. Unsaved changes ask first. A new task: a click beside
+  // the window closes it (asking first when something was typed)
+  const nav = t ? C.navNeighbours(quadOrder(t.q), t.id) : { prev: null, next: null };
+  const navBtn = (k, g) => { const x = nav[k] && find(nav[k]); return '<button type="button" class="quiet" data-nav="' + k + '"' + (x ? ' aria-label="' + (k === 'prev' ? 'Previous' : 'Next') + ' task: ' + esc(plain(x.title)) + '" aria-keyshortcuts="' + (k === 'prev' ? 'Alt+PageUp' : 'Alt+PageDown') + '"' : ' disabled aria-label="No ' + (k === 'prev' ? 'previous' : 'next') + ' task in this quadrant"') + '>' + g + '</button>'; };
+  const navHtml = t ? '<div class="tk-nav">' + navBtn('prev', '‹') + navBtn('next', '›') + '</div>' : '';
+  const ghostHtml2 = k => { const x = nav[k] && find(nav[k]); return x ? '<button type="button" popover="manual" class="tk-ghost ' + k + ' ' + x.q + '" data-nav="' + k + '" tabindex="-1" aria-hidden="true"><span class="k">' + esc(ref(x)) + '</span><span class="t">' + esc(plain(x.title)) + '</span>' + (x.deadline ? '<span class="d">End ' + esc(ymd(x.deadline)) + '</span>' : '') + '</button>' : ''; };
   const dlg = document.createElement('dialog');
   dlg.className = 'tk';
-  dlg.innerHTML = '<form method="dialog"><strong>' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</strong>' +
+  dlg.innerHTML = '<form method="dialog"><strong>' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</strong>' + navHtml +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
     (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
     '<div class="flabel" id="fn-l">Description</div><div class="rt" id="fn" contenteditable="' + editable + '" role="textbox" aria-multiline="true" aria-labelledby="fn-l">' + mdToHtml(dr.notes !== undefined ? dr.notes : t ? t.notes : '') + '</div>' +
-    // round 3 P1, U5: the wider window puts List, Quadrant and End on one row (stacked on a phone)
+    // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
+    // position in its quadrant (2026-10-29)
     '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
+    '<div><label>Start<input id="fsd" type="datetime-local"' + ro + ' value="' + dtl(start) + '"></label><div class="err" id="fsde" aria-live="polite"></div></div>' +
     '<div><label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div></div></div>' +
-    // task links: Start (the Timeline's bar starts here) and Priority (0-5, higher = more important; deriveQuadrant reads it)
-    '<div class="frow"><div><label>Start<input id="fsd" type="datetime-local"' + ro + ' value="' + dtl(start) + '"></label><div class="err" id="fsde" aria-live="polite"></div></div>' +
-    '<div><label>Priority<select id="fp"' + ro + ' aria-describedby="fp-h"><option value="">—</option>' + [0, 1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (prio === n ? ' selected' : '') + '>P' + n + '</option>').join('') + '</select></label>' +
-    '<div class="s-hint" id="fp-h">Higher = more important</div></div></div>' +
     // U1, U6, U8: no "Tags" label; a search box over the groups; the groups scroll inside a box of about 40% of the window's height
     '<div class="tagpick"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' +
     '<div class="tagbox" role="group" aria-label="Tags"></div></div>' +
     (LINKS_READY ? '<div class="flabel" id="lk-l">Links</div><div class="links" id="lk" role="group" aria-labelledby="lk-l"></div>' : '') +
     (t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
     '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
-    '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
+    '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>' + ghostHtml2('prev') + ghostHtml2('next');
   document.body.append(dlg); dlg.showModal();
   if (o.error) dlg.querySelector('#ft').focus();
   // where the item came from (item_refs), read only and loaded when the window opens; links are shown as text
@@ -3607,6 +3692,9 @@ function openTask(id, quad, opts) {
   const lkBox = dlg.querySelector('#lk');
   const pend = []; // { op: 'add' | 'remove' | 'new', role, id, title }
   const ROLE_TEXT = { parent: ['Parent', '+ Parent'], child: ['Subtasks', '+ Subtask'], pred: ['Comes after', '+ Predecessor'], next: ['Next', '+ Next'] };
+  // one list under Links in this order, each chip with its type's glyph and colour; the add buttons in Maksym's order
+  const ROLE_GLYPH = { parent: '↑', child: '↓', pred: '←', next: '→' }, ROLE_KIND = { parent: 'Parent', child: 'Subtask', pred: 'Comes after', next: 'Next' };
+  const ADD_ORDER = ['pred', 'next', 'child', 'parent'];
   const selfTask = () => t || { id: selfId, list: dlg.querySelector('#fl').value, num: 0, title: '', status: 'open' };
   // links as they will be after Save: the stored ones plus pend
   const lkState = () => {
@@ -3627,18 +3715,15 @@ function openTask(id, quad, opts) {
     if (!lkBox) return;
     const { ix, by } = lkState();
     const wait = C.waitingFor(by[selfId], ix, by), prog = C.subtaskProgress(by[selfId], ix, by);
+    const chip = (role, x) => '<span class="lk-chip lk-' + role + (C.CLOSED.includes(x.status) ? ' closed' : '') + '" data-role="' + role + '" title="' + ROLE_KIND[role] + ' · ' + esc(label(x.list)) + '"><span class="lk-g" aria-hidden="true">' + ROLE_GLYPH[role] + '</span><span class="sr">' + ROLE_KIND[role] + ': </span><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) +
+      (editable ? '<button type="button" class="lk-x" data-lk-del="' + role + '|' + x.id + '" aria-label="Remove link to ' + esc(plain(x.title)) + '">×</button>' : '') + '</span>';
+    const chips = C.LINK_ROLES.map(role => ofRole(ix, role).map(id => by[id]).filter(Boolean).map(x => chip(role, x)).join('') +
+      pend.filter(p => p.op === 'new' && p.role === role).map(p => '<span class="lk-chip lk-' + role + ' new" data-role="' + role + '"><span class="lk-g" aria-hidden="true">' + ROLE_GLYPH[role] + '</span><span class="sr">' + ROLE_KIND[role] + ': </span><span class="k">new</span> ' + esc(p.title) + '<button type="button" class="lk-x" data-lk-delnew="' + pend.indexOf(p) + '" aria-label="Do not create ' + esc(p.title) + '">×</button></span>').join('')).join('');
+    const open = prog && prog.done < prog.total ? prog.total - prog.done : 0, hasParent = !!ofRole(ix, 'parent').length;
+    const adds = editable ? '<div class="lk-adds">' + ADD_ORDER.map(role => '<button type="button" class="lk-add quiet lk-' + role + '" data-lk-add="' + role + '" aria-expanded="' + (lkOpen === role) + '"><span class="lk-g" aria-hidden="true">' + ROLE_GLYPH[role] + '</span>' + (role === 'parent' && hasParent ? 'Change parent' : ROLE_TEXT[role][1]) + '</button>').join('') + '</div>' : '';
     lkBox.innerHTML = (wait.length ? '<p class="note lk-wait">Waiting for ' + wait.map(x => esc(ref(x) + ' ' + plain(x.title))).join(', ') + '</p>' : '') +
-      C.LINK_ROLES.map(role => {
-        const ids = ofRole(ix, role), news = pend.filter(p => p.op === 'new' && p.role === role);
-        const chips = ids.map(id => by[id]).filter(Boolean).map(x => '<span class="lk-chip' + (C.CLOSED.includes(x.status) ? ' closed' : '') + '" title="' + esc(label(x.list)) + '"><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) +
-          (editable ? '<button type="button" class="lk-x" data-lk-del="' + role + '|' + x.id + '" aria-label="Remove link to ' + esc(plain(x.title)) + '">×</button>' : '') + '</span>').join('') +
-          news.map((p, i) => '<span class="lk-chip new"><span class="k">new</span> ' + esc(p.title) + '<button type="button" class="lk-x" data-lk-delnew="' + pend.indexOf(p) + '" aria-label="Do not create ' + esc(p.title) + '">×</button></span>').join('');
-        const extra = role === 'child' && prog && prog.done < prog.total ? '<span class="n lk-open">' + (prog.total - prog.done) + (prog.total - prog.done === 1 ? ' subtask' : ' subtasks') + ' still open</span>' : '';
-        const add = editable && !(role === 'parent' && ids.length && lkOpen !== role) ? '<button type="button" class="lk-add quiet" data-lk-add="' + role + '" aria-expanded="' + (lkOpen === role) + '">' + ROLE_TEXT[role][1] + '</button>'
-          : editable && role === 'parent' ? '<button type="button" class="lk-add quiet" data-lk-add="parent" aria-expanded="false">Change</button>' : '';
-        return '<div class="lk-row" data-role="' + role + '"><span class="lk-l">' + ROLE_TEXT[role][0] + extra + '</span><span class="lk-chips">' + (chips || '<span class="n">—</span>') + '</span>' + add + '</div>' +
-          (lkOpen === role ? '<div class="lk-pick"><input id="lk-q" class="tg-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="lk-opts" aria-label="Find a task for ' + ROLE_TEXT[role][0] + '" placeholder="Find by title or #number" autocomplete="off" spellcheck="false" maxlength="300"><ul class="lk-opts" id="lk-opts" role="listbox"></ul></div>' : '');
-      }).join('');
+      '<div class="lk-list">' + (chips || '<span class="n">No links</span>') + '</div>' + (open ? '<p class="n lk-open">' + open + (open === 1 ? ' subtask' : ' subtasks') + ' still open</p>' : '') +
+      (lkOpen ? '<div class="lk-pick"><input id="lk-q" class="tg-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="lk-opts" aria-label="Find a task for ' + ROLE_TEXT[lkOpen][0] + '" placeholder="' + ROLE_TEXT[lkOpen][1].slice(2) + ': find by title or #number" autocomplete="off" spellcheck="false" maxlength="300"><ul class="lk-opts" id="lk-opts" role="listbox"></ul></div>' : '') + adds;
     if (lkOpen) { const q = lkBox.querySelector('#lk-q'); q.oninput = () => { lkAct = 0; drawOpts(); }; q.onkeydown = lkKey; drawOpts(); q.focus(); }
   }
   function lkOptions() {
@@ -3691,7 +3776,7 @@ function openTask(id, quad, opts) {
       if (p.op === 'new') {
         const cat = LIST[list].default_category || 'task';
         const nt = { id: crypto.randomUUID(), list, num: 0, qStored: fq, q: fq, title: p.title, notes: '', tags: [], deadline: null, start: null, status: 'open', doneAt: null, pin: undefined,
-          sortKey: topKey(list, fq), category: cat, priority: null, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
+          sortKey: topKey(list, fq), category: cat, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
         create(nt); other = nt.id;
       }
       linkOp(p.op === 'remove' ? 'remove' : 'add', C.linkFor(p.role, selfId, other));
@@ -3718,7 +3803,6 @@ function openTask(id, quad, opts) {
     else if (title.length > 300) { dlg.querySelector('#fe').textContent = 'The title is over 300 characters (' + title.length + ')'; bad = true; }
     if (!list) { dlg.querySelector('#fle').textContent = 'Choose a list'; bad = true; }
     const endV = dlg.querySelector('#fd').value, startV = dlg.querySelector('#fsd').value, startD = startV ? new Date(startV) : null;
-    const pv = dlg.querySelector('#fp').value, priority = pv === '' ? null : Number(pv);
     if (endV && startD && new Date(endV) < startD) { dlg.querySelector('#fsde').textContent = 'Start is after End.'; bad = true; }
     if (bad) { e.preventDefault(); (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
     // edit window, item 1: no Quadrant field; the window keeps the quadrant it has (a new task: the quadrant whose + was clicked)
@@ -3728,14 +3812,14 @@ function openTask(id, quad, opts) {
     const save = created => {
       const tags = [...new Set(untouched().concat(picked.filter(x => !isNew(x)), created))];
       if (t) {
-        const now = { title, notes, tags: tagKey(tags), deadline: deadline ? deadline.getTime() : null, list, start: startD ? startD.getTime() : null, priority };
+        const now = { title, notes, tags: tagKey(tags), deadline: deadline ? deadline.getTime() : null, list, start: startD ? startD.getTime() : null };
         const mine = Object.keys(now).filter(k => now[k] !== shown[k]);
         const cur = { title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list,
-          start: t.start ? t.start.getTime() : null, priority: Number.isInteger(t.priority) ? t.priority : null };
+          start: t.start ? t.start.getTime() : null };
         const theirs = t.version !== shown.version ? mine.filter(k => cur[k] !== shown[k] && cur[k] !== now[k]) : [];
         if (theirs.length) {
-          const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', start: 'start', priority: 'priority' };
-          setTimeout(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline, start: startD, priority }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
+          const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', start: 'start' };
+          setTimeout(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline, start: startD }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
           return;
         }
         const moved = mine.includes('list');
@@ -3746,7 +3830,6 @@ function openTask(id, quad, opts) {
           if (mine.includes('tags')) x.tags = tags;
           if (mine.includes('deadline')) x.deadline = deadline;
           if (mine.includes('start')) x.start = startD;
-          if (mine.includes('priority')) x.priority = priority;
           if (moved) x.list = list;
           x.sortKey = key;
         }, { origin: 'dialog' });
@@ -3758,7 +3841,7 @@ function openTask(id, quad, opts) {
         const cat = LIST[list].default_category || 'task';
         // the person who adds it is who it is for (owner_id; "Mine"), as the owner tag was before multi-user
         const nt = { id: selfId, list, num: 0, qStored: fq, q: fq, title, notes, tags, deadline, start: startD, status: 'open', doneAt: null, pin: undefined,
-          sortKey: topKey(list, fq), category: cat, priority, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
+          sortKey: topKey(list, fq), category: cat, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
         create(nt, { origin: 'dialog' }); st.keep.add(nt.id);
         applyLinks(list, fq);
         toast('Added to ' + label(list) + ': ' + plain(title), canDo('delete', null, list) ? () => removeTask(nt, true) : null);
@@ -3769,7 +3852,57 @@ function openTask(id, quad, opts) {
     e.preventDefault(); fs.disabled = true; fs.textContent = 'Saving…';
     ensureTags(newNames).then(ids => { dlg.close(); save(ids); render(); });
   };
-  dlg.addEventListener('close', () => { dlg.remove(); render(); const back = opener && document.querySelector(opener); if (back) back.focus(); });
+  // previous / next: what the window showed, so a move asks only when something changed
+  const snap = () => JSON.stringify([htmlToMd(ftEl), htmlToMd(fnEl), dlg.querySelector('#fl').value, dlg.querySelector('#fd').value, dlg.querySelector('#fsd').value, [...chosen].sort(), pend.length]);
+  const snap0 = snap();
+  let goTo = null;
+  const ask = id => {
+    dlg.querySelector('.tk-ask')?.remove();
+    const bar = document.createElement('div'); bar.className = 'tk-ask'; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Unsaved changes');
+    const verb = id ? 'go' : 'close';
+    bar.innerHTML = '<p>You have unsaved changes.</p>' + (editable ? '<button type="button" data-ask="save">Save and ' + verb + '</button>' : '') + '<button type="button" class="quiet" data-ask="discard">Discard and ' + verb + '</button><button type="button" class="quiet" data-ask="stay">Stay</button>';
+    dlg.querySelector('.actions').before(bar);
+    bar.querySelector('[data-ask]').focus();
+    bar.onclick = e => {
+      const b = e.target.closest('[data-ask]'); if (!b) return;
+      const fsb = dlg.querySelector('#fs');
+      if (b.dataset.ask === 'stay') { bar.remove(); return; }
+      goTo = id;
+      if (b.dataset.ask === 'discard') { dlg.close(); return; }
+      bar.remove(); fsb.click();
+      if (dlg.open && !fsb.disabled) goTo = null; // Save found a problem: the window stays, its error shows
+    };
+  };
+  const go = k => {
+    const id = t ? nav[k] : null;
+    if (t && !id) return;
+    if (editable && snap() !== snap0) return ask(id);
+    goTo = id; dlg.close();
+  };
+  dlg.querySelectorAll('[data-nav]').forEach(b => { b.onclick = () => go(b.dataset.nav); });
+  // a click on the backdrop beside the window: left = previous, right = next (a new task closes)
+  dlg.addEventListener('click', e => {
+    if (e.target !== dlg) return;
+    const r = dlg.getBoundingClientRect();
+    if (e.clientX < r.left) go('prev'); else if (e.clientX > r.right) go('next');
+  });
+  dlg.addEventListener('keydown', e => { if (e.altKey && (e.key === 'PageUp' || e.key === 'PageDown')) { e.preventDefault(); go(e.key === 'PageUp' ? 'prev' : 'next'); } });
+  // ghosts: shown from 1100 px, beside the window's box
+  const placeGhosts = () => {
+    const r = dlg.getBoundingClientRect(), room = r.left >= 236 && innerWidth >= 1100;
+    dlg.querySelectorAll('.tk-ghost').forEach(g => {
+      if (!room) { if (g.matches(':popover-open')) g.hidePopover(); return; }
+      g.style.top = Math.max(16, r.top + 96) + 'px';
+      g.style.left = (g.classList.contains('prev') ? r.left - 236 : r.right + 16) + 'px';
+      if (!g.matches(':popover-open')) g.showPopover();
+    });
+  };
+  if (dlg.querySelector('.tk-ghost') && HTMLElement.prototype.showPopover) { placeGhosts(); addEventListener('resize', placeGhosts); dlg.addEventListener('close', () => removeEventListener('resize', placeGhosts)); }
+  dlg.addEventListener('close', () => {
+    dlg.remove(); render();
+    if (goTo) { const id = goTo; setTimeout(() => openTask(id), 0); return; }
+    const back = opener && document.querySelector(opener); if (back) back.focus();
+  });
   dlg.querySelector('#ft').addEventListener('input', () => dlg.querySelector('#fe').textContent = '');
   dlg.querySelector('#fl').addEventListener('change', () => dlg.querySelector('#fle').textContent = '');
   dlg.querySelector('#fd').addEventListener('input', () => { dlg.querySelector('#fde').textContent = ''; dlg.querySelector('#fsde').textContent = ''; });
@@ -3880,7 +4013,7 @@ function reviewHtml() {
 // mark (also in the export), plus the donut's centre in the page.
 let KPI_LISTS = null; // every list I can read, archived ones too: [{ id, name, archived_at }]
 const KPI_CACHE = {}; // sorted list ids -> { status: 'loading' | 'ok' | 'error', hists, ms, items, events, error }
-const KPI_ITEM_COLS = 'id,list_id,quadrant,status,due_at,urgent_pin,priority,category,deleted_at,created_at';
+const KPI_ITEM_COLS = 'id,list_id,quadrant,status,due_at,urgent_pin,category,deleted_at,created_at';
 const KPI_EVENT_COLS = 'id,item_id,at,' + C.KPI_COLUMNS.map(k => k + ':diff->' + k).join(',') + ',items!inner(list_id)';
 let KPI_RPC = null; // db/013 kpi_events: null = not tried yet, false = not there (404), true = in use
 const KPI_WAVE = 4; // REST pages read at once
@@ -4096,7 +4229,7 @@ function openSettings(kind) {
 function openCardLayout() {
   const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
   const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', source: 'Source (category, Sources)',
-    group: 'Subtasks under their parent', priority: 'Priority (P0-P5)', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
+    group: 'Subtasks under their parent', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
   const lists = C.cardLayoutTagLists(TAG_LISTS, me && me.id); // edit window, item 4: archived tag lists are not offered
   const radio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' +

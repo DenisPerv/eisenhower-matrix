@@ -96,7 +96,7 @@ How a row is chosen (the same rule as the Review view, core `reviewEntries` and 
 | `kind` | `done` or `cancelled` when the task was closed in a picked week (a cancelled task by its latest cancel event in `item_events`, else its last change); else `overdue` (still open, end passed) or `due` when its end is in a picked week |
 | `at` | the time the row is listed by: the close time for done and cancelled, else `due_at` |
 | `late` | the end is before the close, or before now while the task is open |
-| `q` | the stored quadrant, else derived: important = priority 3+ or category reminder, tbd or decision; urgent = the pin when set, else an end within `windowDays` (the caller's urgency window) |
+| `q` | the stored quadrant, else derived: important = category reminder, tbd or decision (no priority number since 2026-10-29); urgent = the pin when set, else an end within `windowDays` (the caller's urgency window) |
 | lists, rows | lists in the caller's order (`listOrder` preference, else `sort`, then name); rows by `at`, then `num`; deleted tasks, archived lists and test lists (slug `_…`) never appear |
 | weeks | ISO weeks, Monday 00:00 to Monday 00:00 in the caller's `profiles.timezone` (`period.tz`) |
 

@@ -1,5 +1,5 @@
 // node --test test/  — task links (db/018) in the page's <script id="core">: merging rows, the index, waiting and progress,
-// loops, the picker's candidates, cards grouped by parent, the Timeline's rows and arrows, priority in the patch. No network.
+// loops, the picker's candidates, cards grouped by parent, the Timeline's rows and arrows, Card layout switches. No network.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -112,14 +112,14 @@ test('timelineRows: trees join, rows depth first by start, bars and summaries, c
   assert.deepEqual(c.edges, []);
 });
 
-test('priority goes into the patch (0-5 or null); Card layout keys and defaults', () => {
-  assert.equal(C.FIELD_COLUMNS.priority, 'priority');
-  assert.deepEqual(C.taskToPatch({ priority: 4 }, ['priority']), { priority: 4 });
-  assert.deepEqual(C.taskToPatch({ priority: 9 }, ['priority']), { priority: null });
-  assert.deepEqual(C.taskToPatch({ priority: null }, ['priority']), { priority: null });
+test('no priority (priority by position, 2026-10-29); Card layout keys and defaults', () => {
+  assert.equal(C.FIELD_COLUMNS.priority, undefined);
+  assert.deepEqual(C.taskToPatch({ priority: 4, title: 'x' }, ['title']), { title: 'x' });
+  assert.equal(C.rowToTask({ id: 'i', list_id: 'L', num: 1, title: 'x', priority: 4, status: 'open', tags: [] }).priority, undefined);
   const d = C.CARD_LAYOUT_DEFAULTS;
-  assert.deepEqual([d.group, d.priority, d.waiting, d.progress], [false, true, true, true]);
-  ['group', 'priority', 'waiting', 'progress'].forEach(k => assert.ok(C.CARD_FIELDS.includes(k)));
+  assert.deepEqual([d.group, d.priority, d.waiting, d.progress], [false, undefined, true, true]);
+  ['group', 'waiting', 'progress'].forEach(k => assert.ok(C.CARD_FIELDS.includes(k)));
+  assert.ok(!C.CARD_FIELDS.includes('priority'));
   assert.equal(C.readCardLayout({ group: true }).group, true);
   assert.equal(C.readCardLayout({ group: 1 }).group, false);
 });

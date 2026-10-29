@@ -9,7 +9,7 @@ const TZ = 'Europe/Lisbon';
 const COMMANDS = ['add-task', 'add-reminder', 'overdue', 'do', 'restore-list', 'link', 'unlink'];
 const FLAGS = new Set(['json', 'dry-run', 'needs-review', 'help']);
 const USAGE = `usage: node cli/tasks.mjs <command> [options]
-  add-task      --title T [--list LIST] [--q A|B|C|D] [--due WHEN] [--tags a,b] [--owner HANDLE|none] [--notify a,b] [--body MD] [--priority 0-5] [--confidence 0-1] [--needs-review]
+  add-task      --title T [--list LIST] [--q A|B|C|D] [--due WHEN] [--tags a,b] [--owner HANDLE|none] [--notify a,b] [--body MD] [--confidence 0-1] [--needs-review]
                 [--start WHEN] [--parent REF] [--after REF]
   add-reminder  --title T --due WHEN [--list LIST] [--owner HANDLE|none] [--notify a,b] [--body MD]
   overdue       [--limit 10] [--list slug]
@@ -172,18 +172,18 @@ async function command(a, cmd, c, out) {
     const defaultList = (cats.json.find(x => x.slug === cat) || {}).default_list_id;
     const l = writable(a.list ? bySlug(ls, a.list) : ls[defaultList], a.list || cat + ' default list');
     if (a.q && !core.QS.includes(a.q)) throw new TdError(EXIT.error, '--q is one of A, B, C, D');
-    const priority = a.priority === undefined ? null : Number(a.priority);
-    if (priority !== null && !(Number.isInteger(priority) && priority >= 0 && priority <= 5)) throw new TdError(EXIT.error, '--priority is 0 to 5');
+    // priority by position (2026-10-29): no priority number; a task's priority is its position in its quadrant
+    if (a.priority !== undefined) throw new TdError(EXIT.error, "--priority was removed: a task's priority is its position in its quadrant");
     const conf = a.confidence === undefined ? null : Number(a.confidence);
     if (conf !== null && !(conf >= 0 && conf <= 1)) throw new TdError(EXIT.error, '--confidence is 0 to 1');
-    const draft = { qStored: a.q || null, priority, category: cat, deadline: due, pin: undefined };
+    const draft = { qStored: a.q || null, category: cat, deadline: due, pin: undefined };
     const who = ownerFromTags(tagsOf(a.tags));
     const ownerArg = a.owner !== undefined ? a.owner : who.owner === null ? 'none' : who.owner;
     const owner_id = ownerArg === undefined || /^none$/i.test(ownerArg) ? null : await profileId(c, ownerArg, '--owner');
     const notify = [];
     for (const h of tagsOf(a.notify)) { await profileId(c, h, '--notify'); notify.push(h.toLowerCase()); }
     const body = await common({
-      category: cat, title: String(a.title).trim(), body_md: a.body || '', tags: who.tags, quadrant: a.q || null, priority, owner_id,
+      category: cat, title: String(a.title).trim(), body_md: a.body || '', tags: who.tags, quadrant: a.q || null, owner_id,
       due_at: due ? due.toISOString() : null, start_at: start ? start.toISOString() : null, sort_key: await topKey(c, ls, l.id, draft, now),
       dedup_key: reminder ? reminderKey(new Date(now)) : taskKey(String(a.title).trim(), due, l.slug),
       details: notify.length ? { notify: [...new Set(notify)] } : {},

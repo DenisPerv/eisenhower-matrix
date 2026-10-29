@@ -1,6 +1,6 @@
 """The app's quadrant rule, for display only (TasksDashboard.html `deriveQuadrant` and `QN`).
 
-`test/telegram-parity.test.js` and `tests/test_quadrant.py` read the same cases (`tests/quadrant_cases.json`), so the two
+`test/telegram-parity.test.js` and `tests/test_extract_draft_quadrant.py` read the same cases (`tests/quadrant_cases.json`), so the two
 copies cannot drift apart unnoticed.
 """
 
@@ -14,13 +14,13 @@ IMPORTANT_CATEGORIES = ("reminder", "tbd", "decision")
 DAY_S = 86400
 
 
-def derive_quadrant(*, stored: str | None, priority: int | None, category: str | None, pin: bool | None,
+def derive_quadrant(*, stored: str | None, category: str | None, pin: bool | None,
                     deadline: datetime | None, now: datetime, window_days: int = 7) -> str:
-    """The stored quadrant, else important (priority >= 3 or an important category) x urgent (the pin when set, else a
+    """The stored quadrant, else important (an important category; no priority since 2026-10-29) x urgent (the pin when set, else a
     deadline within the urgency window, overdue included)."""
     if stored in QS:
         return stored
-    important = (isinstance(priority, int) and priority >= 3) or category in IMPORTANT_CATEGORIES
+    important = category in IMPORTANT_CATEGORIES
     if pin is not None:
         urgent = bool(pin)
     else:
