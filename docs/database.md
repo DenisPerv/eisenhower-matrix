@@ -13,12 +13,12 @@ Run the files in the SQL editor (or with an admin tool), each file whole, in thi
 | 3 | `003_rls.sql`, `011_multiuser_rls.sql` | grants for 005-010; 011 replaces some of 003's household policies, so it always runs after 003 |
 | 4 | `012_round3.sql` | round 3; it ends with a policy block (`-- >>> 012 policies` … `-- <<< 012 policies`) that replaces 011's tag policies |
 | 5 | `003`, `011`, the 012 policy block | as after every new file |
-| 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql`, `019_bot_opt_out.sql`, `020_priority_retired.sql` | KPI history RPC, urgency settings by app, access requests, the review report API, the chat bot's scope, task links, the bot's opt-out, functions without priority (priority by position) |
+| 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql`, `019_bot_opt_out.sql`, `020_priority_retired.sql`, `022_share_by_person.sql`, `023_agent_tag_home.sql` | KPI history RPC, urgency settings by app, access requests, the review report API, the chat bot's scope, task links, the bot's opt-out, functions without priority (priority by position) |
 | 7 | `003`, `011`, the 012 policy block | again |
 | 7a | `021_drop_priority.sql` | drops `items.priority`, only once every client runs a page without priority (the hosted copy, both household machines, the Telegram bot); then 7 and 8 again |
-| 8 | `900_selftest.sql` … `906_selftest_task_links.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
+| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced); 905 calls the `020` signature, so until 020 is live run its pre-020 copy |
 
-Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`.
+Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`. `010` also replaces `items_tags_compat_after`, which `023` replaces again: re-running `010` means re-running `023` after it.
 
 **Household:** HomeOS applies files with `node scripts/tasksdb/tasksdb.js apply-sql <files>` (the Supabase Management API with a personal access token, admin SQL only); it appends `011` after `003` and the 012 policy block after `011` by itself.
 
@@ -27,7 +27,7 @@ Every file is re-runnable. The trigger function `items_before_write` is replaced
 1. Add a new file `db/NNN_<name>.sql` with the next free number. Never edit an applied file.
 2. Make it idempotent (`create or replace`, `if not exists`) and end it with a final-check block that raises an exception when its own promise does not hold (see `013`, `014`, `016`: invoker or definer, `search_path`, no execute for `anon`).
 3. New functions: `revoke all … from public, anon` and an explicit `grant execute … to authenticated`. Default privileges revoke execute from everyone, so nothing is callable by accident.
-4. Re-run `003`, `011` and the 012 policy block, then every selftest (900-906).
+4. Re-run `003`, `011` and the 012 policy block, then every selftest (900-908).
 5. Update the root README (Set up table, the section the change touches) and, for an RPC that is part of the API, `docs/api/openapi.yaml` and `docs/api/README.md` (`test/api-doc.test.js` fails otherwise).
 6. Never click a table on the dashboard's Data API page: it replaces the explicit grants with defaults that include `anon`. If it happens, re-run `003_rls.sql`.
 
@@ -51,16 +51,23 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 | Area | Functions | File |
 |---|---|---|
 | lists | `create_list`, `create_list_row`, `set_list_hidden`, `leave_list`, `list_people` | 002/010/012 |
-| sharing | `share_list`, `share_tag_list`, `my_invitations`, `accept_invite`, `decline_invite`, `revoke_invite`, `answer_shared_notice`, `visible_profiles` | 010/012 |
-| tag lists | `create_tag_list`, `set_default_tag_list`, `set_tag_list_archived`, `set_tag_list_hidden`, `leave_tag_list`, `tag_list_people`, `move_tags`, `merge_tags`, `merge_tag_lists` | 010/012 |
+| sharing | `share_list`, `share_tag_list`, `shareable_profiles`, `share_list_with`, `share_tag_list_with`, `my_invitations`, `accept_invite`, `decline_invite`, `revoke_invite`, `answer_shared_notice`, `visible_profiles` | 010/012/022 |
+| tag lists | `create_tag_list`, `set_default_tag_list` (no longer called by the page or the app), `set_tag_list_archived`, `set_tag_list_hidden`, `leave_tag_list`, `tag_list_people`, `move_tags`, `merge_tags`, `merge_tag_lists` | 010/012 |
 | settings | `urgency_settings(p_profile)` | 014 |
 | task links | `link_items(p_from, p_to, p_kind)`, `unlink_items(p_from, p_to, p_kind)`; the trigger `item_links_guard` and its helper `link_would_loop` (no execute for anyone) | 018 |
 | reports | `kpi_events(p_lists)` (invoker), `review_report(p_weeks, p_lists, p_now)` (invoker), its pure helper `review_quadrant` | 013/016 |
 | access requests | `request_access`, `my_access_request`, `access_requests`, `access_request_decided` | 015 |
 | keep-alive | `keepalive`, `keepalive_status` | 002/010 |
+| helpers not callable through the API | `is_whitelisted(uuid)`, `shareable_email(uuid)` (022: the whitelist and a person's verified address, resolved on the server), `agent_tag_home_check`, `tag_lists_home_guard`, `tag_members_keep_home` (023) | 022/023 |
 | helpers used by policies | `has_list_role`, `has_item_role`, `has_tag_list_role`, `has_tag_role`, `can_edit_item`, `can_use_category`, `is_household`, `is_human`, `is_agent`, `my_kind`, `my_verified_emails` | 002/010 |
 
 `review_report` and `kpi_events` are **security invoker**: they run with the caller's rights, so RLS decides exactly as for a REST read, and they need no access checks of their own. The read endpoints and the review report are described in [api/openapi.yaml](api/openapi.yaml).
+
+## Share by name and the agent home tag list
+
+- **Share by name** (`022`): `shareable_profiles()` lists whitelisted human accounts (household members, a used sign-up allowlist row, an approved access request) as `(id, display_name)`: never a bot, never the caller, never an email, and nothing at all to a signed-in account nobody let in or to an agent. `share_list_with` (list owner) and `share_tag_list_with` (tag list owner or editor) take a profile id from that list, resolve the verified email on the server and call `invite_upsert(…, p_join := true)`, like a share by email.
+- **Landing list and agent home** (`012`, `023`): tags typed by name (`items.tags`) are filed by `items_tags_compat_after()`. For a person the landing list is their `is_default` tag list ("My tags"; hidden in the clients, never archived or deleted). An agent with a row in `ops.agent_tag_home` files them into its home list instead, reusing a live or soft-deleted tag by `lower(name)`, else creating one; a missing, archived or read-only home list is 42501 "agent tag home not writable". A home list cannot be archived or merged away, and the agent's membership of it cannot be removed, lowered below editor or left, while its row exists.
+- **Change an agent's home list:** admin SQL only (the table is closed to every API role): make the agent an owner or editor of the new list first, then `update ops.agent_tag_home set tag_list_id = '<id>' where agent_id = '<agent id>'` (HomeOS: `node scripts/tasksdb/tasksdb.js apply-sql <file>`). Live: `homeos-agent` and `telegram-bot` → Maksym's HomeOS tags.
 
 ## Task links
 

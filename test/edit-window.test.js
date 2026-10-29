@@ -29,6 +29,17 @@ test('item 4: Card layout offers live, shown tag lists only, mine first then by 
   assert.deepEqual(C.cardLayoutTagLists(null, 'me'), []);
 });
 
+test('tags round (6): two lists named "My tags" are two choices; unticking mine hides only its tags on cards and previews', () => {
+  const L = Object.assign(lists(), { A2: { id: 'A2', owner_id: 'ana', name: 'My tags', sort: 0, role: 'viewer' } });
+  const offered = C.cardLayoutTagLists(L, 'me');
+  assert.deepEqual(offered.filter(l => l.name === 'My tags').map(l => [l.id, l.owner_id]), [['D', 'me'], ['A2', 'ana']], 'both offered, mine first');
+  const of = { m1: 'D', m2: 'D', a1: 'A2', w1: 'W', s1: 'A' };
+  const ids = ['m1', 'a1', 'w1', 'm2', 's1'];
+  assert.deepEqual(C.cardTagIds(ids, C.readCardLayout({ tags: 'lists', tagLists: ['A2', 'W', 'A'] }, ['D', 'W', 'A', 'A2']), of), ['a1', 'w1', 's1'], 'my My tags unticked: none of its tags');
+  assert.deepEqual(C.cardTagIds(ids, C.readCardLayout({ tags: 'lists', tagLists: ['D'] }, ['D', 'W', 'A', 'A2']), of), ['m1', 'm2'], "only mine ticked: Anastasiia's My tags stays out");
+  assert.deepEqual(C.cardTagIds(ids, C.readCardLayout({ tags: 'lists', tagLists: [] }), of), []);
+});
+
 test('item 4: the task window (tagGroups without archived) never lists an archived tag list', () => {
   const ids = C.tagGroups(lists(), {}, 'me', { me: 'Maksym', ana: 'Anastasiia' }, {}).map(g => g.list.id);
   assert.ok(!ids.includes('X') && !ids.includes('Y'));

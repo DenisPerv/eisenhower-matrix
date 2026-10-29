@@ -1,5 +1,5 @@
-// node --test test/  — round-3 P1 fixes of the page's <script id="core">: the task window's tag groups (U3 order, U6 search, U7 open
-// state) and their preferences. No network.
+// node --test test/  — round-3 P1 fixes of the page's <script id="core">: the task window's tag groups (U3 order, U6 search; the tags
+// round's one free order, favourites and prefs migration) and their preferences. No network.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -19,25 +19,49 @@ const tags = { t1: { id: 't1', tag_list_id: 'D', name: 'urgent', sort: 2 }, t2: 
 const names = { me: 'Maksym', ana: 'Anastasiia', bob: 'Bob' };
 const ids = g => g.map(x => x.list.id);
 
-test('tagGroups: o.order puts shared lists in my order first, the rest by owner name; my own lists are not affected', () => {
-  assert.deepEqual(ids(C.tagGroups(lists(), tags, 'me', names)), ['D', 'H', 'W', 'A', 'A2', 'B']);
-  assert.deepEqual(ids(C.tagGroups(lists(), tags, 'me', names, { order: ['B', 'A2'] })), ['D', 'H', 'W', 'B', 'A2', 'A']);
-  assert.deepEqual(ids(C.tagGroups(lists(), tags, 'me', names, { order: ['W', 'gone'] })), ['D', 'H', 'W', 'A', 'A2', 'B'], 'an own id or a stale id in order changes nothing');
+test('tagGroups (tags round): o.order first, in that order, own and shared mixed; then my lists by sort, then shared by owner name; no default pin', () => {
+  assert.deepEqual(ids(C.tagGroups(lists(), tags, 'me', names)), ['D', 'H', 'W', 'A', 'A2', 'B'], 'no order: mine by sort, then shared by owner name');
+  assert.deepEqual(ids(C.tagGroups(lists(), tags, 'me', names, { order: ['B', 'W', 'A'] })), ['B', 'W', 'A', 'D', 'H', 'A2'], 'a shared list between my own');
+  assert.deepEqual(ids(C.tagGroups(lists(), tags, 'me', names, { order: ['H', 'D'] })), ['H', 'D', 'W', 'A', 'A2', 'B'], 'my landing list is not pinned first');
+  assert.deepEqual(ids(C.tagGroups(lists(), tags, 'me', names, { order: ['gone', 'A2'] })), ['A2', 'D', 'H', 'W', 'A', 'B'], 'a stale id changes nothing');
+  const L = Object.assign(lists(), { Z: { id: 'Z', owner_id: 'me', name: 'Hidden', sort: 4, role: 'owner', hidden: true } });
+  const order = ['Z', 'A', 'D'];
+  assert.deepEqual(ids(C.tagGroups(L, tags, 'me', names, { order })), ['A', 'D', 'H', 'W', 'A2', 'B'], 'a hidden list in the order is left out');
+  assert.deepEqual(ids(C.tagGroups(L, tags, 'me', names, { order, hidden: true })), ['Z', 'A', 'D', 'H', 'W', 'A2', 'B'], 'with hidden: in its place');
 });
 
-test('tagListReorder: own lists among own lists (the default never moves), shared among shared; Alt+arrows and drops', () => {
+test('tagListReorder (tags round): every live list moves among all, own and shared; merged into the full stored order, hidden and archived keep their slots', () => {
   const g = C.tagGroups(lists(), tags, 'me', names);
-  assert.deepEqual(C.tagListReorder(g, 'me', 'W', { dir: -1 }), { kind: 'own', order: ['W', 'H'] });
-  assert.equal(C.tagListReorder(g, 'me', 'H', { dir: -1 }), null, 'not above the default');
-  assert.equal(C.tagListReorder(g, 'me', 'W', { dir: 1 }), null, 'not past my last list into the shared ones');
-  assert.equal(C.tagListReorder(g, 'me', 'D', { dir: 1 }), null, 'the default list does not move');
-  assert.deepEqual(C.tagListReorder(g, 'me', 'A', { dir: 1 }), { kind: 'shared', order: ['A2', 'A', 'B'] });
-  assert.deepEqual(C.tagListReorder(g, 'me', 'B', { targetId: 'A', before: true }), { kind: 'shared', order: ['B', 'A', 'A2'] });
-  assert.deepEqual(C.tagListReorder(g, 'me', 'H', { targetId: 'W', before: false }), { kind: 'own', order: ['W', 'H'] });
-  assert.equal(C.tagListReorder(g, 'me', 'H', { targetId: 'A', before: true }), null, 'an own list cannot go among shared ones');
-  assert.equal(C.tagListReorder(g, 'me', 'A', { targetId: 'A2', before: true }), null, 'already there: nothing changes');
-  assert.equal(C.tagListReorder(g, 'me', 'A', { targetId: 'A', before: true }), null);
-  assert.equal(C.tagListReorder(g, 'me', 'nope', { dir: 1 }), null);
+  assert.deepEqual(C.tagListReorder(g, 'me', 'A2', { targetId: 'H', before: true }, []), { order: ['D', 'A2', 'H', 'W', 'A', 'B'] }, 'a shared list dropped between my own');
+  assert.deepEqual(C.tagListReorder(g, 'me', 'H', { dir: -1 }, []), { order: ['H', 'D', 'W', 'A', 'A2', 'B'] }, 'above my landing list: nothing is pinned');
+  assert.deepEqual(C.tagListReorder(g, 'me', 'W', { dir: 1 }, []), { order: ['D', 'H', 'A', 'W', 'A2', 'B'] }, 'my list past a shared one');
+  assert.deepEqual(C.tagListReorder(g, 'me', 'H', { targetId: 'B', before: false }, []), { order: ['D', 'W', 'A', 'A2', 'B', 'H'] });
+  assert.equal(C.tagListReorder(g, 'me', 'D', { dir: -1 }, []), null, 'first cannot go up');
+  assert.equal(C.tagListReorder(g, 'me', 'B', { dir: 1 }, []), null, 'last cannot go down');
+  assert.equal(C.tagListReorder(g, 'me', 'A', { targetId: 'A2', before: true }, []), null, 'already there: nothing changes');
+  assert.equal(C.tagListReorder(g, 'me', 'A', { targetId: 'A', before: true }, []), null);
+  assert.equal(C.tagListReorder(g, 'me', 'nope', { dir: 1 }, []), null);
+  assert.equal(C.tagListReorder(g, 'me', 'A', null, []), null);
+  // a hidden list (Z) and an archived one (X) sit in the stored order; the task window shows neither
+  const L = Object.assign(lists(), { Z: { id: 'Z', owner_id: 'me', name: 'Hidden', sort: 4, role: 'owner', hidden: true },
+    X: { id: 'X', owner_id: 'me', name: 'Old', sort: 5, role: 'owner', archived_at: '2026-10-20T00:00:00Z' } });
+  const stored = ['D', 'Z', 'H', 'X', 'W', 'A', 'A2', 'B'];
+  const shown = C.tagGroups(L, tags, 'me', names, { order: stored });
+  assert.deepEqual(ids(shown), ['D', 'H', 'W', 'A', 'A2', 'B']);
+  assert.deepEqual(C.tagListReorder(shown, 'me', 'B', { dir: -1 }, stored), { order: ['D', 'Z', 'H', 'X', 'W', 'A', 'B', 'A2'] }, 'Z and X keep their slots');
+  assert.deepEqual(C.tagListReorder(shown, 'me', 'A', { targetId: 'D', before: true }, stored), { order: ['A', 'Z', 'D', 'X', 'H', 'W', 'A2', 'B'] }, 'a shared list to the top: the hidden and archived slots stay');
+  assert.deepEqual(C.tagListReorder(shown, 'me', 'H', { dir: -1 }, ['A2']), { order: ['H', 'D', 'W', 'A', 'A2', 'B'] }, 'a short order is completed from the screen: the result is the new row');
+  const arch = C.tagGroups(L, tags, 'me', names, { archived: true });
+  assert.equal(C.tagListReorder(arch, 'me', 'X', { dir: 1 }, stored), null, 'an archived list does not move');
+});
+
+test('tagListOwnSorts: my own live lists keep tag_lists.sort in their relative order; shared and archived are never written', () => {
+  const L = Object.assign(lists(), { X: { id: 'X', owner_id: 'me', name: 'Old', sort: 0, role: 'owner', archived_at: 'x' } });
+  assert.deepEqual(C.tagListOwnSorts(['D', 'A2', 'H', 'W', 'A', 'B'], L, 'me'), [], 'a shared list between mine: my relative order is the same');
+  assert.deepEqual(C.tagListOwnSorts(['W', 'A', 'X', 'D', 'H'], L, 'me'), [{ id: 'W', sort: 1 }, { id: 'D', sort: 2 }, { id: 'H', sort: 3 }]);
+  assert.deepEqual(C.tagListOwnSorts(['B', 'A'], L, 'me'), []);
+  assert.deepEqual(C.tagListOwnSorts(null, L, 'me'), []);
+  assert.deepEqual(C.tagListOwnSorts(['W', 'D'], null, 'me'), []);
 });
 
 test('sortWrites: the same sort values in the new order, written only where one changes; duplicates raised', () => {
@@ -50,14 +74,18 @@ test('sortWrites: the same sort values in the new order, written only where one 
   assert.deepEqual(C.sortWrites([], () => 0), []);
 });
 
-test('tagGroupOpen: used on the task opens; else the remembered choice; else only my default list', () => {
+test('tagGroupOpen (tags round): only favourites open (an array or a Set, any number, own or shared); every other list starts closed', () => {
   const L = lists();
-  assert.equal(C.tagGroupOpen(L.D, 'me', new Set(), {}), true);
-  assert.equal(C.tagGroupOpen(L.W, 'me', new Set(), {}), false);
-  assert.equal(C.tagGroupOpen(L.A, 'me', new Set(), {}), false, "someone else's default list starts closed");
-  assert.equal(C.tagGroupOpen(L.W, 'me', new Set(['W']), { W: false }), true, 'a list the task uses is open');
-  assert.equal(C.tagGroupOpen(L.W, 'me', new Set(), { W: true }), true);
-  assert.equal(C.tagGroupOpen(L.D, 'me', null, { D: false }), false, 'my default closed when I closed it');
+  assert.equal(C.tagGroupOpen(L.D, []), false, 'my landing list is not open by itself');
+  assert.equal(C.tagGroupOpen(L.W, ['W', 'A']), true);
+  assert.equal(C.tagGroupOpen(L.A, ['W', 'A']), true, 'a shared favourite opens');
+  assert.equal(C.tagGroupOpen(L.H, ['W', 'A']), false);
+  assert.equal(C.tagGroupOpen(L.A2, new Set(['A2', 'B'])), true);
+  assert.equal(C.tagGroupOpen(L.D, new Set(['A2', 'B'])), false);
+  assert.deepEqual(Object.values(L).filter(l => C.tagGroupOpen(l, ['D', 'A2', 'B'])).map(l => l.id), ['D', 'A2', 'B'], 'several favourites, the rest closed');
+  assert.equal(C.tagGroupOpen(null, ['D']), false);
+  assert.equal(C.tagGroupOpen(L.D, undefined), false);
+  assert.equal(C.tagGroupOpen(L.D, { D: true }), false, 'the old tagListsOpen map is not read');
 });
 
 test('tagSearch: chips across all groups by name (case, outer spaces ignored); groups with no hit leave; empty text keeps all', () => {
@@ -69,15 +97,40 @@ test('tagSearch: chips across all groups by name (case, outer spaces ignored); g
   assert.deepEqual(C.tagSearch(g, 'zzz', nameOf), []);
 });
 
-test('prefs: tagListOrder and tagListsOpen read back, with stale ids and wrong types dropped; defaults empty', () => {
+test('prefs (tags round): tagListOrder, tagListFavs and tagListOrderV read back; stale ids and wrong types dropped; tagListsOpen gone', () => {
   assert.deepEqual(C.PREFS_DEFAULTS.tagListOrder, []);
-  assert.deepEqual(C.PREFS_DEFAULTS.tagListsOpen, {});
-  const p = C.prefsFromRow({ tagListOrder: ['A', 'gone', 'B'], tagListsOpen: { A: true, D: false, gone: true, W: 'yes' } }, { tagListIds: ['A', 'B', 'D', 'W'] });
-  assert.deepEqual(p.tagListOrder, ['A', 'B']);
-  assert.deepEqual(p.tagListsOpen, { A: true, D: false });
-  const bad = C.prefsFromRow({ tagListOrder: 'A', tagListsOpen: ['A'] });
-  assert.deepEqual([bad.tagListOrder, bad.tagListsOpen], [[], {}]);
-  assert.deepEqual(C.rowFromPrefs('p', p).prefs.tagListsOpen, { A: true, D: false });
+  assert.deepEqual(C.PREFS_DEFAULTS.tagListFavs, []);
+  assert.equal(C.PREFS_DEFAULTS.tagListOrderV, 0);
+  assert.equal(C.TAG_LIST_ORDER_V, 2);
+  assert.equal('tagListsOpen' in C.PREFS_DEFAULTS, false);
+  const known = { tagListIds: ['A', 'B', 'D', 'W', 'X'] }; // X: archived, still known
+  const p = C.prefsFromRow({ tagListOrder: ['A', 'gone', 'B', 'X', 'A'], tagListFavs: ['W', 'gone', 'W', 'X'], tagListOrderV: 2, tagListsOpen: { A: true } }, known);
+  assert.deepEqual(p.tagListOrder, ['A', 'B', 'X'], 'archived ids keep their place, gone ones leave, no duplicates');
+  assert.deepEqual(p.tagListFavs, ['W', 'X']);
+  assert.equal(p.tagListOrderV, 2);
+  assert.equal('tagListsOpen' in p, false, 'a stored tagListsOpen is not read');
+  for (const v of ['2', -1, 1.5, 1001, null]) assert.equal(C.prefsFromRow({ tagListOrderV: v }).tagListOrderV, 0, 'bad tagListOrderV ' + v);
+  const bad = C.prefsFromRow({ tagListOrder: 'A', tagListFavs: { A: true } });
+  assert.deepEqual([bad.tagListOrder, bad.tagListFavs], [[], []]);
+  const row = C.rowFromPrefs('p', p).prefs;
+  assert.deepEqual([row.tagListOrder, row.tagListFavs, row.tagListOrderV], [['A', 'B', 'X'], ['W', 'X'], 2]);
+  assert.equal('tagListsOpen' in row, false);
+});
+
+test('tagListPrefsMigrate (V12): a legacy row gets own lists first (landing, then by sort), then shared in stored order, then archived; favs = [landing]', () => {
+  const L = Object.assign(lists(), { X: { id: 'X', owner_id: 'me', name: 'Old', sort: 0, role: 'owner', archived_at: 'x' } });
+  L.D.sort = 9; // the landing list came first in the old display whatever its sort
+  const legacy = C.prefsFromRow({ tagListOrder: ['B', 'A2'] });
+  const m = C.tagListPrefsMigrate(legacy, L, 'me', names);
+  assert.deepEqual(m, { tagListOrder: ['D', 'H', 'W', 'B', 'A2', 'A', 'X'], tagListFavs: ['D'], tagListOrderV: 2 });
+  assert.deepEqual(ids(C.tagGroups(L, tags, 'me', names, { order: m.tagListOrder })), ['D', 'H', 'W', 'B', 'A2', 'A'], 'after the migration the task window shows the old display');
+  assert.equal(C.tagListPrefsMigrate(Object.assign({}, legacy, m), L, 'me', names), null, 'a v2 row is left alone');
+  assert.deepEqual(C.tagListPrefsMigrate({ tagListOrder: [], tagListFavs: ['A'], tagListOrderV: 0 }, L, 'me', names).tagListFavs, ['A'], 'favourites already set are kept');
+  assert.deepEqual(C.tagListPrefsMigrate({ tagListOrder: ['W', 'A', 'D'], tagListOrderV: 0 }, L, 'me', names).tagListOrder, ['W', 'A', 'D', 'H', 'A2', 'B', 'X'],
+    'a stored order with my own lists was written by v2: kept, the rest added in the old order');
+  const noDefault = { A: L.A, B: L.B };
+  assert.deepEqual(C.tagListPrefsMigrate({}, noDefault, 'me', names), { tagListOrder: ['A', 'B'], tagListFavs: [], tagListOrderV: 2 }, 'no landing list of mine: no favourite');
+  assert.deepEqual(C.tagListPrefsMigrate(null, {}, 'me', names), { tagListOrder: [], tagListFavs: [], tagListOrderV: 2 });
 });
 
 test('F3 isTestList: a slug starting with _ (today _selftest) is a test list', () => {

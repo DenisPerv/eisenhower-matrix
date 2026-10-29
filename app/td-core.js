@@ -92,7 +92,7 @@
     // round 3 (db/012): tag lists, notices
     'tag list limit reached': 'You have reached your limit of tag lists.',
     'a tag list name has 1 to 60 characters': 'A tag list name has 1 to 60 characters.',
-    'the default tag list is not archived': 'The default tag list can\'t be deleted. Make another list the default first.',
+    'the default tag list is not archived': 'This tag list can\'t be deleted: tags typed by name land here.',
     'only owners and editors share a tag list': 'Only owners and editors share this tag list.',
     'only owners and editors delete tags': 'Only owners and editors delete tags.',
     'only owners and editors archive a tag list': 'Only owners and editors delete a tag list.',
@@ -170,9 +170,12 @@
   const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
     group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
   const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
-  // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
+  // tags round (2026-10-29): tagListOrder = my one free order of every tag list, own and shared (v2, tagListOrderV = TAG_LIST_ORDER_V;
+  // before it: only the shared ones, migrated once by tagListPrefsMigrate); tagListFavs = my favourite (★) tag lists, any number, own
+  // or shared: they open in the task window. tagListsOpen (U7) is gone: groups open and close within the window only
+  const TAG_LIST_ORDER_V = 2;
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
-    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListsOpen: {}, taskSwitcher: 'standard' };
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard' };
   // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
   // WELCOME_VERSION. welcomeSeen stays for clients that only know it
   const WELCOME_VERSION = 3;
@@ -209,8 +212,11 @@
     if (Number.isInteger(raw.welcomeVersion) && raw.welcomeVersion >= 0 && raw.welcomeVersion <= 1000) p.welcomeVersion = raw.welcomeVersion;
     if (TASK_SWITCHERS.includes(raw.taskSwitcher)) p.taskSwitcher = raw.taskSwitcher;
     const tls = known && known.tagListIds ? new Set(known.tagListIds) : null, tlOk = x => typeof x === 'string' && (!tls || tls.has(x));
-    if (strs(raw.tagListOrder)) p.tagListOrder = raw.tagListOrder.filter(tlOk);
-    if (isObj(raw.tagListsOpen)) Object.keys(raw.tagListsOpen).forEach(k => { if (tlOk(k) && typeof raw.tagListsOpen[k] === 'boolean') p.tagListsOpen[k] = raw.tagListsOpen[k]; });
+    // ids of tag lists that no longer exist are dropped; archived and hidden ones are known (the caller passes every tag list it can
+    // see) and keep their place
+    if (strs(raw.tagListOrder)) p.tagListOrder = [...new Set(raw.tagListOrder.filter(tlOk))];
+    if (Number.isInteger(raw.tagListOrderV) && raw.tagListOrderV >= 0 && raw.tagListOrderV <= 1000) p.tagListOrderV = raw.tagListOrderV;
+    if (strs(raw.tagListFavs)) p.tagListFavs = [...new Set(raw.tagListFavs.filter(tlOk))];
     return p;
   }
   function readCardLayout(raw, tagListIds) {
@@ -525,49 +531,79 @@
 
   // ---- round 3, A5-A7: several tag lists with roles, first-share notices, the tag filter by id, the side menu by keyboard ----
   // what the caller may do on a tag list (db/012): viewer uses its tags on items; contributor also adds, renames and reorders tags;
-  // editor also deletes tags, renames the list, archives ("Delete list"), moves tags out and shares; owner also chooses the default,
-  // reorders the lists and removes people. An archived list is read only until an owner or editor restores it.
-  const TAG_LIST_RIGHTS = { viewer: ['use'], contributor: ['use', 'addTag', 'renameTag', 'sortTag'] };
+  // editor also deletes tags, renames the list, archives ("Delete list"), moves tags out and shares; owner also removes people.
+  // Every role places the list in its own order (sortList: prefs tagListOrder, tags round). The landing list for tags typed by name
+  // (is_default, hidden in the UI) is never archived. An archived list is read only until an owner or editor restores it.
+  const TAG_LIST_RIGHTS = { viewer: ['use', 'sortList'], contributor: ['use', 'sortList', 'addTag', 'renameTag', 'sortTag'] };
   TAG_LIST_RIGHTS.editor = TAG_LIST_RIGHTS.contributor.concat(['deleteTag', 'renameList', 'archive', 'move', 'share']);
-  TAG_LIST_RIGHTS.owner = TAG_LIST_RIGHTS.editor.concat(['setDefault', 'sortList', 'removePeople']);
+  TAG_LIST_RIGHTS.owner = TAG_LIST_RIGHTS.editor.concat(['removePeople']);
   function tagListRights(l) {
     if (!l || !l.role) return new Set();
     if (l.archived_at) return new Set(l.role === 'owner' || l.role === 'editor' ? ['restore'] : []);
     const r = new Set(TAG_LIST_RIGHTS[l.role] || []);
-    if (l.is_default) { r.delete('archive'); r.delete('setDefault'); }
+    if (l.is_default) r.delete('archive');
     return r;
   }
   // where a tag of list `from` may move: another live list of the same owner, with move rights on both (move_tags checks the same)
   const moveTargets = (from, tagLists) => !from || !tagListRights(from).has('move') ? [] :
     Object.values(tagLists || {}).filter(l => l && l.id !== from.id && l.owner_id === from.owner_id && tagListRights(l).has('move'));
-  // tag lists in picker order: my default first, my other lists by sort, then shared lists (those in o.order first, in that order:
-  // the person's own order, prefs tagListOrder) by owner name and sort; each with its tag ids by sort, then name. Live lists the
-  // caller may see (hidden ones only with o.hidden); o.archived gives the archived ones instead
+  // tag lists in picker order (tags round): those in o.order first, in that order (the person's one free order, prefs tagListOrder),
+  // then the rest: my lists by sort, then shared lists by owner name and sort. No list is pinned. Each with its tag ids by sort, then
+  // name. Live lists the caller may see (hidden ones only with o.hidden); o.archived gives the archived ones instead
   function tagGroups(tagLists, tags, meId, names, opts) {
     const o = opts || {}, nm = id => String((names || {})[id] || '');
     const mine = l => l.owner_id === meId;
     const at = l => { const i = (o.order || []).indexOf(l.id); return i < 0 ? 1e6 : i; };
     const lists = Object.values(tagLists || {}).filter(l => l && l.role && !!l.archived_at === !!o.archived && (o.hidden || !l.hidden));
-    lists.sort((a, b) => mine(b) - mine(a) || (mine(a) ? !!b.is_default - !!a.is_default : at(a) - at(b) || nm(a.owner_id).localeCompare(nm(b.owner_id)) || String(a.owner_id).localeCompare(String(b.owner_id)))
+    lists.sort((a, b) => at(a) - at(b) || mine(b) - mine(a) || (mine(a) ? 0 : nm(a.owner_id).localeCompare(nm(b.owner_id)) || String(a.owner_id).localeCompare(String(b.owner_id)))
       || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name)));
     const by = {};
     Object.values(tags || {}).forEach(t => { (by[t.tag_list_id] = by[t.tag_list_id] || []).push(t); });
     return lists.map(l => ({ list: l, tags: (by[l.id] || []).sort((a, b) => (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name))).map(t => t.id) }));
   }
-  // round 3 P1, U3: a tag list moved in the task window (groups as tagGroups gives them). My lists move among my lists (the default
-  // stays first and does not move), shared lists among shared lists. to = { dir: -1 | 1 } (Alt+Up / Alt+Down) or { targetId, before }
-  // (a drop). Returns { kind: 'own' | 'shared', order: [ids of that kind] }, or null when it cannot move or nothing changes
-  function tagListReorder(groups, meId, id, to) {
+  // tags round: a tag list moved in the task window or the Tags window (groups as tagGroups gives them: the lists on screen). Every
+  // live list moves among all of them, own and shared alike. to = { dir: -1 | 1 } (Alt+Up / Alt+Down) or { targetId, before } (a
+  // drop). The new row is merged into the full stored order (order = prefs tagListOrder): lists not on screen (hidden, archived)
+  // keep their slots, lists missing from it are added in screen order. Returns { order: [every id] }, or null when it cannot move
+  // or nothing changes. meId is kept for older callers and not used
+  function tagListReorder(groups, meId, id, to, order) {
     const ls = (groups || []).map(g => g.list || g);
-    const kindOf = l => l.owner_id === meId ? (l.is_default ? null : 'own') : 'shared';
-    const self = ls.find(l => l.id === id), kind = self && kindOf(self);
-    if (!kind || !to) return null;
-    const row = ls.filter(l => kindOf(l) === kind).map(l => l.id), rest = row.filter(x => x !== id);
+    const self = ls.find(l => l.id === id);
+    if (!self || self.archived_at || !to) return null;
+    const row = ls.filter(l => !l.archived_at).map(l => l.id), rest = row.filter(x => x !== id);
     let at;
     if (to.dir) { at = row.indexOf(id) + (to.dir < 0 ? -1 : 1); if (at < 0 || at > rest.length) return null; }
     else { if (!rest.includes(to.targetId)) return null; at = rest.indexOf(to.targetId) + (to.before ? 0 : 1); }
     rest.splice(at, 0, id);
-    return rest.join() === row.join() ? null : { kind, order: rest };
+    if (rest.join() === row.join()) return null;
+    const full = [...new Set((order || []).filter(x => typeof x === 'string'))];
+    row.forEach(x => { if (!full.includes(x)) full.push(x); });
+    const slots = []; full.forEach((x, i) => { if (row.includes(x)) slots.push(i); });
+    slots.forEach((s, i) => { full[s] = rest[i]; });
+    return { order: full };
+  }
+  // tags round: the tag_lists.sort writes that keep my own live lists in their relative place in the order (the CLI and Telegram
+  // read sort); C.sortWrites, so only the lists that change are written
+  const tagListOwnSorts = (order, tagLists, meId) => sortWrites((order || []).filter(id => tagLists && tagLists[id] && tagLists[id].owner_id === meId && !tagLists[id].archived_at), id => tagLists[id].sort);
+  // tags round, prefs migration: a row without tagListOrderV = TAG_LIST_ORDER_V gets the full order of what it showed before (my
+  // lists by sort with the landing list first, then the shared ones in their stored order, then archived lists the same way) and
+  // tagListFavs seeded with my landing list. A stored order that already holds one of my lists was written by this version and
+  // dropped its marker in an older client: it is kept, the lists it lacks added in the old order. p: prefs as prefsFromRow gives
+  // them. Returns { tagListOrder, tagListFavs, tagListOrderV } or null when nothing is to do
+  function tagListPrefsMigrate(p, tagLists, meId, names) {
+    const q = p || {};
+    if (q.tagListOrderV === TAG_LIST_ORDER_V) return null;
+    const nm = id => String((names || {})[id] || ''), mine = l => l.owner_id === meId, stored = strs(q.tagListOrder) ? q.tagListOrder : [];
+    const at = l => { const i = stored.indexOf(l.id); return i < 0 ? 1e6 : i; };
+    const legacy = (a, b) => mine(b) - mine(a) || (mine(a) ? !!b.is_default - !!a.is_default : at(a) - at(b) || nm(a.owner_id).localeCompare(nm(b.owner_id)) || String(a.owner_id).localeCompare(String(b.owner_id)))
+      || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name));
+    const all = Object.values(tagLists || {}).filter(l => l && l.role);
+    const old = all.filter(l => !l.archived_at).sort(legacy).concat(all.filter(l => !!l.archived_at).sort(legacy)).map(l => l.id);
+    const keep = stored.some(id => tagLists && tagLists[id] && mine(tagLists[id]));
+    const order = keep ? [...new Set(stored.concat(old))] : old;
+    const def = all.find(l => mine(l) && l.is_default && !l.archived_at);
+    const favs = strs(q.tagListFavs) && q.tagListFavs.length ? q.tagListFavs.slice() : def ? [def.id] : [];
+    return { tagListOrder: order, tagListFavs: favs, tagListOrderV: TAG_LIST_ORDER_V };
   }
   // the sort values for ids in their new order: the same values handed out again in order, written only where one changes (so a
   // move touches only the lists it passes); equal or missing values are raised to keep the order strict. sortOf: id → its sort now
@@ -577,10 +613,9 @@
     (ids || []).forEach((id, i) => { const v = vals[i] > prev ? vals[i] : prev + 1; prev = v; if (v !== now(id)) out.push({ id, sort: v }); });
     return out;
   }
-  // U7: a group of the task window opens when the task carries one of its tags (used: tag list ids), else as I last left it
-  // (prefs tagListsOpen), else only when it is my default list
-  const tagGroupOpen = (list, meId, used, openPref) => !!(used && used.has(list.id)) ||
-    (openPref && typeof openPref[list.id] === 'boolean' ? openPref[list.id] : !!list.is_default && list.owner_id === meId);
+  // tags round: a group of the task window starts open when its list is one of my favourites (favs: prefs tagListFavs, an array or a
+  // Set), every other group starts closed, on each open of the window; the chevron then toggles within the window only
+  const tagGroupOpen = (list, favs) => !!list && (favs instanceof Set ? favs.has(list.id) : Array.isArray(favs) && favs.includes(list.id));
   // U6: the task window's tag search: per group, the tags whose name holds the text (case and outer spaces ignored); groups with
   // no hit are left out; an empty text gives the groups as they are. nameOf: tag id → name (a function or an object)
   function tagSearch(groups, text, nameOf) {
@@ -1089,7 +1124,7 @@
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
-    tagListReorder, sortWrites, tagGroupOpen, tagSearch,
+    tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
     cancelTimes, isTestList, chipSelect, kpiTicks,
     KPI_COLUMNS, kpiHistory, kpiStateAt, kpiStatus, kpiQuadrant, KPI_DAILY_MAX, kpiTimes, kpiSeries, kpiPie, kpiClosure, kpiOverall,

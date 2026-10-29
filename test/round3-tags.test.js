@@ -19,13 +19,16 @@ const tags = { t1: { id: 't1', tag_list_id: 'D', name: 'urgent', sort: 2 }, t2: 
   t5: { id: 't5', tag_list_id: 'X', name: 'gone', sort: 1 } };
 const names = { me: 'Maksym', ana: 'Anastasiia', bob: 'Bob' };
 
-test('tagListRights: viewer uses, contributor edits tags, editor all but default and people, owner everything; archived read only', () => {
+test('tagListRights: every role places the list (sortList); viewer uses, contributor edits tags, editor all but people, owner everything; no setDefault; archived read only', () => {
   const r = role => [...C.tagListRights({ role })].sort();
-  assert.deepEqual(r('viewer'), ['use']);
-  assert.deepEqual(r('contributor'), ['addTag', 'renameTag', 'sortTag', 'use']);
-  assert.deepEqual(r('editor'), ['addTag', 'archive', 'deleteTag', 'move', 'renameList', 'renameTag', 'share', 'sortTag', 'use']);
-  assert.ok(C.tagListRights({ role: 'owner' }).has('setDefault') && C.tagListRights({ role: 'owner' }).has('removePeople'));
-  assert.equal(C.tagListRights({ role: 'owner', is_default: true }).has('archive'), false, 'the default list is never deleted');
+  assert.deepEqual(r('viewer'), ['sortList', 'use']);
+  assert.deepEqual(r('contributor'), ['addTag', 'renameTag', 'sortList', 'sortTag', 'use']);
+  assert.deepEqual(r('editor'), ['addTag', 'archive', 'deleteTag', 'move', 'renameList', 'renameTag', 'share', 'sortList', 'sortTag', 'use']);
+  assert.deepEqual(r('owner'), ['addTag', 'archive', 'deleteTag', 'move', 'removePeople', 'renameList', 'renameTag', 'share', 'sortList', 'sortTag', 'use']);
+  for (const role of ['viewer', 'contributor', 'editor', 'owner']) assert.equal(C.tagListRights({ role }).has('setDefault'), false, role + ': no setDefault (tags round)');
+  const def = [...C.tagListRights({ role: 'owner', is_default: true })].sort();
+  assert.deepEqual(def, r('owner').filter(x => x !== 'archive'), 'the landing list (is_default) only loses archive');
+  assert.equal(C.tagListRights({ role: 'editor', is_default: true }).has('archive'), false);
   assert.deepEqual([...C.tagListRights({ role: 'editor', archived_at: 'x' })], ['restore']);
   assert.deepEqual([...C.tagListRights({ role: 'viewer', archived_at: 'x' })], []);
   assert.equal(C.tagListRights(null).size, 0);
@@ -40,7 +43,7 @@ test('moveTargets: other live lists of the same owner where I may move', () => {
   assert.deepEqual(C.moveTargets(L.X, L), [], 'nothing moves out of an archived list');
 });
 
-test('tagGroups: my default first, my lists by sort, then shared lists by owner name; tags by sort, then name', () => {
+test('tagGroups without an order: my lists by sort, then shared lists by owner name; tags by sort, then name', () => {
   const g = C.tagGroups(lists(), tags, 'me', names);
   assert.deepEqual(g.map(x => x.list.id), ['D', 'H', 'W', 'A', 'B'], 'hidden and archived lists left out');
   assert.deepEqual(g[0].tags, ['t2', 't1']);
@@ -94,7 +97,7 @@ test('noticeText and canShare (adjustment 3)', () => {
 });
 
 test('restError: round-3 database texts in plain words', () => {
-  assert.equal(C.restError(400, { code: '22023', message: 'the default tag list is not archived' }).message, 'The default tag list can\'t be deleted. Make another list the default first.');
+  assert.equal(C.restError(400, { code: '22023', message: 'the default tag list is not archived' }).message, 'This tag list can\'t be deleted: tags typed by name land here.');
   assert.equal(C.restError(400, { code: '42501', message: 'this tag list is archived' }).message, 'This tag list is archived. Restore it first.');
   assert.equal(C.restError(400, { code: '22023', message: 'this list is archived' }).message, 'This list is archived. Restore it first.');
   assert.equal(C.restError(409, { code: '23505', message: 'you already have a tag list named Work' }).message, 'You already have a tag list with this name.');
