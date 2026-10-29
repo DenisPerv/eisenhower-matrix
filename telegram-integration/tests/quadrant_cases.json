@@ -1,0 +1,19 @@
+{
+  "_comment": "Shared by tests/test_quadrant.py and test/telegram-parity.test.js: deriveQuadrant must give the same answer in both. deadline_h is hours from now (null = none).",
+  "names": {"A": "Do", "B": "Plan", "C": "Delegate", "D": "Eliminate"},
+  "cases": [
+    {"stored": "C", "priority": 5, "category": "reminder", "pin": true, "deadline_h": 1, "window": 7, "expect": "C"},
+    {"stored": null, "priority": null, "category": "task", "pin": null, "deadline_h": null, "window": 7, "expect": "D"},
+    {"stored": null, "priority": 3, "category": "task", "pin": null, "deadline_h": null, "window": 7, "expect": "B"},
+    {"stored": null, "priority": 2, "category": "task", "pin": null, "deadline_h": 24, "window": 7, "expect": "C"},
+    {"stored": null, "priority": null, "category": "reminder", "pin": null, "deadline_h": 24, "window": 7, "expect": "A"},
+    {"stored": null, "priority": null, "category": "tbd", "pin": null, "deadline_h": 400, "window": 7, "expect": "B"},
+    {"stored": null, "priority": null, "category": "decision", "pin": false, "deadline_h": 1, "window": 7, "expect": "B"},
+    {"stored": null, "priority": null, "category": "task", "pin": true, "deadline_h": null, "window": 7, "expect": "C"},
+    {"stored": null, "priority": 4, "category": "task", "pin": null, "deadline_h": -48, "window": 7, "expect": "A"},
+    {"stored": null, "priority": null, "category": "task", "pin": null, "deadline_h": 168, "window": 7, "expect": "C"},
+    {"stored": null, "priority": null, "category": "task", "pin": null, "deadline_h": 169, "window": 7, "expect": "D"},
+    {"stored": null, "priority": null, "category": "task", "pin": null, "deadline_h": 40, "window": 1, "expect": "D"},
+    {"stored": "X", "priority": 3, "category": "task", "pin": null, "deadline_h": null, "window": 7, "expect": "B"}
+  ]
+}
