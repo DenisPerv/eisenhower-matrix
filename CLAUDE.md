@@ -51,6 +51,16 @@ Every change to `TasksDashboard.html`, `request.html`, `cli/`, `db/` or `test/e2
 - Commits go to `development_maxden`. When asked to merge or push: merge `development_maxden` into `release_maxden` and push `release_maxden`.
 - Never force-push.
 
+## Local first: every change is tested locally before it is released
+
+Rule since 2026-10-29: the deployed and local versions had drifted apart, each with changes the other lacked.
+
+- **The local version** is the checkout the person runs, on `development_maxden`. In HomeOS that is the mounted submodule `Views/TasksDashboard`, served on http://localhost:8788 by `node scripts/tasksdb/serve-local.js` from HomeOS. A build worktree is not the local version.
+- **It always holds every change.** Every change lands on `development_maxden`, and right after each push the local checkout is fast-forwarded to `origin/development_maxden`. Until something is deployed, the newest code is on the local version, never only on `release_maxden`, the hosted page or a worktree.
+- **The person tests locally first.** Nothing is merged into `release_maxden` and nothing is deployed until the person has tested the change on the local version and said so in chat. A plan puts "local test by <person>" before its release task, and its release and deploy tasks depend on it. A worker stops at "ready for local test", reports the sha and leaves the release and deploy rows pending.
+- **Release and deploy only follow development.** `release_maxden` only ever receives merges from `development_maxden`. A fix made directly on `release_maxden` (avoid it) is merged back into `development_maxden` in the same task. Deploys come only from `release_maxden`. So the hosted page is never ahead of the local version.
+- **Database changes follow the same order.** A `db/` file that the released page needs is applied live before the person's local test, because the local page runs against the live database too.
+
 ## Code
 
 - One HTML file, no build step, no runtime dependencies, opens from `file://`.
