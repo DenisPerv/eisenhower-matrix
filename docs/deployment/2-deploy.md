@@ -30,7 +30,7 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
 
 ## What the script does (also the manual way)
 
-1. **Read the files** without touching any checkout: `git -C <repo> show <ref>:TasksDashboard.html`, `git -C <repo> show <ref>:config/tasksdashboard.config.js`, and `privacy.html` and `request.html` when the ref has them.
+1. **Read the files** without touching any checkout: `git -C <repo> show <ref>:TasksDashboard.html`, `git -C <repo> show <ref>:config/tasksdashboard.config.js`, and `privacy.html` and `request.html` when the ref has them; the phone app's files under `app/` when the ref has `app/index.html` (icons read as binary).
 2. **Build the folder** `pages-dist/`:
 
    | File | From |
@@ -41,9 +41,13 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
    | `request.html` | as is, when the release has it (Pages serves it at `/request`); exactly one inline script, and no external script but the config |
    | `_headers` | generated, below |
    | `version.json` | `{ "sha": "<ref sha>", "builtAt": "<now>" }` |
+   | `app/index.html` | the phone app's page, when the release has it (Pages serves it at `/app/`); its `td-core.js` and `td-data.js` script addresses get `?v=<short sha>`; external scripts only the config, `td-core.js` and `td-data.js` |
+   | `app/td-core.js`, `app/td-data.js`, `app/manifest.webmanifest` | as is, with `app/index.html` (all required then); the manifest's `id`, `start_url` and `scope` must be `/app/` |
+   | `app/sw.js` | the line `const VERSION = 'dev';` becomes `const VERSION = '<ref sha>';` (exactly one such line; no `importScripts`) |
+   | `app/icons/*.png` | as is (binary; PNG only) |
 
-   Nothing else goes in. The config must set only `supabaseUrl`, `publishableKey` and `pollMs` (any other key: exit 3).
-3. **Generate `_headers`.** One CSP for every path: it lists the sha256 of the body of each inline `<script>` of `TasksDashboard.html` and of `request.html` (base64, `'sha256-…'`; `--dry-run` prints them per page), and `connect-src` is the `supabaseUrl` from the config:
+   A release without `app/index.html` (every release before the phone app) ships no `app/` file and no `/app` header rule. Nothing else goes in. The config must set only `supabaseUrl`, `publishableKey` and `pollMs` (any other key: exit 3).
+3. **Generate `_headers`.** One CSP for every path but `/app/`: it lists the sha256 of the body of each inline `<script>` of `TasksDashboard.html` and of `request.html` (base64, `'sha256-…'`; `--dry-run` prints them per page), and `connect-src` is the `supabaseUrl` from the config:
 
    ```
    /*
@@ -69,9 +73,31 @@ Run from the HomeOS root on the machine with the tokens. Look at the dry-run out
      Cache-Control: no-cache
    ```
 
+   With the phone app, an `/app/*` rule follows the `/*` rule, `/app/` repeats it, and the app's paths are no-cache. `! Content-Security-Policy` detaches the `/*` policy first: Pages joins two matching values of one header with a comma, and two policies would both apply. The `/*` rule and the paths outside `/app/` keep exactly the policy above.
+
+   ```
+   /app/*
+     ! Content-Security-Policy
+     Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-<each inline script of app/index.html>'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' <supabaseUrl>; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
+   /app/
+     ! Content-Security-Policy
+     Content-Security-Policy: <the same app policy>
+     Cache-Control: no-cache
+   /app/index.html
+     Cache-Control: no-cache
+   /app/sw.js
+     Cache-Control: no-cache
+   /app/manifest.webmanifest
+     Cache-Control: no-cache
+   ```
+
+   - `manifest-src 'self'` and `worker-src 'self'`: the manifest and `sw.js`; `connect-src 'self'`: the worker's cache refills and `/version.json`.
+   - No `Service-Worker-Allowed`: the worker's scope is its own folder, `/app/`.
+   - After the first deploy with the app, check the response headers of `/app/` (one CSP, the app's) and of `/` (unchanged).
+
    - `style-src 'unsafe-inline'`: the timeline writes `style` attributes.
    - `img-src data:`: the favicon and the background are `data:` SVGs.
-   - A new inline script, an external script or a new network host in `TasksDashboard.html` or `request.html` needs this template changed first.
+   - A new inline script, an external script or a new network host in `TasksDashboard.html`, `request.html` or `app/index.html` needs this template changed first.
    - `privacy.html` stays script-free: its CSP is the same policy, and it needs no hash.
 4. **Deploy:**
 
