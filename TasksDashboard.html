@@ -215,7 +215,7 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .matrix.one .q{min-height:calc(100vh - var(--top) - 34px)}
 .q{position:relative;isolation:isolate;display:flex;flex-direction:column;overflow:hidden;
   background:radial-gradient(120% 70% at 0% 0%,color-mix(in srgb,var(--c) var(--aura),transparent),transparent 58%),radial-gradient(80% 60% at 100% 100%,color-mix(in srgb,var(--c) 9%,transparent),transparent 60%),var(--glass);
-  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);min-height:calc((100vh - var(--top) - 34px - 18px) / 2);transition:box-shadow .3s,transform .3s}
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);min-height:calc((100vh - var(--top) - 34px - 18px) / 2);transition:box-shadow .12s,transform .12s}
 .q::before{content:"";position:absolute;left:22px;right:22px;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.9;z-index:2}
 .q::after{content:attr(data-q);position:absolute;right:-6px;bottom:-62px;z-index:-1;pointer-events:none;font:italic 600 250px/1 var(--serif);color:transparent;-webkit-text-stroke:1.5px color-mix(in srgb,var(--c) 70%,transparent);opacity:var(--wm)}
 :root[data-theme="dark"] .q{box-shadow:var(--depth),0 0 90px -40px var(--c)}
@@ -256,6 +256,8 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .card.dragging{opacity:.45;transform:scale(.98)}
 .card.drop-before{box-shadow:0 -3px 0 var(--accent),0 -6px 18px -4px var(--glow)}
 .card.drop-after{box-shadow:0 3px 0 var(--accent),0 6px 18px -4px var(--glow)}
+/* drag lag fix (2026-10-29): the drop line shows at once; a box-shadow transition restarted on every dragover and slid the line */
+.card.drop-before,.card.drop-after,.lists [data-list].drop-before,.lists [data-list].drop-after,#pop [data-list].drop-before,#pop [data-list].drop-after,.mrow.drop-before,.mrow.drop-after{transition:none}
 .card.compact{grid-template-columns:minmax(0,1fr) auto auto auto}
 .card.full{grid-template-columns:auto minmax(0,1fr) auto auto auto auto}
 .card .ref{min-height:22px;border:0;background:transparent;padding:0 3px;color:var(--ink3);font:600 12px/1 var(--mono);font-variant-numeric:tabular-nums}
@@ -573,7 +575,7 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .content{padding:18px 20px 18px 18px}
 .matrix{gap:16px}
 @property --sp{syntax:'<number>';inherits:false;initial-value:0}
-.q{--spot:18%;border:1px solid transparent;border-radius:var(--r-xl);transition:--sp .45s ease,box-shadow .3s;
+.q{--spot:18%;border:1px solid transparent;border-radius:var(--r-xl);transition:--sp .45s ease,box-shadow .12s;
   background:
     radial-gradient(340px circle at var(--qx,-500px) var(--qy,-500px),color-mix(in srgb,var(--c) calc(var(--sp) * var(--spot)),transparent),transparent 70%) padding-box,
     radial-gradient(110% 60% at 0% 0%,color-mix(in srgb,var(--c) var(--aura),transparent),transparent 60%) padding-box,
@@ -783,7 +785,7 @@ html{transition:--grid .45s ease}
 body::before{translate:calc((var(--fx) - .5) * 34vw) calc((var(--fy) - .5) * 30vh);
   filter:blur(28px) saturate(1.2) hue-rotate(calc((var(--fx) - var(--fy)) * 70deg));
   transition:translate .9s cubic-bezier(.2,.8,.2,1),filter .5s ease}
-.q{transition:--sp .45s ease,--aura .45s ease,box-shadow .3s}
+.q{transition:--sp .45s ease,--aura .45s ease,box-shadow .12s}
 html.axes-moving{--grid:rgba(82,53,240,.13)}
 html.axes-moving body::before{filter:blur(22px) saturate(1.75) brightness(1.06) hue-rotate(calc((var(--fx) - var(--fy)) * 70deg));transition:translate .18s linear,filter .25s ease}
 html.axes-moving .q{--aura:26%}
@@ -2584,8 +2586,13 @@ async function takeTagDefs(rows) {
 let LINKS = new Map(), LINKS_READY = false, maxLinkSeen = 0;
 const LINK_COLS = 'item_links?select=from_item,to_item,kind,removed_at,changed_at&kind=in.(depends_on,parent)';
 const noteLinkMax = rows => rows.forEach(r => { const u = Date.parse(r.changed_at); if (u > maxLinkSeen) maxLinkSeen = u; });
+// only links whose two ends are live items: deleted test items leave many links behind (1859 read, 4 live for Maksym on
+// 2026-10-29). A database where the embed fails (other foreign key names) falls back to the plain read
+const LINK_LIVE = 'item_links?select=from_item,to_item,kind,removed_at,changed_at,f:items!item_links_from_item_fkey!inner(id),t:items!item_links_to_item_fkey!inner(id)' +
+  '&kind=in.(depends_on,parent)&removed_at=is.null&f.deleted_at=is.null&t.deleted_at=is.null';
 async function loadLinks() {
-  const r = await getAll(LINK_COLS + '&removed_at=is.null', 'from_item,to_item,kind');
+  let r = await getAll(LINK_LIVE, 'from_item,to_item,kind');
+  if (!r.ok) r = await getAll(LINK_COLS + '&removed_at=is.null', 'from_item,to_item,kind');
   LINKS_READY = r.ok;
   if (!r.ok) { LINKS = new Map(); return r; }
   noteLinkMax(r.json);
@@ -3171,8 +3178,18 @@ const moveList = (l, to) => {
 };
 // drag a list chip (from the bar or the +N menu) before or after another; dropping on All puts it first. Alt+arrows move a focused chip.
 let dragList = null;
+// drag lag fix (2026-10-29): the one drop marker on the page; a dragover measures first and changes classes only when the
+// marked element or its side changes (no document-wide clearing on every event)
+let dropMark = null; // { el, cls }
+const markDrop = (el, cls) => {
+  if (dropMark && dropMark.el === el && dropMark.cls === cls) return;
+  if (dropMark) dropMark.el.classList.remove(dropMark.cls);
+  dropMark = el ? { el, cls } : null;
+  if (el) el.classList.add(cls);
+};
+const unmarkDrop = el => { if (dropMark && (!el || dropMark.el === el)) markDrop(null); };
 function bindListDrag(app) {
-  const clear = () => app.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging'));
+  const clear = () => { dropMark = null; app.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging')); };
   app.querySelectorAll('.lists [data-list], #pop [data-list]').forEach(b => {
     const l = b.dataset.list, inMenu = !!b.closest('#pop');
     const side = e => {
@@ -3195,10 +3212,9 @@ function bindListDrag(app) {
     b.ondragover = e => {
       if (!dragList || dragList === l) return;
       e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-      app.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
-      b.classList.add(side(e) ? 'drop-before' : 'drop-after');
+      markDrop(b, side(e) ? 'drop-before' : 'drop-after');
     };
-    b.ondragleave = () => b.classList.remove('drop-before', 'drop-after');
+    b.ondragleave = () => unmarkDrop(b);
     b.ondrop = e => {
       if (!dragList || dragList === l) return;
       e.preventDefault(); e.stopPropagation();
@@ -4955,18 +4971,18 @@ function bind() {
     c.onclick = e => { if (!e.target.closest('button')) openTask(c.dataset.card); };
     c.onkeydown = e => { if (e.key === 'Enter' && e.target === c) openTask(c.dataset.card); };
     c.ondragstart = e => { dragId = c.dataset.card; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); c.classList.add('dragging'); };
-    c.ondragend = () => { dragId = null; document.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging')); document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); };
+    c.ondragend = () => { dragId = null; dropMark = null; document.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging')); document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); };
   });
   app.querySelectorAll('section.q').forEach(sec => {
     const q = sec.dataset.q;
     sec.ondragover = e => {
       if (!dragId) return;
       e.preventDefault();
-      document.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
-      document.querySelectorAll('.q.drop').forEach(x => x !== sec && x.classList.remove('drop'));
-      sec.classList.add('drop');
-      const over = e.target.closest('[data-card]');
-      if (over && over.dataset.card !== dragId) { const r = over.getBoundingClientRect(); over.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after'); }
+      // measure before any class changes (no forced style recalc), then touch classes only on a change
+      const over = e.target.closest('[data-card]'), hit = over && over.dataset.card !== dragId ? over : null;
+      const before = hit ? (r => e.clientY < r.top + r.height / 2)(hit.getBoundingClientRect()) : false;
+      if (!sec.classList.contains('drop')) { document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); sec.classList.add('drop'); }
+      if (hit) markDrop(hit, before ? 'drop-before' : 'drop-after'); else unmarkDrop();
     };
     sec.ondragleave = e => { if (!sec.contains(e.relatedTarget)) sec.classList.remove('drop'); };
     sec.ondrop = e => {

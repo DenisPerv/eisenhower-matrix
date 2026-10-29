@@ -395,6 +395,15 @@ async function gData() {
     fire(src,'dragstart',0);fire(dst,'dragover',r.top+2);fire(dst,'drop',r.top+2);fire(src,'dragend',0);return true})()`);
   const keys = await until(async () => { const [x, y] = [await item(a.id), await item(c.id)]; return y.sort_key < x.sort_key && [x.sort_key, y.sort_key]; });
   check(G, 'reorder: the dropped card gets a sort_key before its new neighbour', !!keys, JSON.stringify(keys));
+  // drag lag fix (2026-10-29): the drop line is at full strength within 50 ms of the first dragover and does not slide when
+  // the pointer moves from the upper to the lower half (no running transition on the card, only one marked card on the page)
+  const line = await T.ev(`(async()=>{const src=document.querySelector('[data-card="${a.id}"]'),dst=document.querySelector('[data-card="${b.id}"]');if(!src||!dst)return null;const dt=new DataTransfer();const r=dst.getBoundingClientRect();
+    const fire=(el,type,y)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+20,clientY:y}));
+    const st=()=>({cls:dst.classList.contains('drop-before')?'before':dst.classList.contains('drop-after')?'after':'',anim:dst.getAnimations().length,shadow:getComputedStyle(dst).boxShadow!=='none',marked:document.querySelectorAll('.drop-before,.drop-after').length});
+    fire(src,'dragstart',0);fire(dst,'dragover',r.top+3);await new Promise(z=>setTimeout(z,50));const up=st();
+    fire(dst,'dragover',r.bottom-3);await new Promise(z=>setTimeout(z,50));const down=st();fire(src,'dragend',0);return {up,down}})()`);
+  check(G, 'drag: the drop line is full within 50 ms and does not slide (no transition, one marked card)', !!line && line.up.cls === 'before' && line.down.cls === 'after' &&
+    line.up.anim === 0 && line.down.anim === 0 && line.up.shadow && line.down.shadow && line.up.marked === 1 && line.down.marked === 1, JSON.stringify(line));
   await T.reload(); await T.ready(); await pick(T, ST.id);
   const order = await T.ev(`[...document.querySelectorAll('section.q[data-q="B"] [data-card]')].map(x=>x.dataset.card).filter(id=>[${JSON.stringify(a.id)},${JSON.stringify(b.id)},${JSON.stringify(c.id)}].includes(id)).join()`);
   check(G, 'the card order survives a reload', order === [c.id, a.id, b.id].join(), order);
@@ -598,7 +607,8 @@ async function gUi() {
     check(G, `${who}: the welcome does not come back after a reload`, await T.ev('!document.getElementById("welcome")'));
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     check(G, `${who}: Card layout survives a reload`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.querySelector('input[name=cl-mode][value=expanded]').checked&&d.querySelector('[data-cl=creator]').checked&&d.querySelector('#cl-auto').value==='300'})()`));
-    await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
+// Tasks Grouping (2026-10-29): Reset that changes grouping asks first; the run applies it (grp-ok) so no confirm stays open
+    await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();document.getElementById("cl-save").click();true');
     // round 4, item 5: a small card shows its number and a second line with what Card layout switches on (by default End)
     check(G, `${who}: a small card shows its number and an End line (round 4, item 5)`, await T.wait(`!!${r4c}?.classList.contains('compact')&&!!${r4c}.querySelector('.ref')&&/End \\d{4}-/.test(${r4c}.querySelector('.sub')?.textContent||'')`, 5000),
       await T.ev(`${r4c}?.querySelector('.sub')?.textContent`));
@@ -634,7 +644,7 @@ async function gUi() {
       await T.ev(owns ? `!!document.querySelector('#pop [data-share-list]')&&!document.querySelector('#pop [data-people-list]')` : `!!document.querySelector('#pop [data-people-list]')&&!document.querySelector('#pop [data-share-list]')`));
     await pick(T, 'all');
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
-    await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
+    await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();document.getElementById("cl-save").click();true');
     await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
     check(G, `${who}: settings and preferences survive a reload (Do limit ${lim})`, await T.ev(`document.getElementById('s-lim').value==='${lim}'`));
     check(G, `${who}: Urgency settings hold only window, due soon % and Do limit`, await T.ev('!!document.getElementById("s-win")&&!!document.getElementById("s-th")&&!document.getElementById("s-wd")&&!document.getElementById("s-hpd")&&!document.getElementById("s-name")'));
