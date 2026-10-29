@@ -1019,6 +1019,16 @@
     async function archiveTagList(id, archived) { const r = await rpc('set_tag_list_archived', { p_tag_list: id, p_archived: !!archived }); if (r.ok) await refreshMeta(); return r; }
     async function hideTagList(id, hidden) { const r = await rpc('set_tag_list_hidden', { p_tag_list: id, p_hidden: !!hidden }); if (r.ok) await refreshMeta(); return r; }
     async function leaveTagList(id) { const r = await rpc('leave_tag_list', { p_tag_list: id }); if (r.ok) await refreshMeta(); return r; }
+    // web: openSettings General. display_name and timezone are the profile's own columns; NAMES follows the new name
+    async function saveProfile(patch) {
+      const p = {}; if (patch && typeof patch.display_name === 'string') p.display_name = patch.display_name.replace(/[\u0000-\u001f\u007f]/g, '').trim(); if (patch && typeof patch.timezone === 'string' && patch.timezone.trim()) p.timezone = patch.timezone.trim();
+      if (p.display_name === '') return { ok: false, err: { kind: 'invalid', message: 'Enter a name' } };
+      if (!Object.keys(p).length) return { ok: true, msg: 'Settings saved' };
+      const r = await rest('PATCH', 'profiles?id=eq.' + me.id, p, { Prefer: 'return=representation' });
+      if (!r.ok || !r.json.length) return { ok: false, err: r.ok ? { kind: 'denied', message: 'Not allowed' } : r.err };
+      Object.assign(me, p); NAMES[me.id] = me.display_name; changed('me');
+      return { ok: true, msg: 'Settings saved' };
+    }
     async function setMineTags(ids) { const r = await rest('PATCH', 'profiles?id=eq.' + me.id, { mine_tag_ids: [...ids] }, { Prefer: 'return=representation' }); if (r.ok && r.json.length) { me.mine_tag_ids = r.json[0].mine_tag_ids; changed('me'); } return r; }
 
     // ---- wiring to the page: online, visibility, focus (the UI calls attach(window, document) once) ----
@@ -1048,7 +1058,7 @@
       all, find, canDo, myDefault, linkIx, shownOrder, derive,
       // writes
       edit, makeTask, create: createTask, saveTask, flush, flushAll, undoEdit, markDone, cancelTask, removeTask, restoreTask, moveTask, moveToList, placeIn, topKey,
-      linkOp, setTags, ensureTags, renameTag, deleteTag, sortTag, moveTags, createTagList, renameTagList, sortTagList, setDefaultTagList, archiveTagList, hideTagList, leaveTagList, setMineTags,
+      linkOp, setTags, ensureTags, renameTag, deleteTag, sortTag, moveTags, createTagList, renameTagList, sortTagList, setDefaultTagList, archiveTagList, hideTagList, leaveTagList, setMineTags, saveProfile,
       createList, renameList, reorderLists, archiveList, restoreList, archivedLists, hideList, leaveList,
       people, share, setRole, removeMember, revokeInvite, acceptInvite, declineInvite, answerNotice,
       setPrefs, writePrefs,

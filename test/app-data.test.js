@@ -323,3 +323,19 @@ test('sync state: saved, saving, offline with a count, conflict, ended', () => {
   assert.equal(D.syncStateOf({ pending: 0, conflict: true }).state, 'conflict');
   assert.equal(D.syncStateOf({ pending: 1, offline: true, ended: true }).state, 'ended');
 });
+
+test('saveProfile: PATCH profiles with display_name and timezone, names follow; an empty name or a refused row is an error', async () => {
+  let refuse = false;
+  const f = fakeSupabase([['PATCH', /^\/rest\/v1\/profiles\?id=eq\./, (m, body) => [200, refuse ? [] : [Object.assign({ id: UID }, body)]]]]);
+  const d = make(f);
+  await d.signIn('me@example.com', 'pw', true);
+  assert.equal((await d.loadAll()).ok, true);
+  const r = await d.saveProfile({ display_name: ' Maks\u0007 ', timezone: 'Europe/Lisbon' });
+  assert.equal(r.ok, true);
+  const call = f.calls.find(c => c.method === 'PATCH' && c.u.startsWith('/rest/v1/profiles'));
+  assert.deepEqual(call.body, { display_name: 'Maks', timezone: 'Europe/Lisbon' });
+  assert.equal(d.me.display_name, 'Maks'); assert.equal(d.names[UID], 'Maks'); assert.equal(d.me.timezone, 'Europe/Lisbon');
+  assert.equal((await d.saveProfile({ display_name: '  ' })).ok, false);
+  refuse = true;
+  assert.equal((await d.saveProfile({ display_name: 'X' })).err.kind, 'denied');
+});

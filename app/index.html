@@ -782,7 +782,9 @@ dialog.alert.wl p.wl-step{margin:0 0 4px;font:600 13px/1.2 var(--ui);color:var(-
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
   .pill[data-s="saving"] .dot{animation:none}
 }
-.empty.soon p{margin:0}
+.linkb{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;gap:6px;align-items:baseline;min-height:28px;font:inherit;color:inherit;text-align:left;overflow-wrap:anywhere}.linkb:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.tl li.closed{opacity:.6}
+h2[tabindex="-1"]:focus{outline:none}
 /* real data: long words and links in titles and descriptions wrap, never scroll a quadrant sideways */
 .card .ttl,.card .d,.card .meta,.card .tags{overflow-wrap:anywhere;min-width:0}
 .quad .cards{overflow-x:hidden}
@@ -837,13 +839,10 @@ dialog.alert.wl p.wl-step{margin:0 0 4px;font:600 13px/1.2 var(--ui);color:var(-
   <section class="view" id="v-review" aria-labelledby="rev-h" hidden></section>
   <section class="view" id="v-search" aria-labelledby="srch-h" hidden>
     <div class="phead"><h2 id="srch-h">Search</h2></div>
-    <div class="empty soon" id="search-soon"><p>Coming in the next build.</p></div>
-    <div class="part2" hidden>
     <div class="search"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><label class="vh" for="q">Search tasks</label><input id="q" type="search" placeholder="Search tasks" autocomplete="off" enterkeyhint="search"></div>
     <div class="chiprow" id="filters" role="group" aria-label="Filters" style="margin-top:4px"></div>
     <div class="opts" id="fopts" hidden></div>
     <div class="results" id="results" aria-live="polite"></div>
-    </div>
   </section>
   <section class="view" id="v-me" aria-labelledby="me-h" hidden></section>
 </main>
@@ -951,9 +950,9 @@ dialog.alert.wl p.wl-step{margin:0 0 4px;font:600 13px/1.2 var(--ui);color:var(-
 "use strict";
 /* Tasks on the phone (app/index.html): the UI of prototype p2 v6 on the real data layer.
    Data: app/td-data.js (TDData, every write goes through it), rules: app/td-core.js (TDCore), config: ../config/tasksdashboard.config.js.
-   Part 1 (this build): start, sign-in, access gate, board, quick add, task sheet, gestures, Move picker, Lists sheet, sync pill.
-   Part 2 (next build): Review, Search, Me and its pages, sharing sheets, notices, welcome, install hint. Their screens show
-   "Coming in the next build"; the v6 code for them is in the prototype (td-mobile/p2/index.html, "S7 search", "S8 review", "S9 Me"). */
+   This file: start, sign-in, access gate, board, quick add, task sheet, gestures, Move picker, Lists sheet, sync pill.
+   app-ui-part2.js (built after this file into the same script): Review, Search, Me and its pages, Share and People sheets, notices,
+   welcome, install hint, and the start (boot). Built by build-app-index.mjs into app/index.html. */
 const C = window.TDCore;
 const D = window.TDData.create({ config: window.TD_CONFIG });
 D.attach(window, document);
@@ -993,7 +992,10 @@ const L = id => D.listById[id];
 const lname = id => L(id) ? L(id).name : '?';
 const role = id => D.roles[id];
 const ref = t => ((lname(t.list)[0] || '?').toUpperCase()) + t.num; /* the web's refText: list initial + number */
-const curListId = () => { const p = D.prefs.list; return p !== 'all' && L(p) ? p : 'all'; };
+/* the phone's own list choice (localStorage td.app.list), so the desktop's prefs.list stays as it is; prefs.list is the first default */
+const LIST_KEY = 'td.app.list';
+const curListId = () => { const p = store.get(LIST_KEY) || D.prefs.list; return p !== 'all' && L(p) ? p : 'all'; };
+const setList = id => store.set(LIST_KEY, id);
 const curList = () => { const id = curListId(); return id === 'all' ? null : L(id); };
 const isClosed = t => C.CLOSED.includes(t.status);
 const openAll = () => D.all().filter(t => !isClosed(t));
@@ -1174,21 +1176,12 @@ function renderBoard() {
   if (animateCards && !reduce.matches) document.querySelectorAll('.quad.on .card').forEach(c => c.classList.add('enter'));
   animateCards = false;
 }
-/* part 2 screens: kept in the markup, filled by the next build */
-const SOON = name => `<div class="phead"><h2>${name}</h2></div><div class="empty soon"><p>Coming in the next build.</p></div>`;
-function renderPart2(tab) {
-  if (tab === 'review') $('#v-review').innerHTML = SOON('Review');
-  if (tab === 'search') { const s = $('#search-soon'); if (s) s.hidden = false; }
-  if (tab === 'me') {
-    $('#v-me').innerHTML = `<div class="phead"><h2 id="me-h" tabindex="-1">Me</h2>${me() ? `<p>${esc(me().display_name || '')}${D.session ? ' · ' + esc(D.session.email || '') : ''}</p>` : ''}</div><div class="empty soon"><p>Coming in the next build.</p></div>` +
-      `<div style="margin-top:16px"><button class="btn block" data-act="signout">Sign out</button></div>`;
-  }
-}
 function renderAll() {
   if (!S.ready) return;
   document.documentElement.dataset.ready = '1';
   renderChips(); renderMap(); renderBoard();
-  if (S.tab !== 'board') renderPart2(S.tab);
+  if (S.tab !== 'board') renderTab(S.tab);
+  drawBadge(); drawNotices();
   if ($('#dlg-lists').open && !$('#newlist')) renderLists();
 }
 
@@ -1624,12 +1617,11 @@ async function createList(v) {
     if (r.archived) { nlErr(`<div class="note" style="margin:0 0 12px"><p style="margin:0 0 10px">You already have a list named ${esc(r.archived.name)}. It is archived.</p><div class="row2"><button type="button" class="btn" data-act="nl-restore" data-id="${r.archived.id}">Restore it</button><button type="button" class="btn" data-act="nl-alt" data-v="${esc(r.freeName)}">Create “${esc(r.freeName)}”</button></div></div>`); $('#nl-err .btn').focus(); return; }
     nlErr(`<p class="err">${esc(r.err ? r.err.message : 'The list was not created.')}</p>`); $('#nl-name').focus(); return;
   }
-  closeDlg('dlg-lists'); animateCards = true; renderAll(); toast(`Created ${r.list.name}.`);
+  setList(r.list.id); closeDlg('dlg-lists'); animateCards = true; renderAll(); toast(`Created ${r.list.name}.`);
 }
 function moveListPos(id, dir) { const ids = D.lists.slice(), i = ids.indexOf(id), j = i + dir; if (i < 0 || j < 0 || j >= ids.length) return false; ids.splice(i, 1); ids.splice(j, 0, id); D.reorderLists(ids); return true; }
 const reopenLists = () => { openDlg('dlg-lists'); renderLists(); };
-/* TODO(W2b): Share and People open the part-2 sharing sheets (#dlg-share, prototype "S10 share sheet") */
-function openShareSheet(id) { toast(`Sharing ${lname(id)} comes in the next build.`); }
+const openShareSheet = id => openShare('list', id);
 function listMenu(id) {
   const l = L(id); if (!l) return; const mine = me() && l.owner_id === me().id, i = D.lists.indexOf(id), items = [];
   items.push(mine ? { label: 'Share', icon: 'share', run: () => openShareSheet(id) } : { label: 'People', icon: 'people', run: () => openShareSheet(id) });
@@ -1694,7 +1686,7 @@ async function load() {
   }
   S.flip = new Set((D.prefs.cards && D.prefs.cards.flipped) || []);
   applyTheme();
-  animateCards = true; renderAll(); setPill();
+  animateCards = true; renderAll(); setPill(); afterLoad();
 }
 function applyTheme() { const t = D.prefs.theme; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; store.set('td.app.theme', t || 'auto'); }
 /* request.html's states, inside the app */
@@ -1735,6 +1727,8 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 
 /* ---------- tabs ---------- */
 function showTab(tab) {
+  if (tab === 'review' && S.tab !== 'review') { RV.scrolled = false; kpiLoad(); }
+  if (tab === 'me' && S.tab !== 'me') mePage = null;
   S.tab = tab;
   for (const v of ['board', 'review', 'search', 'me']) $('#v-' + v).hidden = v !== tab;
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-current', b.dataset.tab === tab ? 'page' : 'false'));
@@ -1752,7 +1746,7 @@ document.addEventListener('click', async e => {
   const a = b.dataset.act, card = b.closest('.card'), id = card ? card.dataset.tid : b.dataset.tid;
   switch (a) {
     case 'quad': if (S.q !== b.dataset.q) { S.q = b.dataset.q; animateCards = true; renderMap(); renderBoard(); } break;
-    case 'list': D.setPrefs({ list: b.dataset.id }); if (b.hasAttribute('data-close-lists')) closeDlg('dlg-lists'); animateCards = true; renderAll(); break;
+    case 'list': setList(b.dataset.id); if (b.hasAttribute('data-close-lists')) closeDlg('dlg-lists'); animateCards = true; renderAll(); break;
     case 'lists': openDlg('dlg-lists'); renderLists(); break;
     case 'add': openAdd(b.dataset.q); break;
     case 'add-close': tryCloseAdd(); break;
@@ -1804,7 +1798,7 @@ document.addEventListener('click', async e => {
     case 'lk-del': { const k = b.dataset.k; if (b.dataset.i !== '') TS.mk.splice(+b.dataset.i, 1); else tsSet(k, b.dataset.tid, false); renderLinks(); onTaskInput(); const f = $(`#t-links [data-act="lk-add"][data-k="${k}"]`); if (f) f.focus(); break; }
     case 'nl-open': renderLists(true); break;
     case 'nl-cancel': renderLists(); $('[data-act="nl-open"]').focus(); break;
-    case 'nl-restore': { const r = await D.restoreList(b.dataset.id); if (r.ok) { D.setPrefs({ list: b.dataset.id }); closeDlg('dlg-lists'); renderAll(); } said(r); break; }
+    case 'nl-restore': { const r = await D.restoreList(b.dataset.id); if (r.ok) { setList(b.dataset.id); closeDlg('dlg-lists'); renderAll(); } said(r); break; }
     case 'nl-alt': createList(b.dataset.v); break;
     case 'list-menu': closeDlg('dlg-lists'); listMenu(b.dataset.id); break;
     case 'pill': {
@@ -1818,7 +1812,7 @@ document.addEventListener('click', async e => {
     case 'signout': {
       const r = await D.signOut(!!S.outAsk);
       if (r && !r.ok) { S.outAsk = true; setTimeout(() => { S.outAsk = false; }, 8000); toast(`${r.pending} ${r.pending === 1 ? 'change' : 'changes'} not sent yet. Tap again to sign out anyway.`); break; }
-      S.outAsk = false; S.ready = false; showTab('board'); openSignin({}); break;
+      S.outAsk = false; S.ready = false; showTab('board'); drawNotices(); openSignin({}); break;
     }
     case 'ver-later': unnote('n-ver'); break;
     case 'ver-reload': unnote('n-ver'); if (swReg && swReg.waiting) { swReload = true; swReg.waiting.postMessage({ type: 'SKIP_WAITING' }); } else { try { await D.flushAll(); } catch (er) {} location.reload(); } break;
@@ -1835,7 +1829,7 @@ document.addEventListener('click', async e => {
     case 'ac-check': afterSignIn(); break;
     case 'ac-open': closeDlg('dlg-access'); load(); break;
     case 'ac-other': closeDlg('dlg-access'); await D.signOut(true); openSignin({ other: true }); break;
-    default: break;
+    default: await part2Click(a, b, e); break;
   }
 });
 
@@ -1950,6 +1944,638 @@ document.addEventListener('scroll', e => { const t = e.target; if (t && t.matche
 let fadeQ = 0; new MutationObserver(() => { if (!fadeQ) fadeQ = requestAnimationFrame(() => { fadeQ = 0; updateFades(); }); }).observe(document.body, { childList: true, subtree: true });
 document.addEventListener('focusin', e => { const t = e.target; if (t && t.closest && t.parentElement && t.parentElement.matches(HROW)) t.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
 
+/* ---------- part 2 (app-ui-part2.js, built after app-ui-main.js into the same script): Review, Search, Me and its pages, the Share and
+   People sheets, notices, the welcome note, the install hint, then the start. Web twins named per part ("web: name"). ---------- */
+const plainT = s => String(s || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(?!\s)(.+?)\*/g, '$1');
+const shortDay = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const longDay = ms => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+const spanText = (from, to) => longDay(from) + ' – ' + longDay(to - 1); /* to is exclusive */
+const addDaysMs = (ms, n) => { const d = new Date(ms); d.setDate(d.getDate() + n); return d.getTime(); };
+const ROLE_NAME = { owner: 'Owner', editor: 'Editor', contributor: 'Contributor', viewer: 'Viewer' };
+const human = () => !!(me() && me().kind === 'human');
+const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+/* the web's matchQ: 12, #12, H12 (list initial + number), else words in the title, the description and the tag names */
+function matchQ(t, q) {
+  q = String(q || '').trim().toLowerCase(); if (!q) return true;
+  const r = q.replace(/^#/, '');
+  if (/^\p{L}?\d+$/u.test(r)) { const m = r.match(/^(\p{L}?)(\d+)$/u); if (String(t.num) === m[2] && (!m[1] || (lname(t.list)[0] || '').toLowerCase() === m[1])) return true; }
+  const tags = t.tags.map(id => D.tagNames[id] || '').join(' ');
+  return (plainT(t.title) + ' ' + plainT(t.notes) + ' ' + tags).toLowerCase().includes(q);
+}
+function renderTab(tab) { if (tab === 'review') renderReview(); else if (tab === 'search') renderSearch(); else if (tab === 'me') renderMe(); }
+function drawBadge() { const n = S.ready ? D.invites.length : 0, b = $('#me-badge'); b.hidden = !n; b.textContent = n || ''; b.setAttribute('aria-label', n === 1 ? '1 invitation' : `${n} invitations`); }
+
+/* ---------- S8 Review (web: reviewHtml, rvBody, kpiLoad, kpiGroups): 10 ISO weeks (7 back, this week, 2 ahead), Earlier / Later move 4 ---------- */
+const RV = { sel: null, first: null, lists: new Set(), scrolled: false, scroll: null };
+const VIS = { lists: new Set(), range: 'period', open: true };
+const RV_KIND = { done: 'Done', cancelled: 'Cancelled', overdue: 'Overdue', due: 'Due' };
+function rvInit() { const cur = C.isoWeek(now()).key; if (!RV.sel) { RV.sel = [cur]; RV.first = C.weekStart(addDaysMs(now(), -49)); } return cur; }
+const rvShownLists = () => D.lists.filter(id => !C.isTestList(L(id)));
+const rvTasks = () => D.all().filter(t => !C.isTestList(L(t.list)) && (!RV.lists.size || RV.lists.has(t.list)));
+/* web: loadCancelTimes. When each cancelled task was cancelled (item_events), read once per task and close time */
+const CANCEL_AT = {}, CANCEL_KEY = {};
+async function loadCancelTimes(tasks) {
+  const want = tasks.filter(t => t.status === 'cancelled' && t.doneAt && CANCEL_KEY[t.id] !== t.doneAt.getTime());
+  if (!want.length) return false;
+  want.forEach(t => { CANCEL_KEY[t.id] = t.doneAt.getTime(); });
+  for (let i = 0; i < want.length; i += 80) {
+    const ids = want.slice(i, i + 80).map(t => t.id);
+    const r = await D.getAll('item_events?select=item_id,at,status:diff->status&item_id=in.(' + ids.join(',') + ')&diff->status->>new=eq.cancelled');
+    if (!r.ok) { want.slice(i).forEach(t => { delete CANCEL_KEY[t.id]; }); return i > 0; }
+    Object.assign(CANCEL_AT, C.cancelTimes(r.json));
+  }
+  return true;
+}
+function reviewData() {
+  rvInit();
+  const tasks = rvTasks();
+  loadCancelTimes(tasks).then(ch => { if (ch && S.tab === 'review') renderSoon(); });
+  const entries = C.reviewEntries(tasks, RV.sel, now(), CANCEL_AT);
+  return { tasks, entries, groups: C.reviewGroups(entries, D.lists), period: C.reviewPeriod(RV.sel) };
+}
+function rvRowsHTML(d, exp) {
+  let h = '';
+  for (const g of d.groups) {
+    if (!g.count) continue;
+    h += `<div class="grp" data-q="${g.q}"><h3>${QN[g.q]} <span class="n">${g.count}</span></h3>`;
+    for (const l of g.lists) {
+      h += `<h4>${esc(lname(l.list))}</h4><ul class="rlist">${l.rows.map(e => {
+        const t = e.t, mk = `<span class="mks"><span class="mk ${e.kind === 'done' ? 'done' : e.kind === 'overdue' ? 'overdue' : ''}">${RV_KIND[e.kind]}</span>${e.late && e.kind !== 'overdue' ? '<span class="mk late">late</span>' : ''}</span>`;
+        const inner = `<span class="day">${dayLabel(new Date(e.at))}</span><span><span class="num">${esc(ref(t))}</span>${esc(plainT(t.title))}</span>${mk}`;
+        return `<li class="rrow">${exp ? `<div class="rvb">${inner}</div>` : `<button class="rvb" data-act="open-id" data-tid="${t.id}" aria-haspopup="dialog">${inner}</button>`}</li>`;
+      }).join('')}</ul>`;
+    }
+    h += '</div>';
+  }
+  return h;
+}
+function renderReview() {
+  const cur = rvInit(), d = reviewData(), nowMs = now(), sel = RV.sel;
+  const old = $('#v-review .weeks'), keep = old ? old.scrollLeft : null;
+  const count = k => d.entries.filter(e => e.kind === k).length;
+  const title = sel.length === 1 ? `Week ${C.weekFromKey(sel[0]).week}` : `${sel.length} weeks`;
+  const sub = d.period ? spanText(d.period.from, d.period.to) + (sel.length === 1 && sel[0] === cur ? '. This week' : '') : '';
+  const weeks = C.weekRange(RV.first, 10).map(w => {
+    const n = C.reviewEntries(d.tasks, [w.key], nowMs, CANCEL_AT).length, isNow = w.key === cur;
+    return `<button class="week${isNow ? ' now' : ''}" data-act="week" data-w="${w.key}" aria-pressed="${sel.includes(w.key)}"><span class="wn">W${w.week}${isNow ? '<span class="wnow">This week</span>' : ''}</span><small>${C.weekLabel(w).split(' · ')[1]}</small><small class="wc">${n} ${n === 1 ? 'task' : 'tasks'}</small></button>`;
+  }).join('');
+  const lc = ['all'].concat(rvShownLists());
+  const empty = sel.filter(k => !C.reviewEntries(d.tasks, [k], nowMs, CANCEL_AT).length).map(k => 'W' + C.weekFromKey(k).week);
+  $('#v-review').innerHTML = `<div class="phead"><h2 id="rev-h" tabindex="-1">${title}</h2><p>${esc(sub)}</p></div>
+    <div class="weeks" role="group" aria-label="Weeks">${weeks}</div>
+    <div class="wknav"><button class="btn quiet" data-act="wk-shift" data-d="-4">${ic('back')}Earlier</button><button class="btn quiet" data-act="wk-shift" data-d="4">Later${ic('next')}</button></div>
+    <div class="chiprow" role="group" aria-label="Lists in the review" style="margin-top:2px">${lc.map(id => `<button class="chip" data-act="rlist" data-id="${esc(id)}" aria-pressed="${id === 'all' ? !RV.lists.size : RV.lists.has(id)}">${id === 'all' ? 'All' : esc(lname(id))}</button>`).join('')}</div>
+    <p class="sentence"><b>${count('done')}</b> done, <b>${count('cancelled')}</b> cancelled, <b>${count('overdue')}</b> overdue, <b>${count('due')}</b> still due.</p>
+    ${visualsHTML(false)}
+    <hr class="rv-sep">
+    <div class="toolbar"><span class="count-line" style="margin:0">${d.entries.length} ${d.entries.length === 1 ? 'task' : 'tasks'} in view</span><button class="btn" data-act="export">${ic('share')}Export</button></div>
+    ${d.entries.length ? rvRowsHTML(d, false) : `<div class="empty"><p>No task was due, done or overdue in ${sel.length > 1 ? 'these weeks' : 'this week'}.</p></div>`}
+    ${d.entries.length && empty.length ? `<p class="count-line">${empty.join(', ')}: nothing closed or due in this week.</p>` : ''}`;
+  const w = $('#v-review .weeks'), sc = RV.scroll; RV.scroll = null;
+  requestAnimationFrame(() => {
+    if (!w || !w.isConnected) return; /* a newer render replaced it; that one scrolls */
+    if (sc === 'start') w.scrollLeft = 0; else if (sc === 'end') w.scrollLeft = w.scrollWidth;
+    else if (!RV.scrolled) { const on = $('#v-review .week.now'); if (on) w.scrollLeft = on.offsetLeft - w.offsetLeft - 36; RV.scrolled = true; }
+    else if (keep !== null) w.scrollLeft = keep;
+    fadeRow(w);
+  });
+}
+document.addEventListener('toggle', e => { if (e.target.id === 'vis') VIS.open = e.target.open; }, true);
+
+/* Visuals: the history of the chosen lists from db/013 kpi_events (REST pages without it), rebuilt by TDCore (kpiHistory) */
+let KPI_LISTS = null, KPI_RPC = null, KPI_ERR = '';
+const KPI_CACHE = {};
+const KPI_ITEM_COLS = 'id,list_id,quadrant,status,due_at,urgent_pin,category,deleted_at,created_at';
+const kpiArchivedLists = () => (KPI_LISTS || []).filter(l => l.archived_at);
+const kpiIds = () => (KPI_LISTS || []).filter(l => !VIS.lists.size || VIS.lists.has(l.id) || (VIS.lists.has('archived') && l.archived_at)).map(l => l.id).sort();
+const kpiArchived = () => Object.fromEntries(kpiArchivedLists().map(l => [l.id, Date.parse(l.archived_at)]));
+async function kpiLoad() {
+  if (!D.session || !S.ready) return;
+  rvInit();
+  if (!KPI_LISTS) {
+    const r = await D.getAll('lists?select=id,slug,name,archived_at');
+    if (!r.ok) { KPI_ERR = r.err.message; return renderSoon(); }
+    KPI_ERR = '';
+    KPI_LISTS = r.json.filter(l => !C.isTestList(l)).sort((a, b) => !!a.archived_at - !!b.archived_at || (D.lists.indexOf(a.id) + 1 || 1e9) - (D.lists.indexOf(b.id) + 1 || 1e9) || a.name.localeCompare(b.name));
+  }
+  const ids = kpiIds(), key = ids.join();
+  if (KPI_CACHE[key] && KPI_CACHE[key].status === 'error') delete KPI_CACHE[key];
+  if (!ids.length || KPI_CACHE[key]) return renderSoon();
+  const c = KPI_CACHE[key] = { status: 'loading' };
+  renderSoon();
+  let items = null, events = null;
+  if (KPI_RPC !== false) {
+    const r = await D.rpc('kpi_events', { p_lists: ids });
+    if (r.ok && r.json && Array.isArray(r.json.items)) { items = r.json.items; events = r.json.events || []; KPI_RPC = true; }
+    else if (r.status === 404) KPI_RPC = false;
+    else { Object.assign(c, { status: 'error', error: r.err ? r.err.message : 'no answer' }); return renderSoon(); }
+  }
+  if (!items) {
+    const within = 'in.(' + ids.join(',') + ')';
+    const [a, b] = await Promise.all([D.getAll('items?select=' + KPI_ITEM_COLS + '&list_id=' + within),
+      D.getAll('item_events?select=id,item_id,at,' + C.KPI_COLUMNS.map(k => k + ':diff->' + k).join(',') + ',items!inner(list_id)&items.list_id=' + within + '&action=neq.create')]);
+    if (!a.ok || !b.ok) { Object.assign(c, { status: 'error', error: (a.err || b.err).message }); return renderSoon(); }
+    items = a.json; events = b.json;
+  }
+  Object.assign(c, { status: 'ok', hists: C.kpiHistory(items, events) });
+  renderSoon();
+}
+function visRange(c) {
+  const nowMs = now(), p = C.reviewPeriod(RV.sel);
+  const per = p && p.from < nowMs ? { from: p.from, to: Math.min(p.to, nowMs) } : null, whole = C.kpiOverall(c.hists, nowMs);
+  const same = !!per && !!whole && whole.from >= per.from;
+  const pick = !whole ? 'period' : !per ? 'all' : same || VIS.range !== 'all' ? 'period' : 'all';
+  return { p, per, whole, same, pick, r: pick === 'all' ? whole : per };
+}
+const tickText = (P, i, kind) => kind === 'hour' ? `${shortDay(P[i].at)} ${pad(new Date(P[i].at).getHours())}:00` : shortDay(P[i].at);
+function lineChart(s) {
+  const P = s.points, n = P.length; if (!n) return '<p class="k-note">No points in this range.</p>';
+  const lines = GEO.map(q => ({ key: q, name: QN[q], vals: P.map(p => p[q]) }));
+  const max = Math.max(1, ...lines.flatMap(l => l.vals)), H = 120, x = i => n === 1 ? 150 : i / (n - 1) * 300, y = v => 4 + (1 - v / max) * H;
+  const path = l => l.vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const dots = l => n <= 3 ? l.vals.map((v, i) => `<path d="M${x(i).toFixed(1)} ${y(v).toFixed(1)}l0 0" stroke-width="7" stroke-linecap="round"/>`).join('') : '';
+  const svg = `<svg class="kl-svg" viewBox="0 0 300 128" preserveAspectRatio="none" aria-hidden="true" focusable="false">${lines.map(l => `<g class="kl-l" data-q="${l.key}" fill="none" stroke-linejoin="round"><path d="${path(l)}" stroke-width="2" vector-effect="non-scaling-stroke"/>${dots(l)}</g>`).join('')}</svg>`;
+  const ends = lines.map(l => ({ l, y: y(l.vals[n - 1]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 17);
+  const over = ends[ends.length - 1].y - 124; if (over > 0) ends.forEach(e => { e.y -= over; });
+  const lab = ends.map(e => `<span class="kl-end" data-q="${e.l.key}" style="top:${(e.y - 8).toFixed(0)}px">${e.l.name} ${e.l.vals[n - 1]}</span>`).join('');
+  const tk = C.kpiTicks(P.map(p => p.at));
+  const ticks = tk.idx.map(i => ({ label: tickText(P, i, tk.kind), pos: n === 1 ? 50 : i / (n - 1) * 100, mid: i !== 0 && i !== n - 1 }));
+  const table = `<table class="vh"><caption>Open tasks per ${s.step === 7 ? 'week' : 'point'} and quadrant</caption><tr><th scope="col">When</th>${lines.map(l => `<th scope="col">${l.name}</th>`).join('')}</tr>${P.map((p, i) => `<tr><th scope="row">${tickText(P, i, tk.kind)}</th>${lines.map(l => `<td>${l.vals[i]}</td>`).join('')}</tr>`).join('')}</table>`;
+  return `<div class="kl"><div class="kl-plot"><span class="kl-top" aria-hidden="true">${max}</span>${svg}<div class="kl-ends" aria-hidden="true">${lab}</div></div><div class="kl-ticks" aria-hidden="true"><div>${ticks.map(t => `<span${t.mid ? ' class="mid"' : ''} style="left:${t.pos}%;transform:translateX(${t.pos === 0 ? 0 : t.pos === 100 ? -100 : -50}%)">${t.label}</span>`).join('')}</div></div>${table}</div>`;
+}
+function barChart(p) {
+  const big = Math.max(1, ...QS.map(q => p[q].open + p[q].closed)), pct = n => p.total ? Math.round(100 * n / p.total) : 0;
+  return `<div class="kb">${QS.map(q => { const b = p[q]; return `<div class="kb-row" data-q="${q}"><p><b>${QN[q]}</b> · ${b.open} open · ${b.closed} closed · ${pct(b.open + b.closed)}%</p><div class="kb-bar" aria-hidden="true"><i class="o" style="width:${b.open / big * 100}%"></i><i class="c" style="width:${b.closed / big * 100}%"></i></div></div>`; }).join('')}</div>`;
+}
+function leaveChart(v) {
+  const parts = [['closed', 'Closed', v.closed], ['archived', 'Archived', v.archived], ['deleted', 'Deleted', v.deleted]], sum = v.closed + v.archived + v.deleted;
+  return `<div class="kc"><div class="kc-nums">${parts.map(([k, l, n]) => `<p class="kc-n ${k}"><span class="sw" aria-hidden="true"></span>${l} <b>${n}</b></p>`).join('')}</div>
+    <div class="kc-bar" aria-hidden="true">${sum ? parts.map(([k, , n]) => n ? `<i class="${k}" style="width:${n / sum * 100}%"></i>` : '').join('') : ''}</div>
+    <p class="kc-open">Still open <b>${v.open}</b> of <b>${v.total}</b></p></div>`;
+}
+function visualsHTML(exp) {
+  const c = KPI_CACHE[kpiIds().join()], arch = kpiArchivedLists().length;
+  const live = KPI_LISTS ? KPI_LISTS.filter(l => !l.archived_at).map(l => [l.id, l.name]) : rvShownLists().map(id => [id, lname(id)]);
+  const chips = exp ? `<p class="rv-meta">Lists: ${esc(VIS.lists.size ? (KPI_LISTS || []).filter(l => kpiIds().includes(l.id)).map(l => l.name).join(', ') : 'all lists, archived ones too')}</p>`
+    : `<div class="chiprow" role="group" aria-label="Lists in Visuals">${[['all', 'All lists']].concat(live, arch ? [['archived', `Archived lists (${arch})`]] : []).map(([id, name]) => `<button class="chip" data-act="vlist" data-id="${esc(id)}" aria-pressed="${id === 'all' ? !VIS.lists.size : VIS.lists.has(id)}">${esc(name)}</button>`).join('')}</div>`;
+  let body;
+  if (KPI_ERR) body = `<p class="k-note">Could not read the lists: ${esc(KPI_ERR)}</p>`;
+  else if (!KPI_LISTS || !c || c.status === 'loading') body = '<p class="k-note">Reading the history…</p>';
+  else if (c.status === 'error') body = `<p class="k-note">Could not read the history: ${esc(c.error)}</p>`;
+  else {
+    const R = visRange(c), o = { settings: D.settings, archived: kpiArchived() };
+    const seg = R.same ? '<span class="vis-dates">All time = the same days</span>' : !R.per || !R.whole ? '' : exp ? `<b>${R.pick === 'all' ? 'All time' : 'Period'}</b>`
+      : `<div class="segb" role="group" aria-label="Range">${[['period', 'Period'], ['all', 'All time']].map(([k, nm]) => `<button class="chip" data-act="vrange" data-v="${k}" aria-pressed="${R.pick === k}">${nm}</button>`).join('')}</div>`;
+    const head = `<div class="vis-range">${seg}${R.r ? `<span class="vis-dates">${spanText(R.r.from, R.r.to)}</span>` : ''}</div>`;
+    body = head + (!R.r ? `<p class="k-note">${!R.whole ? 'No tasks in these lists.' : 'Visuals cover the days up to today. Pick this week or an earlier one.'}</p>`
+      : `<div class="kpi"><figure class="kf"><figcaption>Is my open work growing, and where?</figcaption>${lineChart(C.kpiSeries(c.hists, R.r.from, R.r.to, o))}</figure>
+        <figure class="kf"><figcaption>Where is my work, and how much is done?</figcaption>${barChart(C.kpiPie(c.hists, R.r.from, R.r.to, o))}</figure>
+        <figure class="kf"><figcaption>How did tasks leave the board?</figcaption>${leaveChart(C.kpiClosure(c.hists, R.r.from, R.r.to, o))}</figure></div>`);
+  }
+  if (exp) return `<section class="vis"><h2>Visuals</h2>${chips}${body}</section>`;
+  return `<details class="vis" id="vis"${VIS.open ? ' open' : ''}><summary><h3 class="vis-h">Visuals</h3>${ic('chev')}</summary><div class="vis-in">${chips}${body}</div></details>`;
+}
+/* Export (web: reviewDownload): the review as shown and the Visuals as one HTML file, no script, nothing from the network. The page's
+   own light tokens and the review and chart rules are copied in. Shared as a file where the phone can, else downloaded */
+function exportCss() {
+  let root = '', rules = '';
+  const want = /(^|[\s,])(\.(grp|rlist|rrow|rvb|mks?|day|num|kpi|kf|kl|kl-[a-z]+|kb|kb-[a-z]+|kc|kc-[a-z]+|k-note|sentence|vis-dates|n)\b|\[data-q)/;
+  for (const sh of document.styleSheets) {
+    let list; try { list = sh.cssRules; } catch (e) { continue; }
+    for (const r of list) { if (!(r instanceof CSSStyleRule)) continue; if (!root && r.selectorText === ':root') root = r.cssText; else if (want.test(r.selectorText) && !/(dialog|\.card|\.tile|\.cmain|\.qhead|\.rbtn)/.test(r.selectorText)) rules += r.cssText + '\n'; }
+  }
+  return root + '\n' + rules + 'body{margin:0;background:#F3F1EA;color:var(--ink);font:15px/1.45 var(--ui)}main{max-width:760px;margin:0 auto;padding:20px 16px}h1{font:600 28px var(--serif);margin:0}h2{font:600 20px var(--serif);margin:24px 0 8px}' +
+    '.rv-per{font:500 14px var(--ui);margin:4px 0}.rv-meta{color:var(--ink2);font-size:13px;margin:6px 0 0}.rv-sep{border:0;border-top:1px solid var(--hair2);margin:24px 0}.rlist{list-style:none;padding:0}.grp h3{font:600 17px var(--ui)}.grp h4{font:500 13px var(--ui);color:var(--ink2);margin:12px 0 4px}' +
+    '.vis-range{display:flex;gap:12px;align-items:baseline;margin:6px 0 12px}.kc-nums{display:flex;gap:16px;flex-wrap:wrap}.kc-bar{display:flex;gap:2px;height:8px}.kc-bar i{display:block;height:100%}.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}@media print{body{background:#fff}}';
+}
+async function exportReview() {
+  rvInit();
+  toast('Preparing the export…');
+  if (!KPI_LISTS || !(KPI_CACHE[kpiIds().join()] || {}).hists) { await kpiLoad(); for (let i = 0; i < 300 && (KPI_CACHE[kpiIds().join()] || {}).status === 'loading'; i++) await sleepMs(100); }
+  await loadCancelTimes(rvTasks());
+  const d = reviewData(), lists = RV.lists.size ? [...RV.lists].map(lname).join(', ') : 'all lists', stamp = `${longDay(now())} ${hm(new Date(now()))}`;
+  const per = d.period ? spanText(d.period.from, d.period.to) + ' · ' + RV.sel.length + (RV.sel.length === 1 ? ' week' : ' weeks') : '';
+  const doc = `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Weekly review ${esc(per)}</title><style>${exportCss()}</style></head><body><main>` +
+    `<h1>Weekly review</h1><p class="rv-per">${esc(per)}</p><p class="rv-meta">${RV.sel.map(k => esc(C.weekLabel(C.weekFromKey(k)))).join(', ')}<br>Lists: ${esc(lists)}<br>Saved ${esc(stamp)} by ${esc((me() && me().display_name) || '')}</p>` +
+    `<p class="sentence">${['done', 'cancelled', 'overdue', 'due'].map(k => `<b>${d.entries.filter(e => e.kind === k).length}</b> ${k === 'due' ? 'still due' : k}`).join(', ')}.</p>` +
+    visualsHTML(true) + '<hr class="rv-sep">' + (d.entries.length ? rvRowsHTML(d, true) : '<p>No task was due, done or overdue in these weeks.</p>') + '</main></body></html>';
+  const name = C.reviewFileName(RV.sel), blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+  window.tdLastExport = { name, size: blob.size };
+  try {
+    const file = new File([blob], name, { type: 'text/html' });
+    if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Weekly review' }); toast('Shared ' + name); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('Saved ' + name);
+}
+
+/* ---------- S7 Search (web: passFilters): Due, Tag, Category, To check, Mine; results by quadrant; "N in archive" ---------- */
+const SF = { due: null, tag: [], cat: [], check: false, mine: false, open: null };
+const DUE = [['any', 'Any'], ['overdue', 'Overdue'], ['today', 'Today'], ['week', 'Next 7 days'], ['none', 'No date']];
+const dueName = v => (DUE.find(x => x[0] === v) || [, ''])[1];
+function passF(t, q, noDue) {
+  if (!matchQ(t, q)) return false;
+  if (!noDue && SF.due) {
+    const end = n => midnight(now()) + n * DAY;
+    if (SF.due === 'overdue' && !overdue(t)) return false;
+    if (SF.due === 'today' && !(t.deadline && t.deadline.getTime() < end(1))) return false;
+    if (SF.due === 'week' && !(t.deadline && t.deadline.getTime() < end(8))) return false;
+    if (SF.due === 'none' && t.deadline) return false;
+  }
+  if (SF.tag.length && !t.tags.some(id => SF.tag.includes(id))) return false;
+  if (SF.cat.length && !SF.cat.includes(t.category)) return false;
+  if (SF.check && !lowConf(t)) return false;
+  if (SF.mine && !C.isMine(t, me(), D.tagNames)) return false;
+  return true;
+}
+const catName = slug => (D.categories[slug] || {}).name || slug;
+function renderFilters() {
+  const n = SF.tag.length, k = SF.cat.length, any = SF.due || n || k || SF.check || SF.mine;
+  const b = (key, label, on, toggle) => `<button class="chip" data-act="${toggle ? 'f-toggle' : 'f-open'}" data-k="${key}" ${toggle ? `aria-pressed="${!!on}"` : `aria-expanded="${SF.open === key}" aria-pressed="${!!on}"`}>${label}${toggle ? '' : ic('chev')}</button>`;
+  $('#filters').innerHTML = b('due', SF.due ? `Due: ${dueName(SF.due)}` : 'Due', SF.due) + b('tag', n ? `Tag: ${n === 1 ? esc(D.labels[SF.tag[0]] || '?') : n}` : 'Tag', n) + b('cat', k ? `Category: ${k === 1 ? esc(catName(SF.cat[0])) : k}` : 'Category', k)
+    + b('check', 'To check', SF.check, 1) + b('mine', 'Mine', SF.mine, 1) + (any ? '<button class="chip ghost" data-act="f-clear">Clear filters</button>' : '');
+  const o = $('#fopts'); if (!SF.open) { o.hidden = true; o.innerHTML = ''; return; } o.hidden = false;
+  const opt = (key, v, label, on) => `<button class="chip" data-act="f-set" data-k="${key}" data-v="${esc(v)}" aria-pressed="${!!on}">${esc(label)}</button>`;
+  if (SF.open === 'due') o.innerHTML = DUE.map(([v, l]) => opt('due', v, l, v === 'any' ? !SF.due : SF.due === v)).join('');
+  if (SF.open === 'tag') { const ids = Object.keys(D.labels).sort((a, c) => String(D.labels[a]).localeCompare(String(D.labels[c]))); o.innerHTML = ids.map(id => opt('tag', id, D.labels[id], SF.tag.includes(id))).join('') || '<p class="src" style="margin:0">No tags yet.</p>'; }
+  if (SF.open === 'cat') { const cs = [...new Set(D.all().map(t => t.category))].sort((a, c) => catName(a).localeCompare(catName(c))); o.innerHTML = cs.map(c => opt('cat', c, catName(c), SF.cat.includes(c))).join(''); }
+}
+function renderSearch() {
+  renderFilters();
+  const q = $('#q').value.trim(), any = q || SF.due || SF.tag.length || SF.cat.length || SF.check || SF.mine;
+  const hits = openAll().filter(t => passF(t, q));
+  const arch = any ? D.all().filter(t => isClosed(t) && passF(t, q, true)).length : 0;
+  const archLink = arch ? `<button class="btn quiet" data-act="arch-open" style="margin-top:8px;padding:0 4px">${arch} in archive</button>` : '';
+  if (!hits.length) { $('#results').innerHTML = `<div class="empty"><p>${any ? 'No tasks match. Try another word or clear the filters.' : 'No open tasks.'}</p></div>${archLink}`; return; }
+  $('#results').innerHTML = `<p class="count-line">${hits.length} open ${hits.length === 1 ? 'task' : 'tasks'}${any ? (hits.length === 1 ? ' matches' : ' match') : ''}.</p>` + QS.map(qq => {
+    const g = hits.filter(t => t.q === qq).sort(C.byOrder); if (!g.length) return '';
+    return `<div class="grp" data-q="${qq}"><h3>${QN[qq]}</h3><ul class="rlist">${g.map(t => { const di = dueInfo(t); return `<li class="rr"><button class="rbtn" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span><span>${esc(plainT(t.title))}</span><small>${esc(lname(t.list))}${di ? `, ${di.txt}` : ''}</small></button></li>`; }).join('')}</ul></div>`;
+  }).join('') + archLink;
+}
+$('#q').addEventListener('input', renderSearch);
+
+/* ---------- S9 Me and its pages (web: account menu, openSettings, openCardLayout, openTags, openSharing, archiveHtml, openArchivedLists,
+   openHiddenLists, timelineHtml) ---------- */
+let mePage = null, MTQ = '';
+const AR = { sort: 'completed', q: '' };
+const TLW = { off: 0, fold: new Set() };
+const INST_KEY = 'td.app.installHint';
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const themeName = () => ({ auto: 'System', light: 'Light', dark: 'Dark' })[D.prefs.theme] || 'System';
+const closedAll = () => D.all().filter(t => isClosed(t));
+function renderMe() {
+  const v = $('#v-me'), a = document.activeElement;
+  if (mePage && a && v.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'radio') return; /* a poll never wipes what is typed */
+  if (!me()) { v.innerHTML = ''; return; }
+  if (mePage) { v.innerHTML = `<div class="sub"><button class="btn quiet back" data-act="me-back">${ic('back')}Me</button><h2 id="me-h" tabindex="-1">${esc(mePage.title)}</h2><div id="me-sub"></div></div>`; mePage.render($('#me-sub')); return; }
+  const row = (act, label, val = '') => `<li><button class="rowb" data-act="${act}">${label}<span class="v">${val}${ic('next')}</span></button></li>`;
+  const inv = D.invites.length, live = C.tagGroups(D.tagLists, D.tags, me().id, D.names, { order: D.prefs.tagListOrder }).length;
+  v.innerHTML = `<div class="me-id"><span class="avatar" aria-hidden="true">${esc((me().display_name || '?')[0])}</span><div><h2 id="me-h" tabindex="-1">${esc(me().display_name || '')}</h2><p>${esc((D.session && D.session.email) || '')}</p></div></div>
+   <div class="group"><h3>Account</h3><ul class="rows">${row('pg-theme', 'Theme', themeName())}${row('pg-sharing', 'Sharing', inv ? `<span class="cntb inv" aria-label="${inv} ${inv === 1 ? 'invitation' : 'invitations'}">${inv}</span>` : '')}${row('pg-install', 'Install the app', standalone() ? 'Installed' : '')}</ul></div>
+   <div class="group"><h3>Board</h3><ul class="rows">${human() ? row('pg-general', 'General settings') : ''}${row('pg-urgency', 'Urgency settings', `${D.settings.windowDays} ${D.settings.windowDays === 1 ? 'day' : 'days'}`)}${row('pg-cards', 'Card layout')}${row('pg-tags', 'Tags', `${live} ${live === 1 ? 'list' : 'lists'}`)}</ul></div>
+   <div class="group"><h3>History</h3><ul class="rows">${row('pg-archive', 'Archive', String(closedAll().length))}${row('pg-alists', 'Archived lists')}${row('pg-hlists', 'Hidden lists', String(D.hiddenLists.length))}${row('pg-timeline', 'Timeline')}</ul></div>
+   <div class="group"><h3>Coming later</h3><ul class="rows"><li><div class="rowb" aria-disabled="true" style="cursor:default"><span>Reminders<span class="rowsub">Deadline reminders by your settings. Coming later.</span></span><span class="v"><span class="later">Later</span></span></div></li></ul></div>
+   <div class="group"><ul class="rows"><li><button class="rowb out" data-act="signout">Sign out</button></li></ul></div>`;
+}
+function openPage(key, data) { mePage = Object.assign({ key }, PAGES[key], data || {}); if (S.tab !== 'me') { showTab('me'); mePage = Object.assign({ key }, PAGES[key], data || {}); } renderMe(); const h = $('#me-h'); if (h) h.focus(); if (mePage.load) mePage.load(); }
+const reMe = () => { if (S.tab === 'me') renderMe(); };
+
+/* Tags (web: openTags): tag lists as groups, actions in "..." menus by my rights on each list (TDCore tagListRights) */
+function tagGroupsAll() {
+  const id = me().id, o = { order: D.prefs.tagListOrder };
+  return { live: C.tagGroups(D.tagLists, D.tags, id, D.names, o), hid: C.tagGroups(D.tagLists, D.tags, id, D.names, Object.assign({ hidden: true }, o)).filter(g => g.list.hidden),
+    arch: C.tagGroups(D.tagLists, D.tags, id, D.names, Object.assign({ archived: true, hidden: true }, o)) };
+}
+function renderTagGroups() {
+  const box = $('#mt-groups'); if (!box) return; const q = MTQ.trim().toLowerCase(), meId = me().id;
+  const n = id => openAll().filter(t => t.tags.includes(id)).length;
+  const grp = g => {
+    const l = g.list, R = C.tagListRights(l), mine = l.owner_id === meId, ts = g.tags.filter(id => D.tags[id] && (!q || D.tags[id].name.toLowerCase().includes(q)));
+    if (q && !ts.length) return '';
+    const who = mine ? 'Yours' : `Shared by ${D.names[l.owner_id] || 'someone'}. You are ${(l.role || '').toLowerCase()}`;
+    const add = !l.archived_at && !l.hidden && R.has('addTag');
+    return `<section class="tlg${l.archived_at || l.hidden ? ' arch' : ''}" aria-labelledby="tlh-${l.id}"><div class="tlhead"><div><h3 id="tlh-${l.id}">${esc(l.name)}${l.is_default && mine ? ' <span class="def"><svg class="star" aria-hidden="true" focusable="false"><use href="#i-star"/></svg>Default</span>' : ''}</h3><p>${esc(who)}${l.archived_at ? '. Archived, read only' : l.hidden ? '. Hidden from your pickers' : ''}</p></div>
+      <button class="ib" data-act="tl-menu" data-id="${l.id}" aria-label="Tag list actions: ${esc(l.name)}">${ic('more')}</button></div>
+      <ul class="rows">${ts.map(id => { const tg = D.tags[id], mi = mineTag(id); return `<li><div class="rowb"><span class="badge tag${mi ? ' mine' : ''}">${esc(tg.name)}${mi ? '<span class="vh">, counts as Mine</span>' : ''}</span><span class="v">${n(id)} open</span>${!l.archived_at ? `<button class="ib" data-act="tag-menu" data-id="${id}" aria-label="Tag actions: ${esc(tg.name)}">${ic('more')}</button>` : ''}</div></li>`; }).join('') || '<li><div class="rowb"><span class="src" style="margin:0">No tags yet.</span></div></li>'}</ul>
+      ${add && !q ? `<button class="btn quiet" data-act="tag-add" data-id="${l.id}" style="margin:2px 0 0;padding:0 6px">${ic('plus')}Add tag<span class="vh"> to ${esc(l.name)}</span></button>` : ''}</section>`;
+  };
+  const G = tagGroupsAll(), hid = G.hid.map(grp).join(''), arch = G.arch.map(grp).join('');
+  box.innerHTML = (G.live.map(grp).join('') + (hid ? `<div class="group"><h3>Hidden</h3>${hid}</div>` : '') + (arch ? `<details class="group"${MTQ.trim() ? ' open' : ''}><summary><h3 style="display:inline">Archived (${G.arch.length})</h3></summary>${arch}</details>` : '')) || '<p class="src">No tag matches.</p>';
+}
+const rOk = (r, msg) => { if (r && r.ok) { if (msg) toast(msg); } else toast(r && r.err ? r.err.message : 'That did not go through.'); renderAll(); renderTagGroups(); return r && r.ok; };
+async function reorderTagList(id, dir) {
+  const r = C.tagListReorder(C.tagGroups(D.tagLists, D.tags, me().id, D.names, { order: D.prefs.tagListOrder }), me().id, id, { dir });
+  if (!r) return;
+  if (r.kind === 'shared') D.setPrefs({ tagListOrder: r.order });
+  else for (const w of C.sortWrites(r.order, x => D.tagLists[x].sort)) { const x = await D.sortTagList(w.id, w.sort); if (!x.ok || !x.json.length) { toast(x.ok ? 'You may not reorder these lists.' : x.err.message); break; } }
+  renderTagGroups();
+}
+function tlMenu(id) {
+  const l = D.tagLists[id]; if (!l) return; const R = C.tagListRights(l), mine = l.owner_id === me().id, it = [];
+  const live = C.tagGroups(D.tagLists, D.tags, me().id, D.names, { order: D.prefs.tagListOrder });
+  if (l.archived_at) { if (R.has('restore')) it.push({ label: 'Restore tag list', icon: 'back', run: async () => rOk(await D.archiveTagList(id, false), `Restored ${l.name}.`) }); }
+  else if (l.hidden) { it.push({ label: 'Show again', icon: 'check', run: async () => rOk(await D.hideTagList(id, false), `${l.name} is back in your pickers.`) }); if (!mine) it.push({ label: 'Leave tag list', icon: 'back', warn: true, run: () => leaveTL(l) }); }
+  else {
+    if (R.has('renameList')) it.push({ label: 'Rename', icon: 'lists', run: async () => { const v = await promptDlg({ title: 'Rename tag list', label: 'Name', value: l.name }); if (v && v !== l.name) rOk(await D.renameTagList(id, v), 'Renamed.'); } });
+    if (R.has('setDefault')) it.push({ label: 'Make default', icon: 'check', run: async () => rOk(await D.setDefaultTagList(id), `${l.name} is your default tag list.`) });
+    if (R.has('share')) it.push({ label: 'Share tag list', icon: 'share', run: () => openShare('tag_list', id) });
+    else it.push({ label: 'People', icon: 'people', run: () => openShare('tag_list', id) });
+    if (C.tagListReorder(live, me().id, id, { dir: -1 })) it.push({ label: 'Move up', icon: 'up', run: () => reorderTagList(id, -1) });
+    if (C.tagListReorder(live, me().id, id, { dir: 1 })) it.push({ label: 'Move down', icon: 'down', run: () => reorderTagList(id, 1) });
+    if (!mine) { it.push({ label: 'Hide for me', icon: 'x', run: async () => { const r = await D.hideTagList(id, true); if (r.ok) toast(`Hid ${l.name}.`, async () => rOk(await D.hideTagList(id, false))); else rOk(r); renderAll(); renderTagGroups(); } }); it.push({ label: 'Leave tag list', icon: 'back', warn: true, run: () => leaveTL(l) }); }
+    if (R.has('archive')) it.push({ label: 'Delete tag list', icon: 'x', warn: true, run: async () => { if (await confirmDlg({ title: `Delete ${l.name}?`, body: 'It moves to Archived with its tags, off every picker and card. An owner or editor can restore it.', yes: 'Delete', no: 'Cancel' })) rOk(await D.archiveTagList(id, true), `Deleted ${l.name}. Find it under Archived.`); } });
+  }
+  if (!it.length) it.push({ label: l.archived_at ? 'This tag list is archived. Only an owner or editor can restore it.' : `You can use these tags. ${D.names[l.owner_id] || 'The owner'} manages this list.`, run: () => {} });
+  openMenu(l.name, it);
+}
+async function leaveTL(l) { if (await confirmDlg({ title: `Leave ${l.name}?`, body: `Its tags come off your tasks until ${D.names[l.owner_id] || 'the owner'} shares it again.`, yes: 'Leave', no: 'Stay' })) rOk(await D.leaveTagList(l.id), `Left ${l.name}.`); }
+function tagMenu(id) {
+  const g = D.tags[id], l = g && D.tagLists[g.tag_list_id]; if (!g || !l) return; const R = C.tagListRights(l), it = [], mi = mineTag(id);
+  if (R.has('renameTag')) it.push({ label: 'Rename', icon: 'lists', run: async () => { const v = await promptDlg({ title: 'Rename tag', label: 'Name', value: g.name }); if (v && v !== g.name) rOk(await D.renameTag(id, v), 'Renamed.'); } });
+  it.push({ label: mi ? 'Stop counting as Mine' : 'Count as Mine', icon: 'me', run: async () => { const s = new Set(me().mine_tag_ids || []); mi ? s.delete(id) : s.add(id); const r = await D.setMineTags([...s]); rOk(r && r.ok && r.json.length ? r : { ok: false, err: r.err || { message: 'Not saved.' } }, mi ? `${g.name} no longer counts as Mine.` : `Tasks tagged ${g.name} count as Mine.`); } });
+  const targets = C.moveTargets(l, D.tagLists);
+  if (targets.length) it.push({ label: 'Move to tag list', icon: 'board', run: () => openMenu(`Move ${g.name} to`, targets.map(T => ({ label: T.name, icon: 'lists', run: async () => rOk(await D.moveTags([id], T.id), `Moved ${g.name} to ${T.name}.`) }))) });
+  if (R.has('deleteTag')) it.push({ label: 'Delete', icon: 'x', warn: true, run: async () => { const k = D.all().filter(t => t.tags.includes(id)).length; if (await confirmDlg({ title: `Delete ${g.name}?`, body: k ? `It comes off ${k} ${k === 1 ? 'task' : 'tasks'}.` : 'No task uses it.', yes: 'Delete', no: 'Keep' })) { const r = await D.deleteTag(id); rOk(r, r.ok ? r.msg + '.' : ''); } } });
+  openMenu(g.name, it);
+}
+
+const TZS = (() => { try { return Intl.supportedValuesOf('timeZone'); } catch (e) { return ['Europe/Lisbon', 'Europe/London', 'Europe/Kyiv', 'UTC']; } })();
+const browserTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; } })();
+/* the card for the Card layout preview: the first open task of the board, else a sample */
+function previewTask() {
+  const t = openIn(S.q)[0] || openAll()[0];
+  if (t) return t;
+  return { id: 'preview', title: 'Pay the electricity bill', notes: 'Before the 15th.\n- read the meter first', list: D.lists[0], num: 12, q: 'B', tags: [], deadline: atDay(3, END_T), start: null, createdAt: new Date(now()), createdBy: me() && me().id, category: 'task', status: 'open', reviewState: 'none', aiConfidence: null };
+}
+const PAGES = {
+  'pg-theme': { title: 'Theme', render(el) {
+    el.innerHTML = `<fieldset class="radios" style="border:0;padding:0;margin:0"><legend class="vh">Theme</legend>${[['auto', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<label><input type="radio" name="theme" value="${k}"${(D.prefs.theme || 'auto') === k ? ' checked' : ''}>${l}</label>`).join('')}</fieldset>`;
+    el.onchange = e => { if (e.target.name !== 'theme') return; D.setPrefs({ theme: e.target.value }); applyTheme(); };
+  } },
+  'pg-sharing': { title: 'Sharing', render(el) {
+    const rows = Object.values(D.listById).concat(D.hiddenLists), hidden = new Set(D.hiddenLists.map(l => l.id));
+    const mine = rows.filter(l => role(l.id) === 'owner').sort((a, b) => a.name.localeCompare(b.name)), theirs = rows.filter(l => role(l.id) && role(l.id) !== 'owner').sort((a, b) => a.name.localeCompare(b.name));
+    el.innerHTML = `<div class="group" style="margin-top:0"><h3>Invitations</h3>${D.invites.length ? D.invites.map(i => `<div class="invite"><p>${esc(i.inviter_name || 'Someone')} invited you to ${i.kind === 'list' ? 'the list' : 'the tags'} “${esc(i.target_name)}” as ${esc((ROLE_NAME[i.role] || i.role).toLowerCase())}.</p><div class="row"><button class="btn primary" data-act="inv-accept" data-id="${esc(i.id)}">Accept</button><button class="btn" data-act="inv-decline" data-id="${esc(i.id)}">Decline</button><button class="btn quiet dq" data-act="inv-block" data-id="${esc(i.id)}" data-from="${esc(i.inviter_name || 'them')}">Decline and block</button></div></div>`).join('') : '<p class="src">No invitations waiting.</p>'}</div>
+      <div class="group"><h3>My lists</h3><ul class="rows">${mine.map(l => `<li><button class="rowb" data-act="share-open" data-id="${l.id}">${esc(l.name)}${hidden.has(l.id) ? '<span class="rowsub">Hidden for you</span>' : ''}<span class="v">Share${ic('next')}</span></button></li>`).join('') || '<li><div class="rowb"><span class="src" style="margin:0">You own no lists yet.</span></div></li>'}</ul></div>
+      <div class="group"><h3>Shared with me</h3>${theirs.length ? `<ul class="rows">${theirs.map(l => `<li class="shr"><div class="shr-h"><b>${esc(l.name)}</b><span class="rowsub">${esc(D.names[l.owner_id] || 'Someone')}’s list. You are ${esc((role(l.id) || '').toLowerCase())}${hidden.has(l.id) ? '. Hidden for you' : ''}.</span></div><div class="shr-b"><button class="btn quiet" data-act="share-open" data-id="${l.id}">People<span class="vh"> in ${esc(l.name)}</span></button><button class="btn quiet" data-act="${hidden.has(l.id) ? 'hlist-show' : 'swm-hide'}" data-id="${l.id}">${hidden.has(l.id) ? 'Show' : 'Hide'}<span class="vh"> ${esc(l.name)}</span></button><button class="btn quiet dq" data-act="swm-leave" data-id="${l.id}">Leave<span class="vh"> ${esc(l.name)}</span></button></div></li>`).join('')}</ul>` : '<p class="src">No lists are shared with you yet.</p>'}</div>`;
+  } },
+  'pg-general': { title: 'General settings', render(el) {
+    const tz = me().timezone || browserTz, zones = TZS.includes(tz) || !tz ? TZS : [tz].concat(TZS);
+    el.innerHTML = `<form class="setting" id="g-form" novalidate><label class="field"><span>Display name</span><input class="inp" id="g-name" maxlength="60" value="${esc(me().display_name || '')}" autocomplete="name" aria-describedby="g-err"></label><p class="err" id="g-err" role="alert" hidden>Type a name.</p><button class="btn" type="submit">Save name</button></form>
+      <div class="setting"><label class="field" style="margin:0"><span>Time zone</span><select class="inp" id="g-tz">${zones.map(z => `<option${z === tz ? ' selected' : ''}>${esc(z)}</option>`).join('')}</select></label></div>
+      <div class="setting"><h3>Welcome note</h3><p>The two-step note from your first sign-in: urgency, then moving between tasks.</p><button class="btn" data-act="g-welcome">Show again</button></div>`;
+    $('#g-form').onsubmit = async e => { e.preventDefault(); const v = $('#g-name').value.trim(); if (!v) { $('#g-err').hidden = false; $('#g-name').focus(); return; } $('#g-err').hidden = true; const r = await D.saveProfile({ display_name: v }); said(r, r.ok ? 'Name saved.' : ''); $('#g-name').blur(); renderMe(); };
+    el.onchange = async e => { if (e.target.id === 'g-tz') { const r = await D.saveProfile({ timezone: e.target.value }); said(r, r.ok ? `Time zone: ${e.target.value}.` : ''); e.target.blur(); } };
+  } },
+  'pg-urgency': { title: 'Urgency settings', render(el) {
+    const U = Object.assign({}, D.settings), lim = { windowDays: [1, 30, ' days', 1], threshold: [10, 90, ' %', 5], doLimit: [0, 50, '', 1] };
+    const st = (k, label, help) => { const [mn, mx, unit, step] = lim[k]; return `<div class="setting"><h3 id="u-${k}">${label}</h3><p>${help}</p><div class="stepper" role="group" aria-labelledby="u-${k}"><button class="ib" style="border:1px solid var(--hair2)" data-u="${k}" data-d="-${step}" aria-label="Decrease ${label}">−</button><output id="uo-${k}" aria-live="polite">${U[k]}${unit}</output><button class="ib" style="border:1px solid var(--hair2)" data-u="${k}" data-d="${step}" aria-label="Increase ${label}">+</button><span class="src" style="margin:0 0 0 6px">${mn} to ${mx}</span></div></div>`; };
+    el.innerHTML = st('windowDays', 'Urgency window', 'A task without a fixed quadrant moves to Do when its end date is this close.') + st('threshold', 'Due soon at', 'Mark a task due soon when less than this share of the window remains.') + st('doLimit', 'Do limit', 'The Do count turns red above this number. 0 turns it off.') + '<button class="btn primary block" data-act="u-save">Save</button>';
+    el.onclick = e => {
+      const b = e.target.closest('[data-u]'); if (b) { const k = b.dataset.u, [mn, mx, unit] = lim[k]; U[k] = Math.min(mx, Math.max(mn, U[k] + +b.dataset.d)); $('#uo-' + k).textContent = U[k] + unit; return; }
+      if (e.target.closest('[data-act="u-save"]')) {
+        const before = openAll().map(t => [t, t.q]);
+        D.setPrefs({ settings: { threshold: U.threshold, windowDays: U.windowDays, doLimit: U.doLimit } }); renderAll();
+        const moved = before.filter(([t, q]) => D.derive(t).q !== q);
+        toast(moved.length ? `Urgency settings saved. ${moved.slice(0, 5).map(([t]) => `${ref(t)} moved to ${QN[t.q]}`).join(', ')}${moved.length > 5 ? ` and ${moved.length - 5} more` : ''}.` : 'Urgency settings saved.');
+      }
+    };
+  } },
+  'pg-cards': { title: 'Card layout', render(el) {
+    const CL = D.cardLayout, names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', source: 'Source (category, Sources)', group: 'Tasks Grouping', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
+    const tls = C.cardLayoutTagLists(D.tagLists, me().id), radio = (nm, v, l, on) => `<label><input type="radio" name="${nm}" value="${v}"${on ? ' checked' : ''}>${l}</label>`;
+    el.innerHTML = `<p class="src">Preview</p><div class="preview" id="cl-prev" aria-hidden="true"></div>
+      <fieldset class="setting"><legend class="flabel">Cards open</legend><div class="radios">${radio('cl-mode', 'collapsed', 'Collapsed', cardMode() === 'collapsed')}${radio('cl-mode', 'expanded', 'Expanded', cardMode() === 'expanded')}</div></fieldset>
+      <div class="setting"><label class="field" style="margin:0"><span>Shorten descriptions longer than, characters</span><input class="inp" type="number" id="cl-short" min="0" max="5000" step="1" inputmode="numeric" value="${CL.autoCollapse}" aria-describedby="cl-short-h"></label><p id="cl-short-h" style="margin:8px 0 0">An open card shows this many characters of the description, then Show more. 0 shows the whole description; default ${C.CARD_LAYOUT_DEFAULTS.autoCollapse}.</p></div>
+      <h3 class="flabel" style="margin:16px 0 6px 4px">A card shows</h3>
+      <ul class="rows">${C.CARD_FIELDS.map(k => `<li><label class="rowb switch" style="padding:0 14px">${names[k]}<input type="checkbox" data-cl="${k}"${CL[k] ? ' checked' : ''}></label></li>`).join('')}</ul>
+      <fieldset class="setting" style="margin-top:16px"><legend class="flabel">Tags</legend><div class="radios">${radio('cl-tags', 'all', 'All tags', CL.tags === 'all')}${radio('cl-tags', 'lists', 'Only from these tag lists', CL.tags === 'lists')}<div class="cl-lists">${tls.map(l => `<label class="cbrow"><input type="checkbox" data-cltl="${l.id}"${CL.tagLists.includes(l.id) ? ' checked' : ''}${CL.tags === 'lists' ? '' : ' disabled'}><span>${esc(l.name)}${l.owner_id !== me().id ? `, ${esc(D.names[l.owner_id] || '')}` : ''}</span></label>`).join('') || '<p class="src">No tag lists yet.</p>'}</div>${radio('cl-tags', 'off', 'No tags', CL.tags === 'off')}</div></fieldset>
+      <button class="btn block" data-act="cl-reset">Reset</button>`;
+    drawPreview();
+    el.onchange = async e => {
+      const x = e.target, L0 = JSON.parse(JSON.stringify(D.cardLayout));
+      if (x.dataset.cl === 'group') { const on = x.checked; x.checked = !on; const nt = C.groupingNotice(on); if (!(await confirmDlg({ title: nt.title, body: nt.text, yes: 'Apply', no: 'Cancel' }))) { x.focus(); return; } x.checked = on; L0.group = on; toast(on ? 'Tasks Grouping is on.' : 'Tasks Grouping is off.'); x.focus(); }
+      else if (x.dataset.cl) L0[x.dataset.cl] = x.checked;
+      else if (x.name === 'cl-mode') { S.flip.clear(); D.setPrefs({ cards: { mode: x.value, flipped: [] } }); drawPreview(); renderBoard(); return; }
+      else if (x.id === 'cl-short') { const n = Math.round(+x.value); L0.autoCollapse = Number.isInteger(n) && n >= 0 && n <= 5000 ? n : C.CARD_LAYOUT_DEFAULTS.autoCollapse; x.value = L0.autoCollapse; }
+      else if (x.name === 'cl-tags') { L0.tags = x.value; el.querySelectorAll('[data-cltl]').forEach(c => { c.disabled = x.value !== 'lists'; }); }
+      else if (x.dataset.cltl) L0.tagLists = x.checked ? [...new Set(L0.tagLists.concat(x.dataset.cltl))] : L0.tagLists.filter(v => v !== x.dataset.cltl);
+      else return;
+      D.setPrefs({ cardLayout: C.readCardLayout(L0, Object.keys(D.tagLists)) }); drawPreview(); renderBoard();
+    };
+  } },
+  'pg-tags': { title: 'Tags', render(el) {
+    el.innerHTML = `<div class="search" style="margin-top:0">${ic('search')}<label class="vh" for="mt-q">Find a tag</label><input id="mt-q" type="search" placeholder="Find a tag" autocomplete="off" value="${esc(MTQ)}"></div>
+      <button class="btn block" data-act="tl-new" style="margin:10px 0 4px">${ic('plus')}New tag list</button><div id="mt-groups"></div>`;
+    renderTagGroups(); $('#mt-q').oninput = e => { MTQ = e.target.value; renderTagGroups(); };
+  } },
+  'pg-archive': { title: 'Archive', render(el) {
+    const key = t => t.doneAt ? t.doneAt.getTime() : 0, by = { completed: (a, b) => key(b) - key(a), end: (a, b) => (a.deadline || Infinity) - (b.deadline || Infinity), title: (a, b) => plainT(a.title).localeCompare(plainT(b.title)) }[AR.sort];
+    const all = closedAll(), rows = all.filter(t => matchQ(t, AR.q)).sort(by), clear = rows.filter(t => D.canDo('delete', t));
+    el.innerHTML = `<div class="artools"><label class="field"><span>Sort</span><select class="inp" id="ar-sort">${[['completed', 'Completed'], ['end', 'End'], ['title', 'Title']].map(([v, l]) => `<option value="${v}"${AR.sort === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>${clear.length ? '<button class="btn" data-act="ar-clear">Clear</button>' : ''}</div>
+      ${AR.q ? `<p class="src" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px">Matching “${esc(AR.q)}”: ${rows.length} of ${all.length}.<button class="btn quiet" data-act="ar-all" style="padding:0 6px">Show all</button></p>` : ''}
+      ${rows.length ? `<ul class="rlist">${rows.slice(0, 300).map(t => `<li class="arow"><span class="day">${t.doneAt ? dayLabel(t.doneAt) : ''}</span><span><button class="linkb" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span>${esc(plainT(t.title))}</button><span class="rowsub">${t.status === 'done' ? 'Done' : 'Cancelled'}, ${esc(lname(t.list))}${t.deadline ? `, end ${dayLabel(t.deadline)}` : ''}</span></span><span class="aracts">${D.canDo('edit', t) && !(L(t.list) || {}).archived_at ? `<button class="btn quiet" data-act="restore" data-tid="${t.id}">Restore<span class="vh"> ${esc(plainT(t.title))}</span></button>` : ''}${D.canDo('delete', t) ? `<button class="btn quiet dq" data-act="ar-del" data-tid="${t.id}">Delete<span class="vh"> ${esc(plainT(t.title))}</span></button>` : ''}</span></li>`).join('')}</ul>${rows.length > 300 ? `<p class="src">The first 300 of ${rows.length}. Search narrows them.</p>` : ''}` : `<div class="empty"><p>${all.length ? 'No finished task matches.' : 'Nothing finished yet.'}</p></div>`}`;
+    el.onchange = e => { if (e.target.id === 'ar-sort') { AR.sort = e.target.value; e.target.blur(); mePage.render(el); $('#ar-sort').focus(); } };
+  } },
+  'pg-alists': { title: 'Archived lists', rows: null, err: '',
+    async load() { const pg = mePage, r = await D.archivedLists(); if (mePage !== pg) return; pg.rows = r.ok ? r.lists : []; pg.err = r.ok ? '' : r.err.message; reMe(); },
+    render(el) {
+      const a = this.rows;
+      el.innerHTML = a === null ? '<p class="src">Loading…</p>' : (this.err ? `<p class="err">${esc(this.err)}</p>` : '') + (a.length ? `<p class="src">Their tasks stay hidden until the list is restored.</p><ul class="rows">${a.map(l => `<li><div class="rowb">${esc(l.name)}<span class="rowsub">Archived ${dayLabel(new Date(l.archived_at))}</span><span class="v">${l.canRestore ? `<button class="btn quiet" data-act="alist-restore" data-id="${l.id}">Restore<span class="vh"> ${esc(l.name)}</span></button>` : ''}</span></div></li>`).join('')}</ul>` : '<p class="src">No archived lists.</p>');
+    } },
+  'pg-hlists': { title: 'Hidden lists', render(el) {
+    const a = D.hiddenLists;
+    el.innerHTML = a.length ? `<ul class="rows">${a.map(l => `<li><div class="rowb">${esc(l.name)}<span class="v"><button class="btn quiet" data-act="hlist-show" data-id="${l.id}">Show again<span class="vh"> ${esc(l.name)}</span></button></span></div></li>`).join('')}</ul>` : '<p class="src">No hidden lists. Use Hide for me on a list shared with you to tuck it away.</p>';
+  } },
+  /* web: timelineHtml (TDCore timelineRows): 3 weeks from this Monday; bars Start to End in the quadrant's colour, a paler span over a
+     parent's subtasks, the thin line is today; a next task that starts before its predecessor ends is marked */
+  'pg-timeline': { title: 'Timeline', render(el) {
+    const DAYS = 21, start = addDaysMs(C.weekStart(now()), TLW.off * 7), end = addDaysMs(start, DAYS), pos = i => Math.max(0, Math.min(100, i / DAYS * 100));
+    const base = openAll().filter(t => inList(t) && (t.start || t.deadline) && (t.start || t.deadline).getTime() < end && (t.deadline || t.start).getTime() >= start);
+    const R = ixNow(), out = C.timelineRows(base, R.ix, R.by, { start, days: DAYS, collapsed: TLW.fold, cap: 5 });
+    const today = Math.round((midnight(now()) - start) / DAY), late = {};
+    out.edges.forEach(e => { if (e.late) late[e.to] = out.rows[e.from].t; });
+    const rows = out.rows.map((r, i) => {
+      const t = r.t, b = r.bar, s = r.sum && r.kids ? r.sum : null, p = late[i];
+      const bar = b ? `<i style="left:${pos(b.a).toFixed(1)}%;width:${Math.max(2, pos(b.b + 1) - pos(b.a)).toFixed(1)}%"></i>` : '';
+      const span = s ? `<i class="span" style="left:${pos(s.a).toFixed(1)}%;width:${Math.max(2, pos(s.b + 1) - pos(s.a)).toFixed(1)}%"></i>` : '';
+      const when = t.start || t.deadline ? `${t.start ? `Start ${dayLabel(t.start)}${t.deadline ? ', ' : ''}` : ''}${t.deadline ? `End ${dayLabel(t.deadline)}` : ''}` : s ? `Subtasks run ${dayLabel(new Date(addDaysMs(start, s.a)))} to ${dayLabel(new Date(addDaysMs(start, s.b)))}` : 'No dates';
+      return `<li data-q="${t.q}" style="--d:${r.depth}"${r.closed ? ' class="closed"' : ''}><div class="tlr">${r.kids ? `<button class="ib fold" data-act="tl-fold" data-tid="${t.id}" aria-expanded="${!r.collapsed}" aria-label="${r.collapsed ? 'Show' : 'Hide'} the subtasks of ${esc(ref(t))}">${ic('chev')}</button>` : ''}<button class="linkb" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span><span>${esc(plainT(t.title))}</span></button></div>
+        <span class="track" aria-hidden="true">${span}${bar}${today >= 0 && today < DAYS ? `<b style="left:${pos(today + 0.5).toFixed(1)}%"></b>` : ''}</span>
+        <small>${when}. ${r.closed ? esc(t.status) : QN[t.q]}.</small>${p ? `<small class="early">Starts too early: ${esc(ref(p))} ends ${p.deadline ? dayLabel(p.deadline) : '?'}.</small>` : ''}</li>`;
+    }).join('');
+    el.innerHTML = `<div class="wknav" style="margin-top:0"><button class="btn quiet" data-act="tl-shift" data-d="-1">${ic('back')}Earlier</button><button class="btn quiet" data-act="tl-shift" data-d="0">This week</button><button class="btn quiet" data-act="tl-shift" data-d="1">Later${ic('next')}</button></div>
+      <p class="src">Open tasks${curListId() === 'all' ? '' : ' in ' + esc(lname(curListId()))} with a Start or End date, ${dayLabel(new Date(start))} to ${dayLabel(new Date(addDaysMs(start, DAYS - 1)))}. Bars run from Start to End in the quadrant’s colour; the thin line is today. A paler bar is a parent’s span over its subtasks.</p>
+      ${rows ? `<ul class="tl">${rows}</ul>` : '<div class="empty"><p>No tasks with dates in these weeks.</p></div>'}`;
+  } },
+  'pg-install': { title: 'Install the app', render(el) {
+    el.innerHTML = standalone() ? '<p class="src">Tasks is installed on this phone. It opens from your home screen.</p>' : `
+      <div class="setting"><h3>On Android</h3><p>Chrome installs Tasks. It then opens from your home screen, full screen, without the browser bar.</p><button class="btn primary" data-act="inst-android">${ic('plus')}Install app</button>${instEvt ? '' : '<p class="src" style="margin:8px 0 0">If nothing happens, open Chrome’s menu and tap Install app or Add to Home screen.</p>'}</div>
+      <div class="setting"><h3>On iPhone</h3><p>Safari adds Tasks to your home screen in two steps:</p><ol class="steps"><li>Tap Share <span class="glyph">${ic('share')}</span><span class="vh">, the square with an arrow,</span> in Safari’s toolbar.</li><li>Tap Add to Home Screen.</li></ol></div>`;
+  } },
+};
+function drawPreview() { const box = $('#cl-prev'); if (!box) return; box.innerHTML = `<ul class="cards">${cardHTML(previewTask(), 0, true)}</ul>`; box.querySelectorAll('button').forEach(b => { b.tabIndex = -1; b.disabled = true; }); }
+
+/* ---------- S10 Share and People sheets (web: openShare): who is on it, pending invitations, the share form; a first share to a known
+   account joins at once (db/012 p_join). Read again on open, after each action and every 10 s while open ---------- */
+let SH = null, shTick = 0;
+function openShare(kind, id) {
+  const isList = kind === 'list', target = isList ? (L(id) || D.hiddenLists.find(l => l.id === id)) : D.tagLists[id]; if (!target) return;
+  const myRole = isList ? role(id) : target.role, owner = myRole === 'owner' && human(), sharer = C.canShare(myRole, kind) && human();
+  SH = { kind, id, owner, sharer, name: target.name, last: null };
+  const roles = (isList ? C.LIST_ROLES : C.TAG_LIST_ROLES).filter(r => r !== 'owner');
+  const what = isList ? 'Editor changes everything, Contributor adds and edits their own tasks, Viewer reads.' : 'They see these tags on tasks they can already see. Viewer puts them on tasks; Contributor also adds, renames and reorders tags; Editor also deletes and moves tags, deletes the list and shares it.';
+  $('#share-h').textContent = sharer ? `Share ${target.name}` : `People in ${target.name}`;
+  $('#share-body').innerHTML = `${sharer ? `<p class="src" style="margin-top:0">${what}</p>` : ''}<ul class="people" id="sh-people" aria-live="polite"><li><span class="src">Loading…</span></li></ul>
+    ${sharer ? `<form id="inv" class="setting" novalidate><h3>Invite someone</h3><label class="field"><span>Email</span><input class="inp" id="inv-email" type="email" inputmode="email" autocomplete="off" spellcheck="false" maxlength="254" aria-describedby="inv-err"></label><p class="err" id="inv-err" role="alert" hidden>Enter an email address like name@example.com.</p><label class="field"><span>Role</span><select class="inp" id="inv-role">${roles.map(r => `<option value="${r}"${r === 'viewer' ? ' selected' : ''}>${ROLE_NAME[r]}</option>`).join('')}</select></label><button class="btn primary block" type="submit" id="inv-go">Invite</button><p class="src" style="margin:10px 0 0">No email is sent. Someone who already has an account sees it at once the first time you share with them; anyone else signs in to Tasks with Google and accepts it under Me, Sharing.</p></form>` : ''}`;
+  openDlg('dlg-share');
+  const f = $('#inv');
+  if (f) {
+    $('#inv-email').oninput = () => { $('#inv-err').hidden = true; $('#inv-email').removeAttribute('aria-invalid'); };
+    f.onsubmit = async e => {
+      e.preventDefault(); const v = $('#inv-email').value.trim(), r0 = $('#inv-role').value, s = SH;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { $('#inv-err').textContent = 'Enter an email address like name@example.com.'; $('#inv-err').hidden = false; $('#inv-email').setAttribute('aria-invalid', 'true'); $('#inv-email').focus(); return; }
+      $('#inv-go').disabled = true; const r = await D.share(s.kind, s.id, v, r0); if ($('#inv-go')) $('#inv-go').disabled = false;
+      if (!r.ok) { $('#inv-err').textContent = r.err.message; $('#inv-err').hidden = false; $('#inv-email').focus(); return; }
+      $('#inv-email').value = ''; toast(`Shared with ${v} as ${ROLE_NAME[r0].toLowerCase()}.`); loadPeople();
+    };
+  }
+  loadPeople();
+  clearInterval(shTick); shTick = setInterval(() => { if (!$('#dlg-share').open) { clearInterval(shTick); return; } if (document.visibilityState === 'visible') loadPeople(true); }, 10000);
+}
+async function loadPeople(quiet) {
+  const s = SH; if (!s) return;
+  const r = await D.people(s.kind, s.id);
+  if (SH !== s || !$('#dlg-share').open) return;
+  const box = $('#sh-people');
+  if (!r.ok) { if (!quiet) box.innerHTML = `<li><span class="err">${esc(r.err.message)}</span></li>`; return; }
+  const rows = r.json.slice().sort((a, b) => (a.state === 'member' ? 0 : 1) - (b.state === 'member' ? 0 : 1) || (a.role === 'owner' ? -1 : 0) - (b.role === 'owner' ? -1 : 0));
+  const key = JSON.stringify(rows);
+  if (quiet && (key === s.last || (box.contains(document.activeElement) && document.activeElement.tagName === 'SELECT'))) return;
+  s.last = key;
+  const roles = (s.kind === 'list' ? C.LIST_ROLES : C.TAG_LIST_ROLES).filter(x => x !== 'owner');
+  box.innerHTML = rows.map(p => {
+    const member = p.state === 'member', you = member && p.profile_id === me().id, name = member ? (you ? me().display_name : p.display_name || 'someone') : p.email;
+    const ctl = p.role === 'owner' ? `<span class="badge">Owner</span>`
+      : member ? (s.owner ? `<span class="ctl"><select aria-label="Role of ${esc(name)}" data-act="sh-role" data-pid="${esc(p.profile_id)}">${roles.map(x => `<option value="${x}"${x === p.role ? ' selected' : ''}>${ROLE_NAME[x]}</option>`).join('')}</select><button class="btn quiet dq" data-act="sh-remove" data-pid="${esc(p.profile_id)}">Remove<span class="vh"> ${esc(name)}</span></button></span>` : `<span class="badge">${ROLE_NAME[p.role] || esc(p.role)}</span>`)
+      : `<span class="ctl">${s.sharer ? `<button class="btn quiet" data-act="sh-revoke" data-id="${esc(p.invite_id)}">Revoke<span class="vh"> the invitation to ${esc(p.email)}</span></button>` : ''}</span>`;
+    return `<li><span class="ini" aria-hidden="true">${esc((name || '?')[0].toUpperCase())}</span><span class="who"><b>${esc(name)}${you ? ' (you)' : ''}</b><small>${member ? esc(p.email || '') : `Invited, waiting. ${ROLE_NAME[p.role] || esc(p.role)}`}</small></span>${ctl}</li>`;
+  }).join('') || '<li><span class="src">Nobody yet.</span></li>';
+}
+$('#share-body').addEventListener('change', async e => {
+  const x = e.target; if (x.dataset.act !== 'sh-role' || !SH) return;
+  said(await D.setRole(SH.kind, SH.id, x.dataset.pid, x.value), 'Role changed.'); loadPeople();
+});
+
+/* ---------- the welcome note (web: showWelcome): two steps, once per person and version (prefs.welcomeVersion) ---------- */
+let WL = 0;
+function welcome() { WL = 0; drawWelcome(); if (!$('#dlg-welcome').open) openDlg('dlg-welcome'); const p = $('#wl-body .btn.primary'); if (p) p.focus(); }
+function welcomeDone() { D.setPrefs({ welcomeVersion: C.WELCOME_VERSION, welcomeSeen: true }); closeDlg('dlg-welcome'); }
+function drawWelcome(announce) {
+  const s = D.settings, dots = `<span class="wl-dots" aria-hidden="true">${[0, 1].map(i => `<i${i === WL ? ' class="on"' : ''}></i>`).join('')}</span>`;
+  $('#wl-body').innerHTML = WL === 0
+    ? `<p class="wl-step">Welcome. Step 1 of 2</p><h2 id="wl-h" tabindex="-1">Urgency</h2><p>Tasks near their end date move up and stand out. Your values now:</p><dl class="wl-dl"><div><dt>Urgency window <span>${s.windowDays} ${s.windowDays === 1 ? 'day' : 'days'}</span></dt><dd>A task without a fixed quadrant moves to Do when its end date is this close.</dd></div><div><dt>Due soon <span>${s.threshold}%</span></dt><dd>A card is marked due soon when less than this share of the window is left.</dd></div><div><dt>Do limit <span>${s.doLimit || 'off'}</span></dt><dd>The Do count turns red above this number.</dd></div></dl><button class="btn quiet block" data-act="wl-urg">Set urgency now</button><div class="wl-foot"><button class="btn" data-act="wl-later">Later</button>${dots}<button class="btn primary" data-act="wl-next">Next</button></div>`
+    : `<p class="wl-step">Welcome. Step 2 of 2</p><h2 id="wl-h" tabindex="-1">Moving between tasks</h2><ul class="wl-ul"><li>In an open task, swipe its header left or right for the next or previous task in the quadrant.</li><li>The slim tabs at the sheet’s sides do the same.</li><li>Unsaved changes ask first.</li></ul><button class="btn quiet block" data-act="wl-cl">Open Card layout</button><div class="wl-foot"><button class="btn" data-act="wl-back">Back</button>${dots}<button class="btn primary" data-act="wl-done">Done</button></div>`;
+  if (announce) { $('#wl-live').textContent = `Step ${WL + 1} of 2`; $('#wl-h').focus(); }
+}
+$('#dlg-welcome').addEventListener('cancel', e => { e.preventDefault(); welcomeDone(); });
+
+/* ---------- the dock: first-share notices (web: drawNotices) and the install hint ---------- */
+function drawNotices() {
+  const open = S.ready && human() ? D.notices : [], ids = new Set(open.map(n => 'n-ntc-' + n.id));
+  document.querySelectorAll('#dock [id^="n-ntc-"]').forEach(el => { if (!ids.has(el.id)) unnote(el.id); });
+  open.forEach(n => { const id = 'n-ntc-' + n.id; if (document.getElementById(id)) return;
+    note(id, `<p id="${id}-p">${esc(C.noticeText(n))}</p><div class="row"><button class="btn quiet dq" data-act="ntc" data-v="block" data-id="${esc(n.id)}">Block</button><button class="btn quiet" data-act="ntc" data-v="leave" data-id="${esc(n.id)}">Leave</button><button class="btn primary" data-act="ntc" data-v="seen" data-id="${esc(n.id)}">Keep</button></div>`); });
+}
+let instEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); instEvt = e; if (S.ready) installHint(); });
+addEventListener('appinstalled', () => { instEvt = null; unnote('n-install'); store.set(INST_KEY, 'installed'); });
+function installHint() {
+  if (standalone() || store.get(INST_KEY)) return;
+  if (isIOS()) note('n-install', `<p id="n-install-p">Install Tasks: tap Share <span class="glyph">${ic('share')}</span><span class="vh">, the square with an arrow,</span> then Add to Home Screen.</p><div class="row"><button class="btn" data-act="inst-dismiss">Got it</button></div>`);
+  else if (instEvt) note('n-install', `<p id="n-install-p">Install Tasks on this phone. It opens from your home screen like an app.</p><div class="row"><button class="btn quiet" data-act="inst-dismiss">Not now</button><button class="btn primary" data-act="inst-android">Install app</button></div>`);
+}
+async function doInstall() {
+  if (!instEvt) { toast(isIOS() ? 'In Safari: tap Share, then Add to Home Screen.' : 'Open the browser menu and tap Install app or Add to Home screen.'); return; }
+  const ev = instEvt; instEvt = null; unnote('n-install');
+  try { ev.prompt(); const c = await ev.userChoice; store.set(INST_KEY, c && c.outcome === 'accepted' ? 'installed' : 'dismissed'); } catch (e) { store.set(INST_KEY, 'dismissed'); }
+}
+function afterLoad() {
+  drawBadge(); drawNotices();
+  if (human() && C.welcomeDue(D.prefs)) setTimeout(() => { if (S.ready && !document.querySelector('dialog[open]')) welcome(); }, 400);
+  installHint();
+}
+
+/* ---------- part 2 actions (the main click handler's default case) ---------- */
+async function part2Click(a, b) {
+  const id = b.dataset.id, tid = b.dataset.tid;
+  if (a.startsWith('pg-')) { openPage(a); return; }
+  switch (a) {
+    case 'week': { const k = b.dataset.w, s = new Set(RV.sel); if (s.has(k)) { if (s.size > 1) s.delete(k); } else s.add(k); RV.sel = [...s].sort(); renderReview(); if (S.tab === 'review') kpiLoad(); const nb = $(`#v-review [data-w="${k}"]`); if (nb) nb.focus(); break; }
+    case 'wk-shift': { const d = +b.dataset.d; RV.first = addDaysMs(RV.first, d * 7); RV.scroll = d < 0 ? 'start' : 'end'; renderReview(); $(`#v-review [data-act="wk-shift"][data-d="${d}"]`).focus(); break; }
+    case 'rlist': { if (id === 'all') RV.lists.clear(); else RV.lists.has(id) ? RV.lists.delete(id) : RV.lists.add(id); renderReview(); const nb = $(`#v-review [data-act="rlist"][data-id="${id}"]`); if (nb) nb.focus(); break; }
+    case 'vlist': { if (id === 'all') VIS.lists.clear(); else VIS.lists.has(id) ? VIS.lists.delete(id) : VIS.lists.add(id); renderReview(); kpiLoad(); const nb = $(`#vis [data-act="vlist"][data-id="${id}"]`); if (nb) nb.focus(); break; }
+    case 'vrange': { VIS.range = b.dataset.v; renderReview(); const nb = $(`#vis [data-act="vrange"][data-v="${b.dataset.v}"]`); if (nb) nb.focus(); break; }
+    case 'export': await exportReview(); break;
+    case 'f-open': SF.open = SF.open === b.dataset.k ? null : b.dataset.k; renderSearch(); { const f = $('#fopts .chip'); if (f && SF.open) f.focus(); } break;
+    case 'f-set': {
+      const k = b.dataset.k, v = b.dataset.v;
+      if (k === 'due') { SF.due = v === 'any' || SF.due === v ? null : v; SF.open = null; renderSearch(); $('#filters [data-k="due"]').focus(); }
+      else { SF[k] = SF[k].includes(v) ? SF[k].filter(x => x !== v) : [...SF[k], v]; renderSearch(); const nb = [...document.querySelectorAll('#fopts [data-v]')].find(x => x.dataset.v === v); if (nb) nb.focus(); }
+      break;
+    }
+    case 'f-toggle': { const k = b.dataset.k; SF[k] = !SF[k]; renderSearch(); $(`#filters [data-k="${k}"]`).focus(); break; }
+    case 'f-clear': Object.assign(SF, { due: null, tag: [], cat: [], check: false, mine: false, open: null }); renderSearch(); $('#q').focus(); break;
+    case 'arch-open': AR.q = $('#q').value.trim(); openPage('pg-archive'); break;
+    case 'me-back': mePage = null; renderMe(); $('#me-h').focus(); break;
+    case 'ar-all': AR.q = ''; renderMe(); $('#me-h').focus(); break;
+    case 'restore': { const r = await D.restoreTask(tid); if (r) toast(r.msg + '.', r.undo); else toast('That did not go through.'); renderAll(); break; }
+    case 'ar-del': { const t = task(tid); if (!t) break; if (await confirmDlg({ title: `Delete ${ref(t)}?`, body: plainT(t.title), yes: 'Delete', no: 'Keep' })) { said(D.removeTask(tid), `Deleted ${ref(t)}.`); renderAll(); } break; }
+    case 'ar-clear': {
+      const rows = closedAll().filter(t => matchQ(t, AR.q) && D.canDo('delete', t));
+      if (await confirmDlg({ title: 'Clear the archive?', body: `${rows.length} finished ${rows.length === 1 ? 'task is' : 'tasks are'} deleted${AR.q ? ` (the ones matching “${AR.q}”)` : ''}.`, yes: 'Clear', no: 'Cancel' })) { rows.forEach(t => D.removeTask(t.id)); renderAll(); toast(`Deleted ${rows.length} ${rows.length === 1 ? 'task' : 'tasks'}.`); }
+      break;
+    }
+    case 'alist-restore': { const r = await D.restoreList(id); said(r); if (r.ok && mePage) { mePage.rows = null; mePage.load(); } renderAll(); break; }
+    case 'hlist-show': { const r = await D.hideList(id, false); said(r); renderAll(); break; }
+    case 'swm-hide': { const l = L(id); const r = await D.hideList(id, true); if (r.ok) toast(`Hid ${l ? l.name : 'the list'}.`, async () => { said(await D.hideList(id, false)); renderAll(); }); else said(r); renderAll(); break; }
+    case 'swm-leave': { const l = L(id) || D.hiddenLists.find(x => x.id === id); if (l && await confirmDlg({ title: `Leave ${l.name}?`, body: `You lose access until ${D.names[l.owner_id] || 'the owner'} invites you again.`, yes: 'Leave list', no: 'Stay' })) { said(await D.leaveList(id)); renderAll(); } break; }
+    case 'share-open': openShare('list', id); break;
+    case 'inv-accept': { b.disabled = true; const r = await D.acceptInvite(id); said(r, r.ok ? 'Accepted. It is on your lists.' : ''); renderAll(); break; }
+    case 'inv-decline': { const r = await D.declineInvite(id, false); said(r, r.ok ? 'Declined the invitation.' : ''); renderAll(); break; }
+    case 'inv-block': if (await confirmDlg({ title: `Decline and block ${b.dataset.from}?`, body: 'You will not see invitations from them again.', yes: 'Decline and block', no: 'Cancel' })) { const r = await D.declineInvite(id, true); said(r, r.ok ? `Declined. Invitations from ${b.dataset.from} are blocked.` : ''); renderAll(); } break;
+    case 'sh-remove': { const r = await D.removeMember(SH.kind, SH.id, b.dataset.pid); said(r, r.ok ? 'Removed.' : ''); loadPeople(); break; }
+    case 'sh-revoke': { const r = await D.revokeInvite(id); said(r, r.ok ? 'Invitation revoked.' : SH && SH.owner ? '' : 'Only the owner revokes an invitation someone else sent.'); loadPeople(); break; }
+    case 'tl-new': { const v = await promptDlg({ title: 'New tag list', label: 'Name', yes: 'Create' }); if (v) rOk(await D.createTagList(v), `Created ${v}.`); break; }
+    case 'tl-menu': tlMenu(id); break;
+    case 'tag-menu': tagMenu(id); break;
+    case 'tag-add': { const l = D.tagLists[id]; if (!l) break; const v = await promptDlg({ title: `Add a tag to ${l.name}`, label: 'Tag name', yes: 'Add' }); if (!v) break; if (Object.values(D.tags).some(x => x.tag_list_id === id && x.name.toLowerCase() === v.toLowerCase())) { toast(`${l.name} already has ${v}.`); break; } const made = await D.ensureTags([{ list: id, name: v }]); if (made.length) toast(`Added ${v} to ${l.name}.`); renderTagGroups(); break; }
+    case 'tl-fold': { TLW.fold.has(tid) ? TLW.fold.delete(tid) : TLW.fold.add(tid); renderMe(); const f = $(`[data-act="tl-fold"][data-tid="${tid}"]`); if (f) f.focus(); break; }
+    case 'tl-shift': { const d = +b.dataset.d; TLW.off = d ? TLW.off + d : 0; renderMe(); const f = $(`[data-act="tl-shift"][data-d="${d}"]`); if (f) f.focus(); break; }
+    case 'g-welcome': D.setPrefs({ welcomeVersion: 0, welcomeSeen: false }); welcome(); break;
+    case 'cl-reset': { const g = D.cardLayout.group; D.setPrefs({ cardLayout: Object.assign(JSON.parse(JSON.stringify(C.CARD_LAYOUT_DEFAULTS)), { group: g }), cards: { mode: 'collapsed', flipped: [] } }); S.flip.clear(); renderBoard(); renderMe(); toast('Card layout reset. Tasks Grouping is kept as it was.'); break; }
+    case 'wl-next': WL = 1; drawWelcome(true); break;
+    case 'wl-back': WL = 0; drawWelcome(true); break;
+    case 'wl-later': case 'wl-done': welcomeDone(); break;
+    case 'wl-urg': welcomeDone(); openPage('pg-urgency'); break;
+    case 'wl-cl': welcomeDone(); openPage('pg-cards'); break;
+    case 'ntc': {
+      const v = b.dataset.v, n = D.notices.find(x => x.id === id); if (!n) { unnote('n-ntc-' + id); break; }
+      if (v === 'block' && !(await confirmDlg({ title: `Block ${n.inviter_name || 'them'}?`, body: `You leave “${n.target_name}” and will not see shares or invitations from ${n.inviter_name || 'them'} again.`, yes: 'Block', no: 'Cancel' }))) break;
+      const r = await D.answerNotice(id, v); if (r.ok) { unnote('n-ntc-' + id); if (r.msg) toast(r.msg + '.'); else toast(`${n.target_name} is on your lists.`); } else said(r);
+      renderAll(); break;
+    }
+    case 'inst-dismiss': store.set(INST_KEY, 'dismissed'); unnote('n-install'); break;
+    case 'inst-android': await doInstall(); reMe(); break;
+    default: break;
+  }
+}
+
+/* ---------- start: splash, then the session, the gate and the board ---------- */
 async function boot() {
   const r = await D.start();
   if (r.state === 'signedin') return afterSignIn();
