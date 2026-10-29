@@ -71,10 +71,10 @@ test('mergeTagDefs: new tag, rename, delete, unknown tag list', () => {
 test('prefs: cardLayout and welcomeSeen, defaults are today\'s card', () => {
   const p = C.prefsFromRow(null);
   assert.equal(p.welcomeSeen, false);
-  assert.deepEqual(p.cardLayout, { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, source: false, group: false, priority: true, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 }, 'round 4 adds source, off; task links add group (off), priority, waiting, progress');
-  const q = C.prefsFromRow({ welcomeSeen: true, cardLayout: { owner: true, number: 'yes', tags: 'lists', tagLists: ['TL1', 'gone'], autoCollapse: 250, extra: 1 } }, { tagListIds: ['TL1'] });
+  assert.deepEqual(p.cardLayout, { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false, group: false, priority: true, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 }, 'round 4 adds source, off; task links add group (off), priority, waiting, progress; the edit window drops owner');
+  const q = C.prefsFromRow({ welcomeSeen: true, cardLayout: { created: true, owner: true, number: 'yes', tags: 'lists', tagLists: ['TL1', 'gone'], autoCollapse: 250, extra: 1 } }, { tagListIds: ['TL1'] });
   assert.equal(q.welcomeSeen, true);
-  assert.equal(q.cardLayout.owner, true); assert.equal(q.cardLayout.number, true, 'a wrong type keeps the default');
+  assert.equal(q.cardLayout.created, true); assert.equal(q.cardLayout.owner, undefined, 'owner is no longer a field'); assert.equal(q.cardLayout.number, true, 'a wrong type keeps the default');
   assert.deepEqual(q.cardLayout.tagLists, ['TL1'], 'a tag list that no longer exists is dropped');
   assert.equal(q.cardLayout.autoCollapse, 250); assert.equal(q.cardLayout.extra, undefined);
   assert.equal(C.readCardLayout({ autoCollapse: -1, tags: 'some' }).autoCollapse, 100);

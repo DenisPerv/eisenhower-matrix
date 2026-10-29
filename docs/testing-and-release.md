@@ -37,6 +37,7 @@ node test/e2e.mjs --env <env file> --out <dir> [--group auth,data,sync,archive,e
 - Writes stay in the `_selftest` list and test lists the run creates and archives; both people's preferences are put back at the end.
 - Group `ui` includes the parity check of the review API: for the weeks picked in the Review, `rpc/review_report` as the same person must give the same ids, kinds and quadrants as the page, in under 2 s (timings in the report's "Review API" table).
 - Group `links` makes a parent tree and a predecessor chain in `_selftest` through the task window and `rpc/link_items`, checks the badges, Group by parent and the Timeline (tree, arrows, fold), and draws 200 more rows in under 100 ms (report table "Timeline render").
+- The Edit window checks (2026-10-29, groups `data` and `ui`): no Quadrant field (a quadrant moves by a card drag), no "Who it is for", no archived tag list in Card layout, the info line on the formatting row at 1440 and under it at 390 without horizontal scroll; screenshots `ui-edit-window-*`.
 - `--url` runs the same checks against a hosted copy; `--access-env` adds the Access service-token headers to that origin only.
 
 ## Branches and release

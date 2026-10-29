@@ -1015,6 +1015,13 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 /* round 3, A7: a compact title (wraps to two lines at most, smaller type), who the task is for */
 .rt.one{min-height:0;white-space:normal;overflow-y:auto;max-height:calc(2 * 1.35em + 14px);padding:6px 10px;font:500 15px/1.35 var(--ui)}
 .fwho{margin:6px 0 0;font:400 12.5px/1.4 var(--font);color:var(--ink3)}
+/* edit window, item 2: the formatting buttons and the read-only facts share one row; the facts sit right and wrap under the buttons */
+.fbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px var(--s3);margin-top:var(--s3)}
+.fbar .fmt{margin-top:0}
+.fbar .fwho{margin:0 0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:4px 12px;font-variant-numeric:tabular-nums}
+.fbar .fwho:only-child{margin-left:0;justify-content:flex-start}
+.fref{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;background:var(--well);border:1px solid var(--hair);border-radius:var(--r);color:var(--ink2);font-weight:600}
+@media (max-width:519px){.fbar .fwho{margin-left:0;justify-content:flex-start;flex-basis:100%}}
 /* round 3 P1: the task window is wider (U5); List, Quadrant and End share a row; Save stays in view at the bottom */
 dialog.tk{width:min(720px,94vw)}
 .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 var(--s4)}
@@ -1284,9 +1291,9 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   // (only the tag lists in tagLists) or 'off'; autoCollapse: an expanded-mode card whose description is longer starts collapsed (0 = off).
   // Round 4: source = the category badge on cards and Sources in the task window (off by default; never with one list selected)
   // task links: group (children under their parent; off by default), priority (P0-P5), waiting (open predecessors), progress (n/m)
-  const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, source: false,
+  const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
     group: false, priority: true, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
-  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'owner', 'source', 'group', 'priority', 'waiting', 'progress'];
+  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'priority', 'waiting', 'progress'];
   // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
     cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, tagListOrder: [], tagListsOpen: {} };
@@ -1365,8 +1372,12 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     if (l.end && t.deadline) out.push({ k: 'end', at: t.deadline });
     if (l.created && t.createdAt) out.push({ k: 'created', at: t.createdAt });
     if (l.creator && t.createdBy) out.push({ k: 'creator', id: t.createdBy });
-    if (l.owner && t.ownerId) out.push({ k: 'owner', id: t.ownerId });
     return out;
+  }
+  // edit window, item 4: the tag lists Card layout offers - live (never archived) and not hidden; mine first, then by sort
+  function cardLayoutTagLists(tagLists, meId) {
+    return Object.values(tagLists || {}).filter(l => l && !l.hidden && !l.archived_at)
+      .sort((a, b) => (a.owner_id !== meId) - (b.owner_id !== meId) || (a.sort || 0) - (b.sort || 0));
   }
   // round 4, item 3: where an item came from (its category badge, Sources) shows only when switched on and the board shows All lists
   const showSource = (layout, listSelected) => !!(layout || CARD_LAYOUT_DEFAULTS).source && !listSelected;
@@ -2112,7 +2123,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
@@ -2964,7 +2975,7 @@ function cardHtml(t, q, g) {
 // the faded parent of children whose parent is in another quadrant (not a card: no drag, not counted); it opens the parent
 const ghostHtml = p => '<button type="button" class="lk-ghost ' + p.q + '" data-open="' + p.id + '" aria-label="Parent: ' + esc(plain(p.title)) + ', in ' + QN[p.q] + '"><span aria-hidden="true">↑</span><span class="t">' + mdInline(p.title) + '</span><span class="gq">' + QN[p.q] + '</span></button>';
 let RLX = null; // the link index of the current render (linkIx)
-const factText = f => ({ end: 'End ' + ymd(f.at), created: 'Created ' + ymd(f.at), creator: 'By ' + displayName(f.id), owner: 'For ' + displayName(f.id) })[f.k];
+const factText = f => ({ end: 'End ' + ymd(f.at), created: 'Created ' + ymd(f.at), creator: 'By ' + displayName(f.id) })[f.k];
 
 const archivedIn = () => all().filter(t => t.doneAt && inList(t));
 const fmtDay = x => ymd(x).slice(0, 10);
@@ -3386,30 +3397,31 @@ function openTask(id, quad, opts) {
   const dl = dr.deadline !== undefined ? dr.deadline : t && t.deadline;
   const tagKey = a => JSON.stringify(a.slice().sort());
   // what the window showed: Save sends only what the person changed, and checks it against changes made meanwhile
-  const shown = t ? { version: t.version, title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q,
+  const shown = t ? { version: t.version, title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list,
     start: t.start ? t.start.getTime() : null, priority: Number.isInteger(t.priority) ? t.priority : null } : null;
   const dtl = d => d ? new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '';
   const ro = editable ? '' : ' disabled';
   const src = C.showSource(cardLayout, st.list !== 'all'); // round 4, item 3: Sources follow Card layout's Source switch
-  const wfacts = t ? (cardLayout.number ? [refText(t)] : []).concat(C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText)) : [];
+  // edit window, item 2: the number (a chip shaped like the formatting buttons), Created and By on the formatting row; the hidden
+  // separators keep the line readable as one sentence for a screen reader
+  const wnum = t && cardLayout.number ? refText(t) : '', wrest = t ? C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText) : [];
+  const whoHtml = wnum || wrest.length ? '<p class="fwho" id="fwho">' + (wnum ? ['<span class="fref">' + esc(wnum) + '</span>'] : []).concat(wrest.map(x => '<span>' + esc(x) + '</span>')).join('<span class="sr"> · </span>') + '</p>' : '';
+  const fmtHtml = editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '';
   const dlg = document.createElement('dialog');
   dlg.className = 'tk';
   dlg.innerHTML = '<form method="dialog"><strong>' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</strong>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
-    (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list, quadrant and text.</p>' : '') +
+    (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
-    (editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '') +
+    (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
     '<div class="flabel" id="fn-l">Description</div><div class="rt" id="fn" contenteditable="' + editable + '" role="textbox" aria-multiline="true" aria-labelledby="fn-l">' + mdToHtml(dr.notes !== undefined ? dr.notes : t ? t.notes : '') + '</div>' +
     // round 3 P1, U5: the wider window puts List, Quadrant and End on one row (stacked on a phone)
     '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
-    (t ? '<div><label>Quadrant<select id="fq"' + ro + '>' + QS.map(q => '<option value="' + q + '"' + (t.q === q ? ' selected' : '') + '>' + q + ' ' + QN[q] + '</option>').join('') + '</select></label></div>' : '') +
     '<div><label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div></div></div>' +
     // task links: Start (the Timeline's bar starts here) and Priority (0-5, higher = more important; deriveQuadrant reads it)
     '<div class="frow"><div><label>Start<input id="fsd" type="datetime-local"' + ro + ' value="' + dtl(start) + '"></label><div class="err" id="fsde" aria-live="polite"></div></div>' +
     '<div><label>Priority<select id="fp"' + ro + ' aria-describedby="fp-h"><option value="">—</option>' + [0, 1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (prio === n ? ' selected' : '') + '>P' + n + '</option>').join('') + '</select></label>' +
     '<div class="s-hint" id="fp-h">Higher = more important</div></div></div>' +
-    // round 4, item 5: the read-only facts follow Card layout (number, created, who created it, who it is for); End is a field
-    (t && wfacts.length ? '<p class="fwho" id="fwho">' + wfacts.map(esc).join(' · ') + '</p>' : '') +
     // U1, U6, U8: no "Tags" label; a search box over the groups; the groups scroll inside a box of about 40% of the window's height
     '<div class="tagpick"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' +
     '<div class="tagbox" role="group" aria-label="Tags"></div></div>' +
@@ -3709,26 +3721,26 @@ function openTask(id, quad, opts) {
     const pv = dlg.querySelector('#fp').value, priority = pv === '' ? null : Number(pv);
     if (endV && startD && new Date(endV) < startD) { dlg.querySelector('#fsde').textContent = 'Start is after End.'; bad = true; }
     if (bad) { e.preventDefault(); (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
-    const fq = t ? dlg.querySelector('#fq').value : (quad || 'B');
+    // edit window, item 1: no Quadrant field; the window keeps the quadrant it has (a new task: the quadrant whose + was clicked)
+    const fq = t ? t.q : (quad || 'B');
     const deadline = endV ? new Date(endV) : null;
     const picked = [...chosen], newNames = picked.filter(isNew).map(x => ({ list: newList(x), name: newName(x) }));
     const save = created => {
       const tags = [...new Set(untouched().concat(picked.filter(x => !isNew(x)), created))];
       if (t) {
-        const now = { title, notes, tags: tagKey(tags), deadline: deadline ? deadline.getTime() : null, list, q: fq, start: startD ? startD.getTime() : null, priority };
+        const now = { title, notes, tags: tagKey(tags), deadline: deadline ? deadline.getTime() : null, list, start: startD ? startD.getTime() : null, priority };
         const mine = Object.keys(now).filter(k => now[k] !== shown[k]);
-        const cur = { title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q,
+        const cur = { title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list,
           start: t.start ? t.start.getTime() : null, priority: Number.isInteger(t.priority) ? t.priority : null };
         const theirs = t.version !== shown.version ? mine.filter(k => cur[k] !== shown[k] && cur[k] !== now[k]) : [];
         if (theirs.length) {
-          const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', q: 'quadrant', start: 'start', priority: 'priority' };
+          const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', start: 'start', priority: 'priority' };
           setTimeout(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline, start: startD, priority }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
           return;
         }
-        const moved = mine.includes('list'), fromQ = t.q;
-        const key = mine.includes('q') || moved ? topKey(list, fq) : t.sortKey;
+        const moved = mine.includes('list');
+        const key = moved ? topKey(list, fq) : t.sortKey;
         const r = edit(t, x => {
-          if (mine.includes('q')) { if (URGENT[fq] !== URGENT[fromQ]) x.pin = URGENT[fq]; x.qStored = fq; }
           if (mine.includes('title')) x.title = title;
           if (mine.includes('notes')) x.notes = notes;
           if (mine.includes('tags')) x.tags = tags;
@@ -4083,9 +4095,9 @@ function openSettings(kind) {
 // round 3, adjustment 13: Card layout (prefs.cardLayout and cards.mode). Defaults are today's card.
 function openCardLayout() {
   const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
-  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', owner: 'Who it is for', source: 'Source (category, Sources)',
+  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', source: 'Source (category, Sources)',
     group: 'Subtasks under their parent', priority: 'Priority (P0-P5)', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
-  const lists = Object.values(TAG_LISTS).filter(l => !l.hidden).sort((a, b) => (a.owner_id !== (me && me.id)) - (b.owner_id !== (me && me.id)) || (a.sort || 0) - (b.sort || 0));
+  const lists = C.cardLayoutTagLists(TAG_LISTS, me && me.id); // edit window, item 4: archived tag lists are not offered
   const radio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' +
     '<fieldset><legend>Cards open</legend>' + radio('cl-mode', 'collapsed', 'Collapsed', st.cardMode === 'collapsed') + radio('cl-mode', 'expanded', 'Expanded', st.cardMode === 'expanded') + '</fieldset>' +
