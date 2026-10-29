@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TasksDashboard read API
-  version: "2026-10-28"
+  version: "2026-10-29"
   summary: The weekly review report and the read endpoints of TasksDashboardDB (Supabase, PostgREST).
   description: |
     Read endpoints of the database behind TasksDashboard. Every call runs as a signed-in login: Supabase Auth issues the
@@ -9,7 +9,9 @@ info:
     come back. A login sees exactly what the app shows it: its own lists, lists shared with it, and for household members
     the household's lists. `anon` (the publishable key alone, no token) reads nothing.
 
-    Writes (create, update, done, cancel) are not part of this document: they stay with the app and the CLI (`cli/`).
+    Writes (create, update, done, cancel) are not part of this document: they stay with the app and the CLI (`cli/`). The
+    one exception is task links (`db/018_task_links.sql`): `rpc/link_items` and `rpc/unlink_items` are the only way to change
+    them, so scripts that link tasks call them too.
     Google sign-in is browser-only (PKCE redirect); scripts sign in with a password login (`/auth/v1/token`).
 
     How to call it, with curl examples and error codes: `docs/api/README.md`. Database functions: `docs/database.md`.
@@ -30,6 +32,8 @@ tags:
     description: the weekly review as data (`db/016_review_report.sql`)
   - name: rpc
     description: other read RPCs the app uses
+  - name: links
+    description: task links, predecessor (depends_on) and parent (`db/018_task_links.sql`)
   - name: tables
     description: plain table reads through PostgREST (RLS applies)
 paths:
@@ -364,6 +368,121 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Item" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/item_links:
+    get:
+      tags: [links]
+      operationId: get_item_links
+      summary: Links between tasks the caller can read on both ends
+      description: |
+        Rows are stored with from_item = the dependent side: kind depends_on means from_item comes after to_item (its
+        predecessor); kind parent means from_item is a child of to_item (one live parent per task). relates and duplicates
+        are written by HomeOS skills and not shown in the app. RLS returns a link only when the caller can read both items,
+        so a link to something the caller cannot read never shows. Removal is soft (removed_at); filter removed_at=is.null
+        for live links, or read changed_at=gte.<time> to follow changes.
+      parameters:
+        - { $ref: "#/components/parameters/select" }
+        - name: kind
+          in: query
+          schema: { type: string }
+          example: in.(depends_on,parent)
+        - name: removed_at
+          in: query
+          schema: { type: string }
+          example: is.null
+        - name: from_item
+          in: query
+          schema: { type: string }
+          example: eq.<item-uuid>
+        - name: changed_at
+          in: query
+          schema: { type: string }
+          example: gte.2026-10-29T00:00:00Z
+      responses:
+        "200":
+          description: link rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    from_item: { type: string, format: uuid }
+                    to_item: { type: string, format: uuid }
+                    kind: { type: string, enum: [depends_on, parent, relates, duplicates] }
+                    created_by: { type: [string, "null"], format: uuid }
+                    created_at: { type: string, format: date-time }
+                    changed_at: { type: string, format: date-time }
+                    removed_at: { type: [string, "null"], format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/rpc/link_items:
+    post:
+      tags: [links]
+      operationId: link_items
+      summary: Link two tasks (predecessor or parent), or bring back a removed link
+      description: |
+        `db/018_task_links.sql`, security definer. The caller needs edit rights on at least one end (editor and up, or the
+        contributor who made that item) and read rights on both. p_kind depends_on: p_from comes after p_to. p_kind parent:
+        p_from becomes a child of p_to and its old parent link is removed in the same call. Refused: a loop (through live
+        links of the same kind), a deleted task, a task in an archived list, more than 200 links on a task. Soft: an open
+        predecessor never blocks anything.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_from, p_to, p_kind]
+              properties:
+                p_from: { type: string, format: uuid }
+                p_to: { type: string, format: uuid }
+                p_kind: { type: string, enum: [depends_on, parent] }
+      responses:
+        "200":
+          description: '"ok"'
+          content:
+            application/json:
+              schema: { type: string, enum: [ok] }
+        "400":
+          description: "22023: a loop, a task linked to itself, a deleted task, a bad kind"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostgrestError" }
+        "403":
+          description: "42501: not allowed (the text never names an item), or a task in an archived list"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostgrestError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /rest/v1/rpc/unlink_items:
+    post:
+      tags: [links]
+      operationId: unlink_items
+      summary: Remove a link (soft)
+      description: |
+        `db/018_task_links.sql`, security definer. The caller needs edit rights on either end, or must be the one who made
+        the link, and read rights on both. Sets removed_at; a link that is not there answers "none".
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [p_from, p_to, p_kind]
+              properties:
+                p_from: { type: string, format: uuid }
+                p_to: { type: string, format: uuid }
+                p_kind: { type: string, enum: [depends_on, parent, relates, duplicates] }
+      responses:
+        "200":
+          description: '"ok", or "none" when there was no such link'
+          content:
+            application/json:
+              schema: { type: string, enum: [ok, none] }
+        "403":
+          description: "42501: not allowed, or a task in an archived list"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostgrestError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 components:
   securitySchemes:
     publishableKey:
@@ -493,7 +612,8 @@ components:
         status: { type: string }
         quadrant: { type: [string, "null"], enum: [A, B, C, D, null] }
         urgent_pin: { type: [boolean, "null"] }
-        priority: { type: [integer, "null"] }
+        priority: { type: [integer, "null"], minimum: 0, maximum: 5, description: "higher = more important" }
+        start_at: { type: [string, "null"], format: date-time }
         due_at: { type: [string, "null"], format: date-time }
         completed_at: { type: [string, "null"], format: date-time }
         owner_id: { type: [string, "null"], format: uuid }

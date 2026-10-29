@@ -13,9 +13,9 @@ Run the files in the SQL editor (or with an admin tool), each file whole, in thi
 | 3 | `003_rls.sql`, `011_multiuser_rls.sql` | grants for 005-010; 011 replaces some of 003's household policies, so it always runs after 003 |
 | 4 | `012_round3.sql` | round 3; it ends with a policy block (`-- >>> 012 policies` … `-- <<< 012 policies`) that replaces 011's tag policies |
 | 5 | `003`, `011`, the 012 policy block | as after every new file |
-| 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql` | KPI history RPC, urgency settings by app, access requests, the review report API |
+| 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql` | KPI history RPC, urgency settings by app, access requests, the review report API, the chat bot's scope, task links |
 | 7 | `003`, `011`, the 012 policy block | again |
-| 8 | `900_selftest.sql` … `904_selftest_review_report.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
+| 8 | `900_selftest.sql` … `906_selftest_task_links.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
 
 Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`.
 
@@ -53,12 +53,21 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 | sharing | `share_list`, `share_tag_list`, `my_invitations`, `accept_invite`, `decline_invite`, `revoke_invite`, `answer_shared_notice`, `visible_profiles` | 010/012 |
 | tag lists | `create_tag_list`, `set_default_tag_list`, `set_tag_list_archived`, `set_tag_list_hidden`, `leave_tag_list`, `tag_list_people`, `move_tags`, `merge_tags`, `merge_tag_lists` | 010/012 |
 | settings | `urgency_settings(p_profile)` | 014 |
+| task links | `link_items(p_from, p_to, p_kind)`, `unlink_items(p_from, p_to, p_kind)`; the trigger `item_links_guard` and its helper `link_would_loop` (no execute for anyone) | 018 |
 | reports | `kpi_events(p_lists)` (invoker), `review_report(p_weeks, p_lists, p_now)` (invoker), its pure helper `review_quadrant` | 013/016 |
 | access requests | `request_access`, `my_access_request`, `access_requests`, `access_request_decided` | 015 |
 | keep-alive | `keepalive`, `keepalive_status` | 002/010 |
 | helpers used by policies | `has_list_role`, `has_item_role`, `has_tag_list_role`, `has_tag_role`, `can_edit_item`, `can_use_category`, `is_household`, `is_human`, `is_agent`, `my_kind`, `my_verified_emails` | 002/010 |
 
 `review_report` and `kpi_events` are **security invoker**: they run with the caller's rights, so RLS decides exactly as for a REST read, and they need no access checks of their own. The read endpoints and the review report are described in [api/openapi.yaml](api/openapi.yaml).
+
+## Task links
+
+`item_links` (`db/001`, extended by `018`) keeps two kinds the app shows, both with `from_item` = the dependent side: `depends_on` (from comes after to, its predecessor; soft: nothing is refused for an open predecessor) and `parent` (from is a child of to; one live parent per task, a unique partial index). `relates` and `duplicates` are written by HomeOS skills and not shown; `blocks` rows were turned into `depends_on` and new ones are refused, so one direction is stored. Removal is soft (`removed_at`), and `changed_at` moves on every write so a poll sees adds and removals.
+
+- **Rules for every write path** (trigger `item_links_guard`, security definer): no loop through live links of the same kind (`link_would_loop`, a recursive walk), no deleted end, no end in an archived list, at most 200 live links on a task. Texts name no item.
+- **Rights** (`link_items`, `unlink_items`): edit rights on at least one end (`can_edit_item`: editor and up, or the contributor who made that item) and read on both; removing is also allowed to the one who made the link. A parent link replaces the old parent in the same call. `links_read` (`011`, read on both ends) is unchanged, so a link to an item someone cannot read never reaches them, not even as a count.
+- **Direct REST** (`003`: select, insert, delete for `authenticated`): an insert still needs `links_add` and passes the trigger; agents should use the RPCs so removals are soft and polled.
 
 ## Limits
 

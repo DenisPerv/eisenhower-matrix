@@ -18,8 +18,11 @@ The database behind TasksDashboard is a Supabase project. Its REST API (PostgRES
 | `/rest/v1/rpc/my_invitations` | POST | open invitations addressed to the caller (`db/012`) |
 | `/rest/v1/lists` | GET | the lists the caller can read |
 | `/rest/v1/items` | GET | the items of those lists, with PostgREST filters |
+| `/rest/v1/item_links` | GET | links between tasks the caller can read on both ends: `depends_on` (from comes after to) and `parent` (from is a child of to) (`db/018`) |
+| `/rest/v1/rpc/link_items` | POST | link two tasks, predecessor or parent; a parent link replaces the old parent (`db/018`) |
+| `/rest/v1/rpc/unlink_items` | POST | remove a link (soft, `removed_at`) (`db/018`) |
 
-Writes are not part of this API description: the app and the CLI (`cli/tasks.mjs`) write, with the rules in `docs/database.md`.
+Writes are not part of this API description: the app and the CLI (`cli/tasks.mjs`) write, with the rules in `docs/database.md`. The exception is task links: `link_items` and `unlink_items` are the only way to change them, so they are described here.
 
 ## Who can call it
 
@@ -124,16 +127,31 @@ curl -s "$TD_URL/rest/v1/items?select=id,num,title,status,due_at,quadrant&list_i
 
 `items` and `lists` answer at most 1000 rows; page with `limit` and `offset` (or a `Range: 0-999` header).
 
+Task links (`db/018`): read the live ones, then make one task come after another and give it a parent:
+
+```bash
+curl -s "$TD_URL/rest/v1/item_links?select=from_item,to_item,kind&removed_at=is.null&kind=in.(depends_on,parent)" -H "apikey: $TD_KEY" -H "Authorization: Bearer $TOKEN"
+# <later-uuid> comes after <earlier-uuid>
+curl -s "$TD_URL/rest/v1/rpc/link_items" -H "apikey: $TD_KEY" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"p_from":"<later-uuid>","p_to":"<earlier-uuid>","p_kind":"depends_on"}'
+# <child-uuid> becomes a child of <parent-uuid> (its old parent link goes)
+curl -s "$TD_URL/rest/v1/rpc/link_items" -H "apikey: $TD_KEY" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"p_from":"<child-uuid>","p_to":"<parent-uuid>","p_kind":"parent"}'
+curl -s "$TD_URL/rest/v1/rpc/unlink_items" -H "apikey: $TD_KEY" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"p_from":"<child-uuid>","p_to":"<parent-uuid>","p_kind":"parent"}'
+```
+
 ## Errors
 
 | Status | Code | When |
 |---|---|---|
-| 400 | `22023` | `review_report`: a bad week key, no week, more than 26 weeks or more than 50 lists |
+| 400 | `22023` | `review_report`: a bad week key, no week, more than 26 weeks or more than 50 lists; `link_items`: a loop ("this link would make a loop"), a task linked to itself, a deleted task, a bad kind |
 | 400 | `invalid_credentials` | `/auth/v1/token`: wrong email or password |
 | 400 | `refresh_token_already_used`, `refresh_token_not_found` | a refresh token used again after the reuse interval, or unknown: sign in again |
 | 401 | `PGRST301`, `PGRST303` | no, expired or invalid access token: refresh and retry |
 | 401 | `42501` | no token at all: `anon` may not execute the function or read the table |
-| 403 | `42501` | `urgency_settings` for someone outside your household |
+| 403 | `42501` | `urgency_settings` for someone outside your household; `link_items` / `unlink_items`: "not allowed" (no rights on either end, or no read on one; the text never names an item) or "this list is archived" |
+| 400 | `54000` | `link_items`: more than 200 links on one task |
 | 429 | `over_request_rate_limit` | too many sign-ins: wait a minute |
 
 PostgREST errors are JSON `{ code, message, details, hint }`; Auth errors are `{ code, error_code, msg }`.

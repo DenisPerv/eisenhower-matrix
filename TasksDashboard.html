@@ -82,10 +82,10 @@
   --toast-bg:rgba(238,237,255,.92);--toast-ink:#16142E;
 }}
 /* each quadrant element carries its own colour as --c */
-[data-q="A"],.card.A,.tl-bar.A{--c:var(--qa);--c-on:var(--qa-on)}
-[data-q="B"],.card.B,.tl-bar.B{--c:var(--qb);--c-on:var(--qb-on)}
-[data-q="C"],.card.C,.tl-bar.C{--c:var(--qc);--c-on:var(--qc-on)}
-[data-q="D"],.card.D,.tl-bar.D{--c:var(--qd);--c-on:var(--qd-on)}
+[data-q="A"],.card.A,.tl-bar.A,.lk-ghost.A,.tl-row.A{--c:var(--qa);--c-on:var(--qa-on)}
+[data-q="B"],.card.B,.tl-bar.B,.lk-ghost.B,.tl-row.B{--c:var(--qb);--c-on:var(--qb-on)}
+[data-q="C"],.card.C,.tl-bar.C,.lk-ghost.C,.tl-row.C{--c:var(--qc);--c-on:var(--qc-on)}
+[data-q="D"],.card.D,.tl-bar.D,.lk-ghost.D,.tl-row.D{--c:var(--qd);--c-on:var(--qd-on)}
 
 /* base: aurora + grain behind everything */
 *{box-sizing:border-box}
@@ -308,21 +308,56 @@ html:not(.settled) .rail{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
 .ar-act [data-del]:hover{background:var(--danger-bg);border-color:var(--danger)}
 .empty{padding:32px;text-align:center;color:var(--ink3);font:italic 500 20px var(--serif)}
 
-/* timeline */
+/* timeline (task links): one row per task; a fixed day width (--dw) so bars, the today line and the arrow layer share px */
 #tl-prev,#tl-next{width:32px;padding:0;border-radius:50%}
-.tl{overflow-x:auto;background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);padding:6px 16px 8px}
-.tl-row{display:grid;align-items:center;min-height:38px;border-bottom:1px solid var(--hair)}
-.tl-row:last-child{border-bottom:0}
-.tl-head{min-height:34px}
-.tl-load{background:var(--well);margin:0 -16px;padding:0 16px}
-.tl-name{padding-right:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:500}
+.tl{overflow-x:auto;background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);padding:6px 0 0;overscroll-behavior-x:contain}
+.tl-in{width:var(--tlw);min-width:100%}
+.tl-head,.tl-load,.tl-row{display:grid;grid-template-columns:var(--nw) 1fr;align-items:center}
+.tl-head{min-height:34px;border-bottom:1px solid var(--hair);position:sticky;top:0}
+.tl-days{display:grid;grid-template-columns:repeat(auto-fill,var(--dw))}
 .tl-d{text-align:center;font:12px/1 var(--mono);color:var(--ink3);padding:9px 0;font-variant-numeric:tabular-nums}
-.tl-d.we{background:var(--well)}
-.tl-d.td{font-weight:700;color:#FFFFFF;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:10px;box-shadow:0 0 22px -4px var(--glow)}
+.tl-d.we{color:color-mix(in srgb,var(--ink3) 70%,transparent)}
+.tl-d.td{font-weight:700;color:#FFFFFF;background:var(--accent);border-radius:var(--r-sm);box-shadow:0 0 18px -4px var(--glow)}
 .tl-d.over{font-weight:700;color:var(--danger-ink)}
-.tl-bar{height:16px;min-height:16px;border-radius:999px;padding:0;border:0;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#fff),var(--c));box-shadow:0 0 16px -3px var(--c)}
-.tl-bar:hover{background:var(--c);transform:scaleY(1.15)}
+.tl-body{position:relative}
+.tl-cols{position:absolute;left:var(--nw);top:0;bottom:0;right:0;pointer-events:none}
+.tl-we{position:absolute;top:0;bottom:0;background:var(--well)}
+.tl-now{position:absolute;top:0;bottom:0;width:0;border-left:1.5px solid color-mix(in srgb,var(--accent) 70%,transparent)}
+.tl-row{position:relative;height:34px;border-bottom:1px solid var(--hair)}
+.tl-row:hover{background:color-mix(in srgb,var(--c) 6%,transparent)}
+.tl-name{display:flex;align-items:center;gap:2px;min-width:0;height:100%;padding:0 10px 0 calc(8px + var(--ind,0) * 16px);border-right:1px solid var(--hair);position:sticky;left:0;z-index:2;background:var(--solid)}
+.tl-chev,.tl-chev-sp{flex:none;width:22px;height:22px;min-height:22px}
+.tl-chev{padding:0;border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink3)}
+.tl-chev:hover{background:var(--hover);color:var(--ink)}
+.tl-chev .ic{width:14px;height:14px}
+.tl-t{display:block;flex:1;min-width:0;min-height:28px;padding:0 4px;border:0;background:transparent;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 13px/28px var(--ui);color:var(--ink)}
+.tl-t .k{font:600 11.5px var(--mono);color:var(--ink3)}
+.tl-row.parent .tl-t{font-weight:650}
+.tl-row.closed .tl-t{color:var(--ink3);text-decoration:line-through}
+.tl-track{position:relative;height:100%}
+.tl-bar{position:absolute;top:9px;height:16px;min-height:16px;padding:0;border:0;border-radius:var(--r-sm);background:var(--c);box-shadow:0 0 14px -4px var(--c);z-index:1}
+.tl-bar:hover{filter:brightness(1.08);box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 35%,transparent),0 0 16px -3px var(--c)}
+.tl-bar.cut-l{border-top-left-radius:0;border-bottom-left-radius:0}
+.tl-bar.cut-r{border-top-right-radius:0;border-bottom-right-radius:0}
 .tl-bar.overdue{outline:2px solid var(--danger);outline-offset:2px}
+.tl-row.closed .tl-bar{background:var(--hair2);box-shadow:none}
+.tl-sum{position:absolute;bottom:4px;height:3px;border-radius:2px;background:color-mix(in srgb,var(--c) 55%,transparent);pointer-events:none}
+.tl-sum::before,.tl-sum::after{content:"";position:absolute;bottom:0;width:2px;height:7px;background:inherit;border-radius:1px}
+.tl-sum::before{left:0}.tl-sum::after{right:0}
+.tl-nd{position:absolute;left:8px;top:9px;font:italic 400 12px var(--ui);color:var(--ink3)}
+.tl-off{position:absolute;top:7px;min-height:20px;padding:0 6px;border:1px dashed var(--hair2);border-radius:var(--r-sm);background:transparent;font:11.5px var(--mono);color:var(--ink3)}
+.tl-off.l{left:4px}.tl-off.r{right:4px}
+.tl-links{position:absolute;left:var(--nw);top:0;overflow:visible;pointer-events:none;z-index:1}
+.tl-links path{fill:none;stroke:var(--ink2);stroke-width:1.5;stroke-linejoin:round}
+.tl-links marker path{fill:var(--ink2);stroke:none}
+.tl-links path.late{stroke:var(--danger);stroke-dasharray:4 3}
+.tl-links marker.late path{fill:var(--danger)}
+.tl-key{display:inline-flex;align-items:center;gap:6px}
+.tl-key-a{display:inline-block;width:18px;height:0;border-top:1.5px solid var(--ink2);margin-left:6px}
+.tl-key-a.late{border-top:1.5px dashed var(--danger)}
+.tl-load{background:var(--well);min-height:34px}
+.tl-load .tl-name{background:var(--well)}
+@media (max-width:700px){.tl-key{display:none}}
 
 /* dialogs: deep glass */
 dialog{border:1px solid var(--rim);border-radius:24px;background:var(--glass3);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);color:var(--ink);width:min(520px,92vw);max-height:90vh;padding:22px 24px;box-shadow:var(--depth),0 40px 100px -30px var(--glow)}
@@ -588,10 +623,6 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .ar{border-radius:var(--r-xl);box-shadow:var(--depth)}
 .ar th{font:500 13px var(--ui);letter-spacing:.02em;border-bottom:1px solid var(--hair2)}
 .ar-act [data-restore]{border-radius:var(--r)}
-.tl{border-radius:var(--r-xl)}
-.tl-d.td{border-radius:var(--r-sm);background:var(--accent);box-shadow:0 0 18px -4px var(--glow)}
-.tl-d.we{background:repeating-linear-gradient(90deg,transparent 0 3px,var(--well) 3px 4px)}
-.tl-bar{border-radius:var(--r-sm);background:var(--c);height:14px;min-height:14px}
 #tl-prev,#tl-next{border-radius:var(--r)}
 /* round 3, adjustments 8 and 9: Weekly review as a rail view. Weeks are instrument tiles under an orange week line (--week);
    this week carries a "now" tag, picked weeks the accent underline. Tasks by quadrant (its colour as a top rule), then list. */
@@ -948,6 +979,27 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .card .more:hover{text-decoration:underline}
 .tbs{display:inline-flex;gap:4px;align-items:center}
 .tb{display:inline-flex;align-items:center;min-height:18px;padding:0 6px;border:1px solid var(--hair2);border-radius:var(--r-sm);font:500 11.5px/1 var(--ui);color:var(--ink2);white-space:nowrap;letter-spacing:.01em}
+/* task links on cards: priority, waiting for open predecessors, a parent's progress (Card layout switches) */
+.tb.pr{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink3)}
+.tb.pr.hi{color:var(--ink);border-color:color-mix(in srgb,var(--c) 60%,transparent)}
+.tb.wt{border-style:dashed;border-color:color-mix(in srgb,var(--qc) 75%,transparent);color:var(--ink2)}
+.tb.wt .ws{display:none}
+@media (max-width:700px){.tb.wt .wl{display:none}.tb.wt .ws{display:inline}.card.lk-kid{margin-left:calc(var(--lk-d,1) * 12px)}.card.lk-kid::after{left:-9px;width:7px}}
+.tb.pg{position:relative;overflow:hidden;padding-bottom:1px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tb.pg i{position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,var(--c) var(--p),var(--hair) var(--p))}
+/* children under their parent (Card layout → Subtasks under their parent): indent per level, an elbow from the parent's
+   colour stripe; a faded copy of a parent that lives in another quadrant heads its children there */
+.qb{--lk-line:color-mix(in srgb,var(--ink3) 55%,transparent)}
+.card.lk-kid{margin-left:calc(var(--lk-d,1) * 18px)}
+.card.lk-kid::after{content:"";position:absolute;left:-12px;top:-9px;bottom:-9px;width:10px;border-left:1.5px solid var(--lk-line);pointer-events:none;
+  background:linear-gradient(var(--lk-line),var(--lk-line)) no-repeat 0 calc(50% + 1px)/100% 1.5px}
+.card.lk-kid.lk-last::after{bottom:auto;height:calc(50% + 9px);background:none;border-bottom:1.5px solid var(--lk-line);border-bottom-left-radius:7px}
+.lk-ghost{position:relative;display:flex;align-items:center;gap:8px;width:100%;min-height:30px;margin-top:7px;padding:2px 12px 2px 14px;border:1px dashed var(--hair2);border-radius:13px;
+  background:transparent;color:var(--ink3);font:500 13px var(--ui);text-align:left;cursor:pointer}
+.lk-ghost::before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--c);opacity:.45}
+.lk-ghost .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lk-ghost .gq{flex:none;font-size:11.5px}
+.lk-ghost:hover{color:var(--ink2);border-color:color-mix(in srgb,var(--c) 45%,transparent)}
 .tb.ai{border-color:color-mix(in srgb,var(--qc) 75%,transparent);background:color-mix(in srgb,var(--qc) 18%,transparent);color:var(--ink)}
 #listmenu{width:32px;padding:0;color:var(--ink3)}
 .who-am{padding:6px 10px 8px;color:var(--ink3);font:500 12px var(--ui)}
@@ -1226,7 +1278,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   // preferences v2, one row per person and app. List keys are list ids; flipped holds item ids.
   // round 3: workingDays and hoursPerDay are gone (never read); readSettings drops them from older rows
   const SETTINGS_DEFAULTS = { threshold: 50, windowDays: 7, doLimit: 5 };
-  // the rail's tabs are matrix, archive and review; timeline opens from the account menu ("Timeline (draft)")
+  // the rail's tabs are matrix, archive, review and timeline (task links: the Timeline left the account menu)
   const VIEWS = ['matrix', 'archive', 'review', 'timeline'];
   // round 3, adjustment 13: what a card shows (Account menu → Card layout). The defaults are today's card. tags: 'all', 'lists'
   // (only the tag lists in tagLists) or 'off'; autoCollapse: an expanded-mode card whose description is longer starts collapsed (0 = off).
@@ -2126,7 +2178,7 @@ const label = l => LIST[l] ? LIST[l].name : '?';
 const initial = l => (label(l)[0] || '?').toUpperCase();
 const all = () => tasks.filter(t => !t.deleted && LIST[t.list]);
 const find = id => tasks.find(t => t.id === id);
-const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), more: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
+const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), more: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2, tlCollapsed: new Set(), tlDayW: 0 };
 const THEMES = ['light', 'dark'];
 let toastTimer = null, lastUndo = null, dragId = null;
 const overdue = t => t.deadline && t.deadline < TODAY;
@@ -2872,16 +2924,22 @@ function gate(kind) {
 }
 
 // round 3: what a card shows follows Card layout (cardLayout); the grid keeps an empty cell where a part is switched off
-function cardHtml(t, q) {
+// g: the groupCards row when Card layout groups children under their parent (depth, last)
+function cardHtml(t, q, g) {
   const L = cardLayout;
   const expanded = C.cardExpanded(t, st.cardMode, L, st.flip);
   const editable = canDo('edit', t);
   const arrow = L.arrow ? '<button class="exp" data-flip="' + t.id + '" aria-expanded="' + expanded + '" aria-label="' + (expanded ? 'Collapse card' : 'Expand card') + '">' + (expanded ? I.chevD : I.chevR) + '</button>' : '<span></span>';
-  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (soon(t) ? ' soon' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '');
-  const open = '<div class="' + cls + '" data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
+  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (soon(t) ? ' soon' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '') + (g && g.depth ? ' lk-kid' + (g.last ? ' lk-last' : '') : '');
+  const open = '<div class="' + cls + '"' + (g && g.depth ? ' style="--lk-d:' + g.depth + '"' : '') + ' data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
   const meta = t.deadline ? '<span class="meta"' + (soon(t) ? ' title="Due soon: less than ' + settings.threshold + '% of the ' + settings.windowDays + '-day urgency window left"' : '') + '>' + rel(t) + (soon(t) ? '<span class="sr">, due soon</span>' : '') + '</span>' : '<span></span>';
   const done = editable ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>' : '<span></span>';
-  const badges = '<span class="tbs">' + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
+  // task links: P0-P5, Waiting for N (open predecessors), a parent's done/total (Card layout priority, waiting, progress)
+  const lx = RLX, wt = L.waiting && lx ? C.waitingFor(t, lx.ix, lx.by) : [], pg = L.progress && lx ? C.subtaskProgress(t, lx.ix, lx.by) : null;
+  const linkBadges = (L.priority && Number.isInteger(t.priority) ? '<span class="tb pr' + (t.priority >= 3 ? ' hi' : '') + '" title="Priority ' + t.priority + ' of 5">P' + t.priority + '</span>' : '') +
+    (wt.length ? '<span class="tb wt" title="Waiting for ' + esc(wt.map(x => ref(x) + ' ' + plain(x.title)).join(', ')) + '"><span class="wl">Waiting for&nbsp;</span><span class="ws" aria-hidden="true">Wait&nbsp;</span>' + wt.length + '</span>' : '') +
+    (pg ? '<span class="tb pg" title="' + pg.done + ' of ' + pg.total + ' subtasks done">' + pg.done + '/' + pg.total + '<i style="--p:' + Math.round(100 * pg.done / pg.total) + '%"></i></span>' : '');
+  const badges = '<span class="tbs">' + linkBadges + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
     (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
     (t.category !== 'task' && C.showSource(L, st.list !== 'all') ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
   const num = L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>';
@@ -2903,6 +2961,9 @@ function cardHtml(t, q) {
   return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
     (body ? '<div class="details">' + body + '</div>' : '') + '</div>';
 }
+// the faded parent of children whose parent is in another quadrant (not a card: no drag, not counted); it opens the parent
+const ghostHtml = p => '<button type="button" class="lk-ghost ' + p.q + '" data-open="' + p.id + '" aria-label="Parent: ' + esc(plain(p.title)) + ', in ' + QN[p.q] + '"><span aria-hidden="true">↑</span><span class="t">' + mdInline(p.title) + '</span><span class="gq">' + QN[p.q] + '</span></button>';
+let RLX = null; // the link index of the current render (linkIx)
 const factText = f => ({ end: 'End ' + ymd(f.at), created: 'Created ' + ymd(f.at), creator: 'By ' + displayName(f.id), owner: 'For ' + displayName(f.id) })[f.k];
 
 const archivedIn = () => all().filter(t => t.doneAt && inList(t));
@@ -2924,26 +2985,84 @@ function archiveHtml() {
       : '<div class="empty n">' + (total ? 'No matches' : '0') + '</div>');
 }
 
-// timeline: one bar per dated open task from start (or deadline day) to deadline; weekends and today marked; load row below
+// Timeline (task links): one row per task. The picked tasks are the open ones that pass the filters and have a date in the
+// window; their parent trees join them (C.timelineRows). A row shows the tree indent (a chevron folds a parent, this session
+// only: st.tlCollapsed), the number and title, and a bar from Start (or the End day) to End in the quadrant's colour; a parent
+// also gets a thin span over its whole tree. One SVG layer draws an arrow from each predecessor's bar end to the next task's bar
+// start, red and dashed when the next one starts before the predecessor ends. Closed tasks in a tree are greyed. Geometry is
+// in px from the day width st.tlDayW, measured once after a render (tlFit), so no row reads the layout.
+const TL_ROW = 34;
 function timelineHtml() {
+  const t0 = performance.now();
   const mon = x => { const y = new Date(x); y.setHours(0, 0, 0, 0); y.setDate(y.getDate() - ((y.getDay() + 6) % 7)); return y; };
   if (!st.tlStart) st.tlStart = mon(TODAY);
   const days = st.tlWeeks * 7, start = st.tlStart, end = new Date(start.getTime() + days * DAY);
-  const dayIx = x => Math.floor((new Date(x).setHours(0, 0, 0, 0) - start) / DAY);
-  const shown = all().filter(t => !t.doneAt && inList(t) && t.deadline && passFilters(t) && t.deadline >= start && (t.start || t.deadline) < end);
-  const today = dayIx(TODAY);
-  const cols = 'grid-template-columns:minmax(140px,220px) repeat(' + days + ',minmax(18px,1fr))';
-  const head = [...Array(days)].map((_, i) => { const x = new Date(start.getTime() + i * DAY), we = x.getDay() === 0 || x.getDay() === 6; return '<div class="tl-d' + (we ? ' we' : '') + (i === today ? ' td' : '') + '">' + x.getDate() + '</div>'; }).join('');
-  const bars = shown.map(t => {
-    const a = Math.max(0, dayIx(t.start || t.deadline)), b = Math.min(days - 1, dayIx(t.deadline));
-    return '<div class="tl-row" style="' + cols + '"><div class="tl-name"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + '</div><button class="tl-bar ' + t.q + (overdue(t) ? ' overdue' : '') + '" data-open="' + t.id + '" style="grid-column:' + (a + 2) + ' / ' + (b + 3) + '" aria-label="' + esc(plain(t.title)) + ', end ' + fmtDay(t.deadline) + '"></button></div>';
+  const phone = matchMedia('(max-width:700px)').matches, nw = phone ? 132 : 248, dw = st.tlDayW || (phone ? 22 : 30), W = days * dw;
+  const lx = linkIx();
+  const base = all().filter(t => !t.doneAt && inList(t) && passFilters(t) && (t.start || t.deadline) && (t.start || t.deadline) < end && (t.deadline || t.start) >= start);
+  const { rows, edges } = C.timelineRows(base, lx.ix, lx.by, { start, days, collapsed: st.tlCollapsed, cap: 5 });
+  const today = Math.round((new Date(TODAY).setHours(0, 0, 0, 0) - start) / DAY);
+  const dayAt = i => new Date(start.getTime() + i * DAY);
+  const head = [...Array(days)].map((_, i) => { const x = dayAt(i), we = x.getDay() === 0 || x.getDay() === 6; return '<div class="tl-d' + (we ? ' we' : '') + (i === today ? ' td' : '') + '">' + x.getDate() + '</div>'; }).join('');
+  const cols = [...Array(days)].map((_, i) => { const x = dayAt(i); return x.getDay() === 0 || x.getDay() === 6 ? '<i class="tl-we" style="left:' + i * dw + 'px;width:' + dw + 'px"></i>' : ''; }).join('') +
+    (today >= 0 && today < days ? '<i class="tl-now" style="left:' + (today * dw + dw / 2) + 'px"></i>' : '');
+  const clip = (a, b) => ({ a: Math.max(0, a), b: Math.min(days - 1, b) });
+  const barHtml = r => {
+    const t = r.t, title = esc(plain(t.title));
+    let h = '';
+    if (r.sum && r.kids) { const c = clip(r.sum.a, r.sum.b); if (c.a <= c.b) h += '<i class="tl-sum" style="left:' + c.a * dw + 'px;width:' + (c.b - c.a + 1) * dw + 'px"></i>'; }
+    if (!r.bar) return h + (r.sum && r.kids ? '' : '<span class="tl-nd">no dates</span>');
+    if (r.bar.b < 0) return h + '<button class="tl-off l" data-open="' + t.id + '" aria-label="' + title + ', ended before these weeks">‹ ' + fmtDay(t.deadline || t.start) + '</button>';
+    if (r.bar.a > days - 1) return h + '<button class="tl-off r" data-open="' + t.id + '" aria-label="' + title + ', starts after these weeks">' + fmtDay(t.start || t.deadline) + ' ›</button>';
+    const c = clip(r.bar.a, r.bar.b);
+    return h + '<button class="tl-bar ' + t.q + (overdue(t) ? ' overdue' : '') + (c.a !== r.bar.a ? ' cut-l' : '') + (c.b !== r.bar.b ? ' cut-r' : '') + '" data-open="' + t.id + '" style="left:' + c.a * dw + 'px;width:' + (c.b - c.a + 1) * dw + 'px"' +
+      ' aria-label="' + title + (t.start ? ', start ' + fmtDay(t.start) : '') + (t.deadline ? ', end ' + fmtDay(t.deadline) : '') + '"></button>';
+  };
+  const rowsHtml = rows.map(r => {
+    const t = r.t;
+    const chev = r.kids ? '<button class="tl-chev" data-tlcol="' + t.id + '" aria-expanded="' + !r.collapsed + '" aria-label="' + (r.collapsed ? 'Show' : 'Hide') + ' the ' + r.kids + ' subtasks of ' + esc(plain(t.title)) + '">' + (r.collapsed ? I.chevR : I.chevD) + '</button>' : '<span class="tl-chev-sp"></span>';
+    return '<div class="tl-row ' + t.q + (r.closed ? ' closed' : '') + (r.kids ? ' parent' : '') + '" data-tl="' + t.id + '"><div class="tl-name" style="--ind:' + r.depth + '">' + chev +
+      '<button class="tl-t" data-open="' + t.id + '"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + '</button></div><div class="tl-track">' + barHtml(r) + '</div></div>';
   }).join('');
-  const load = [...Array(days)].map((_, i) => { const n = shown.filter(t => dayIx(t.start || t.deadline) <= i && dayIx(t.deadline) >= i).length; return '<div class="tl-d' + (n > 3 ? ' over' : '') + '">' + (n || '') + '</div>'; }).join('');
-  return '<div class="ar-tools"><button id="tl-prev" aria-label="Previous week">' + I.left + '</button><button id="tl-today">Today</button><button id="tl-next" aria-label="Next week">' + I.right + '</button>' +
-    '<span class="n">' + fmtDay(start) + ' – ' + fmtDay(new Date(end.getTime() - DAY)) + '</span><span class="sp"></span><label>Weeks <select id="tl-weeks">' + [2, 4, 8].map(w => '<option' + (st.tlWeeks === w ? ' selected' : '') + '>' + w + '</option>').join('') + '</select></label></div>' +
-    '<div class="tl"><div class="tl-row tl-head" style="' + cols + '"><div class="tl-name"></div>' + head + '</div>' + (bars || '<div class="empty n">0</div>') +
-    '<div class="tl-row tl-load" style="' + cols + '"><div class="tl-name n">Load</div>' + load + '</div></div>';
+  // arrows: from a predecessor's bar end to the next task's bar start, clipped to the window
+  const y = i => i * TL_ROW + TL_ROW / 2, X = d => Math.max(0, Math.min(W, d * dw));
+  const paths = edges.map(e => {
+    const x1 = X(e.fromDay + 1), x2 = X(e.toDay), y1 = y(e.from), y2 = y(e.to);
+    if ((e.fromDay + 1 < 0 && e.toDay < 0) || (e.fromDay >= days && e.toDay >= days)) return '';
+    // forward: out of the bar end, down, into the next bar's start; backward (the next one starts too early): out, up to the
+    // row's top edge, back past its start, down, and in from the left, so the line never runs over a bar
+    let d;
+    if (x2 - x1 >= 16) { const xm = x1 + 8; d = 'M' + x1 + ' ' + y1 + 'H' + xm + 'V' + y2 + 'H' + (x2 - 2); }
+    else { const xa = Math.min(W, x1 + 8), xb = Math.max(0, x2 - 8), yt = y2 + (y2 > y1 ? -TL_ROW / 2 + 2 : TL_ROW / 2 - 2); d = 'M' + x1 + ' ' + y1 + 'H' + xa + 'V' + yt + 'H' + xb + 'V' + y2 + 'H' + (x2 - 2); }
+    return '<path class="' + (e.late ? 'late' : '') + '" d="' + d + '" marker-end="url(#tl-ah' + (e.late ? '-late' : '') + ')"/>';
+  }).join('');
+  const svg = paths ? '<svg class="tl-links" width="' + W + '" height="' + rows.length * TL_ROW + '" viewBox="0 0 ' + W + ' ' + rows.length * TL_ROW + '" aria-hidden="true" focusable="false">' +
+    '<defs><marker id="tl-ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z"/></marker>' +
+    '<marker id="tl-ah-late" class="late" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z"/></marker></defs>' + paths + '</svg>' : '';
+  const load = [...Array(days)].map((_, i) => { const n = rows.filter(r => !r.closed && r.bar && r.bar.a <= i && r.bar.b >= i).length; return '<div class="tl-d' + (n > 3 ? ' over' : '') + '">' + (n || '') + '</div>'; }).join('');
+  const html = '<div class="ar-tools"><button id="tl-prev" aria-label="Previous week">' + I.left + '</button><button id="tl-today">Today</button><button id="tl-next" aria-label="Next week">' + I.right + '</button>' +
+    '<span class="n">' + fmtDay(start) + ' – ' + fmtDay(new Date(end.getTime() - DAY)) + '</span><span class="sp"></span>' +
+    (edges.length ? '<span class="n tl-key"><i class="tl-key-a" aria-hidden="true"></i>comes before<i class="tl-key-a late" aria-hidden="true"></i>starts too early</span>' : '') +
+    '<label>Weeks <select id="tl-weeks">' + [2, 4, 8].map(w => '<option' + (st.tlWeeks === w ? ' selected' : '') + '>' + w + '</option>').join('') + '</select></label></div>' +
+    '<div class="tl" id="tl" style="--nw:' + nw + 'px;--dw:' + dw + 'px;--tlw:' + (nw + W) + 'px"><div class="tl-in">' +
+    '<div class="tl-head"><div class="tl-name"></div><div class="tl-days">' + head + '</div></div>' +
+    (rows.length ? '<div class="tl-body"><div class="tl-cols" aria-hidden="true">' + cols + '</div>' + rowsHtml + svg + '</div>' : '<div class="empty n">No tasks with dates in these weeks</div>') +
+    '<div class="tl-load"><div class="tl-name n">Load</div><div class="tl-days">' + load + '</div></div></div></div>';
+  tlBuildMs = performance.now() - t0;
+  return html;
 }
+let tlBuildMs = 0, tlResize = 0;
+// after a Timeline render: the day width that fills the panel (one layout read), then a second render if it changed; the time
+// of the render is published as performance measure td:tl-render and window.tdTimelineMs (read by the e2e runner)
+function tlFit(t0) {
+  const box = document.getElementById('tl'); if (!box) return;
+  const nw = parseFloat(box.style.getPropertyValue('--nw')) || 248, days = st.tlWeeks * 7;
+  const want = Math.max(18, Math.floor((box.clientWidth - nw - 2) / days));
+  window.tdTimelineMs = performance.now() - t0;
+  try { performance.measure('td:tl-render', { start: t0, end: performance.now() }); } catch (e) {}
+  if (want !== st.tlDayW) { st.tlDayW = want; render(); }
+}
+addEventListener('resize', () => { if (st.view !== 'timeline') return; clearTimeout(tlResize); tlResize = setTimeout(() => { st.tlDayW = 0; render(); }, 150); });
 
 function confirmAsk(text, yes, onYes, opener) {
   const dlg = dialogShell('<form method="dialog"><strong>' + esc(text) + '</strong><div class="actions"><button value="cancel" id="cf-cancel" autofocus>Cancel</button><button id="cf-ok" value="ok">' + esc(yes) + '</button></div></form>', opener || '[data-view="archive"]');
@@ -3022,6 +3141,7 @@ function bindListDrag(app) {
 
 function render() {
   if (boot.gate) return gate(boot.gate);
+  const tR0 = performance.now();
   TODAY = new Date(); // "now" is recomputed on every render
   const live = all();
   live.forEach(t => { t.q = C.deriveQuadrant(t, settings, TODAY.getTime()); });
@@ -3051,14 +3171,16 @@ function render() {
         (canDo('edit', t) ? ' draggable="true" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
   }).join('');
   const addable = canAddSomewhere();
+  RLX = LINKS_READY ? linkIx() : null;
   const quad = q => {
     const cards = shown.filter(t => t.q === q);
+    const body = cardLayout.group && RLX ? C.groupCards(cards, RLX.ix, RLX.by).map(r => r.ghost ? ghostHtml(r.t) : cardHtml(r.t, q, r)).join('') : cards.map(t => cardHtml(t, q)).join('');
     const total = open.filter(t => inList(t) && t.q === q).length;
     const over = q === 'A' && settings.doLimit > 0 && total > settings.doLimit;
     const ex = st.expanded === q;
     return '<section class="q" data-q="' + q + '" aria-label="' + QN[q] + '"><div class="qh"><span class="ql" data-q="' + q + '" aria-hidden="true">' + q + '</span><span>' + QN[q] + '</span><span class="cnt' + (over ? ' over' : '') + '">' + total + '</span><span class="sp"></span>' +
       (addable ? '<button data-add="' + q + '" aria-label="Add to ' + QN[q] + '">' + I.plus + '</button>' : '') + '<button data-expand="' + q + '" aria-label="' + (ex ? 'Collapse ' : 'Expand ') + QN[q] + '" aria-pressed="' + ex + '">' + I.expand + '</button></div>' +
-      '<div class="qb" data-body="' + q + '">' + cards.map(t => cardHtml(t, q)).join('') + '</div></section>';
+      '<div class="qb" data-body="' + q + '">' + body + '</div></section>';
   };
   let dd = '';
   if (st.q.trim()) {
@@ -3082,7 +3204,7 @@ function render() {
     profile: () => '<div class="who-am" role="none"><strong>' + esc(me.display_name) + '</strong>' + (session.user.email ? '<span>' + esc(session.user.email) + '</span>' : '') + '</div>' +
       (human ? '<button data-menu="tags">Tags</button><button data-menu="sharing">Sharing' + (INVITES.length ? ' <span class="badge" aria-label="' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '">' + INVITES.length + '</span>' : '') + '</button>' : '') +
       (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
-      '<hr><button data-menu="timeline">Timeline (draft)</button><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
+      '<hr><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
       (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : '') +
       '<hr><button data-signout>Sign out</button>',
     more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
@@ -3112,11 +3234,12 @@ function render() {
     '<button class="f" id="mine" aria-pressed="' + st.mine + '">Mine</button>' +
     (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop + '</header>' +
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
-    [['matrix', '▦'], ['archive', '▤'], ['review', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v || (st.view === 'timeline' && v === 'matrix') ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
+    [['matrix', '▦'], ['archive', '▤'], ['review', '▬'], ['timeline', '☰']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
     '</div><nav class="groups" aria-label="Items by quadrant">' + menuGroups + '</nav></aside>' +
     '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : esc(label(st.list))) + '</h1>' +
     (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : st.view === 'review' ? reviewHtml() : matrix) + '</main></div>';
   bind();
+  if (st.view === 'timeline') tlFit(tR0);
   anchorPop();
   const qi = document.getElementById('q'); if (st.focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); st.focusQ = false; }
   if (st.sel >= 0) qi.setAttribute('aria-activedescendant', 'opt' + st.sel);
@@ -4712,6 +4835,7 @@ function bind() {
     });
   };
   const shift = w => { st.tlStart = new Date(st.tlStart.getTime() + w * 7 * DAY); render(); };
+  app.querySelectorAll('[data-tlcol]').forEach(b => b.onclick = () => { const id = b.dataset.tlcol; if (!st.tlCollapsed.delete(id)) st.tlCollapsed.add(id); render(); });
   const tp = document.getElementById('tl-prev'); if (tp) { tp.onclick = () => shift(-1); document.getElementById('tl-next').onclick = () => shift(1); document.getElementById('tl-today').onclick = () => { st.tlStart = null; render(); }; document.getElementById('tl-weeks').onchange = e => { st.tlWeeks = Number(e.target.value); render(); }; }
 }
 document.addEventListener('keydown', e => {

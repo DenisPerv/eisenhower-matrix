@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|guests|request|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|links|guests|request|smoke] [--page <html>]
 //   [--url <https origin> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/, and sessions are seeded on <origin>/version.json
 // (same origin, same storage); --access-env adds the Cloudflare Access service-token headers to requests for that origin only.
@@ -20,7 +20,7 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, ACCESS = null; // --url and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'guests', 'request'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'links', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 // the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
 const OFFLINE = want.every(g => g === 'request');
@@ -34,7 +34,7 @@ const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // real key presses (CDP Input): implicit form submission and the dialog's Escape only follow trusted keys. Modifiers: Alt 1
 const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 } };
-const rows = [], leftovers = [], kpiTimes = [], reviewApiTimes = [];
+const rows = [], leftovers = [], kpiTimes = [], reviewApiTimes = [], timelineTimes = [];
 let pass = 0, fail = 0, skipped = 0;
 const check = (group, what, ok, note) => { ok ? pass++ : fail++; rows.push(`| ${group} | ${what} | ${ok ? 'pass' : 'FAIL'} | ${String(note || '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 160)} |`); console.log(`${ok ? 'pass' : 'FAIL'} ${group}: ${what}`); };
 // a check that cannot run here (a login missing from the env): reported, never counted as passed or failed
@@ -621,8 +621,8 @@ async function gUi() {
     check(G, `${who}: settings and preferences survive a reload (Do limit ${lim})`, await T.ev(`document.getElementById('s-lim').value==='${lim}'`));
     check(G, `${who}: Urgency settings hold only window, due soon % and Do limit`, await T.ev('!!document.getElementById("s-win")&&!!document.getElementById("s-th")&&!document.getElementById("s-wd")&&!document.getElementById("s-hpd")&&!document.getElementById("s-name")'));
     await T.ev('document.querySelector("dialog[open]")?.close(),true');
-    // round 3, adjustment 7: rail tabs Matrix, Archive, Review; Timeline (draft) from the account menu
-    check(G, `${who}: rail tabs are Matrix, Archive, Review`, await T.ev(`[...document.querySelectorAll('.views [role=tab]')].map(b=>b.dataset.view).join()==='matrix,archive,review'`));
+    // round 3, adjustment 7: rail tabs Matrix, Archive, Review; task links: Timeline is the fourth tab
+    check(G, `${who}: rail tabs are Matrix, Archive, Review, Timeline`, await T.ev(`[...document.querySelectorAll('.views [role=tab]')].map(b=>b.dataset.view).join()==='matrix,archive,review,timeline'`));
     await T.click('[data-view=review]');
     // round 3, adjustment 8: the Weekly review view. Ten ISO weeks, this one picked and marked; Ctrl and Shift pick several
     check(G, `${who}: Review shows the week strip (10 weeks, this week picked and marked "now") and the hint`, await T.wait('document.querySelectorAll(".rvw .wk").length===10', 5000) &&
@@ -719,9 +719,10 @@ async function gUi() {
       }
     }
     await T.click('#profile');
-    check(G, `${who}: the account menu has General settings, Urgency settings and Timeline (draft), no Weekly review`, await T.ev(`(()=>{const t=document.getElementById('pop').textContent;return /General settings/.test(t)&&/Urgency settings/.test(t)&&/Timeline \\(draft\\)/.test(t)&&!/Weekly review/.test(t)})()`));
-    await T.click('[data-menu=timeline]');
-    check(G, `${who}: Timeline (draft) opens the Timeline view`, await T.wait('!!document.querySelector(".tl")', 5000));
+    check(G, `${who}: the account menu has General settings and Urgency settings, no Weekly review and no Timeline (a rail tab since task links)`, await T.ev(`(()=>{const t=document.getElementById('pop').textContent;return /General settings/.test(t)&&/Urgency settings/.test(t)&&!/Timeline/.test(t)&&!/Weekly review/.test(t)})()`));
+    await T.click('#profile');
+    await T.click('[data-view=timeline]');
+    check(G, `${who}: the Timeline tab opens the Timeline view`, await T.wait('!!document.querySelector(".tl")', 5000));
     await T.click('#profile'); await T.click('[data-menu=general]');
     check(G, `${who}: General settings hold display name and time zone`, await T.wait('!!document.getElementById("s-name")&&!!document.getElementById("s-tz")&&!document.getElementById("s-lim")', 5000));
     await T.ev('document.querySelector("dialog[open]")?.close(),true');
@@ -833,6 +834,114 @@ async function gUi() {
   await N.wait(`!!document.querySelector('[data-card="${tz.id}"]')`); await N.click(`[data-card="${tz.id}"]`);
   check(G, 'time zone override: the end shows in the browser zone (10:00 in New York for 15:00 UTC)', await N.wait('document.querySelector("dialog[open] #fd")?.value==="2026-11-20T10:00"'));
   await N.close();
+}
+
+// ---- links (task links, db/018), Maksym's page, all in _selftest: a parent with subtasks made in the task window (one found by
+// the search, one created there), a predecessor chain and a parent by rpc/link_items, a loop left out of the picker, Start and
+// Priority saved; badges and Group by parent on the board (a faded parent heads its child in another quadrant); the Timeline's
+// tree, arrows (one late) and fold; 200 rows drawn in under 100 ms; screenshots at both widths, light and dark.
+async function gLinks() {
+  const G = 'links';
+  const T = await tab(B, await ctx(B));
+  await T.theme('light');
+  check(G, 'opens signed in', await open(T, await grantFor('maksym')));
+  const ready = await MK.rest('POST', 'rpc/unlink_items', { p_from: ST.id, p_to: ST.id, p_kind: 'parent' });
+  if (!ready.ok && ready.status === 404) { skip(G, 'task links', 'rpc/unlink_items is missing: db/018 is not applied'); await T.close(); return; }
+  const day = n => { const d = new Date(Date.now() + n * 864e5); d.setHours(12, 0, 0, 0); return d.toISOString(); };
+  const par = await mkItem('links parent', { quadrant: 'A', start_at: day(0), due_at: day(9), priority: 4 });
+  const k1 = await mkItem('links child one', { quadrant: 'A', start_at: day(0), due_at: day(3) });
+  const k2 = await mkItem('links child two', { quadrant: 'B', start_at: day(2), due_at: day(6) });
+  const k3 = await mkItem('links child three', { quadrant: 'A', start_at: day(4), due_at: day(8) });
+  const L = (f, t, k) => MK.rest('POST', 'rpc/link_items', { p_from: f, p_to: t, p_kind: k });
+  const rs = [await L(k2.id, k1.id, 'depends_on'), await L(k3.id, k2.id, 'depends_on'), await L(k3.id, par.id, 'parent'), await L(k2.id, par.id, 'parent')];
+  check(G, 'rpc/link_items: two predecessors and two parents', rs.every(r => r.ok), rs.map(r => r.ok ? 'ok' : r.err.message).join(', '));
+  const loop = await L(k1.id, k3.id, 'depends_on');
+  check(G, 'rpc/link_items refuses a loop (22023, no titles in the text)', !loop.ok && /loop/.test(loop.err.message) && !loop.err.message.includes(RUN), loop.ok ? 'ok' : loop.err.message);
+  await T.reload(); await T.ready(); await pick(T, ST.id);
+  await T.wait(`!!document.querySelector('[data-card="${par.id}"]')`, 10000);
+  // the task window: + Subtask by search, + Subtask by Create, a loop left out, Start and Priority
+  await T.click(`[data-card="${par.id}"]`);
+  check(G, 'the task window has Start, Priority and the Links block', await T.wait('!!document.querySelector("dialog[open] #fsd")&&!!document.querySelector("dialog[open] #fp")&&!!document.querySelector("dialog[open] #lk")', 5000));
+  check(G, 'the window lists the stored subtasks (two) and Priority P4', await T.ev(`document.querySelectorAll('#lk [data-role=child] [data-lk-del]').length===2&&document.getElementById('fp').value==='4'`));
+  await T.click('#lk [data-lk-add=child]');
+  await T.insert('#lk-q', 'links child one');
+  check(G, 'the search finds the task by title words', await T.wait(`(document.querySelector('#lk-opts li[data-i="0"]')||{}).textContent?.includes('links child one')`, 4000));
+  await T.key('Enter');
+  check(G, 'Enter picks it: a chip under Subtasks, the box closed', await T.wait(`!!document.querySelector('#lk [data-lk-del="child|${k1.id}"]')&&!document.getElementById('lk-q')`, 3000));
+  await T.click('#lk [data-lk-add=child]');
+  await T.insert('#lk-q', `${RUN} links child new`);
+  await T.wait('!!document.querySelector("#lk-opts li.create")', 3000);
+  await T.click('#lk-opts li.create');
+  check(G, 'Create adds a new subtask chip', await T.wait('!!document.querySelector("#lk .lk-chip.new")', 3000));
+  await T.click('#lk [data-lk-add=parent]');
+  await T.insert('#lk-q', 'links child');
+  check(G, 'the parent search leaves out the subtasks (each would make a loop)', await T.wait('document.querySelectorAll("#lk-opts li[data-i]").length===0', 3000));
+  await T.key('Escape');
+  check(G, 'Escape closes the search box and keeps the window', await T.wait('!document.getElementById("lk-q")&&!!document.querySelector("dialog[open] #lk")', 3000));
+  for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`links-window-maksym-${w}x${h}-light`); }
+  await T.size(1440, 900);
+  await T.ev(`(()=>{const e=document.getElementById('fsd');e.value='${day(1).slice(0, 10)}T09:00';e.dispatchEvent(new Event('input'));return true})()`);
+  await T.click('dialog[open] #fs');
+  const kids = await until(async () => { const r = await MK.rest('GET', `item_links?select=from_item&kind=eq.parent&removed_at=is.null&to_item=eq.${par.id}`); return r.ok && r.json.length === 4 ? r.json : null; });
+  check(G, 'Save sends the links: four subtasks stored (two old, the picked one, the created one)', !!kids, kids ? '' : 'not 4');
+  const nk = await until(async () => { const r = await MK.rest('GET', `items?select=id,quadrant,list_id&title=eq.${encodeURIComponent(RUN + ' links child new')}`); return r.ok && r.json.length ? r.json[0] : null; });
+  check(G, 'the created subtask is in the same list and quadrant as its parent', !!nk && nk.list_id === ST.id && nk.quadrant === 'A');
+  const ps = await item(par.id);
+  check(G, 'Start is saved (start_at)', !!ps.start_at && new Date(ps.start_at).getDate() === new Date(day(1)).getDate(), ps.start_at);
+  // the board: badges, then Group by parent
+  await T.wait(`!!document.querySelector('[data-card="${par.id}"] .tb.pg')`, 8000);
+  check(G, 'badges: P4 and the progress 0/4 on the parent, "Waiting for 1" on a task with an open predecessor', await T.ev(`(()=>{const p=document.querySelector('[data-card="${par.id}"]');const w=document.querySelector('[data-card="${k2.id}"] .tb.wt');return /P4/.test(p.querySelector('.tb.pr').textContent)&&p.querySelector('.tb.pg').textContent==='0/4'&&!!w&&w.querySelector('.wl').textContent.trim()==='Waiting for'&&w.textContent.endsWith('1')})()`));
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("[data-cl=group]")', 4000);
+  check(G, 'Card layout lists the four switches, grouping off by default', await T.ev(`['group','priority','waiting','progress'].every(k=>!!document.querySelector('[data-cl='+k+']'))&&!document.querySelector('[data-cl=group]').checked&&document.querySelector('[data-cl=priority]').checked`));
+  await T.ev(`(document.querySelector('[data-cl=group]').checked=true,true)`); await T.click('#cl-save');
+  await T.wait(`!!document.querySelector('[data-card="${k1.id}"].lk-kid')`, 5000);
+  check(G, 'Group by parent: the parent first, its subtasks indented after it in Do', await T.ev(`(()=>{const ids=[...document.querySelectorAll('[data-body=A] [data-card]')].map(c=>c.dataset.card);const i=ids.indexOf('${par.id}');return i>=0&&ids.indexOf('${k1.id}')>i&&ids.indexOf('${k3.id}')>i&&document.querySelector('[data-card="${k3.id}"]').classList.contains('lk-kid')})()`));
+  check(G, 'a subtask in another quadrant sits under a faded copy of its parent (not a card)', await T.ev(`(()=>{const g=document.querySelector('[data-body=B] .lk-ghost[data-open="${par.id}"]');const c=document.querySelector('[data-body=B] [data-card="${k2.id}"]');return !!g&&!!c&&c.classList.contains('lk-kid')&&!g.hasAttribute('data-card')&&(g.compareDocumentPosition(c)&4)>0})()`));
+  for (const theme of ['light', 'dark']) {
+    await T.theme(theme);
+    await T.ev(`(document.documentElement.dataset.theme='${theme}',true)`);
+    for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(500); await T.shot(`links-board-maksym-${w}x${h}-${theme}`); }
+  }
+  await T.size(390, 844); await sleep(300);
+  check(G, 'no card is wider than itself at 390 px (grouped)', await T.ev(`[...document.querySelectorAll('[data-card],.lk-ghost')].every(c=>c.scrollWidth<=c.clientWidth+1)`));
+  await T.size(1440, 900); await T.theme('light');
+  // the Timeline
+  await T.click('[data-view=timeline]');
+  check(G, 'Timeline: one row per task, the subtasks after their parent and indented', await T.wait(`!!document.querySelector('.tl-row[data-tl="${par.id}"]')`, 5000) &&
+    await T.ev(`(()=>{const ids=[...document.querySelectorAll('.tl-row')].map(r=>r.dataset.tl);const i=ids.indexOf('${par.id}');const ind=id=>+getComputedStyle(document.querySelector('.tl-row[data-tl="'+id+'"] .tl-name')).getPropertyValue('--ind');return i>=0&&ids.indexOf('${k1.id}')>i&&ids.indexOf('${k2.id}')>i&&ind('${k1.id}')===ind('${par.id}')+1&&new Set(ids).size===ids.length})()`));
+  check(G, 'Timeline: an arrow per predecessor link in view, the one that starts too early dashed red', await T.ev(`(()=>{const p=[...document.querySelectorAll('.tl-links > path')];return p.length>=2&&p.filter(x=>x.classList.contains('late')).length>=1})()`));
+  check(G, 'Timeline: the parent has a span over its tree', await T.has(`.tl-row[data-tl="${par.id}"] .tl-sum`));
+  for (const theme of ['light', 'dark']) {
+    await T.theme(theme);
+    await T.ev(`(document.documentElement.dataset.theme='${theme}',true)`);
+    for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(500); await T.shot(`links-timeline-maksym-${w}x${h}-${theme}`); }
+  }
+  await T.size(390, 844); await sleep(300);
+  check(G, 'Timeline at 390 px: the page does not scroll sideways (the day track scrolls inside)', await T.ev('document.documentElement.scrollWidth<=innerWidth+1'));
+  await T.size(1440, 900); await T.theme('light');
+  await T.click(`[data-tlcol="${par.id}"]`);
+  check(G, 'Timeline: the chevron folds the parent (its subtasks and their arrows go)', await T.wait(`!document.querySelector('.tl-row[data-tl="${k1.id}"]')&&document.querySelector('[data-tlcol="${par.id}"]').getAttribute('aria-expanded')==='false'`, 3000));
+  await T.click(`[data-tlcol="${par.id}"]`);
+  // 200 rows: one bulk insert in _selftest (soft-deleted by cleanup), 20 parents of 9 subtasks each
+  const many = [...Array(200)].map((_, i) => ({ list_id: ST.id, category: 'task', title: `${RUN} links bulk ${i}`, quadrant: 'D', sort_key: 500000 + i, start_at: day(i % 9), due_at: day(i % 9 + 2) }));
+  const bulk = await MK.rest('POST', 'items', many, { Prefer: 'return=representation' });
+  if (bulk.ok) {
+    const ids = bulk.json.map(r => r.id);
+    for (let p = 0; p < 20; p++) for (let c = 1; c < 10; c++) await L(ids[p * 10 + c], ids[p * 10], 'parent');
+    for (let p = 0; p < 20; p++) await L(ids[p * 10 + 2], ids[p * 10 + 1], 'depends_on');
+    await T.reload(); await T.ready(); await pick(T, ST.id); await T.click('[data-view=timeline]');
+    await T.wait(`document.querySelectorAll('.tl-row').length>=200`, 10000);
+    await T.click('#tl-today'); await sleep(300);
+    const ms = await T.ev('window.tdTimelineMs||0'), n = await T.ev(`document.querySelectorAll('.tl-row').length`);
+    timelineTimes.push({ rows: n, ms: Math.round(ms) });
+    check(G, `Timeline: ${n} rows drawn in under 100 ms (render to bind, td:tl-render)`, n >= 200 && ms > 0 && ms < 100, Math.round(ms) + ' ms');
+  } else skip(G, 'Timeline with 200 rows', 'bulk insert failed: ' + bulk.err.message);
+  await T.click('[data-view=matrix]');
+  // Card layout back to the person's own (prefs are put back in cleanup too)
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("[data-cl=group]")', 4000);
+  await T.ev(`(document.querySelector('[data-cl=group]').checked=false,true)`); await T.click('#cl-save');
+  check(G, 'no console errors', !T.errors.length, T.errors.slice(0, 2).join(' / '));
+  await T.close();
 }
 
 // round 3, A5-A7 (Maksym's page): a test tag list through the Tags window (create, a tag, rename, delete = archive, Archived tags
@@ -1384,9 +1493,9 @@ const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, guests: gGuests, request: gRequest, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'guests', 'request'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'links', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }
@@ -1399,6 +1508,7 @@ try {
   const report = ['# TasksDashboard e2e', '', `Run \`${RUN}\`, ${new Date().toISOString()}, ${Math.round((Date.now() - t0) / 1000)} s. Page \`${ORIGIN ? ORIGIN + '/' + (ACCESS ? '` (Access service token)' : '`') : PAGE + '`'}. Groups: ${want.join(', ')}. Logins from the env file; no values printed.`, '',
     `**${pass} of ${pass + fail} passed${skipped ? `, ${skipped} skipped` : ''}.**`, '', '| Group | Check | Result | Note |', '|---|---|---|---|', ...rows, '', '## Leftovers', '', ...(leftovers.length ? leftovers.map(x => '- ' + x) : ['- none']), '',
     ...(reviewApiTimes.length ? ['## Review API (rpc/review_report)', '', '| Login | ms | rows | weeks |', '|---|---|---|---|', ...reviewApiTimes.map(k => `| ${k.who} | ${k.ms} | ${k.rows} | ${k.weeks} |`), ''] : []),
+    ...(timelineTimes.length ? ['## Timeline render (td:tl-render)', '', '| rows | ms |', '|---|---|', ...timelineTimes.map(k => `| ${k.rows} | ${k.ms} |`), ''] : []),
     ...(kpiTimes.length ? ['## KPI read', '', '| Login | ms | items | events | lists | via |', '|---|---|---|---|---|---|', ...kpiTimes.map(k => `| ${k.who} | ${k.ms} | ${k.items} | ${k.events} | ${k.lists} | ${k.via} |`), ''] : []),
     'Screenshots: the `*.png` files next to this report.'].join('\n');
   fs.writeFileSync(path.join(OUT, 'e2e-report.md'), report + '\n');

@@ -135,3 +135,16 @@ test('multi-user (HomeOS multi-user-plan.md T13): owner tags set the owner, OWNE
   assert.equal(L.EXIT.limit, 9);
   assert.equal(L.errorExit(L.loadCore().restError(400, { code: '54000', message: 'item limit reached' })), 9);
 });
+
+test('task links: LIST#num references, --parent or --after, the commands in the usage', () => {
+  assert.deepEqual(T.parseRef('backlog#12'), { list: 'backlog', num: 12 });
+  assert.deepEqual(T.parseRef('maksym/backlog#3'), { list: 'maksym/backlog', num: 3 });
+  assert.throws(() => T.parseRef('backlog'), /LIST#num/);
+  assert.deepEqual(T.linkArgs({ parent: 'a#1' }), { other: 'a#1', kind: 'parent' });
+  assert.deepEqual(T.linkArgs({ after: 'a#2' }), { other: 'a#2', kind: 'depends_on' });
+  assert.equal(T.linkArgs({}), null);
+  assert.throws(() => T.linkArgs({ parent: 'a#1', after: 'a#2' }), /not both/);
+  const r = runCli(['--help']);
+  assert.match(r.stdout, /link {10}REF --parent REF \| --after REF/);
+  assert.match(r.stdout, /--start WHEN\] \[--parent REF\] \[--after REF\]/);
+});
