@@ -1,6 +1,7 @@
 """The card: what will be written, and what each tap does to it. Pure: no network, no clock (dates come in).
 
-Fields match the app's task window (title, list, quadrant, end, description, tags) plus For. A card is either a new
+Fields match the app's task window (title, list, end, description, tags). Quadrant and owner are still written (Auto or
+the stored quadrant; the owner the card opened with, moved to me when a new list lacks them) but no button changes them. A card is either a new
 item (`mode="add"`) or a change to a stored one (`mode="change"`, with `origin` holding the stored values).
 """
 
@@ -139,8 +140,9 @@ def pick_due(pick: str, today: date) -> date | None:
 
 
 def apply(card: Card, op: str, scope: Scope, today: date) -> Card:
-    """One tap. `op` is the decoded button: l<i> list, L lists view, q<x> quadrant, o<i> For option, d<i> due pick,
-    t tags view, g<i> tag toggle, p<n> tags page, b back, e description. Unknown or out-of-range ops change nothing."""
+    """One tap. `op` is the decoded button: l<i> list, L lists view, d<i> due pick, t tags view, g<i> tag toggle, p<n>
+    tags page, b back, e description. Unknown or out-of-range ops change nothing, and so do q<x> and o<i> from cards
+    sent before Quadrant and For left the card (2026-10-29)."""
     head, arg = op[:1], op[1:]
     num = int(arg) if arg.isdigit() else None
     clear = card.guessed
@@ -148,19 +150,6 @@ def apply(card: Card, op: str, scope: Scope, today: date) -> Card:
         return _fit_owner(replace(card, list_index=num, view="main", guessed=clear - {"list"}), scope)
     if head == "L":
         return replace(card, view="lists")
-    if head == "q" and arg in QUADRANTS:
-        return replace(card, quadrant=arg, guessed=clear - {"quadrant"})
-    if head == "o" and num is not None:
-        opts = owner_options(card, scope)
-        if num >= len(opts):
-            return card
-        who = opts[num]
-        nxt = replace(card, owner=who, guessed=clear - {"owner"})
-        if who == "agent" and card.lst(scope).member_by_handle(card.agent_handle) is None and card.agent_list_slug:
-            idx = scope.list_by_slug(card.agent_list_slug)
-            if idx is not None:
-                nxt = replace(nxt, list_index=idx)
-        return nxt
     if head == "d" and num is not None and num < len(DUE_PICKS):
         day = pick_due(DUE_PICKS[num], today)
         return replace(card, due_date=day, due_time=(card.due_time or DEFAULT_TIME) if day else None,

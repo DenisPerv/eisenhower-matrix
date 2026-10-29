@@ -28,12 +28,14 @@ class Render(unittest.TestCase):
     def test_main_view(self):
         text, rows = self.r(self.c)
         self.assertIn("<b>clean &lt;up&gt;</b>", text)
-        self.assertIn("Quadrant: Auto: Plan?", text)
+        self.assertNotIn("Quadrant", text)
+        self.assertNotIn("For:", text)
         self.assertIn("List: OtherTasks", text)
         labels = [b["text"] for r in rows for b in r]
         self.assertIn("• OtherTasks", labels)
-        self.assertIn("• Auto", labels)
-        self.assertIn("Nastia", labels)
+        self.assertNotIn("• Auto", labels)
+        self.assertNotIn("Nastia", labels)
+        self.assertFalse([d for d in all_data(rows) if d.split(":")[-1][:1] in ("q", "o")], "no Quadrant or For buttons")
         self.assertIn("• None", labels)
         self.assertEqual(rows[-1][0]["callback_data"], f"tbc:{self.tok}:s")
         for d in all_data(rows):
@@ -122,9 +124,7 @@ class Payload(unittest.TestCase):
         o = Origin(item_id="i1", version=3, ref="T7", list_id="L-ot", quadrant=None, owner_id=MK, due_date=None,
                    due_time=None, title="buy filters", details="", tag_ids=frozenset({"g-car"}))
         c = change_card(o, self.s, owner_handle="maksym")
-        c = apply(apply(c, "qA", self.s, TODAY), "o1", self.s, TODAY)
-        self.assertEqual(change_patch(c, self.s, utc_plus0), {"quadrant": "A", "owner_id": AN})
-        self.assertEqual(change_patch(apply(c, "qauto", self.s, TODAY), self.s, utc_plus0), {"owner_id": AN})
+        self.assertEqual(change_patch(apply(apply(c, "qA", self.s, TODAY), "o1", self.s, TODAY), self.s, utc_plus0), {}, "stale taps write nothing")
         c = apply(replace(c, details="note"), f"l{self.s.list_by_slug('backlog')}", self.s, TODAY)
         p = change_patch(c, self.s, utc_plus0)
         self.assertEqual((p["list_id"], p["category"], p["body_md"]), ("L-bl", "task", "note"))

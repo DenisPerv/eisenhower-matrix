@@ -353,7 +353,7 @@ async function dialogSave(T, fields) {
   if (!(await T.wait('!!document.querySelector("dialog[open] #fs")'))) throw new Error('the task window did not open; page errors: ' + (T.errors.slice(-2).join(' / ') || 'none'));
   await T.ev(`(()=>{const d=document.querySelector('dialog[open]');const f=${JSON.stringify(fields)};
     if(f.title!==undefined)d.querySelector('#ft').textContent=f.title; if(f.notes!==undefined)d.querySelector('#fn').textContent=f.notes;
-    if(f.list)d.querySelector('#fl').value=f.list; if(f.q)d.querySelector('#fq').value=f.q; d.querySelector('#fs').click();return true})()`);
+    if(f.list)d.querySelector('#fl').value=f.list; d.querySelector('#fs').click();return true})()`);
 }
 
 async function gData() {
@@ -377,9 +377,14 @@ async function gData() {
   await undo(T);
   check(G, 'undo edit: the old title is back', await until(async () => (await item(e.id)).title === `${RUN} edit me`));
   await T.wait('!document.querySelector("dialog[open]")');
-  await T.click(`[data-card="${e.id}"]`);
-  await dialogSave(T, { q: 'A' });
-  check(G, 'quadrant move: quadrant A, pin set (urgency by hand)', await until(async () => { const x = await item(e.id); return x.quadrant === 'A' && x.urgent_pin === true; }));
+  // edit window, item 1: the task window has no Quadrant field; a quadrant is pinned by dragging the card into another quadrant
+  await T.click(`[data-card="${e.id}"]`); await T.wait('!!document.querySelector("dialog[open] #ft")');
+  check(G, 'the task window has no Quadrant field (edit window, item 1)', await T.ev('!document.querySelector("dialog[open] #fq")'));
+  await closeDialogs(T);
+  await T.ev(`(()=>{const src=document.querySelector('[data-card="${e.id}"]'),dst=document.querySelector('section.q[data-q="A"]');const dt=new DataTransfer();const r=dst.getBoundingClientRect();
+    const fire=(el,type)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+r.width/2,clientY:r.bottom-4}));
+    fire(src,'dragstart');fire(dst,'dragover');fire(dst,'drop');fire(src,'dragend');return true})()`);
+  check(G, 'quadrant move by drag: quadrant A, pin set (urgency by hand)', await until(async () => { const x = await item(e.id); return x.quadrant === 'A' && x.urgent_pin === true; }));
   await undo(T);
   check(G, 'undo move: back to B, pin cleared', await until(async () => { const x = await item(e.id); return x.quadrant === 'B' && x.urgent_pin === null; }));
   // reorder by drag: a, b, c in B; drop c before a
@@ -578,8 +583,11 @@ async function gUi() {
     // round 3, adjustment 13: Card layout (cards open expanded, owner shown, auto-collapse 300)
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     await T.shot(`ui-cardlayout-${who}-1440x900-${theme}`);
-    await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('input[name=cl-mode][value=expanded]').checked=true;d.querySelector('[data-cl=owner]').checked=true;d.querySelector('#cl-auto').value='300';d.querySelector('#cl-save').click();return true})()`);
-    check(G, `${who}: Card layout expanded: cards open; "For <name>" on cards with an owner`, await T.wait(`!document.querySelector('[data-card]') || document.querySelectorAll('[data-card].full').length>0`, 5000), 'For-lines: ' + await T.ev(`[...document.querySelectorAll('.card.full .details .row span')].filter(s=>/^For /.test(s.textContent)).length`));
+    const archivedTl = ((await c0.rest('GET', 'tag_lists?select=id&archived_at=not.is.null')).json || []).map(x => x.id);
+    check(G, `${who}: Card layout has no "Who it is for" and lists no archived tag list (edit window, items 3, 4; ${archivedTl.length} archived)`,
+      await T.ev(`(()=>{const d=document.querySelector('dialog[open]');const a=new Set(${JSON.stringify(archivedTl)});return !d.querySelector('[data-cl=owner]')&&!/Who it is for/.test(d.textContent)&&![...d.querySelectorAll('[data-cl-list]')].some(b=>a.has(b.dataset.clList))})()`));
+    await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('input[name=cl-mode][value=expanded]').checked=true;d.querySelector('[data-cl=creator]').checked=true;d.querySelector('#cl-auto').value='300';d.querySelector('#cl-save').click();return true})()`);
+    check(G, `${who}: Card layout expanded: cards open; "By <name>" on cards`, await T.wait(`!document.querySelector('[data-card]') || document.querySelectorAll('[data-card].full').length>0`, 5000), 'By-lines: ' + await T.ev(`[...document.querySelectorAll('.card.full .details .row span')].filter(s=>/^By /.test(s.textContent)).length`));
     // round 4, item 4: an open card cuts the long description at 300 characters with Show more (and Show less); item 3: no category badge
     check(G, `${who}: an open card cuts a 400-character description at 300, Show more shows the rest (round 4, item 4)`, await T.wait(`!!${r4c}?.querySelector('[data-more]')`, 8000) &&
       await T.ev(`${r4c}.querySelector('.md').textContent.length<=302`) && (await T.click(`[data-more="${r4.id}"]`), await T.wait(`${r4c}.querySelector('.md').textContent.length>390&&/Show less/.test(${r4c}.querySelector('[data-more]').textContent)`, 3000)),
@@ -589,7 +597,7 @@ async function gUi() {
     await T.reload(); await T.ready();
     check(G, `${who}: the welcome does not come back after a reload`, await T.ev('!document.getElementById("welcome")'));
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
-    check(G, `${who}: Card layout survives a reload`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.querySelector('input[name=cl-mode][value=expanded]').checked&&d.querySelector('[data-cl=owner]').checked&&d.querySelector('#cl-auto').value==='300'})()`));
+    check(G, `${who}: Card layout survives a reload`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.querySelector('input[name=cl-mode][value=expanded]').checked&&d.querySelector('[data-cl=creator]').checked&&d.querySelector('#cl-auto').value==='300'})()`));
     await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
     // round 4, item 5: a small card shows its number and a second line with what Card layout switches on (by default End)
     check(G, `${who}: a small card shows its number and an End line (round 4, item 5)`, await T.wait(`!!${r4c}?.classList.contains('compact')&&!!${r4c}.querySelector('.ref')&&/End \\d{4}-/.test(${r4c}.querySelector('.sub')?.textContent||'')`, 5000),
@@ -597,6 +605,16 @@ async function gUi() {
     await T.ev(`(${r4c}.click(),true)`); await T.wait('!!document.querySelector("dialog[open] #ft")', 5000);
     check(G, `${who}: the task window shows the number (Card layout) and no Sources while Source is off (round 4, items 3, 5)`,
       await T.ev(`(document.getElementById('fwho')?.textContent||'')===${r4c}.querySelector('.ref').textContent&&!document.querySelector('dialog[open] #srcs')`), await T.ev(`document.getElementById('fwho')?.textContent`));
+    // edit window, items 1-3: no Quadrant, no For; the number sits on the formatting row (right at 1440, under the buttons at 390)
+    const rowAt = `(()=>{const d=document.querySelector('dialog[open]'),f=d.querySelector('.fbar .fmt'),w=d.querySelector('.fbar #fwho');if(!f||!w)return null;const a=f.getBoundingClientRect(),b=w.getBoundingClientRect();return {same:Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<=4,below:b.top>=a.bottom-1,right:b.left>a.right,fits:d.scrollWidth<=d.clientWidth,fq:!!d.querySelector('#fq'),forText:d.querySelector('#fwho').textContent.split(' ').includes('For')}})()`;
+    const wide = await T.ev(rowAt);
+    check(G, `${who}: task window at 1440: no Quadrant, no For, the info line on the formatting row, right of the buttons (edit window, items 1-3)`, !!wide && wide.same && wide.right && !wide.fq && !wide.forText, JSON.stringify(wide));
+    await T.shot(`ui-edit-window-${who}-1440x900-${theme}`);
+    await T.size(390, 844); await sleep(400);
+    const narrow = await T.ev(rowAt);
+    check(G, `${who}: task window at 390: the info line wraps under the buttons, no horizontal scroll (edit window, item 2)`, !!narrow && narrow.below && narrow.fits, JSON.stringify(narrow));
+    await T.shot(`ui-edit-window-${who}-390x844-${theme}`);
+    await T.size(1440, 900);
     await closeDialogs(T);
     // round 4, item 3: Source on shows the category badge and Sources with All lists, never with one list selected
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');

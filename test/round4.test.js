@@ -34,7 +34,7 @@ test('descClip: word boundary, unclosed markers dropped, lone bullet dropped, 0 
 test('cardFacts: only what Card layout switches on and the item has, in card order', () => {
   const t = { deadline: new Date(2), createdAt: new Date(1), createdBy: 'u1', ownerId: 'u2' };
   assert.deepEqual(C.cardFacts(t, C.readCardLayout(null)).map(f => f.k), ['end'], 'defaults: End only');
-  assert.deepEqual(C.cardFacts(t, C.readCardLayout({ end: false, created: true, creator: true, owner: true })).map(f => f.k), ['created', 'creator', 'owner']);
+  assert.deepEqual(C.cardFacts(t, C.readCardLayout({ end: false, created: true, creator: true, owner: true })).map(f => f.k), ['created', 'creator'], 'owner is no longer a fact (edit window, item 3)');
   assert.deepEqual(C.cardFacts({ createdBy: 'u1' }, C.readCardLayout({ created: true, creator: true, owner: true })), [{ k: 'creator', id: 'u1' }], 'missing facts left out');
   assert.equal(C.cardFacts(t, C.readCardLayout({ created: true })).find(f => f.k === 'created').at, t.createdAt);
 });

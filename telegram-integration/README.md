@@ -7,12 +7,10 @@ prefilled card; the person taps buttons until it is right and presses Save. Stan
 ```
 New task
 clean up the table
-List: OtherTasks · Quadrant: Auto: Plan? · For: Me · Due: no date
+List: OtherTasks · Due: no date
 ? = suggested, tap to change
 
 [Backlog] [• OtherTasks] [Reminders] [HomeOS tasks]
-[• Auto] [Do] [Plan] [Delegate] [Eliminate]
-[• Me] [Nastia] [Both] [Agent]
 [Today] [Tomorrow] [Weekend] [+1 wk] [• None]
 [🏷 Tags (0)] [+ Description]
 [✅ Save] [✖ Cancel]
@@ -41,11 +39,12 @@ tags; **+ Description** asks for a reply to the card. Texts are in English, Ukra
 Rules on the card:
 - The list decides the kind: a list whose `default_category` is `reminder` makes a reminder, which needs a date (a date
   alone gets 09:00).
-- **For** shows only people on the chosen list (the database refuses an owner who is not a member). **Both** writes no
-  owner. **Agent** owns it as `homeos-agent` and moves the card to the agent list when the chosen one does not have the
-  agent.
-- Auto writes the LLM's quadrant when it gave one (shown as "Auto: Plan?"), else none (the app then shows
-  `deriveQuadrant`). On a change card, Auto on a stored quadrant clears it.
+- No Quadrant and no For on the card since 2026-10-29, as in the app's task window. The quadrant is still written:
+  the keyword or the LLM's quadrant when there is one, else none (the app then shows `deriveQuadrant`); a change card
+  keeps the stored one. The owner is still written: "for Nastia", "for both" (no owner) or "for the agent" in the
+  message, else the asker; after a list change, an owner who is not on the new list falls back to the asker (the
+  database refuses an owner who is not a member). `owner_options` stays exported for bots that want their own row.
+- Buttons `q…` and `o…` on cards sent before the change do nothing when tapped.
 - The leading command's kind holds: "remind me" lands on a reminder list, "add a task" never on one.
 - A change card opens on the stored values and Save sends only what changed, with the version shown.
 
