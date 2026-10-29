@@ -155,7 +155,7 @@ test('remove marks the approved request removed through the agent login', async 
   assert.equal(db.closed, true);
 });
 
-test('setup: dry run changes nothing; --apply creates both policies and the request app, keeps the household policy, prints the id', async () => {
+test('setup: dry run changes nothing; --apply creates both policies, the request app and the phone app, keeps the household policy, prints the id', async () => {
   let st = cfState(), cf = fakeCf(st);
   const env = Object.assign({}, ENV, { CF_ACCESS_GUEST_POLICY_ID: '' });
   delete st.policies.pg;
@@ -163,6 +163,7 @@ test('setup: dry run changes nothing; --apply creates both policies and the requ
   assert.equal(r.code, 0);
   assert.match(r.out, /would create policy "TasksDashboard guests"/);
   assert.match(r.out, /would create app "TasksDashboard request" for board\.example\.com\/request, board\.example\.com\/config\/tasksdashboard\.config\.js/);
+  assert.match(r.out, /would create app "TasksDashboard phone app" for board\.example\.com\/app, board\.example\.com\/app\/\*/);
   assert.match(r.out, /before: Household\n.*after: {2}Household, TasksDashboard guests/);
   assert.ok(cf.calls.every(c => c.startsWith('GET ')));
   r = await runCmd(['setup', '--apply'], { env, fetch: cf.fetch });
@@ -174,6 +175,10 @@ test('setup: dry run changes nothing; --apply creates both policies and the requ
   const app = Object.values(st.apps).find(x => x.name === A.REQUEST_APP);
   assert.deepEqual(app.destinations.map(d => d.uri), ['board.example.com/request', 'board.example.com/config/tasksdashboard.config.js']);
   assert.deepEqual(app.policies.map(p => p.id), [bypass.id]);
+  const phone = Object.values(st.apps).find(x => x.name === A.PHONE_APP);
+  assert.deepEqual(phone.destinations.map(d => d.uri), ['board.example.com/app', 'board.example.com/app/*']);
+  assert.equal(phone.domain, 'board.example.com/app');
+  assert.deepEqual(phone.policies.map(p => p.id), [bypass.id]);
   assert.deepEqual(st.apps.app1.policies.map(p => p.id), ['ph', guest.id]);
   assert.equal(st.apps.app1.aud, undefined);   // read-only fields are not sent back
   assert.match(r.out, new RegExp(`CF_ACCESS_GUEST_POLICY_ID=${guest.id}`));

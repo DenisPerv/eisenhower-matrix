@@ -11,6 +11,9 @@ export const GUEST_POLICY = 'TasksDashboard guests';
 export const BYPASS_POLICY = 'TasksDashboard request (bypass)';
 export const REQUEST_APP = 'TasksDashboard request';
 export const REQUEST_PATHS = ['/request', '/config/tasksdashboard.config.js'];
+// the phone app (app/, published at /app/) is public at the edge and gates itself (docs/hosting.md "The phone app")
+export const PHONE_APP = 'TasksDashboard phone app';
+export const PHONE_PATHS = ['/app', '/app/*'];
 // a reusable policy needs one include rule; this address can never sign in (.invalid), and list/add/remove hide it
 export const PLACEHOLDER = 'no-guests-yet@example.invalid';
 export const SEATS = { warn: 45, max: 50 };   // Zero Trust free plan: 50 users (G5)
@@ -21,7 +24,8 @@ const USAGE = `usage: node cli/access.mjs <command> [options]     (dry run unles
   list                         the guests policy's emails and seats, the production app's policies
   add     --email A [--force]  add A to the guests policy (warn at ${SEATS.warn} emails, refuse at ${SEATS.max} unless --force)
   remove  --email A            take A off the guests policy; its approved request becomes removed
-  setup                        create the guests policy, the bypass policy and the request app (${REQUEST_PATHS.join(', ')}),
+  setup                        create the guests policy, the bypass policy, the request app (${REQUEST_PATHS.join(', ')})
+                               and the phone app (${PHONE_PATHS.join(', ')}), both on the bypass policy,
                                attach the guests policy to the production app keeping every policy it has
   process [--force]            open tasks in the Access requests list: Approved / Declined as the first word of the
                                description → the guests policy, access_request_decided, the task done
@@ -237,6 +241,13 @@ export async function run(argv, out = console.log, deps = {}) {
         destinations: REQUEST_PATHS.map(p => ({ type: 'public', uri: host + p })), session_duration: '24h', app_launcher_visible: false,
         policies: [{ id: bypass.id, precedence: 1 }] });
     } else out(`app "${REQUEST_APP}": ${reqApp.id}`);
+    let phoneApp = (await cf.apps()).find(x => x.name === PHONE_APP);
+    if (!phoneApp) {
+      out(`${a.apply ? 'create' : 'would create'} app "${PHONE_APP}" for ${PHONE_PATHS.map(p => host + p).join(', ')}, policy "${BYPASS_POLICY}"`);
+      if (a.apply) phoneApp = await cf.createApp({ name: PHONE_APP, type: 'self_hosted', domain: host + PHONE_PATHS[0],
+        destinations: PHONE_PATHS.map(p => ({ type: 'public', uri: host + p })), session_duration: '24h', app_launcher_visible: false,
+        policies: [{ id: bypass.id, precedence: 1 }] });
+    } else out(`app "${PHONE_APP}": ${phoneApp.id}`);
     // G6: the production app keeps every policy it has; the guests policy is added after the last
     const plan = attachPlan(app.policies, guest ? guest.id : '(new)');
     out('production app policies before: ' + (plan.before.map(p => p.name).join(', ') || '(none)'));

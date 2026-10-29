@@ -4,10 +4,10 @@ TasksDashboard is an Eisenhower matrix task app: one HTML file (`TasksDashboard.
 
 | Page | Read it for |
 |---|---|
-| [architecture.md](architecture.md) | the pieces (page, core, UI, CLI, database, host) and how data flows between them |
+| [architecture.md](architecture.md) | the pieces (page, core, UI, phone app, CLI, database, host) and how data flows between them; the phone app's structure, durable queue, service worker and gate |
 | [database.md](database.md) | the SQL files and their apply order, the RLS model, the functions (RPCs), limits, how to change the schema |
-| [auth.md](auth.md) | password and Google sign-in, sessions and storage, the sign-up hook and allowlist, closing registrations |
-| [hosting.md](hosting.md) | serving the page on Cloudflare Pages behind Cloudflare Access: setup steps, headers and CSP, Supabase redirect URLs, verified free-plan facts |
+| [auth.md](auth.md) | password and Google sign-in (also in the phone app), sessions and storage, the sign-up hook and allowlist, closing registrations |
+| [hosting.md](hosting.md) | serving the page on Cloudflare Pages behind Cloudflare Access: setup steps, the phone app at `/app/` with its Access bypass, headers and CSP, Supabase redirect URLs, verified free-plan facts |
 | [testing-and-release.md](testing-and-release.md) | unit tests, the end-to-end runner, the selftests, branches and the release flow |
 | [api/README.md](api/README.md) and [api/openapi.yaml](api/openapi.yaml) | the read API: the weekly review report (`rpc/review_report`), tokens, curl examples, errors |
 | [deployment/](deployment/README.md) | the step-by-step runbook for a deploy or a rollback (version check, deploy, post-deploy check) |

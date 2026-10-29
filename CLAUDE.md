@@ -10,8 +10,11 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`, public values, committed |
 | `db/001_schema.sql` … `004_seed.sql`, `005_item_order.sql`, `006_archived_lists.sql`, `007_renewal.sql`, `008_telegram_editor.sql`, `009_multiuser_schema.sql`, `010_multiuser_functions.sql`, `011_multiuser_rls.sql`, `012_round3.sql`, `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql`, `019_bot_opt_out.sql`, `020_priority_retired.sql`, `021_drop_priority.sql` (apply only when every client runs code without priority), `900_selftest.sql`, `901_selftest_multiuser.sql`, `902_selftest_round3.sql`, `903_selftest_access.sql`, `904_selftest_review_report.sql`, `905_selftest_telegram.sql`, `906_selftest_task_links.sql` | the database, applied in file order (README "Set up") |
 | `cli/lib.mjs`, `cli/tasks.mjs` | the CLI and its helpers (also used by the e2e runner) |
+| `cli/sync-app-core.mjs` | writes `app/td-core.js` from the `<script id="core">` block of `TasksDashboard.html`; `--check` exits 1 when the copy is out of date |
 | `cli/access.mjs` | access requests (`db/015`) to the Cloudflare Access guests policy: `list`, `add`, `remove`, `setup`, `process`; dry run unless `--apply` |
-| `test/core.test.js`, `test/multiuser.test.js`, `test/round3.test.js`, `test/round3-tags.test.js`, `test/round3-review.test.js`, `test/round3-p1.test.js`, `test/round4.test.js`, `test/links.test.js`, `test/edit-window.test.js`, `test/priority-position.test.js`, `test/access.test.js`, `test/cli.test.js`, `test/api-doc.test.js`, `test/telegram-parity.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
+| `app/index.html`, `app/td-core.js`, `app/td-data.js`, `app/sw.js`, `app/manifest.webmanifest`, `app/icons/` | the phone app, a second page published at `/app/`: the UI (inline CSS and script), the rules copied from the web's core block (generated, never edited), the data layer (a twin of the web's), the service worker (scope `/app/`), the manifest and the PNG icons. Section "The phone app has a twin in the web page" |
+| `test/app-core-parity.test.js`, `test/app-data.test.js`, `test/app-sw.test.js` | the phone app's tests: the core copy equals the block, the data layer against a fake Supabase, the service worker's cache rules (all no network) |
+| `test/core.test.js`, `test/multiuser.test.js`, `test/round3.test.js`, `test/round3-tags.test.js`, `test/round3-review.test.js`, `test/round3-p1.test.js`, `test/round4.test.js`, `test/links.test.js`, `test/edit-window.test.js`, `test/edit-nav.test.js`, `test/priority-position.test.js`, `test/access.test.js`, `test/cli.test.js`, `test/api-doc.test.js`, `test/telegram-parity.test.js`, `test/e2e.mjs` | unit tests and the end-to-end runner |
 | `README.md`, `CLAUDE.md`, `dependencies-doc.md` | documentation |
 | `docs/README.md`, `docs/architecture.md`, `docs/database.md`, `docs/auth.md`, `docs/hosting.md`, `docs/testing-and-release.md` | the documentation pages (index in `docs/README.md`); README stays the technical reference |
 | `docs/api/openapi.yaml`, `docs/api/README.md` | the read API: OpenAPI 3.1 description and curl examples (weekly review report `rpc/review_report`, `db/016`); `test/api-doc.test.js` checks them against `db/` |
@@ -25,6 +28,17 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 
 `telegram-integration/` builds the same card as the app's task window (title, list, end, description, tags; since 2026-10-29 neither has a Quadrant or a For field, but both still write a quadrant and an owner). When the app's create or edit window changes (a field added, removed or renamed, a new rule for a field, the quadrant rule `deriveQuadrant`, the tag picker), change `telegram-integration/` in the same change: its card, its payloads, its tests (`python -m unittest discover telegram-integration/tests`) and its README. `test/telegram-parity.test.js` checks the quadrant names and `deriveQuadrant` against the module's shared cases. Bots that copied the module refresh their copy afterwards.
 
+## The phone app has a twin in the web page
+
+`app/` is a second client of the same database. It shares the rules and has its own copy of the data code:
+
+- `app/td-core.js` is generated from `<script id="core">` by `node cli/sync-app-core.mjs`; `test/app-core-parity.test.js` fails when it is stale. A change to the core block is followed by that command in the same change; never edit `app/td-core.js` by hand.
+- `app/td-data.js` is a port of the page's main-script data code (sign-in and refresh, `rest`, load, poll, versioned writes and the field-level conflict, links, tags, lists, sharing, preferences). Each part names the web function it came from ("web: name"). When the web's write path, auth, a field rule or a stored key changes, change `app/td-data.js` and `test/app-data.test.js` in the same change, or list the gap in the commit body and in the README "Phone app" section.
+- The access gate (`gate()`, `requestAccess()`) repeats what `request.html` does with `rpc/my_access_request` and `rpc/request_access`; change them together.
+- Both clients share the storage key `td.auth`, the Web Lock `td.refresh`, the BroadcastChannel `td.auth` and the synced preferences, except the selected list: the phone keeps its own in `localStorage td.app.list` (it reads `prefs.list` only as the first default). A change to a shared key or preference is a change to both clients.
+- `app/index.html` is the source of the phone UI (its inline scripts are edited in place; nothing generates it). `app/td-core.js` is the only generated file.
+- The app has no copy of the desktop UI: a UI change on the web does not need one in `app/`. A new database object, RPC or column that the web uses is checked for the app too.
+
 ## Deployment: use `docs/deployment/` whenever the person asks for one
 
 When the person asks to deploy, publish, update or roll back the hosted page, or asks whether it is up to date, read `docs/deployment/README.md` first. Then follow its three steps in order: the version check, the deploy, the post-deployment check.
@@ -36,7 +50,7 @@ When the person asks to deploy, publish, update or roll back the hosted page, or
 
 ## README is the documentation: update it with every change
 
-Every change to `TasksDashboard.html`, `request.html`, `cli/`, `db/` or `test/e2e.mjs` updates `README.md` in the same commit. No exceptions, including small fixes.
+Every change to `TasksDashboard.html`, `request.html`, `app/`, `cli/`, `db/` or `test/e2e.mjs` updates `README.md` in the same commit. No exceptions, including small fixes.
 
 - Before committing, check each README section against the change: Database, Config, Sign-in, Data and sync, Preferences and Settings, Storage, Features, CLI, Tests, Limits.
 - Values in the README come from the code (`PREFS_DEFAULTS`, `SETTINGS_DEFAULTS`, `restError`, `*_KEY`, `PAGE`, `POLL_OVERLAP_MS`, `EXIT`), never from memory.
@@ -51,9 +65,20 @@ Every change to `TasksDashboard.html`, `request.html`, `cli/`, `db/` or `test/e2
 - Commits go to `development_maxden`. When asked to merge or push: merge `development_maxden` into `release_maxden` and push `release_maxden`.
 - Never force-push.
 
+## Local first: every change is tested locally before it is released
+
+Rule since 2026-10-29: the deployed and local versions had drifted apart, each with changes the other lacked.
+
+- **The local version** is the checkout the person runs, on `development_maxden`. In HomeOS that is the mounted submodule `Views/TasksDashboard`, served on http://localhost:8788 by `node scripts/tasksdb/serve-local.js` from HomeOS. A build worktree is not the local version.
+- **It always holds every change.** Every change lands on `development_maxden`, and right after each push the local checkout is fast-forwarded to `origin/development_maxden`. Until something is deployed, the newest code is on the local version, never only on `release_maxden`, the hosted page or a worktree.
+- **The person tests locally first.** Nothing is merged into `release_maxden` and nothing is deployed until the person has tested the change on the local version and said so in chat. A plan puts "local test by <person>" before its release task, and its release and deploy tasks depend on it. A worker stops at "ready for local test", reports the sha and leaves the release and deploy rows pending.
+- **Release and deploy only follow development.** `release_maxden` only ever receives merges from `development_maxden`. A fix made directly on `release_maxden` (avoid it) is merged back into `development_maxden` in the same task. Deploys come only from `release_maxden`. So the hosted page is never ahead of the local version.
+- **Database changes follow the same order.** A `db/` file that the released page needs is applied live before the person's local test, because the local page runs against the live database too.
+
 ## Code
 
-- One HTML file, no build step, no runtime dependencies, opens from `file://`.
+- `TasksDashboard.html`: one HTML file, no build step, no runtime dependencies, opens from `file://`.
+- `app/`: one app page (`index.html`) plus its scripts (`td-core.js`, `td-data.js`), manifest, service worker and icons; no build step beyond `node cli/sync-app-core.mjs`, no libraries. The PWA parts (manifest, service worker, install) need an https or `http://localhost` origin; `app/` does not need to open from `file://` (the page skips the worker there; Google sign-in is hosted or localhost only). A new inline script, external script or network host in `app/index.html` changes the `/app/*` CSP template in `docs/deployment/2-deploy.md` in the same commit.
 - The only network calls are `fetch` to `TD_CONFIG.supabaseUrl` (`/auth/v1`, `/rest/v1`). No libraries, nothing else loaded from the network.
 - Logic stays in `<script id="core">` with no DOM and no system clock (time is a parameter). The CLI and the tests load that block through `vm` (`cli/lib.mjs` `loadCore`), so there is one rule set.
 - The CLI and the tests are dependency-free Node. `telegram-integration/` is the one Python folder: standard library only, never loaded by the page.

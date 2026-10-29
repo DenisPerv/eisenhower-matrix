@@ -12,6 +12,7 @@ Why not Supabase itself: on the free plan Supabase Storage and Edge Functions se
 | `/config/tasksdashboard.config.js` | the config | public values only (`supabaseUrl`, `publishableKey`, `pollMs`) |
 | `/privacy` (`privacy.html`) | `privacy.html` | no script; the Google consent screen's privacy link |
 | `/request` (`request.html`) | `request.html` | the access-request page, exactly one inline script ([access-requests.md](access-requests.md)) |
+| `/app/` (`app/index.html`) | `app/index.html`, `app/td-core.js`, `app/td-data.js`, `app/sw.js`, `app/manifest.webmanifest`, `app/icons/*.png` | the phone app, only when the release has `app/index.html`; `sw.js` gets the release sha, the page's script addresses get `?v=<short sha>` ([deployment/2-deploy.md](deployment/2-deploy.md)) |
 | `_headers` | generated | security headers and the CSP (below); not served itself |
 | `/version.json` | generated | `{ "sha", "builtAt" }` of the release commit, for the version check |
 
@@ -31,6 +32,27 @@ Nothing else: never `db/`, `cli/`, `test/`, `docs/` or the Markdown files. Only 
 
 **Household:** project `homeos-tasksboard` (`https://homeos-tasksboard.pages.dev`), set up on 2026-10-27 by the HomeOS hosting plan (`references/homeos/tasksdb/hosting-plan.md` in HomeOS), deployed by HomeOS `scripts/tasksdb/deploy-pages.js` from Maksym's PC, the only machine with the tokens. Access stays on production; strangers ask for access on `/request`, which a bypass application makes public together with the config ([access-requests.md](access-requests.md)).
 
+## The phone app on the same project
+
+The phone app ([architecture.md](architecture.md), section Phone app) ships from the same Pages project and domain: `https://<project>.pages.dev/app/`. Same origin means the same Supabase redirect allow-list (`https://<project>.pages.dev/**` already covers `/app/`), the same config file and the same `td.auth` storage.
+
+**Person step: a path bypass for `/app/*`.** Access in front of the app breaks installing it: the browser fetches the manifest and icons without the Access cookie, and an iPhone's installed app does not share Safari's cookies. So `/app/*` is public at the edge and the app gates itself; the website at `/` keeps Access. It is the same pattern as `/request` ([access-requests.md](access-requests.md)):
+
+1. `node cli/access.mjs setup --env <file>` (dry run), then with `--apply`: it creates, when missing, the self-hosted application **TasksDashboard phone app** for `<project>.pages.dev/app` and `<project>.pages.dev/app/*` with the bypass policy (action **Bypass**, include **Everyone**) it also uses for `/request`; the more specific path wins over the production application ([access-requests.md](access-requests.md)).
+2. By hand instead: Zero Trust → Access → Applications → Add → Self-hosted; domain `<project>.pages.dev`, paths `app` and `app/*`; policy Bypass, include Everyone.
+3. Check in a private window: `/app/` opens the app without the Access page; `/` still asks for Access.
+
+Bypass hides nothing that was hidden before: Access never protected the data, RLS does ([What Access does and does not do](#what-access-does-and-does-not-do)).
+
+**After the first deploy with the app, check the headers:**
+
+- `/app/`: exactly one `Content-Security-Policy`, the app's (`connect-src 'self' <supabaseUrl>`, `manifest-src 'self'`, `worker-src 'self'`), and `Cache-Control: no-cache`. Two policies joined by a comma mean the `! Content-Security-Policy` detach line is missing.
+- `/app/sw.js` and `/app/manifest.webmanifest`: `no-cache`.
+- `/`: unchanged, the page's CSP (`connect-src` only the Supabase origin).
+- The Cloudflare features that inject scripts stay off (below); the app's CSP blocks them too.
+
+**Switch the app off.** Deploy a release without `app/` (the script then ships no `app/` file and no `/app` header rule), or delete the bypass application so `/app/*` is behind Access again. A phone that installed the app keeps its cached shell until the next network start; the website and `file://` are not affected.
+
 ## Headers and CSP
 
 `_headers` applies one policy to every path:
@@ -38,6 +60,8 @@ Nothing else: never `db/`, `cli/`, `test/`, `docs/` or the Markdown files. Only 
 - `Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-<each inline script>'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src <supabaseUrl>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`
 - `Referrer-Policy: no-referrer` (keeps the Google `?code=` out of any request), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`, `Permissions-Policy` with every device off, `Strict-Transport-Security`, `X-Robots-Tag: noindex`
 - `Cache-Control: no-cache` for `/`, `/index.html`, `/request`, the config and `version.json`
+
+Paths under `/app/` get their own CSP (`default-src 'none'; script-src 'self' 'sha256-<each inline script of app/index.html>'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' <supabaseUrl>; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'`); the template is in `docs/deployment/2-deploy.md`.
 
 `script-src` lists the sha256 of the body of each inline `<script>` of the page and of `request.html` (line endings LF), so a new inline script, an external script or a new network host needs the template changed in the same commit (`docs/deployment/2-deploy.md` holds the template). `connect-src` is only the Supabase origin, so a stolen token cannot be sent anywhere else from the page. Turn off any Cloudflare feature that injects scripts (Web Analytics auto-inject, Rocket Loader, email obfuscation): the CSP blocks them and the page breaks.
 
@@ -50,7 +74,7 @@ Nothing else: never `db/`, `cli/`, `test/`, `docs/` or the Markdown files. Only 
 
 ## Storage per origin
 
-Each hosted origin has its own browser storage (`td.auth`, `td.accounts`, `td.pkce`, `td.theme`, `td.rail`): sign in once on each; signing out of one leaves the others signed in.
+Each hosted origin has its own browser storage (`td.auth`, `td.accounts`, `td.pkce`, `td.theme`, `td.rail`; the phone app adds `td.app.pkce`, `td.app.theme`, `td.app.lastList`, IndexedDB `td-app` and the cache `td-app-<sha>`; the web page and the app share the origin, so they share the sign-in): sign in once on each; signing out of one leaves the others signed in.
 
 ## Verified free-plan facts
 

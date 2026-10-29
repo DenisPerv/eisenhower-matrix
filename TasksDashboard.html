@@ -215,7 +215,7 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .matrix.one .q{min-height:calc(100vh - var(--top) - 34px)}
 .q{position:relative;isolation:isolate;display:flex;flex-direction:column;overflow:hidden;
   background:radial-gradient(120% 70% at 0% 0%,color-mix(in srgb,var(--c) var(--aura),transparent),transparent 58%),radial-gradient(80% 60% at 100% 100%,color-mix(in srgb,var(--c) 9%,transparent),transparent 60%),var(--glass);
-  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);min-height:calc((100vh - var(--top) - 34px - 18px) / 2);transition:box-shadow .3s,transform .3s}
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);min-height:calc((100vh - var(--top) - 34px - 18px) / 2);transition:box-shadow .12s,transform .12s}
 .q::before{content:"";position:absolute;left:22px;right:22px;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.9;z-index:2}
 .q::after{content:attr(data-q);position:absolute;right:-6px;bottom:-62px;z-index:-1;pointer-events:none;font:italic 600 250px/1 var(--serif);color:transparent;-webkit-text-stroke:1.5px color-mix(in srgb,var(--c) 70%,transparent);opacity:var(--wm)}
 :root[data-theme="dark"] .q{box-shadow:var(--depth),0 0 90px -40px var(--c)}
@@ -256,6 +256,8 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .card.dragging{opacity:.45;transform:scale(.98)}
 .card.drop-before{box-shadow:0 -3px 0 var(--accent),0 -6px 18px -4px var(--glow)}
 .card.drop-after{box-shadow:0 3px 0 var(--accent),0 6px 18px -4px var(--glow)}
+/* drag lag fix (2026-10-29): the drop line shows at once; a box-shadow transition restarted on every dragover and slid the line */
+.card.drop-before,.card.drop-after,.lists [data-list].drop-before,.lists [data-list].drop-after,#pop [data-list].drop-before,#pop [data-list].drop-after,.mrow.drop-before,.mrow.drop-after{transition:none}
 .card.compact{grid-template-columns:minmax(0,1fr) auto auto auto}
 .card.full{grid-template-columns:auto minmax(0,1fr) auto auto auto auto}
 .card .ref{min-height:22px;border:0;background:transparent;padding:0 3px;color:var(--ink3);font:600 12px/1 var(--mono);font-variant-numeric:tabular-nums}
@@ -263,7 +265,6 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .card .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:500}
 .card .t strong,.ar strong{font-weight:700}
 .card .meta{color:var(--ink3);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.card .pin{min-height:20px;font-size:12px;font-weight:600;padding:0 9px;border-radius:999px;border-color:transparent;background:linear-gradient(135deg,var(--qc),color-mix(in srgb,var(--qc) 70%,#ff9f1c));color:var(--qc-on)}
 .card .exp{width:26px;min-height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--ink3)}
 .card .exp:hover{background:var(--hover);color:var(--ink)}
 .card .done{width:26px;min-height:26px;padding:0;border-radius:50%;background:transparent;border:1.5px solid var(--hair2);color:transparent}
@@ -367,13 +368,13 @@ dialog[open]{animation:pop .28s cubic-bezier(.2,.8,.2,1)}
 dialog::backdrop{background:rgba(24,20,70,.28);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 :root[data-theme="dark"] dialog::backdrop{background:rgba(2,2,12,.55)}
 dialog form > strong:first-child{display:block;font:600 26px/1.1 var(--serif);margin-bottom:var(--s3)}
-dialog label{display:block;margin-top:var(--s4);color:var(--ink2);font:600 12px var(--ui);letter-spacing:.01em}
-dialog label > select,dialog label > input{margin-top:var(--s2)}
-dialog input,dialog select{width:100%;min-height:38px;padding:0 12px;border:1px solid var(--hair2);border-radius:12px;background-color:var(--glass2);font:400 14px var(--font);color:var(--ink)}
+dialog label,.welcome label{display:block;margin-top:var(--s4);color:var(--ink2);font:600 12px var(--ui);letter-spacing:.01em}
+dialog label > select,dialog label > input,.welcome label > input{margin-top:var(--s2)}
+dialog input,dialog select,.welcome input{width:100%;min-height:38px;padding:0 12px;border:1px solid var(--hair2);border-radius:12px;background-color:var(--glass2);font:400 14px var(--font);color:var(--ink)}
 dialog select{padding-right:30px;font-weight:500}
-dialog input:focus,dialog select:focus{outline:0;border-color:var(--accent-line);box-shadow:0 0 0 4px var(--accent-bg)}
-dialog label.cb{display:flex;gap:var(--s3);align-items:center;font:500 13px var(--font)}
-dialog label.cb input{width:16px;min-height:16px;margin:0;accent-color:var(--accent)}
+dialog input:focus,dialog select:focus,.welcome input:focus{outline:0;border-color:var(--accent-line);box-shadow:0 0 0 4px var(--accent-bg)}
+dialog label.cb,.welcome label.cb{display:flex;gap:var(--s3);align-items:center;font:500 13px var(--font)}
+dialog label.cb input,.welcome label.cb input{width:16px;min-height:16px;margin:0;accent-color:var(--accent)}
 .flabel{margin-top:var(--s4);color:var(--ink2);font:600 12px var(--ui)}
 .fixed{display:flex;gap:12px;align-items:baseline;margin-top:8px}
 .fixed .flabel{margin-top:0}
@@ -450,7 +451,7 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   .ar{display:block;overflow-x:auto;white-space:nowrap}
   .ar-tools{gap:6px}
   dialog{padding:16px 16px 18px}
-  dialog input,dialog select,.rt{font-size:16px}
+  dialog input,dialog select,.rt,.welcome input{font-size:16px}
   .fmt button{min-width:40px;min-height:36px}
   .tagchip,.tag-add{min-height:36px}
   .tag-add{width:36px;height:36px}
@@ -573,7 +574,7 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .content{padding:18px 20px 18px 18px}
 .matrix{gap:16px}
 @property --sp{syntax:'<number>';inherits:false;initial-value:0}
-.q{--spot:18%;border:1px solid transparent;border-radius:var(--r-xl);transition:--sp .45s ease,box-shadow .3s;
+.q{--spot:18%;border:1px solid transparent;border-radius:var(--r-xl);transition:--sp .45s ease,box-shadow .12s;
   background:
     radial-gradient(340px circle at var(--qx,-500px) var(--qy,-500px),color-mix(in srgb,var(--c) calc(var(--sp) * var(--spot)),transparent),transparent 70%) padding-box,
     radial-gradient(110% 60% at 0% 0%,color-mix(in srgb,var(--c) var(--aura),transparent),transparent 60%) padding-box,
@@ -616,7 +617,6 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .card .exp{border-radius:var(--r)}
 .card .done{border-radius:var(--r-sm);width:22px;min-height:22px;margin:0 4px}
 .card .done:hover{background:var(--accent);box-shadow:0 0 14px -4px var(--glow)}
-.card .pin{border-radius:var(--r-sm);background:var(--qc)}
 .card .tagtxt,.card .details .tags button{border-radius:var(--r-sm)}
 
 /* archive, timeline */
@@ -686,32 +686,48 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .mrow.soon{box-shadow:inset 2px 0 0 var(--qc)}
 .nl-x{justify-content:flex-start;margin-top:var(--s2)}
 .s-hint{margin:2px 0 var(--s3);font-size:12px;line-height:1.4;color:var(--ink3);max-width:46ch}
+/* a radio group on one row (Moving between tasks, Cards open); it wraps on a narrow screen */
+dialog .cl-inline,.welcome .cl-inline{display:flex;flex-wrap:wrap;align-items:center;column-gap:var(--s5)}.cl-inline .s-hint{flex-basis:100%;margin:0}
 .s-row{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin-top:var(--s4);padding-top:var(--s3);border-top:1px solid var(--hair);font:500 13px var(--ui)}
 /* round 3: Card layout */
 dialog form.cl{min-width:min(420px,calc(100vw - 48px))}
-dialog fieldset{border:1px solid var(--hair);border-radius:var(--r);margin:var(--s4) 0 0;padding:var(--s2) var(--s4) var(--s3);display:grid;gap:var(--s2)}
-dialog legend{padding:0 var(--s2);font:500 13px var(--ui);color:var(--ink2)}
+dialog fieldset,.welcome fieldset{border:1px solid var(--hair);border-radius:var(--r);margin:var(--s4) 0 0;padding:var(--s2) var(--s4) var(--s3);display:grid;gap:var(--s2)}
+dialog legend,.welcome legend{padding:0 var(--s2);font:500 13px var(--ui);color:var(--ink2)}
 .cl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2) var(--s4)}
 .cl-lists{display:grid;gap:var(--s2);padding-left:22px}
 .cl-lists .n{font-size:12px;color:var(--ink3)}
 @media (max-width:480px){.cl-grid{grid-template-columns:1fr}}
-/* round 3: the first-login welcome, pinned under the profile menu; the menu button gets an accent ring while it is open */
-.welcome{position:fixed;z-index:25;width:min(360px,calc(100vw - 16px));background:var(--solid);border:1px solid var(--hair2);border-radius:var(--r-xl);
-  box-shadow:var(--depth),0 30px 70px -30px var(--glow);padding:var(--s5);color:var(--ink);
+/* round 3, then version 3 (2026-10-29): the welcome card, pinned under the profile menu (which gets an accent ring while it is
+   open); one long card with two forms: the body scrolls inside it, the action row stays at the bottom */
+.welcome{position:fixed;z-index:25;width:min(460px,calc(100vw - 16px));display:flex;flex-direction:column;background:var(--solid);border:1px solid var(--hair2);border-radius:var(--r-xl);
+  box-shadow:var(--depth),0 30px 70px -30px var(--glow);color:var(--ink);
   background-image:linear-gradient(90deg,var(--accent),var(--cyan) 60%,transparent);background-size:100% 2px;background-repeat:no-repeat}
 .welcome::before{content:"";position:absolute;top:-6px;right:22px;width:10px;height:10px;background:var(--solid);border-left:1px solid var(--hair2);border-top:1px solid var(--hair2);transform:rotate(45deg)}
-.welcome h2{margin:0 0 var(--s3);font:600 17px var(--serif)}
-.welcome p{margin:0 0 var(--s4);font-size:13px;line-height:1.45;color:var(--ink2)}
-.welcome dl{margin:0;display:grid;gap:var(--s2)}
-.welcome dt{display:flex;justify-content:space-between;gap:var(--s3);font:500 13px var(--ui)}
-.welcome dt .v{font:600 12px var(--mono);font-variant-numeric:tabular-nums;color:var(--accent-ink)}
-.welcome dd{margin:0 0 var(--s2);font-size:12px;line-height:1.4;color:var(--ink3)}
-.welcome .actions{margin-top:var(--s4)}
-#wl-go{background:var(--accent);border-color:transparent;color:var(--on-accent)}
+.welcome .wl-form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.welcome .wl-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:var(--s5) var(--s5) var(--s4)}
+.welcome h2{margin:0 0 var(--s3);padding-right:32px;font:600 19px var(--serif)}
+.welcome .wl-step{margin:0 0 var(--s1);font:600 11px var(--mono);letter-spacing:.02em;color:var(--accent-ink)}
+.welcome .wl-lead p{margin:0 0 var(--s3);font-size:13px;line-height:1.45;color:var(--ink2)}
+.welcome .wl-lead p:last-child{margin:var(--s3) 0 0}
+.welcome ul{margin:0;padding-left:18px;display:grid;gap:var(--s2);font-size:12.5px;line-height:1.45;color:var(--ink2)}
+.welcome kbd{font:600 12px var(--mono);padding:0 5px;border:1px solid var(--hair2);border-bottom-width:2px;border-radius:5px;background:var(--glass2);color:var(--ink)}
+.welcome .wl-card{margin-top:var(--s5);padding:var(--s4);border:1px solid var(--hair2);border-radius:var(--r);background:var(--well)}
+.welcome .wl-card h3{margin:0;font:600 15px var(--ui);color:var(--ink)}
+.welcome .wl-card .wl-sub{margin:2px 0 0;font-size:12px;line-height:1.4;color:var(--ink3)}
+.welcome .wl-card > label:first-of-type{margin-top:var(--s3)}
+.welcome .wl-card fieldset{background:var(--solid)}
+.welcome .wl-foot{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s5);border-top:1px solid var(--hair)}
+.welcome .wl-foot .sp{flex:1}
+.welcome .wl-foot button{min-height:38px;padding:0 18px;border-radius:var(--r);font:600 14px var(--ui)}
+.welcome .wl-pri{background:var(--accent);border-color:transparent;color:var(--on-accent)}
+.welcome .wl-pri:hover{background:var(--accent);filter:brightness(1.08)}
+.welcome .wl-x{position:absolute;z-index:1;top:10px;right:10px;width:32px;min-height:32px;padding:0;background:transparent;border-color:transparent;color:var(--ink3)}
+.welcome .wl-x:hover{color:var(--ink);background:var(--glass2)}
+.welcome .wl-x svg{width:16px;height:16px}
 #profile.beacon{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--r);box-shadow:0 0 0 6px var(--accent-bg),0 0 22px -4px var(--glow)}
 @media (prefers-reduced-motion:no-preference){#profile.beacon{animation:td-beacon 1.6s ease-out 2}}
 @keyframes td-beacon{0%{box-shadow:0 0 0 0 var(--glow)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 6px var(--accent-bg),0 0 22px -4px var(--glow)}}
-@media (max-width:700px){.welcome{left:8px;right:8px!important;width:auto}.welcome::before{display:none}}
+@media (max-width:700px){.welcome{left:8px;right:8px!important;width:auto}.welcome::before{display:none}.welcome .wl-body{padding:var(--s4)}.welcome .wl-card{padding:var(--s3)}.welcome .wl-foot{padding:var(--s3) var(--s4)}}
 
 /* dialog: a sharp panel with an aurora hairline across the top, plain dimmed backdrop */
 dialog{border-radius:var(--r-xl);border:1px solid var(--hair2);background:var(--solid);box-shadow:var(--depth),0 40px 90px -40px var(--glow);
@@ -719,8 +735,8 @@ dialog{border-radius:var(--r-xl);border:1px solid var(--hair2);background:var(--
 dialog::backdrop{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(14,12,40,.42)}
 :root[data-theme="dark"] dialog::backdrop{background:rgba(0,0,6,.66)}
 dialog form > strong:first-child{font:500 28px/1.1 var(--serif)}
-dialog label,.flabel{font:500 13px var(--ui);letter-spacing:.01em}
-dialog input,dialog select,.rt{border-radius:var(--r)}
+dialog label,.flabel,.welcome label{font:500 13px var(--ui);letter-spacing:.01em}
+dialog input,dialog select,.rt,.welcome input{border-radius:var(--r)}
 .fmt{border-radius:var(--r);padding:0;gap:0}
 .fmt button{border-radius:0;border-right:1px solid var(--hair)}
 .fmt button:last-child{border-right:0}
@@ -783,7 +799,7 @@ html{transition:--grid .45s ease}
 body::before{translate:calc((var(--fx) - .5) * 34vw) calc((var(--fy) - .5) * 30vh);
   filter:blur(28px) saturate(1.2) hue-rotate(calc((var(--fx) - var(--fy)) * 70deg));
   transition:translate .9s cubic-bezier(.2,.8,.2,1),filter .5s ease}
-.q{transition:--sp .45s ease,--aura .45s ease,box-shadow .3s}
+.q{transition:--sp .45s ease,--aura .45s ease,box-shadow .12s}
 html.axes-moving{--grid:rgba(82,53,240,.13)}
 html.axes-moving body::before{filter:blur(22px) saturate(1.75) brightness(1.06) hue-rotate(calc((var(--fx) - var(--fy)) * 70deg));transition:translate .18s linear,filter .25s ease}
 html.axes-moving .q{--aura:26%}
@@ -1021,10 +1037,7 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .fref{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;background:var(--well);border:1px solid var(--hair);border-radius:var(--r);color:var(--ink2);font-weight:600}
 @media (max-width:519px){.fbar .fwho{margin-left:0;justify-content:flex-start;flex-basis:100%}}
 /* round 3 P1: the task window is wider (U5); List, Quadrant and End share a row; Save stays in view at the bottom */
-dialog.tk{width:min(720px,94vw)}
 .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 var(--s4)}
-dialog.tk .actions{position:sticky;bottom:-22px;z-index:2;margin:var(--s5) -24px -22px;padding:var(--s4) 24px 22px;background:var(--solid);border-top:1px solid var(--hair)}
-@media (max-width:700px){dialog.tk .actions{bottom:-18px;margin:var(--s4) -16px -18px;padding:var(--s3) 16px 18px}}
 /* the task window's tags (U1, U2, U6, U7, U8): a search box, then one group per tag list, its name on top and its chips below; a
    closed group is one row; the groups scroll inside a box of about 40% of the window's height */
 .tagpick{margin-top:var(--s4)}
@@ -1051,19 +1064,146 @@ dialog input.tg-q{width:min(260px,100%);min-height:32px;padding:0 10px;font-size
 .lk-g{color:var(--lk-c);font-weight:700;margin-right:1px}
 .lk-adds{display:flex;flex-wrap:wrap;gap:6px;padding-top:8px;border-top:1px solid var(--hair)}
 .lk-adds .lk-g{margin-right:3px}
-/* previous / next task: buttons in the window header, faded ghost cards beside the window (top layer popovers) */
-dialog.tk form{position:relative}
-.tk-nav{position:absolute;top:0;right:0;display:flex;gap:4px}
-.tk-nav button{min-width:34px;min-height:32px;padding:0;font-size:18px;line-height:1}
-.tk-ghost{position:fixed;inset:auto;margin:0;width:220px;padding:12px 14px 12px 18px;border:1px solid var(--rim);border-radius:16px;background:var(--glass3);
-  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);color:var(--ink2);box-shadow:var(--depth);text-align:left;font:500 13px/1.35 var(--ui);opacity:.55;cursor:pointer;transition:opacity .15s}
-.tk-ghost::before{content:"";position:absolute;left:7px;top:12px;bottom:12px;width:3px;border-radius:3px;background:var(--c)}
-.tk-ghost.prev{transform:rotate(-2deg)}.tk-ghost.next{transform:rotate(2deg)}
-.tk-ghost:hover{opacity:.92}
-.tk-ghost .k{display:block;font:500 11.5px var(--mono);color:var(--ink3);margin-bottom:3px}
-.tk-ghost .t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.tk-ghost .d{display:block;margin-top:6px;font-size:11.5px;color:var(--ink3)}
-@media (prefers-reduced-motion:reduce){.tk-ghost{transition:none}}
+/* the task deck (edit-nav plan, 2026-10-29): one full-screen modal for a whole edit session. The task window is its card in the
+   middle row; the zones left and right of the card switch to the previous / next task (a shadow band or the Coverflow copies from 1000 px, edge tabs below),
+   the bands above and below close. Side zones tint in the neighbour's quadrant colour, close areas in neutral ink */
+dialog.tk-deck{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;border-radius:0;
+  background:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;overflow:hidden;color:var(--ink)}
+dialog.tk-deck[open]{display:grid;grid-template-rows:minmax(5vh,1fr) auto minmax(max(5vh,68px),1fr);
+  grid-template-columns:minmax(0,1fr) min(720px,94%) minmax(0,1fr);animation:none}
+@media (max-width:999px){dialog.tk-deck[open]{grid-template-columns:minmax(0,1fr) min(720px,calc(100% - 48px)) minmax(0,1fr)}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) dialog.tk-deck::backdrop{background:rgba(0,0,6,.66)}}
+/* the card: the old task window's look; the scroll container. It lives as long as the deck, so pop runs once. Its top line is the
+   task's colour: lists carry no colour, so the quadrant's (--c from data-q on the deck, on each Coverflow copy its own task's) */
+:is(.tk-card,.tk-pv){grid-area:2/2;position:relative;z-index:1;min-width:0;max-height:calc(95vh - max(5vh,68px));max-height:calc(95dvh - max(5vh,68px));overflow:auto;overscroll-behavior:contain;
+  padding:22px 24px;border:1px solid var(--hair2);border-radius:var(--r-xl);color:var(--ink);background-color:var(--solid);
+  background-image:linear-gradient(90deg,var(--c,var(--accent)),color-mix(in srgb,var(--c,var(--accent)) 45%,transparent) 60%,transparent);background-size:100% 3px;background-repeat:no-repeat;
+  box-shadow:var(--depth),0 40px 90px -40px var(--glow);scrollbar-width:thin;scrollbar-color:var(--hair2) transparent}
+dialog.tk-deck[open] .tk-card{animation:pop .28s cubic-bezier(.2,.8,.2,1)}
+:is(.tk-card,.tk-pv) form{position:relative}
+:is(.tk-card,.tk-pv) .actions{flex-wrap:wrap;position:sticky;bottom:-22px;z-index:2;margin:var(--s5) -24px -22px;padding:var(--s4) 24px 22px;background:var(--solid);border-top:1px solid var(--hair)}
+@media (max-width:700px){
+  :is(.tk-card,.tk-pv){padding:16px 16px 18px}
+  .tk-card .actions{bottom:-18px;margin:var(--s4) -16px -18px;padding:var(--s3) 16px 18px}}
+/* header: heading and position line ("3 of 7 in A Do"); the swipe surface on touch */
+.tk-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--s2) var(--s4);margin-bottom:var(--s3);touch-action:pan-y;user-select:none}
+.tk-h{margin:0;font:500 28px/1.1 var(--serif)}
+.tk-h:focus{outline:none}.tk-h:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
+.tk-pos{display:inline-flex;align-items:center;gap:6px;font:500 12.5px/1 var(--ui);color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tk-pos::before{content:"";width:8px;height:8px;border-radius:1px;background:var(--c)}
+/* zones: real hit areas; data-act switch | close */
+.tk-deck [data-zone]{position:relative;display:flex;align-items:center;min-width:0;-webkit-tap-highlight-color:transparent}
+.tk-deck [data-zone=top]{grid-area:1/1/2/4;justify-content:center;align-items:flex-end}
+.tk-deck [data-zone=bottom]{grid-area:3/1/4/4;justify-content:center;align-items:flex-start}
+.tk-deck [data-zone=prev]{grid-area:2/1;justify-content:flex-end}
+.tk-deck [data-zone=next]{grid-area:2/3;justify-content:flex-start}
+.tk-deck [data-act=switch]{cursor:pointer}
+.tk-deck [data-act=close]{cursor:zoom-out}
+.tk-deck [data-zone]::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .14s ease-out;
+  --tint:color-mix(in srgb,var(--ink) 11%,transparent)}
+.tk-deck [data-act=switch]::before{--tint:color-mix(in srgb,var(--c) 20%,transparent)}
+.tk-deck [data-zone=top]::before{background:linear-gradient(to bottom,var(--tint),transparent)}
+.tk-deck [data-zone=bottom]::before{background:linear-gradient(to top,var(--tint),transparent)}
+.tk-deck [data-zone=prev]::before{background:linear-gradient(to right,var(--tint),transparent 85%)}
+.tk-deck [data-zone=next]::before{background:linear-gradient(to left,var(--tint),transparent 85%)}
+@media (hover:hover){.tk-deck [data-zone]:hover::before{opacity:.75}}
+.tk-deck [data-zone].is-down::before{opacity:1}
+/* Coverflow (prefs.taskSwitcher = coverflow, Card layout): from 1000 px the neighbours are read-only copies of the whole
+   window (.tk-pv), in the card's grid cell behind it, set aside by the transform the deck sets (--rest, --hover; poses in core
+   COVERFLOW / deckGeo). The side zones stay the hit areas: their data-nav button covers the zone, shows "Next ›" on hover and
+   focus, and the copy under it comes forward and brightens. Swiper's look: a light 2 px rim on every slide, neighbours slightly
+   dimmed, no slide shadows */
+.tk-pv{grid-area:2/2/3/3;position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;user-select:none;
+  transform:var(--rest,none);transform-origin:50% 50%;backface-visibility:hidden;transition:transform .2s cubic-bezier(.2,.7,.2,1);
+  animation:pv-in .28s cubic-bezier(.2,.8,.2,1)}
+.tk-pv[hidden]{display:none}
+.tk-pv::after{content:"";position:absolute;inset:-1px;z-index:5;border-radius:inherit;pointer-events:none;background:var(--pv-ink);opacity:var(--pv-dim);
+  transition:opacity .2s ease-out}
+@keyframes pv-in{from{opacity:0}}
+.tk-deck{--pv-ink:rgba(14,12,40,1);--pv-dim:.16}
+:root[data-theme="dark"] .tk-deck{--pv-ink:rgba(0,0,6,1);--sh:#000}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tk-deck{--pv-ink:rgba(0,0,6,1);--sh:#000}}
+.tk-deck[data-switcher=coverflow] :is(.tk-card,.tk-pv){border:2px solid color-mix(in srgb,var(--hair2) 50%,rgba(159,160,168,.5));border-radius:var(--r-xl)}
+.tk-deck[data-switcher=coverflow] .tk-pv{box-shadow:none}
+.tk-deck:has([data-zone=prev][data-act=switch] :is(:hover,:focus-visible)) .tk-pv[data-side=prev],
+.tk-deck:has([data-zone=next][data-act=switch] :is(:hover,:focus-visible)) .tk-pv[data-side=next]{transform:var(--hover,var(--rest,none))}
+.tk-deck:has([data-zone=prev][data-act=switch] :is(:hover,:focus-visible)) .tk-pv[data-side=prev]::after,
+.tk-deck:has([data-zone=next][data-act=switch] :is(:hover,:focus-visible)) .tk-pv[data-side=next]::after{opacity:calc(var(--pv-dim) * .55)}
+.tk-deck.is-moving .tk-pv{transition:none}
+/* the data-nav button. Coverflow from 1000 px: it covers its zone, invisible but for the chip */
+.tk-g{position:absolute;inset:0;display:block;width:auto;height:auto;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;
+  color:var(--ink2);font:500 13px/1.35 var(--ui);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tk-g:hover{background:none}
+.tk-g .chev{display:none}
+.tk-g:focus-visible{outline:2px solid var(--focus);outline-offset:-8px;border-radius:var(--r-xl)}
+/* the side zones' tint stays off from 1000 px: the copy (Coverflow) or the band (Standard) answers */
+@media (min-width:1000px){.tk-deck [data-act=switch]::before{display:none}}
+/* the shadow (Standard; Maksym, 2026-10-29): the whole side zone, from the card's side edge to the screen edge, is the button; its
+   visual is a light neutral shadow (black at --sh-rest, more on hover; no tint, no circle around the arrow: the shadow is what says "button") that fades out within --sh-len of the card (Maksym: less saturated,
+   shorter); the rest of the zone stays clickable. It starts under the card's rounded edge (the card sits above it), so the corners read as the card's
+   own shadow. The arrow sits near the card, centred on its height, in the accent as it reads on dark (the dark theme's accent) */
+.tk-deck{--sh:#000;--sh-len:150px;--sh-rest:26%;--sh-hover:18%;--sh-arrow:#9C8CFF;--sh-glow:rgba(140,123,255,.3)}
+/* dark: a black shade does not show on the dark backdrop, so the shade is a faint light one */
+:root[data-theme="dark"] .tk-deck{--sh:#fff;--sh-rest:9%;--sh-hover:7%}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tk-deck{--sh:#fff;--sh-rest:9%;--sh-hover:7%}}
+/* the arrow takes the colour of the quadrant it leads to (Maksym, 2026-10-29), with a glow in that colour */
+.tk-g{--sh-arrow:var(--c,#9C8CFF);--sh-glow:color-mix(in srgb,var(--c,#9C8CFF) 42%,transparent)}
+.tk-arw{display:flex;flex-direction:column;align-items:center;gap:6px}
+.tk-g .chev svg{display:block;width:100%;height:100%;fill:currentColor;stroke:currentColor;stroke-width:2.2;stroke-linejoin:round;overflow:visible;
+  transition:transform .16s cubic-bezier(.2,.7,.2,1)}
+[data-zone=prev] .tk-g .chev{transform:scaleX(-1)} /* one arrow drawn pointing right; the previous side mirrors it, so a nudge of +x is outward on both */
+@media (min-width:1000px){
+  .tk-deck[data-switcher=standard] .tk-g{inset:0;display:flex;align-items:center;color:var(--sh-arrow);transition:transform .12s ease-out;
+    background:linear-gradient(to var(--out),color-mix(in srgb,var(--sh) var(--sh-rest),transparent),transparent var(--sh-len))}
+  .tk-deck[data-switcher=standard] [data-zone=next] .tk-g{--out:right;left:calc(-1 * var(--r-xl));justify-content:flex-start;padding-left:calc(var(--r-xl) + 22px);transform-origin:left 50%}
+  .tk-deck[data-switcher=standard] [data-zone=prev] .tk-g{--out:left;right:calc(-1 * var(--r-xl));justify-content:flex-end;padding-right:calc(var(--r-xl) + 22px);transform-origin:right 50%}
+  .tk-deck[data-switcher=standard] .tk-g::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
+    background:linear-gradient(to var(--out),color-mix(in srgb,var(--sh) var(--sh-hover),transparent),transparent var(--sh-len));transition:opacity .14s ease-out}
+  .tk-deck[data-switcher=standard] .tk-g .chev{display:block;position:relative;z-index:1;width:40px;height:40px;filter:drop-shadow(0 0 14px var(--sh-glow))}
+  .tk-deck[data-switcher=standard] .tk-g:focus-visible{outline-offset:-5px;border-radius:0}
+  .tk-deck[data-switcher=standard] .tk-g:focus-visible::after{opacity:1}
+  .tk-deck[data-switcher=standard] .tk-g:focus-visible svg{transform:translateX(4px)}
+  .tk-deck[data-switcher=standard] [data-zone].is-down .tk-g,.tk-deck[data-switcher=standard] .tk-g:active{transform:scale(.98)}}
+@media (min-width:1000px) and (hover:hover){
+  .tk-deck[data-switcher=standard] [data-act=switch]:hover .tk-g::after{opacity:1}
+  .tk-deck[data-switcher=standard] [data-act=switch]:hover .tk-g svg{transform:translateX(4px)}}
+/* the dots under the window (Coverflow): one per task of the quadrant (at most 9, a sliding window for longer ones), the current
+   one a wide pill in the accent colour; a dot goes to its task through the same way out, so unsaved changes still ask */
+.tk-dots{grid-area:3/2;align-self:start;justify-self:center;position:relative;z-index:2;display:flex;align-items:center;margin-top:4px}
+.tk-dots[hidden]{display:none}
+.tk-dot{position:relative;display:block;width:18px;height:24px;min-height:0;margin:0;padding:0;border:0;border-radius:var(--r);background:none;box-shadow:none;cursor:pointer}
+.tk-dot::before{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:8px;
+  background:rgba(255,255,255,.9);box-shadow:0 0 0 1px var(--hair2),0 1px 3px rgba(14,12,40,.25);transition:all .3s ease-in-out}
+.tk-dot:hover{background:none}
+.tk-dot:hover::before{background:#fff;box-shadow:0 0 0 1px var(--accent-line),0 1px 3px rgba(14,12,40,.25)}
+.tk-dot[aria-current="true"]{width:26px;cursor:default}
+.tk-dot[aria-current="true"]::before{width:18px;margin-left:-9px;background:var(--accent);box-shadow:0 0 0 1px var(--accent-line)}
+.tk-dot:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.tk-dots .more{width:6px;height:6px;margin:0 4px;border-radius:50%;background:rgba(255,255,255,.55)}
+.tk-deck.is-asking .tk-dots{pointer-events:none;opacity:.5}
+@media (prefers-reduced-motion:reduce){.tk-pv,.tk-pv::after,.tk-dot::before,.tk-g,.tk-g::after,.tk-g .chev svg{transition:none;animation:none}}
+/* read-only copy: the task's own tags as static chips */
+.pv-tag{display:inline-flex;align-items:center;min-height:28px;padding:0 12px;border-radius:var(--r-sm);background:var(--accent);color:var(--on-accent);font:500 13px/1 var(--ui)}
+:root[data-theme="dark"] .pv-tag{color:var(--solid)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pv-tag{color:var(--solid)}}
+/* edge tab (below 1000 px, both switchers): the same button, slim, flush to the screen edge, in the shadow's ink with its arrow */
+@media (max-width:999px){
+  .tk-deck [data-zone=prev]{justify-content:flex-start}.tk-deck [data-zone=next]{justify-content:flex-end}
+  .tk-g{position:relative;inset:auto;display:flex;align-items:center;justify-content:center;width:24px;height:auto;max-width:none;min-height:56px;margin:0;padding:0;
+    border:0;background:color-mix(in srgb,var(--sh) 78%,transparent);color:var(--sh-arrow);opacity:1;box-shadow:var(--lift);transition:background .14s ease-out}
+  [data-zone=prev] .tk-g{border-radius:0 var(--r-xl) var(--r-xl) 0;margin:0 0 0 env(safe-area-inset-left,0px)}
+  [data-zone=next] .tk-g{border-radius:var(--r-xl) 0 0 var(--r-xl);margin:0 env(safe-area-inset-right,0px) 0 0}
+  .tk-g .chev{display:block;width:13px;height:13px}
+  .tk-g:hover{background:color-mix(in srgb,var(--sh) 78%,transparent)}
+  .tk-g:focus-visible{outline-offset:3px}
+  .tk-deck .tk-pv{display:none}
+  .tk-deck [data-act=switch]:hover .tk-g,.tk-g:active,.tk-deck [data-zone].is-down .tk-g{background:color-mix(in srgb,var(--sh) 92%,transparent);transform:none}
+  .tk-deck [data-act=switch]:hover .tk-g svg,.tk-deck [data-zone].is-down .tk-g svg{transform:translateX(2px)}}
+/* unsaved changes asked: the deck holds still */
+.tk-deck.is-asking [data-zone]{pointer-events:none}
+.tk-deck.is-asking [data-zone]::before{opacity:0}
+.tk-deck.is-asking .tk-g{opacity:.35}
+.actions > .tk-ask{flex-basis:100%;margin:0 0 var(--s2)}
 .tk-ask{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:var(--s3);padding:10px 12px;border:1px solid var(--accent-line);border-radius:var(--r);background:var(--accent-bg)}
 .tk-ask p{margin:0 auto 0 0;font-size:13px}
 /* Tasks Grouping confirm: a short title, the consequence in plain text */
@@ -1319,7 +1459,11 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
   // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
-    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, tagListOrder: [], tagListsOpen: {} };
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListsOpen: {}, taskSwitcher: 'standard' };
+  // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
+  // WELCOME_VERSION. welcomeSeen stays for clients that only know it
+  const WELCOME_VERSION = 3;
+  const welcomeDue = p => !isObj(p) || !(Number.isInteger(p.welcomeVersion) && p.welcomeVersion >= WELCOME_VERSION);
   const clone = o => JSON.parse(JSON.stringify(o));
   function readSettings(raw) {
     const s = clone(SETTINGS_DEFAULTS);
@@ -1349,6 +1493,8 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     p.settings = readSettings(raw.settings);
     p.cardLayout = readCardLayout(raw.cardLayout, known && known.tagListIds);
     if (typeof raw.welcomeSeen === 'boolean') p.welcomeSeen = raw.welcomeSeen;
+    if (Number.isInteger(raw.welcomeVersion) && raw.welcomeVersion >= 0 && raw.welcomeVersion <= 1000) p.welcomeVersion = raw.welcomeVersion;
+    if (TASK_SWITCHERS.includes(raw.taskSwitcher)) p.taskSwitcher = raw.taskSwitcher;
     const tls = known && known.tagListIds ? new Set(known.tagListIds) : null, tlOk = x => typeof x === 'string' && (!tls || tls.has(x));
     if (strs(raw.tagListOrder)) p.tagListOrder = raw.tagListOrder.filter(tlOk);
     if (isObj(raw.tagListsOpen)) Object.keys(raw.tagListsOpen).forEach(k => { if (tlOk(k) && typeof raw.tagListsOpen[k] === 'boolean') p.tagListsOpen[k] = raw.tagListsOpen[k]; });
@@ -2128,6 +2274,52 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     : { title: 'Turn off Tasks Grouping?', text: 'The board will show each quadrant in its stored order, without subtasks under their parent. Orders you changed while grouping was on stay as they are: AI and the scripts keep reading them, and there is no automatic way back.' };
   // previous and next task of the task window: the neighbours in the quadrant's shown order (null at the ends)
   const navNeighbours = (ids, id) => { const i = ids.indexOf(id); return i < 0 ? { prev: null, next: null } : { prev: ids[i - 1] || null, next: ids[i + 1] || null }; };
+  // the task deck (edit-nav plan): what a click around the task window does. zone = the zone the click ended in ('prev', 'next',
+  // 'close' or null), downZone = the zone it started in; a press that started elsewhere (a text selection dragged out of the
+  // window) does nothing. A side with no neighbour (the end of the quadrant, a new task) closes, like the bands above and below.
+  const deckAct = ({ zone, downZone, hasPrev, hasNext }) => {
+    if (!zone || zone !== downZone) return null;
+    if (zone === 'prev') return hasPrev ? 'prev' : 'close';
+    if (zone === 'next') return hasNext ? 'next' : 'close';
+    return zone === 'close' ? 'close' : null;
+  };
+  // a swipe on the window header (phone): at least min px sideways and more than twice as far as up or down; left = next
+  const swipeDir = (dx, dy, min = 60) => Math.abs(dx) >= min && Math.abs(dx) > 2 * Math.abs(dy) ? (dx < 0 ? 'next' : 'prev') : null;
+  // the task window's position line: "3 of 7 in A Do"; null when the task is not in the shown order
+  // the order the task window moves in: every quadrant's shown order, A Do, then B Plan, C Delegate, D Eliminate (Maksym,
+  // 2026-10-29): after a quadrant's last task comes the next quadrant's first; empty quadrants are skipped
+  const deckSequence = byQ => ['A', 'B', 'C', 'D'].flatMap(q => byQ[q] || []);
+  const deckPos = (ids, id, q, qName) => { const i = ids.indexOf(id); return i < 0 ? null : (i + 1) + ' of ' + ids.length + ' in ' + q + ' ' + qName; };
+  // how the task window moves between tasks (prefs.taskSwitcher, Card layout; Maksym, 2026-10-29): 'standard' (default) =
+  // the card stays and its content slides, a dark band with an arrow beside each side that has a neighbour; 'coverflow' = the
+  // neighbours are read-only copies of the window beside it (Swiper's coverflow effect), the row turns on a switch, dots below
+  const TASK_SWITCHERS = ['standard', 'coverflow'];
+  // Swiper's coverflow: rotate 10, stretch 120, depth 200, modifier 1, no slide shadows, centred slides, perspective 1200
+  const COVERFLOW = { p: 1200, rotate: 10, stretch: 120, depth: 200, modifier: 1, hoverDepth: 0.75, dur: 280, ease: 'cubic-bezier(.25,.75,.25,1)', dim: 0.9 };
+  // a pose is one transform, always the same function list so a move interpolates per function. perspective() sits around the
+  // card's centre (the copies share the card's grid cell): one shared perspective, as in Swiper
+  const deckTransform = q => 'perspective(' + q.p + 'px) translate3d(' + q.b + 'px,0px,' + q.z + 'px) rotateY(' + q.r + 'deg)';
+  // the poses for a card W px wide: centre; prev / next at rest, under the pointer (Hover) and one step further (Far: where a copy
+  // leaves to and comes from). Swiper: offset multiplier m = -side * modifier per step; the slide sits W away, translateX =
+  // stretch * m, translateZ = -depth * |m|, rotateY = rotate * m (side -1 = prev, 1 = next)
+  const deckGeo = W => {
+    const k = COVERFLOW, pose = o => Object.assign({ p: k.p, b: 0, z: 0, r: 0 }, o);
+    const out = { centre: pose({}), dur: k.dur, ease: k.ease, dim: k.dim };
+    [[-1, 'prev'], [1, 'next']].forEach(([side, n]) => {
+      const cf = steps => { const m = -side * k.modifier * steps; return pose({ b: side * steps * W + k.stretch * m, z: -k.depth * Math.abs(m), r: k.rotate * m }); };
+      out[n] = cf(1);
+      out[n + 'Hover'] = Object.assign(cf(1), { z: -k.depth * k.hoverDepth });
+      out[n + 'Far'] = cf(2);
+    });
+    return out;
+  };
+  // the dots under the window: at most max dots; a longer quadrant shows a window of them that slides with the current one
+  // (kept in the middle where it can). Out: { from, to } (to exclusive), or null for fewer than 2 tasks or a task not in it
+  const dotWindow = (n, i, max = 9) => {
+    if (n < 2 || i < 0 || i >= n) return null;
+    const m = Math.min(max, n), from = Math.max(0, Math.min(i - Math.floor(m / 2), n - m));
+    return { from, to: from + m };
+  };
   // the Timeline: one row per task. base = the tasks the view picked (open, filters, a date in the window); their parent
   // trees join them (ancestors and children). Rows run depth first, siblings by start (or end), then number. A bar is in day
   // indexes from opts.start (a Date at local midnight) over opts.days; a parent gets a summary span over its tree. Edges go
@@ -2175,8 +2367,8 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
-    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
@@ -2584,8 +2776,13 @@ async function takeTagDefs(rows) {
 let LINKS = new Map(), LINKS_READY = false, maxLinkSeen = 0;
 const LINK_COLS = 'item_links?select=from_item,to_item,kind,removed_at,changed_at&kind=in.(depends_on,parent)';
 const noteLinkMax = rows => rows.forEach(r => { const u = Date.parse(r.changed_at); if (u > maxLinkSeen) maxLinkSeen = u; });
+// only links whose two ends are live items: deleted test items leave many links behind (1859 read, 4 live for Maksym on
+// 2026-10-29). A database where the embed fails (other foreign key names) falls back to the plain read
+const LINK_LIVE = 'item_links?select=from_item,to_item,kind,removed_at,changed_at,f:items!item_links_from_item_fkey!inner(id),t:items!item_links_to_item_fkey!inner(id)' +
+  '&kind=in.(depends_on,parent)&removed_at=is.null&f.deleted_at=is.null&t.deleted_at=is.null';
 async function loadLinks() {
-  const r = await getAll(LINK_COLS + '&removed_at=is.null', 'from_item,to_item,kind');
+  let r = await getAll(LINK_LIVE, 'from_item,to_item,kind');
+  if (!r.ok) r = await getAll(LINK_COLS + '&removed_at=is.null', 'from_item,to_item,kind');
   LINKS_READY = r.ok;
   if (!r.ok) { LINKS = new Map(); return r; }
   noteLinkMax(r.json);
@@ -2675,7 +2872,7 @@ async function loadAll() {
   if (!prefsExists) savePrefsSoon();
   startPolling();
   flushAll();
-  if (!welcomeSeen && me.kind === 'human') showWelcome();
+  if (C.welcomeDue({ welcomeVersion }) && me.kind === 'human') showWelcome();
   drawNotices();
 }
 function loadFailed(r) {
@@ -2898,7 +3095,8 @@ async function poll(meta) {
 
 // ---- preferences v2: one row per person (preferences, app tasksdashboard), upserted 1 s after a change when they differ ----
 let themePref = 'auto', lastWritten = null, prefsTimer = 0;
-let cardLayout = C.readCardLayout(null), welcomeSeen = false; // round 3: Card layout and the first-login welcome
+let cardLayout = C.readCardLayout(null), welcomeSeen = false, welcomeVersion = 0; // round 3: Card layout and the first-login welcome
+let taskSwitcher = 'standard'; // how the task window moves between tasks (Card layout; the deck reads it when it opens)
 function applyTheme() {
   st.theme = (themePref === 'auto' ? matchMedia('(prefers-color-scheme: dark)').matches : themePref === 'dark') ? 1 : 0;
   document.documentElement.dataset.theme = THEMES[st.theme];
@@ -2908,7 +3106,7 @@ const collectPrefs = () => ({
   version: 2, theme: themePref, view: st.view, list: st.list, listOrder: LISTS.slice(), tagOrder: tagOrder.slice(),
   axes: window.tdAxes && window.tdAxes.get ? window.tdAxes.get() : { fx: 0.5, fy: 0.5 },
   menuCollapsed: QS.filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] }, settings: Object.assign({}, settings),
-  cardLayout: JSON.parse(JSON.stringify(cardLayout)), welcomeSeen, tagListOrder: tagListOrder.slice(), tagListsOpen: Object.assign({}, tagListsOpen),
+  cardLayout: JSON.parse(JSON.stringify(cardLayout)), welcomeSeen, welcomeVersion, tagListOrder: tagListOrder.slice(), tagListsOpen: Object.assign({}, tagListsOpen), taskSwitcher,
 });
 const prefsText = () => JSON.stringify(collectPrefs());
 // stale entries (a list, item or tag that no longer exists) are dropped
@@ -2924,7 +3122,7 @@ function applyPrefs(p) {
   st.cardMode = p.cards.mode;
   st.flip = new Set(p.cards.flipped);
   settings = C.readSettings(p.settings);
-  cardLayout = p.cardLayout; welcomeSeen = p.welcomeSeen;
+  cardLayout = p.cardLayout; welcomeSeen = p.welcomeSeen; welcomeVersion = p.welcomeVersion; taskSwitcher = p.taskSwitcher;
   if (window.tdAxes && window.tdAxes.set) window.tdAxes.set(p.axes.fx, p.axes.fy);
 }
 function savePrefsSoon() {
@@ -3020,7 +3218,9 @@ function cardHtml(t, q, g) {
     const sub = facts.map(x => '<span>' + esc(x) + '</span>').join('') + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('');
     return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + meta + arrow + done + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
   }
-  const pin = t.pin === undefined ? '<span></span>' : '<button class="pin" data-unpin="' + t.id + '"' + (editable ? '' : ' disabled') + ' aria-label="' + (t.pin ? 'Urgent, set by hand. Clear' : 'Not urgent, set by hand. Clear') + '">' + (t.pin ? 'urgent (manual)' : 'not urgent (manual)') + '</button>';
+  // no "urgent (manual)" badge (Maksym, 2026-10-29: not needed). The pin (urgent_pin) is still set by a drag across the urgency
+  // line and still counts for a task without a stored quadrant (deriveQuadrant); the empty cell keeps the card's grid
+  const pin = '<span></span>';
   // round 4, item 4: an open card shows the first autoCollapse characters of the description, then Show more (st.more, this session)
   const more = st.more.has(t.id), clip = C.descClip(t.notes, L.autoCollapse), cut = clip.clipped && !more;
   const body = (facts.length ? '<div class="row">' + facts.map(x => '<span>' + esc(x) + '</span>').join('') + '</div>' : '') +
@@ -3171,8 +3371,18 @@ const moveList = (l, to) => {
 };
 // drag a list chip (from the bar or the +N menu) before or after another; dropping on All puts it first. Alt+arrows move a focused chip.
 let dragList = null;
+// drag lag fix (2026-10-29): the one drop marker on the page; a dragover measures first and changes classes only when the
+// marked element or its side changes (no document-wide clearing on every event)
+let dropMark = null; // { el, cls }
+const markDrop = (el, cls) => {
+  if (dropMark && dropMark.el === el && dropMark.cls === cls) return;
+  if (dropMark) dropMark.el.classList.remove(dropMark.cls);
+  dropMark = el ? { el, cls } : null;
+  if (el) el.classList.add(cls);
+};
+const unmarkDrop = el => { if (dropMark && (!el || dropMark.el === el)) markDrop(null); };
 function bindListDrag(app) {
-  const clear = () => app.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging'));
+  const clear = () => { dropMark = null; app.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging')); };
   app.querySelectorAll('.lists [data-list], #pop [data-list]').forEach(b => {
     const l = b.dataset.list, inMenu = !!b.closest('#pop');
     const side = e => {
@@ -3195,10 +3405,9 @@ function bindListDrag(app) {
     b.ondragover = e => {
       if (!dragList || dragList === l) return;
       e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-      app.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
-      b.classList.add(side(e) ? 'drop-before' : 'drop-after');
+      markDrop(b, side(e) ? 'drop-before' : 'drop-after');
     };
-    b.ondragleave = () => b.classList.remove('drop-before', 'drop-after');
+    b.ondragleave = () => unmarkDrop(b);
     b.ondrop = e => {
       if (!dragList || dragList === l) return;
       e.preventDefault(); e.stopPropagation();
@@ -3335,7 +3544,7 @@ function toast(msg, undo) {
   lastUndo = undo || null;
   const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status');
   el.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button>Undo</button>' : '');
-  document.body.append(el);
+  (DECK && DECK.dlg.open ? DECK.dlg : document.body).append(el); // above the task window while it is open (its modal makes the page inert)
   if (undo) el.querySelector('button').onclick = () => runUndo();
   toastTimer = setTimeout(() => { el.remove(); lastUndo = null; }, UNDO_MS);
 }
@@ -3459,6 +3668,165 @@ async function ensureTags(items) {
 }
 
 // the task window. opts.draft reopens it with the person's text after a conflict or a refused save; opts.error / opts.notice explain why
+// the task deck (edit-nav plan, 2026-10-29): one full-screen modal for a whole edit session, so moving between tasks never
+// closes the window. Its card in the middle row is the task window (openTask fills it); the zones left and right of the card
+// switch to the previous / next task of the quadrant (their data-nav buttons: from 1000 px a shadow band in Standard, a cover over the neighbour's copy in Coverflow (prefs.taskSwitcher); edge tabs below), the
+// bands above and below close it, and so does a side with no neighbour. Every way out goes to the content's leave(kind), which asks
+// first when something changed. A switch slides the card's content out and the next task's in; the modal, the backdrop and the
+// board behind it stay as they are until the real close (render then).
+let DECK = null;
+// the side arrow: a rounded triangle pointing right (the previous side mirrors it in CSS)
+const DECK_ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 4.5 19 12 8 19.5Z"/></svg>';
+const deckWord = { prev: 'Previous', next: 'Next' }, deckKeys = { prev: 'ArrowLeft Alt+ArrowLeft Alt+PageUp', next: 'ArrowRight Alt+ArrowRight Alt+PageDown' };
+function deckOpen() {
+  if (DECK) return DECK;
+  const d = document.createElement('dialog');
+  // how this deck moves between tasks (prefs.taskSwitcher), fixed while it is open: a change in Card layout applies next time
+  const cover = taskSwitcher === 'coverflow';
+  d.className = 'tk-deck'; d.dataset.switcher = cover ? 'coverflow' : 'standard';
+  d.setAttribute('aria-labelledby', 'tk-h'); d.setAttribute('aria-describedby', 'tk-pos');
+  const hint = ''; // the close areas show nothing (Maksym, 2026-10-29: no "Close" hints, empty space)
+  // DOM order: card, the two read-only copies (behind it, inert), the zones (tab order: form, prev, next), the dots
+  d.innerHTML = '<div class="tk-card"></div><div class="tk-pv" data-side="prev" inert aria-hidden="true" hidden></div><div class="tk-pv" data-side="next" inert aria-hidden="true" hidden></div>' +
+    '<div data-zone="prev"></div><div data-zone="next"></div><div data-zone="top" data-act="close">' + hint + '</div>' +
+    '<div data-zone="bottom" data-act="close">' + hint + '</div><div class="tk-dots" role="group" hidden></div><p class="sr" id="tk-live" aria-live="polite"></p>';
+  const card = d.querySelector('.tk-card'), live = d.querySelector('#tk-live'), dots = d.querySelector('.tk-dots'), refs = new Map();
+  const pv = { prev: d.querySelector('.tk-pv[data-side=prev]'), next: d.querySelector('.tk-pv[data-side=next]') };
+  const dac = new AbortController();
+  let anim = [], pending = null, down = null, minH = 0, geo = null;
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wide = () => matchMedia('(min-width: 1000px)').matches;
+  const flush = () => { if (pending) pending(); anim.forEach(a => a.finish()); anim = []; };
+  const zoneOf = el => { const z = el && el.closest ? el.closest('[data-zone]') : null; return z && z.parentElement === d ? z : null; };
+  const kindOf = z => !z ? null : z.dataset.zone === 'top' || z.dataset.zone === 'bottom' ? 'close' : z.dataset.zone;
+  // Coverflow only: the copies' poses for the card's width W (C.deckGeo), on open and on a resize; null in Standard and below 1000 px
+  const layout = () => {
+    if (!cover || !wide() || !d.open) return (geo = null);
+    geo = C.deckGeo(card.offsetWidth);
+    ['prev', 'next'].forEach(k => { pv[k].style.setProperty('--rest', C.deckTransform(geo[k])); pv[k].style.setProperty('--hover', C.deckTransform(geo[k + 'Hover'])); });
+    return geo;
+  };
+  // Coverflow: a neighbour's read-only copy, the whole window (openTask in preview mode), or nothing at the end of the quadrant
+  const preview = (k, id) => {
+    const el = pv[k];
+    if (cover && id && find(id)) { openTask(id, null, { preview: el }); el.hidden = false; }
+    else { el.hidden = true; el.textContent = ''; delete el.dataset.id; delete el.dataset.q; }
+  };
+  // Coverflow: the dots, one per task of the quadrant (C.dotWindow: at most 9, a sliding window), the current one a wide pill
+  const drawDots = c => {
+    const n = cover && c.order ? c.order.length : 0, i0 = n ? c.order.indexOf(c.id) : -1, w = C.dotWindow(n, i0);
+    dots.hidden = !w;
+    if (!w) { dots.textContent = ''; return; }
+    const more = '<span class="more" aria-hidden="true"></span>';
+    let h = w.from > 0 ? more : '';
+    for (let i = w.from; i < w.to; i++) {
+      const x = find(c.order[i]); if (!x) continue;
+      h += '<button type="button" class="tk-dot" data-dot="' + x.id + '" aria-label="Go to task ' + (i + 1) + ' of ' + n + ': ' + esc(ref(x) + ' ' + plain(x.title)) + '"' + (i === i0 ? ' aria-current="true"' : '') + '></button>';
+    }
+    dots.innerHTML = h + (w.to < n ? more : '');
+    dots.setAttribute('aria-label', 'Tasks in ' + c.q + ' ' + QN[c.q]);
+  };
+  const deck = DECK = {
+    dlg: d, card, cur: null,
+    // the sides for the content shown: a neighbour's data-nav button (from 1000 px a dark band with an arrow beside the card in
+    // Standard, a cover over the zone with the neighbour's copy under it in Coverflow; an edge tab below 1000 px), else a close
+    // hint; the dots below the card (Coverflow)
+    show(c, says) {
+      d.dataset.q = c.q || '';
+      ['prev', 'next'].forEach(k => {
+        const z = d.querySelector('[data-zone=' + k + ']'), x = c.nav[k] && find(c.nav[k]);
+        z.dataset.act = x ? 'switch' : 'close';
+        if (x) z.dataset.q = x.q; else delete z.dataset.q;
+        z.innerHTML = x ? '<button type="button" class="tk-g" data-nav="' + k + '" data-q="' + x.q + '" aria-label="' + deckWord[k] + ' task: ' + esc(ref(x) + ' ' + plain(x.title)) + '" aria-keyshortcuts="' + deckKeys[k] + '" title="' + deckWord[k] + ' task (' + (k === 'prev' ? '←' : '→') + ')">' +
+          '<span class="tk-arw" aria-hidden="true"><span class="chev">' + DECK_ARROW + '</span></span></button>'
+          : '';
+        preview(k, x ? x.id : null);
+      });
+      drawDots(c);
+      // first open: a new task starts in its title, a task at its heading; after a switch the heading and a spoken "M10 title, 4 of 7 in A Do"
+      if (!d.open) { document.body.append(d); d.showModal(); card.querySelector(c.isNew ? "#ft" : ".tk-h").focus(); }
+      else if (says !== undefined) { card.querySelector('.tk-h').focus({ preventScroll: true }); live.textContent = says; }
+      layout();
+    },
+    // fill the card again (build = openTask for the next task); dir 1 = next, -1 = previous, 0 = in place without motion; to = the
+    // task a dot jumps to (its copy is put on that side first). Coverflow from 1000 px: the row turns, the neighbour's copy comes to
+    // the front, the card goes to the other side and that side's copy leaves; at the end the real window is built into the card, the
+    // poses reset and the copies are drawn again, in one frame. Standard, and below 1000 px: the card stays, its content slides
+    // (60 ms out, 100 ms in). Reduced motion: no motion
+    swap(build, dir, to) {
+      flush();
+      const old = card.firstElementChild, side = dir > 0 ? 'next' : 'prev', back = dir > 0 ? 'prev' : 'next';
+      const turn = !!(dir && old && !reduced() && layout() && (to || !pv[side].hidden));
+      const run = () => {
+        pending = null;
+        if (turn) { anim.forEach(a => a.cancel()); anim = []; d.classList.remove('is-moving'); }
+        minH = Math.max(minH, card.offsetHeight); card.style.minHeight = 'min(' + minH + 'px, calc(95vh - max(5vh, 68px)))'; // grow only: a shorter task does not move the window
+        build();
+        card.scrollTop = 0;
+        if (turn) { // the new neighbour on the far side comes in from beyond
+          const g = layout(), el = pv[side];
+          if (g && !el.hidden) anim = [el.animate([{ transform: C.deckTransform(g[side + 'Far']), opacity: 0 }, { transform: C.deckTransform(g[side]), opacity: 1 }], { duration: 200, easing: 'cubic-bezier(0,0,.2,1)' })];
+          return;
+        }
+        const f = card.firstElementChild;
+        if (dir && f && !reduced()) anim = [f.animate([{ opacity: 0, transform: 'translateX(' + 24 * dir + 'px)' }, { opacity: 1, transform: 'none' }], { duration: 100, easing: 'cubic-bezier(0,0,.2,1)' })];
+      };
+      if (!dir || !old || reduced()) return run();
+      if (turn) {
+        if (to) preview(side, to);
+        const g = geo, T = C.deckTransform, o = { duration: g.dur, easing: g.ease, fill: 'forwards', id: 'deck-move' };
+        const inc = pv[side], out = pv[back], from = d.querySelector('[data-zone=' + side + ']:hover') ? g[side + 'Hover'] : g[side];
+        d.classList.add('is-moving');
+        // the copy coming in passes over the card halfway (z-index), loses its shade; the card takes the other side's pose and shade
+        anim = [inc.animate([{ transform: T(from), zIndex: 0, offset: 0 }, { zIndex: 0, offset: 0.45 }, { zIndex: 2, offset: 0.46 }, { transform: T(g.centre), zIndex: 2, offset: 1 }], o),
+          inc.animate([{ opacity: getComputedStyle(inc, '::after').opacity }, { opacity: 0 }], Object.assign({}, o, { pseudoElement: '::after' })),
+          card.animate([{ transform: T(g.centre), filter: 'brightness(1)' }, { transform: T(g[back]), filter: 'brightness(' + g.dim + ')' }], o)];
+        if (!out.hidden) anim.push(out.animate([{ transform: T(g[back]), opacity: 1 }, { transform: T(g[back + 'Far']), opacity: 0 }], o));
+        pending = run;
+        anim[0].onfinish = () => { if (pending === run) run(); };
+        return;
+      }
+      const a = old.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(' + -24 * dir + 'px)' }], { duration: 60, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+      anim = [a]; pending = run;
+      a.onfinish = () => { if (pending === run) run(); };
+    },
+    // item_refs of a task, read once per deck (the neighbours' ahead of a switch)
+    refs(id) {
+      if (!refs.has(id)) refs.set(id, rest('GET', 'item_refs?select=kind,target,note&item_id=eq.' + id + '&order=created_at'));
+      return refs.get(id);
+    }
+  };
+  // a zone acts only when the press started on it too (C.deckAct): a text selection dragged out of the card does nothing
+  d.addEventListener('pointerdown', e => { const z = zoneOf(e.target); down = kindOf(z); if (z) z.classList.add('is-down'); });
+  const up = () => d.querySelectorAll('.is-down').forEach(z => z.classList.remove('is-down'));
+  d.addEventListener('pointerup', up); d.addEventListener('pointercancel', up);
+  d.addEventListener('click', e => {
+    // a dot: to that task through the same way out (unsaved changes ask first)
+    const dot = e.target.closest && e.target.closest('.tk-dot');
+    if (dot) { down = null; flush(); const c = deck.cur; if (c && dot.getAttribute('aria-current') !== 'true') c.leave('jump', dot.dataset.dot); return; }
+    const z = zoneOf(e.target); if (!z) { down = null; return; }
+    flush();
+    const c = deck.cur, k = kindOf(z), from = e.detail === 0 ? k : down; // a ghost or edge tab clicked by keyboard: no press
+    down = null;
+    const act = c && C.deckAct({ zone: k, downZone: from, hasPrev: !!c.nav.prev, hasNext: !!c.nav.next });
+    if (act) c.leave(act);
+  });
+  // ← / → (Maksym, 2026-10-29: plain arrows), not while typing in a field, where they move the caret; Alt+← / Alt+→ and
+  // Alt+PageUp / Alt+PageDown anywhere: previous / next. At an end they only say so (closing stays with Esc and the zones)
+  d.addEventListener('keydown', e => {
+    const typing = !!(e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]'));
+    const plain = !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !typing;
+    const k = (e.altKey || plain) && (plain ? { ArrowLeft: 'prev', ArrowRight: 'next' } : { ArrowLeft: 'prev', PageUp: 'prev', ArrowRight: 'next', PageDown: 'next' })[e.key];
+    if (!k) return;
+    e.preventDefault(); flush();
+    const c = deck.cur; if (!c || d.classList.contains('is-asking') || c.isNew) return;
+    if (c.nav[k]) return c.leave(k);
+    live.textContent = (k === 'next' ? 'Last' : 'First') + ' task in ' + c.q + ' ' + QN[c.q] + '.';
+  });
+  addEventListener('resize', () => { if (!pending) layout(); }, { signal: dac.signal });
+  d.addEventListener('close', () => { const t0 = d.querySelector('.toast'); if (t0) document.body.append(t0); /* a toast shown in the window outlives it */ const c = deck.cur; pending = null; anim.forEach(a => a.cancel()); dac.abort(); if (c) c.ac.abort(); d.remove(); DECK = null; if (c && c.onClose) c.onClose(); });
+  return deck;
+}
 function openTask(id, quad, opts) {
   const o = opts || {}, dr = o.draft || {};
   const t = id ? find(id) : null;
@@ -3495,16 +3863,15 @@ function openTask(id, quad, opts) {
   const wnum = t && cardLayout.number ? refText(t) : '', wrest = t ? C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText) : [];
   const whoHtml = wnum || wrest.length ? '<p class="fwho" id="fwho">' + (wnum ? ['<span class="fref">' + esc(wnum) + '</span>'] : []).concat(wrest.map(x => '<span>' + esc(x) + '</span>')).join('<span class="sr"> · </span>') + '</p>' : '';
   const fmtHtml = editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '';
-  // previous / next task (2026-10-29): the neighbours in this quadrant's shown order; ‹ › in the header, Alt+PageUp / Alt+PageDown,
-  // a click beside the window, and from 1100 px faded ghost cards there. Unsaved changes ask first. A new task: a click beside
-  // the window closes it (asking first when something was typed)
-  const nav = t ? C.navNeighbours(quadOrder(t.q), t.id) : { prev: null, next: null };
-  const navBtn = (k, g) => { const x = nav[k] && find(nav[k]); return '<button type="button" class="quiet" data-nav="' + k + '"' + (x ? ' aria-label="' + (k === 'prev' ? 'Previous' : 'Next') + ' task: ' + esc(plain(x.title)) + '" aria-keyshortcuts="' + (k === 'prev' ? 'Alt+PageUp' : 'Alt+PageDown') + '"' : ' disabled aria-label="No ' + (k === 'prev' ? 'previous' : 'next') + ' task in this quadrant"') + '>' + g + '</button>'; };
-  const navHtml = t ? '<div class="tk-nav">' + navBtn('prev', '‹') + navBtn('next', '›') + '</div>' : '';
-  const ghostHtml2 = k => { const x = nav[k] && find(nav[k]); return x ? '<button type="button" popover="manual" class="tk-ghost ' + k + ' ' + x.q + '" data-nav="' + k + '" tabindex="-1" aria-hidden="true"><span class="k">' + esc(ref(x)) + '</span><span class="t">' + esc(plain(x.title)) + '</span>' + (x.deadline ? '<span class="d">End ' + esc(ymd(x.deadline)) + '</span>' : '') + '</button>' : ''; };
-  const dlg = document.createElement('dialog');
-  dlg.className = 'tk';
-  dlg.innerHTML = '<form method="dialog"><strong>' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</strong>' + navHtml +
+  // previous / next task: the neighbours in the board's shown order across the quadrants (C.deckSequence: A, B, C, D), shown by the
+  // task deck beside the window (deckOpen). The window is the deck's card: a switch fills the same card again, the modal stays open.
+  // The position line and the dots count within the task's own quadrant
+  const order = t ? quadOrder(t.q) : [];
+  const nav = t ? C.navNeighbours(C.deckSequence({ A: quadOrder('A'), B: quadOrder('B'), C: quadOrder('C'), D: quadOrder('D') }), t.id) : { prev: null, next: null };
+  const pos = t ? C.deckPos(order, t.id, t.q, QN[t.q]) : null;
+  const ROLE_GLYPH = { parent: '↑', child: '↓', pred: '←', next: '→' }, ROLE_KIND = { parent: 'Parent', child: 'Subtask', pred: 'Comes after', next: 'Next' };
+  const formHtml = '<form method="dialog"><div class="tk-head"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' +
+    '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
@@ -3521,12 +3888,36 @@ function openTask(id, quad, opts) {
     (LINKS_READY ? '<div class="flabel" id="lk-l">Links</div><div class="links" id="lk" role="group" aria-labelledby="lk-l"></div>' : '') +
     (t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
     '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
-    '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>' + ghostHtml2('prev') + ghostHtml2('next');
-  document.body.append(dlg); dlg.showModal();
+    '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
+  // the carousel's read-only copy of a neighbour (opts.preview = the panel): the same window, its tags and links as static chips,
+  // no ids, nothing wired; the panel itself is inert and aria-hidden (deckOpen)
+  if (o.preview) {
+    const el = o.preview;
+    el.innerHTML = formHtml; el.dataset.id = t.id; el.dataset.q = t.q; // its own top line in its own quadrant colour
+    el.querySelectorAll('[contenteditable]').forEach(x => x.setAttribute('contenteditable', 'false'));
+    const tb = el.querySelector('.tagbox'), lk = el.querySelector('#lk'), sb = el.querySelector('#srcs');
+    if (tb) tb.innerHTML = t.tags.filter(x => TAG[x]).map(x => '<span class="pv-tag">' + esc(lab(x)) + '</span>').join('') || '<span class="n">No tags</span>';
+    if (lk) {
+      const by = {}; all().forEach(x => { by[x.id] = x; });
+      const ix = C.linkIndex(new Map(LINKS), by);
+      const of = role => role === 'parent' ? (ix.parentOf[t.id] ? [ix.parentOf[t.id]] : []) : ((role === 'child' ? ix.childrenOf : role === 'pred' ? ix.predsOf : ix.succsOf)[t.id] || []);
+      const chips = C.LINK_ROLES.map(role => of(role).map(x => by[x]).filter(Boolean).map(x => '<span class="lk-chip lk-' + role + (C.CLOSED.includes(x.status) ? ' closed' : '') + '"><span class="lk-g">' + ROLE_GLYPH[role] + '</span><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) + '</span>').join('')).join('');
+      lk.innerHTML = '<div class="lk-list">' + (chips || '<span class="n">No links</span>') + '</div>';
+    }
+    if (sb && DECK) DECK.refs(t.id).then(r => { if (el.dataset.id !== t.id || !sb.isConnected) return; sb.innerHTML = r.ok && r.json.length ? r.json.map(x => '<div><span class="k">' + esc(x.kind) + '</span> ' + esc(x.target) + (x.note ? ' <span class="n">' + esc(x.note) + '</span>' : '') + '</div>').join('') : r.ok ? 'None' : esc(r.err.message); });
+    el.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+    return;
+  }
+  const deck = deckOpen(), dlg = deck.card, ac = new AbortController(), sig = { signal: ac.signal };
+  if (deck.cur) deck.cur.ac.abort();
+  const here = deck.cur = { ac, nav, isNew: !t, q: t ? t.q : null, id: t ? t.id : null, order, leave: () => {}, onClose: null };
+  dlg.innerHTML = formHtml;
+  deck.show(here, t ? ref(t) + ' ' + plain(t.title) + (pos ? ', ' + pos : '') : '');
   if (o.error) dlg.querySelector('#ft').focus();
-  // where the item came from (item_refs), read only and loaded when the window opens; links are shown as text
-  if (t && src) rest('GET', 'item_refs?select=kind,target,note&item_id=eq.' + t.id + '&order=created_at').then(r => {
-    const box = dlg.querySelector('#srcs'); if (!box) return;
+  // where the item came from (item_refs), read only; loaded once per deck, the neighbours' ahead of a switch
+  if (t && src) [nav.prev, nav.next].forEach(x => { if (x) deck.refs(x); });
+  if (t && src) deck.refs(t.id).then(r => {
+    const box = deck.cur === here && dlg.querySelector('#srcs'); if (!box) return;
     box.innerHTML = r.ok && r.json.length ? r.json.map(x => '<div><span class="k">' + esc(x.kind) + '</span> ' + esc(x.target) + (x.note ? ' <span class="n">' + esc(x.note) + '</span>' : '') + '</div>').join('') : r.ok ? 'None' : esc(r.err.message);
   });
   const ftEl = dlg.querySelector('#ft'), fnEl = dlg.querySelector('#fn');
@@ -3701,7 +4092,6 @@ function openTask(id, quad, opts) {
   const pend = []; // { op: 'add' | 'remove' | 'new', role, id, title }
   const ROLE_TEXT = { parent: ['Parent', '+ Parent'], child: ['Subtasks', '+ Subtask'], pred: ['Comes after', '+ Predecessor'], next: ['Next', '+ Next'] };
   // one list under Links in this order, each chip with its type's glyph and colour; the add buttons in Maksym's order
-  const ROLE_GLYPH = { parent: '↑', child: '↓', pred: '←', next: '→' }, ROLE_KIND = { parent: 'Parent', child: 'Subtask', pred: 'Comes after', next: 'Next' };
   const ADD_ORDER = ['pred', 'next', 'child', 'parent'];
   const selfTask = () => t || { id: selfId, list: dlg.querySelector('#fl').value, num: 0, title: '', status: 'open' };
   // links as they will be after Save: the stored ones plus pend
@@ -3792,19 +4182,24 @@ function openTask(id, quad, opts) {
     return pend.length;
   }
 
-  // Escape closes a tag box being typed in, then clears the search, and only then closes the window
-  dlg.addEventListener('cancel', e => {
-    const a = document.activeElement;
+  // Escape closes a tag box being typed in, then clears the search, then answers Stay to the unsaved-changes question, and only
+  // then closes the window (asking first when something changed)
+  deck.dlg.addEventListener('cancel', e => {
+    const a = document.activeElement, bar = dlg.querySelector('.tk-ask');
     if (a && a.id === 'lk-q') { e.preventDefault(); lkOpen = null; drawLinks(); const b = lkBox.querySelector('[data-lk-add]'); if (b) b.focus(); }
     else if (a && a.classList.contains('tag-new')) e.preventDefault();
     else if (a === qEl && qEl.value) { e.preventDefault(); qEl.value = ''; drawTags(false); }
-  });
+    else if (bar) { e.preventDefault(); bar.querySelector('[data-ask=stay]').click(); }
+    else if (dirty()) { e.preventDefault(); ask('close'); }
+  }, sig);
   const fc = dlg.querySelector('#fcancel');
-  if (fc) fc.onclick = () => { dlg.close(); const r = edit(t, x => { x.status = 'cancelled'; }); toast('Cancelled: ' + plain(t.title), undoEdit(t, r)); };
+  if (fc) fc.onclick = () => { deck.dlg.close(); const r = edit(t, x => { x.status = 'cancelled'; }); toast('Cancelled: ' + plain(t.title), undoEdit(t, r)); };
   const fdel = dlg.querySelector('#fdel');
-  if (fdel) fdel.onclick = () => { dlg.close(); removeTask(t); };
+  if (fdel) fdel.onclick = () => { deck.dlg.close(); removeTask(t); };
   const fs = dlg.querySelector('#fs');
+  let after = null, afterTo = null, saveBad = false; // after: where "Save and go / close" goes once the save is through
   if (fs) fs.onclick = e => {
+    saveBad = false;
     const title = htmlToMd(dlg.querySelector('#ft')).replace(/\n+/g, ' ').trim(), notes = htmlToMd(dlg.querySelector('#fn')).trim(), list = dlg.querySelector('#fl').value;
     let bad = false;
     if (!plain(title).trim()) { dlg.querySelector('#fe').textContent = 'Title can\'t be empty'; bad = true; }
@@ -3812,7 +4207,7 @@ function openTask(id, quad, opts) {
     if (!list) { dlg.querySelector('#fle').textContent = 'Choose a list'; bad = true; }
     const endV = dlg.querySelector('#fd').value, startV = dlg.querySelector('#fsd').value, startD = startV ? new Date(startV) : null;
     if (endV && startD && new Date(endV) < startD) { dlg.querySelector('#fsde').textContent = 'Start is after End.'; bad = true; }
-    if (bad) { e.preventDefault(); (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
+    if (bad) { e.preventDefault(); saveBad = true; (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
     // edit window, item 1: no Quadrant field; the window keeps the quadrant it has (a new task: the quadrant whose + was clicked)
     const fq = t ? t.q : (quad || 'B');
     const deadline = endV ? new Date(endV) : null;
@@ -3827,8 +4222,9 @@ function openTask(id, quad, opts) {
         const theirs = t.version !== shown.version ? mine.filter(k => cur[k] !== shown[k] && cur[k] !== now[k]) : [];
         if (theirs.length) {
           const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', start: 'start' };
-          setTimeout(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline, start: startD }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
-          return;
+          // the window stays open on this task with my text and the notice (filled again in place)
+          deck.swap(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline, start: startD }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
+          return true;
         }
         const moved = mine.includes('list');
         const key = moved ? topKey(list, fq) : t.sortKey;
@@ -3855,62 +4251,56 @@ function openTask(id, quad, opts) {
         toast('Added to ' + label(list) + ': ' + plain(title), canDo('delete', null, list) ? () => removeTask(nt, true) : null);
       }
     };
-    if (!newNames.length) return save([]);
-    // new tag names: created in their tag lists first, then the save goes on (the window closes when they exist)
+    // "Save and go": the save, then the switch in place (the form must not submit, that would close the window)
+    const then = stay => { if (stay) return; if (after === 'prev' || after === 'next' || after === 'jump') leaveNow(after, afterTo); else deck.dlg.close(); };
+    if (!newNames.length) { const stay = save([]); if (stay || after === 'prev' || after === 'next' || after === 'jump') { e.preventDefault(); then(stay); } return; }
+    // new tag names: created in their tag lists first, then the save goes on (the window closes or moves on when they exist)
     e.preventDefault(); fs.disabled = true; fs.textContent = 'Saving…';
-    ensureTags(newNames).then(ids => { dlg.close(); save(ids); render(); });
+    ensureTags(newNames).then(ids => then(save(ids)));
   };
-  // previous / next: what the window showed, so a move asks only when something changed
+  // leaving this task (a side zone, a ghost or edge tab, Alt+arrows, a swipe: prev / next; a band, an end zone, Esc: close): what
+  // the window showed, so leaving asks only when something changed
   const snap = () => JSON.stringify([htmlToMd(ftEl), htmlToMd(fnEl), dlg.querySelector('#fl').value, dlg.querySelector('#fd').value, dlg.querySelector('#fsd').value, [...chosen].sort(), pend.length]);
   const snap0 = snap();
-  let goTo = null;
-  const ask = id => {
+  const dirty = () => editable && snap() !== snap0;
+  // kind: prev | next | close | jump (a dot; to = its task)
+  const leaveNow = (kind, to) => kind === 'close' ? deck.dlg.close()
+    : kind === 'jump' ? deck.swap(() => openTask(to, null), order.indexOf(to) > order.indexOf(t.id) ? 1 : -1, to)
+    : deck.swap(() => openTask(nav[kind], null), kind === 'next' ? 1 : -1);
+  const ask = (kind, to) => {
     dlg.querySelector('.tk-ask')?.remove();
+    const back = document.activeElement;
     const bar = document.createElement('div'); bar.className = 'tk-ask'; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', 'Unsaved changes');
-    const verb = id ? 'go' : 'close';
+    const verb = kind === 'close' ? 'close' : 'go';
     bar.innerHTML = '<p>You have unsaved changes.</p>' + (editable ? '<button type="button" data-ask="save">Save and ' + verb + '</button>' : '') + '<button type="button" class="quiet" data-ask="discard">Discard and ' + verb + '</button><button type="button" class="quiet" data-ask="stay">Stay</button>';
-    dlg.querySelector('.actions').before(bar);
+    dlg.querySelector('.actions').prepend(bar); // inside the sticky button row, so it is in view however far the window is scrolled (journey judge, 2026-10-29)
+    deck.dlg.classList.add('is-asking');
+    bar.scrollIntoView({ block: 'nearest' });
     bar.querySelector('[data-ask]').focus();
+    const done = () => { bar.remove(); deck.dlg.classList.remove('is-asking'); };
     bar.onclick = e => {
       const b = e.target.closest('[data-ask]'); if (!b) return;
-      const fsb = dlg.querySelector('#fs');
-      if (b.dataset.ask === 'stay') { bar.remove(); return; }
-      goTo = id;
-      if (b.dataset.ask === 'discard') { dlg.close(); return; }
-      bar.remove(); fsb.click();
-      if (dlg.open && !fsb.disabled) goTo = null; // Save found a problem: the window stays, its error shows
+      done();
+      if (b.dataset.ask === 'stay') { if (back && back.isConnected) back.focus(); return; }
+      if (b.dataset.ask === 'discard') return leaveNow(kind, to);
+      after = kind; afterTo = to || null; dlg.querySelector('#fs').click();
+      if (saveBad) after = null; // Save found a problem: the window stays on this task, its error shows
     };
   };
-  const go = k => {
-    const id = t ? nav[k] : null;
-    if (t && !id) return;
-    if (editable && snap() !== snap0) return ask(id);
-    goTo = id; dlg.close();
+  here.leave = (kind, to) => {
+    if (deck.dlg.classList.contains('is-asking')) return;
+    if (kind === 'jump') { if (!t || !to || to === t.id || !order.includes(to) || !find(to)) return; }
+    else if (kind !== 'close' && !nav[kind]) return;
+    if (dirty()) return ask(kind, to);
+    leaveNow(kind, to);
   };
-  dlg.querySelectorAll('[data-nav]').forEach(b => { b.onclick = () => go(b.dataset.nav); });
-  // a click on the backdrop beside the window: left = previous, right = next (a new task closes)
-  dlg.addEventListener('click', e => {
-    if (e.target !== dlg) return;
-    const r = dlg.getBoundingClientRect();
-    if (e.clientX < r.left) go('prev'); else if (e.clientX > r.right) go('next');
-  });
-  dlg.addEventListener('keydown', e => { if (e.altKey && (e.key === 'PageUp' || e.key === 'PageDown')) { e.preventDefault(); go(e.key === 'PageUp' ? 'prev' : 'next'); } });
-  // ghosts: shown from 1100 px, beside the window's box
-  const placeGhosts = () => {
-    const r = dlg.getBoundingClientRect(), room = r.left >= 236 && innerWidth >= 1100;
-    dlg.querySelectorAll('.tk-ghost').forEach(g => {
-      if (!room) { if (g.matches(':popover-open')) g.hidePopover(); return; }
-      g.style.top = Math.max(16, r.top + 96) + 'px';
-      g.style.left = (g.classList.contains('prev') ? r.left - 236 : r.right + 16) + 'px';
-      if (!g.matches(':popover-open')) g.showPopover();
-    });
-  };
-  if (dlg.querySelector('.tk-ghost') && HTMLElement.prototype.showPopover) { placeGhosts(); addEventListener('resize', placeGhosts); dlg.addEventListener('close', () => removeEventListener('resize', placeGhosts)); }
-  dlg.addEventListener('close', () => {
-    dlg.remove(); render();
-    if (goTo) { const id = goTo; setTimeout(() => openTask(id), 0); return; }
-    const back = opener && document.querySelector(opener); if (back) back.focus();
-  });
+  // swipe on the window header (touch, pen): left = next, right = previous; toward a missing neighbour nothing happens
+  const head = dlg.querySelector('.tk-head');
+  let sw = null;
+  head.addEventListener('pointerdown', e => { sw = e.pointerType === 'mouse' ? null : { x: e.clientX, y: e.clientY }; });
+  head.addEventListener('pointercancel', () => { sw = null; });
+  head.addEventListener('pointerup', e => { if (!sw) return; const k = C.swipeDir(e.clientX - sw.x, e.clientY - sw.y); sw = null; if (k && nav[k]) here.leave(k); });
+  here.onClose = () => { render(); const back = opener && document.querySelector(opener); if (back) back.focus(); };
   dlg.querySelector('#ft').addEventListener('input', () => dlg.querySelector('#fe').textContent = '');
   dlg.querySelector('#fl').addEventListener('change', () => dlg.querySelector('#fle').textContent = '');
   dlg.querySelector('#fd').addEventListener('input', () => { dlg.querySelector('#fde').textContent = ''; dlg.querySelector('#fsde').textContent = ''; });
@@ -3937,7 +4327,7 @@ function dialogShell(html, opener) {
   const dlg = document.createElement('dialog');
   dlg.innerHTML = html;
   document.body.append(dlg); dlg.showModal();
-  dlg.addEventListener('close', () => { dlg.remove(); render(); document.querySelector(opener)?.focus(); });
+  dlg.addEventListener('close', () => { dlg.remove(); render(); (typeof opener === 'string' ? document.querySelector(opener) : opener)?.focus(); }); // opener: a selector or the element
   return dlg;
 }
 
@@ -4198,6 +4588,78 @@ async function reviewDownload() {
 }
 document.head.insertAdjacentHTML('beforeend', '<style id="kpi-css">' + KPI_CSS + '</style>');
 
+// welcome v3 (2026-10-29): the fields of Urgency settings and Card layout are built and read here only, for both windows and
+// for the welcome card, so the two never drift. p prefixes the ids (the welcome uses 'wl-', a window may be open over it);
+// reads go by data attributes and radio names inside root (each form is its own radio scope), never by id.
+function urgencyFields(p) {
+  const s = settings, D = C.SETTINGS_DEFAULTS;
+  const f = (k, label, attrs, val, hint) => '<label>' + label + '<input id="' + p + 's-' + k + '" data-u="' + k + '" type="number" ' + attrs + ' value="' + val + '" aria-describedby="' + p + 's-' + k + '-h"></label>' +
+    '<p class="s-hint" id="' + p + 's-' + k + '-h">' + hint + '</p>';
+  return f('win', 'Urgency window, days', 'min="1" max="30"', s.windowDays, 'A task without a fixed quadrant moves to Do when its end is this close. 1-30, default ' + D.windowDays + '.') +
+    f('th', 'Due soon, % of the window', 'min="10" max="90" step="5"', s.threshold, 'A card is marked due soon when less than this share of the window is left. 10-90, default ' + D.threshold + '.') +
+    f('lim', 'Do limit', 'min="0" max="50"', s.doLimit, 'The Do count turns red above this number. 0 turns it off; default ' + D.doLimit + '.');
+}
+// out-of-range values fall back to the default, as they always did
+function readUrgency(root) {
+  const D = C.SETTINGS_DEFAULTS;
+  const num = (k, lo, hi, dflt) => { const v = Number(root.querySelector('[data-u=' + k + ']').value); return v >= lo && v <= hi ? v : dflt; };
+  return C.readSettings({ threshold: num('th', 10, 90, D.threshold), windowDays: num('win', 1, 30, D.windowDays), doLimit: num('lim', 0, 50, D.doLimit) });
+}
+const CL_NAMES = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', source: 'Source (category, Sources)',
+  group: 'Tasks Grouping', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
+const clRadio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
+// order (2026-10-29, Maksym): Moving between tasks, Cards open (both one row of options), Shorten, A card shows, Tags
+function cardLayoutFields(p) {
+  const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
+  const lists = C.cardLayoutTagLists(TAG_LISTS, me && me.id); // edit window, item 4: archived tag lists are not offered
+  return '<fieldset class="s-switch cl-inline"><legend>Moving between tasks</legend>' + clRadio('s-switch', 'standard', 'Standard', taskSwitcher === 'standard') + clRadio('s-switch', 'coverflow', 'Coverflow carousel', taskSwitcher === 'coverflow') +
+    '<p class="s-hint">How the task window shows the previous and next task. Applies the next time a task opens.</p></fieldset>' +
+    '<fieldset class="cl-mode cl-inline"><legend>Cards open</legend>' + clRadio('cl-mode', 'collapsed', 'Collapsed', st.cardMode === 'collapsed') + clRadio('cl-mode', 'expanded', 'Expanded', st.cardMode === 'expanded') + '</fieldset>' +
+    '<label>Shorten descriptions longer than, characters<input id="' + p + 'cl-auto" data-cl-auto type="number" min="0" max="5000" value="' + L.autoCollapse + '" aria-describedby="' + p + 'cl-auto-h"></label>' +
+    '<p class="s-hint" id="' + p + 'cl-auto-h">An open card shows this many characters of the description, then Show more. 0 shows the whole description; default ' + D.autoCollapse + '.</p>' +
+    '<fieldset><legend>A card shows</legend><div class="cl-grid">' + C.CARD_FIELDS.map(k => '<label class="cb"><input type="checkbox" data-cl="' + k + '"' + (L[k] ? ' checked' : '') + '> ' + CL_NAMES[k] + '</label>').join('') + '</div></fieldset>' +
+    '<fieldset><legend>Tags</legend>' + clRadio('cl-tags', 'all', 'All tags', L.tags === 'all') + clRadio('cl-tags', 'lists', 'Only from these tag lists', L.tags === 'lists') +
+    '<div class="cl-lists">' + (lists.length ? lists.map(l => '<label class="cb"><input type="checkbox" data-cl-list="' + esc(l.id) + '"' + (L.tagLists.includes(l.id) ? ' checked' : '') + '> ' + esc(l.name) + (l.owner_id !== me.id ? ' <span class="n">' + esc(personName(l.owner_id)) + '</span>' : '') + '</label>').join('') : '<p class="s-hint">No tag lists yet.</p>') + '</div>' +
+    clRadio('cl-tags', 'off', 'No tags', L.tags === 'off') + '</fieldset>';
+}
+// the tag-list ticks follow the Tags choice; Tasks Grouping asks first (C.groupingNotice), Cancel or Escape puts the tick back.
+// Returns reset(): the defaults into the form (the window's Reset)
+function wireCardLayout(root) {
+  const D = C.CARD_LAYOUT_DEFAULTS, q = s => root.querySelector(s);
+  const syncLists = () => { const on = q('input[name=cl-tags]:checked').value === 'lists'; root.querySelectorAll('[data-cl-list]').forEach(b => { b.disabled = !on; }); };
+  root.querySelectorAll('input[name=cl-tags]').forEach(r => r.onchange = syncLists); syncLists();
+  const grp = q('[data-cl=group]');
+  const askGrouping = was => {
+    const n = C.groupingNotice(grp.checked);
+    const c = dialogShell('<form method="dialog" class="grp-ask"><strong>' + esc(n.title) + '</strong><p>' + esc(n.text) + '</p><div class="actions"><span class="sp"></span><button value="cancel" id="grp-cancel">Cancel</button><button id="grp-ok" value="ok">Apply</button></div></form>', grp);
+    let ok = false;
+    c.querySelector('#grp-ok').onclick = () => { ok = true; };
+    c.addEventListener('close', () => { if (!ok) grp.checked = was; });
+    c.querySelector('#grp-cancel').focus();
+  };
+  grp.onchange = () => askGrouping(!grp.checked);
+  return () => {
+    const was = grp.checked;
+    C.CARD_FIELDS.forEach(k => { q('[data-cl="' + k + '"]').checked = D[k]; });
+    if (grp.checked !== was) askGrouping(was);
+    q('[data-cl-auto]').value = D.autoCollapse; q('input[name=s-switch][value=standard]').checked = true; q('input[name=cl-tags][value=all]').checked = true; q('input[name=cl-mode][value=collapsed]').checked = true; syncLists();
+  };
+}
+function readCardLayoutForm(root) {
+  const D = C.CARD_LAYOUT_DEFAULTS, q = s => root.querySelector(s);
+  const raw = { tags: q('input[name=cl-tags]:checked').value, tagLists: [...root.querySelectorAll('[data-cl-list]:checked')].map(b => b.dataset.clList) };
+  C.CARD_FIELDS.forEach(k => { raw[k] = q('[data-cl="' + k + '"]').checked; });
+  const n = Number(q('[data-cl-auto]').value); raw.autoCollapse = Number.isInteger(n) && n >= 0 && n <= 5000 ? n : D.autoCollapse;
+  const sw = q('input[name=s-switch]:checked');
+  return { layout: C.readCardLayout(raw, Object.keys(TAG_LISTS)), mode: q('input[name=cl-mode]:checked').value, switcher: sw && C.TASK_SWITCHERS.includes(sw.value) ? sw.value : taskSwitcher };
+}
+// prefs.cardLayout, cards.mode and prefs.taskSwitcher; the caller's render() saves the preferences
+function applyCardLayout(v) {
+  cardLayout = v.layout;
+  if (v.mode !== st.cardMode) { st.cardMode = v.mode; st.flip.clear(); }
+  if (v.switcher !== taskSwitcher) { taskSwitcher = v.switcher; savePrefsSoon(); }
+}
+
 // settings are saved per person in the preferences row; display name and time zone are the profile's own columns
 // round 3: two windows. General (people): display name, time zone. Urgency: window, due soon %, Do limit (SETTINGS_DEFAULTS).
 function openSettings(kind) {
@@ -4208,18 +4670,15 @@ function openSettings(kind) {
   const dlg = dialogShell('<form method="dialog" class="settings"><strong>' + (general ? 'General settings' : 'Urgency settings') + '</strong>' +
     (general ? '<label>Display name<input id="s-name" maxlength="60" autocomplete="name" value="' + esc(me.display_name) + '"></label><div class="err" id="s-name-e" aria-live="polite"></div>' +
       '<label>Time zone<input id="s-tz" list="s-tzs" autocomplete="off" spellcheck="false" value="' + esc(me.timezone || browserTz) + '"></label><datalist id="s-tzs">' + zones.map(z => '<option value="' + esc(z) + '">').join('') + '</datalist><div class="err" id="s-tz-e" aria-live="polite"></div>' +
-      '<div class="s-row"><span>Welcome note</span><button type="button" id="s-welcome">Show again</button></div>'
-    : '<label>Urgency window, days<input id="s-win" type="number" min="1" max="30" value="' + settings.windowDays + '" aria-describedby="s-win-h"></label><p class="s-hint" id="s-win-h">A task without a fixed quadrant moves to Do when its end is this close. 1-30, default ' + D.windowDays + '.</p>' +
-      '<label>Due soon, % of the window<input id="s-th" type="number" min="10" max="90" step="5" value="' + settings.threshold + '" aria-describedby="s-th-h"></label><p class="s-hint" id="s-th-h">A card is marked due soon when less than this share of the window is left. 10-90, default ' + D.threshold + '.</p>' +
-      '<label>Do limit<input id="s-lim" type="number" min="0" max="50" value="' + settings.doLimit + '" aria-describedby="s-lim-h"></label><p class="s-hint" id="s-lim-h">The Do count turns red above this number. 0 turns it off; default ' + D.doLimit + '.</p>') +
+      '<div class="s-row"><span>Welcome card</span><button type="button" id="s-welcome">Show again</button></div>'
+    : urgencyFields('')) +
     '<div class="actions"><button value="cancel">Cancel</button><button id="s-save" value="save">Save</button></div></form>', '#profile');
   const again = dlg.querySelector('#s-welcome');
   // after the window's own close handler (render, focus back to the menu), so the note keeps the focus
-  if (again) again.onclick = () => { welcomeSeen = false; dlg.addEventListener('close', () => setTimeout(showWelcome)); dlg.close(); };
+  if (again) again.onclick = () => { welcomeSeen = false; welcomeVersion = 0; dlg.addEventListener('close', () => setTimeout(showWelcome)); dlg.close(); };
   dlg.querySelector('#s-save').onclick = e => {
-    const num = (id, lo, hi, dflt) => { const v = Number(dlg.querySelector(id).value); return v >= lo && v <= hi ? v : dflt; };
     const patch = {};
-    if (!general) { settings = C.readSettings({ threshold: num('#s-th', 10, 90, D.threshold), windowDays: num('#s-win', 1, 30, D.windowDays), doLimit: num('#s-lim', 0, 50, D.doLimit) }); return toast('Urgency settings saved'); }
+    if (!general) { settings = readUrgency(dlg); return toast('Urgency settings saved'); }
     const name = dlg.querySelector('#s-name').value.replace(/[\u0000-\u001f\u007f]/g, '').trim(), tz = dlg.querySelector('#s-tz').value.trim();
     if (!name) { e.preventDefault(); dlg.querySelector('#s-name-e').textContent = 'Enter a name'; dlg.querySelector('#s-name').focus(); return; }
     if (tz && zones.length && !zones.includes(tz) && tz !== 'UTC') { e.preventDefault(); dlg.querySelector('#s-tz-e').textContent = 'Pick a time zone from the list'; dlg.querySelector('#s-tz').focus(); return; }
@@ -4235,80 +4694,62 @@ function openSettings(kind) {
 
 // round 3, adjustment 13: Card layout (prefs.cardLayout and cards.mode). Defaults are today's card.
 function openCardLayout() {
-  const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
-  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', source: 'Source (category, Sources)',
-    group: 'Tasks Grouping', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
-  const lists = C.cardLayoutTagLists(TAG_LISTS, me && me.id); // edit window, item 4: archived tag lists are not offered
-  const radio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
-  const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' +
-    '<fieldset><legend>Cards open</legend>' + radio('cl-mode', 'collapsed', 'Collapsed', st.cardMode === 'collapsed') + radio('cl-mode', 'expanded', 'Expanded', st.cardMode === 'expanded') + '</fieldset>' +
-    '<label>Shorten descriptions longer than, characters<input id="cl-auto" type="number" min="0" max="5000" value="' + L.autoCollapse + '" aria-describedby="cl-auto-h"></label>' +
-    '<p class="s-hint" id="cl-auto-h">An open card shows this many characters of the description, then Show more. 0 shows the whole description; default ' + D.autoCollapse + '.</p>' +
-    '<fieldset><legend>A card shows</legend><div class="cl-grid">' + C.CARD_FIELDS.map(k => '<label class="cb"><input type="checkbox" data-cl="' + k + '"' + (L[k] ? ' checked' : '') + '> ' + names[k] + '</label>').join('') + '</div></fieldset>' +
-    '<fieldset><legend>Tags</legend>' + radio('cl-tags', 'all', 'All tags', L.tags === 'all') + radio('cl-tags', 'lists', 'Only from these tag lists', L.tags === 'lists') +
-    '<div class="cl-lists">' + (lists.length ? lists.map(l => '<label class="cb"><input type="checkbox" data-cl-list="' + esc(l.id) + '"' + (L.tagLists.includes(l.id) ? ' checked' : '') + '> ' + esc(l.name) + (l.owner_id !== me.id ? ' <span class="n">' + esc(personName(l.owner_id)) + '</span>' : '') + '</label>').join('') : '<p class="s-hint">No tag lists yet.</p>') + '</div>' +
-    radio('cl-tags', 'off', 'No tags', L.tags === 'off') + '</fieldset>' +
+  const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' + cardLayoutFields('') +
     '<div class="actions"><button type="button" id="cl-reset">Reset</button><span class="sp"></span><button value="cancel">Cancel</button><button id="cl-save" value="save">Save</button></div></form>', '#profile');
-  const q = s => dlg.querySelector(s);
-  const syncLists = () => { const on = q('input[name=cl-tags]:checked').value === 'lists'; dlg.querySelectorAll('[data-cl-list]').forEach(b => { b.disabled = !on; }); };
-  dlg.querySelectorAll('input[name=cl-tags]').forEach(r => r.onchange = syncLists); syncLists();
-  // Tasks Grouping: a change is confirmed first (C.groupingNotice); Cancel or Escape puts the switch back
-  const grp = q('[data-cl=group]');
-  const askGrouping = was => {
-    const n = C.groupingNotice(grp.checked);
-    const c = dialogShell('<form method="dialog" class="grp-ask"><strong>' + esc(n.title) + '</strong><p>' + esc(n.text) + '</p><div class="actions"><span class="sp"></span><button value="cancel" id="grp-cancel">Cancel</button><button id="grp-ok" value="ok">Apply</button></div></form>', '[data-cl=group]');
-    let ok = false;
-    c.querySelector('#grp-ok').onclick = () => { ok = true; };
-    c.addEventListener('close', () => { if (!ok) grp.checked = was; });
-    c.querySelector('#grp-cancel').focus();
-  };
-  grp.onchange = () => askGrouping(!grp.checked);
-  q('#cl-reset').onclick = () => {
-    const was = grp.checked;
-    C.CARD_FIELDS.forEach(k => { q('[data-cl="' + k + '"]').checked = D[k]; });
-    if (grp.checked !== was) askGrouping(was);
-    q('#cl-auto').value = D.autoCollapse; q('input[name=cl-tags][value=all]').checked = true; q('input[name=cl-mode][value=collapsed]').checked = true; syncLists();
-  };
-  q('#cl-save').onclick = () => {
-    const raw = { tags: q('input[name=cl-tags]:checked').value, tagLists: [...dlg.querySelectorAll('[data-cl-list]:checked')].map(b => b.dataset.clList) };
-    C.CARD_FIELDS.forEach(k => { raw[k] = q('[data-cl="' + k + '"]').checked; });
-    const n = Number(q('#cl-auto').value); raw.autoCollapse = Number.isInteger(n) && n >= 0 && n <= 5000 ? n : D.autoCollapse;
-    cardLayout = C.readCardLayout(raw, Object.keys(TAG_LISTS));
-    const mode = q('input[name=cl-mode]:checked').value;
-    if (mode !== st.cardMode) { st.cardMode = mode; st.flip.clear(); }
-    toast('Card layout saved');
-  };
+  const form = dlg.querySelector('form');
+  dlg.querySelector('#cl-reset').onclick = wireCardLayout(form);
+  dlg.querySelector('#cl-save').onclick = () => { applyCardLayout(readCardLayoutForm(form)); toast('Card layout saved'); };
 }
 
-// round 3, adjustment 12: a short welcome once per person (prefs.welcomeSeen), beside the profile menu, which it highlights.
-// Not a <dialog>: an open dialog holds back renders after a poll, and this note may stay open while the person works.
+// round 3, adjustment 12, then 2026-10-29 (version 3): a welcome card once per person and version (prefs.welcomeVersion <
+// C.WELCOME_VERSION), under the profile menu, which it highlights. One long card: what is new in the task window, then the
+// Urgency and Card layout forms (the same builders as the two windows, prefilled), then Later and Save. Save saves both as
+// the windows' Save would; Later, ✕ and Escape save nothing. Either way it is marked seen. Not a <dialog> and no role="dialog":
+// it is not modal (an open dialog holds back renders after a poll, and this card may stay open while the person works).
+// Its body scrolls inside the card; the action row stays in view.
 let welcomeOn = false;
 function showWelcome() {
   if (document.getElementById('welcome') || !me) return;
-  const s = settings;
   const el = document.createElement('section');
-  el.id = 'welcome'; el.className = 'welcome'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-labelledby', 'wl-h'); el.setAttribute('aria-describedby', 'wl-p');
-  el.innerHTML = '<h2 id="wl-h">Welcome to TasksDashboard</h2><p id="wl-p">Tasks close to their end date stand out, so set your urgency now. You can change it any time under your profile → Urgency settings.</p>' +
-    '<dl><dt>Urgency window <span class="v">' + s.windowDays + ' days</span></dt><dd>A task without a fixed quadrant moves to Do when its end date is this close.</dd>' +
-    '<dt>Due soon <span class="v">' + s.threshold + '%</span></dt><dd>A card is marked due soon when less than this share of the window is left.</dd>' +
-    '<dt>Do limit <span class="v">' + s.doLimit + '</span></dt><dd>The Do count turns red above this number.</dd></dl>' +
-    '<div class="actions"><button type="button" id="wl-later">Later</button><button type="button" id="wl-go">Set urgency now</button></div>';
+  el.id = 'welcome'; el.className = 'welcome'; el.setAttribute('aria-labelledby', 'wl-h');
+  el.innerHTML = '<button type="button" id="wl-x" class="wl-x" aria-label="Close the welcome card">' + I.x + '</button>' +
+    '<form id="wl-form" class="wl-form" novalidate><div class="wl-body">' +
+    '<p class="wl-step">New in the task window</p><h2 id="wl-h">Set up your board</h2>' +
+    '<div class="wl-lead"><p>Move between tasks without closing the task window:</p>' +
+    '<ul><li>Click beside the window, or press <kbd>←</kbd> or <kbd>→</kbd>, for the previous or next task: Do, then Plan, Delegate, Eliminate.</li>' +
+    '<li>Click above or below the window to close it. Unsaved changes ask first.</li></ul>' +
+    '<p>The two cards below set how your board works. Change what you like, then Save. Both stay in the profile menu.</p></div>' +
+    '<section class="wl-card" data-wl="urgency" aria-labelledby="wl-u-h"><h3 id="wl-u-h">Urgency</h3><p class="wl-sub">When tasks move up to Do and stand out.</p>' + urgencyFields('wl-') + '</section>' +
+    '<section class="wl-card" data-wl="cardlayout" aria-labelledby="wl-c-h"><h3 id="wl-c-h">Card layout</h3><p class="wl-sub">How cards look and how the task window moves.</p>' + cardLayoutFields('wl-') + '</section>' +
+    '</div><div class="wl-foot"><span class="sp"></span><button type="button" id="wl-later">Later</button><button type="submit" class="wl-pri" id="wl-save">Save</button></div></form>';
   document.body.append(el);
   welcomeOn = true;
-  const done = () => { el.remove(); welcomeOn = false; welcomeSeen = true; removeEventListener('resize', placeWelcome); render(); };
-  el.querySelector('#wl-later').onclick = () => { done(); document.getElementById('profile')?.focus(); };
-  el.querySelector('#wl-go').onclick = () => { done(); openSettings('urgency'); };
-  el.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); el.querySelector('#wl-later').click(); } };
+  const form = el.querySelector('#wl-form');
+  wireCardLayout(form);
+  // seen: this version (welcomeVersion), and welcomeSeen for clients that only know that key; render() saves the preferences
+  const done = () => { el.remove(); welcomeOn = false; welcomeSeen = true; welcomeVersion = C.WELCOME_VERSION; removeEventListener('resize', placeWelcome); render(); savePrefsSoon(); document.getElementById('profile')?.focus(); };
+  form.onsubmit = e => {
+    e.preventDefault();
+    settings = readUrgency(form);
+    applyCardLayout(readCardLayoutForm(form));
+    done(); toast('Urgency and Card layout saved');
+  };
+  el.querySelector('#wl-later').onclick = done;
+  el.querySelector('#wl-x').onclick = done;
+  // the page's own Escape (close a menu) stays out of it
+  el.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(); } };
   addEventListener('resize', placeWelcome);
   render(); placeWelcome();
-  el.querySelector('#wl-go').focus();
+  el.querySelector('[data-u=win]').focus({ preventScroll: true });
 }
 function placeWelcome() {
   const el = document.getElementById('welcome'), b = document.getElementById('profile');
   if (!el || !b) return;
-  const r = b.getBoundingClientRect();
-  el.style.top = Math.round(r.bottom + 10) + 'px';
+  const r = b.getBoundingClientRect(), top = Math.round(r.bottom + 10);
+  el.style.top = top + 'px';
   el.style.right = Math.max(8, Math.round(innerWidth - r.right)) + 'px';
+  // the card ends above the bottom of the screen; its body scrolls (.wl-body), the pointer above it and the action row stay
+  el.style.maxHeight = Math.max(240, innerHeight - top - 8) + 'px';
 }
 
 // round 3, adjustment 3: the note of a first share (shared_notices, db/012). Someone shared a list or tags with me and I joined
@@ -4955,18 +5396,18 @@ function bind() {
     c.onclick = e => { if (!e.target.closest('button')) openTask(c.dataset.card); };
     c.onkeydown = e => { if (e.key === 'Enter' && e.target === c) openTask(c.dataset.card); };
     c.ondragstart = e => { dragId = c.dataset.card; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); c.classList.add('dragging'); };
-    c.ondragend = () => { dragId = null; document.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging')); document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); };
+    c.ondragend = () => { dragId = null; dropMark = null; document.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging')); document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); };
   });
   app.querySelectorAll('section.q').forEach(sec => {
     const q = sec.dataset.q;
     sec.ondragover = e => {
       if (!dragId) return;
       e.preventDefault();
-      document.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
-      document.querySelectorAll('.q.drop').forEach(x => x !== sec && x.classList.remove('drop'));
-      sec.classList.add('drop');
-      const over = e.target.closest('[data-card]');
-      if (over && over.dataset.card !== dragId) { const r = over.getBoundingClientRect(); over.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after'); }
+      // measure before any class changes (no forced style recalc), then touch classes only on a change
+      const over = e.target.closest('[data-card]'), hit = over && over.dataset.card !== dragId ? over : null;
+      const before = hit ? (r => e.clientY < r.top + r.height / 2)(hit.getBoundingClientRect()) : false;
+      if (!sec.classList.contains('drop')) { document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); sec.classList.add('drop'); }
+      if (hit) markDrop(hit, before ? 'drop-before' : 'drop-after'); else unmarkDrop();
     };
     sec.ondragleave = e => { if (!sec.contains(e.relatedTarget)) sec.classList.remove('drop'); };
     sec.ondrop = e => {
@@ -4979,7 +5420,6 @@ function bind() {
     sec.ondblclick = e => { if (!e.target.closest('[data-card], button') && canAddSomewhere()) openTask(null, q); };
   });
   app.querySelectorAll('[data-copy]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.copy); const r = refText(t); try { navigator.clipboard.writeText(r); } catch (err) {} toast('Copied ' + r); });
-  app.querySelectorAll('[data-unpin]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.unpin); const r = edit(t, x => { x.pin = undefined; }); toast('Urgency follows dates', undoEdit(t, r)); render(); });
   app.querySelectorAll('[data-expand]').forEach(b => b.onclick = () => { const q = b.dataset.expand; st.expanded = st.expanded === q ? null : q; render(); document.querySelector('[data-expand="' + q + '"]')?.focus(); });
   app.querySelectorAll('[data-done]').forEach(b => b.onclick = e => { e.stopPropagation(); const t = find(b.dataset.done); const r = edit(t, x => { x.status = 'done'; }); toast('Completed: ' + plain(t.title), undoEdit(t, r)); render(); });
   app.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openTask(null, b.dataset.add));

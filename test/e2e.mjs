@@ -33,7 +33,8 @@ const CYR_LIST = 'Тестовий список ' + RUN.slice(4).replace(/\d/g, 
 const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // real key presses (CDP Input): implicit form submission and the dialog's Escape only follow trusted keys. Modifiers: Alt 1
-const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 } };
+const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 },
+  ArrowLeft: { code: 'ArrowLeft', vk: 37 }, ArrowRight: { code: 'ArrowRight', vk: 39 }, PageUp: { code: 'PageUp', vk: 33 }, PageDown: { code: 'PageDown', vk: 34 }, Tab: { code: 'Tab', vk: 9 } };
 const rows = [], leftovers = [], kpiTimes = [], reviewApiTimes = [], timelineTimes = [];
 let pass = 0, fail = 0, skipped = 0;
 const check = (group, what, ok, note) => { ok ? pass++ : fail++; rows.push(`| ${group} | ${what} | ${ok ? 'pass' : 'FAIL'} | ${String(note || '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 160)} |`); console.log(`${ok ? 'pass' : 'FAIL'} ${group}: ${what}`); };
@@ -111,6 +112,14 @@ async function tab(B, ctxId, opts = {}) {
   T.size = (width, height) => s('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 700 });
   T.theme = v => s('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: v }] });
   T.shot = async name => { const r = await s('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(OUT, name + '.png'), Buffer.from(r.data, 'base64')); return name + '.png'; };
+  // real pointer input (CDP Input): a press at (x, y), released at (x2, y2); a hover; a touch swipe of dx px (touch emulation on for it)
+  T.mouse = async (x, y, x2 = x, y2 = y) => { await s('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }); await s('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+    if (x2 !== x || y2 !== y) for (let i = 1; i <= 5; i++) await s('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x + (x2 - x) * i / 5, y: y + (y2 - y) * i / 5, button: 'left', buttons: 1 });
+    await s('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x2, y: y2, button: 'left', buttons: 0, clickCount: 1 }); };
+  T.hover = (x, y) => s('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  T.swipe = async (x, y, dx) => { await s('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }); await s('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (let i = 1; i <= 5; i++) await s('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * i / 5, y }] });
+    await s('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await s('Emulation.setTouchEmulationEnabled', { enabled: false }); };
   T.insert = async (sel, text) => { await T.ev(`document.querySelector(${JSON.stringify(sel)}).focus()`); await s('Input.insertText', { text }); };
   T.key = async (key, modifiers = 0) => {
     const k = KEYS[key], base = { modifiers, key, code: k.code, windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk };
@@ -395,6 +404,15 @@ async function gData() {
     fire(src,'dragstart',0);fire(dst,'dragover',r.top+2);fire(dst,'drop',r.top+2);fire(src,'dragend',0);return true})()`);
   const keys = await until(async () => { const [x, y] = [await item(a.id), await item(c.id)]; return y.sort_key < x.sort_key && [x.sort_key, y.sort_key]; });
   check(G, 'reorder: the dropped card gets a sort_key before its new neighbour', !!keys, JSON.stringify(keys));
+  // drag lag fix (2026-10-29): the drop line is at full strength within 50 ms of the first dragover and does not slide when
+  // the pointer moves from the upper to the lower half (no running transition on the card, only one marked card on the page)
+  const line = await T.ev(`(async()=>{const src=document.querySelector('[data-card="${a.id}"]'),dst=document.querySelector('[data-card="${b.id}"]');if(!src||!dst)return null;const dt=new DataTransfer();const r=dst.getBoundingClientRect();
+    const fire=(el,type,y)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+20,clientY:y}));
+    const st=()=>({cls:dst.classList.contains('drop-before')?'before':dst.classList.contains('drop-after')?'after':'',anim:dst.getAnimations().length,shadow:getComputedStyle(dst).boxShadow!=='none',marked:document.querySelectorAll('.drop-before,.drop-after').length});
+    fire(src,'dragstart',0);fire(dst,'dragover',r.top+3);await new Promise(z=>setTimeout(z,50));const up=st();
+    fire(dst,'dragover',r.bottom-3);await new Promise(z=>setTimeout(z,50));const down=st();fire(src,'dragend',0);return {up,down}})()`);
+  check(G, 'drag: the drop line is full within 50 ms and does not slide (no transition, one marked card)', !!line && line.up.cls === 'before' && line.down.cls === 'after' &&
+    line.up.anim === 0 && line.down.anim === 0 && line.up.shadow && line.down.shadow && line.up.marked === 1 && line.down.marked === 1, JSON.stringify(line));
   await T.reload(); await T.ready(); await pick(T, ST.id);
   const order = await T.ev(`[...document.querySelectorAll('section.q[data-q="B"] [data-card]')].map(x=>x.dataset.card).filter(id=>[${JSON.stringify(a.id)},${JSON.stringify(b.id)},${JSON.stringify(c.id)}].includes(id)).join()`);
   check(G, 'the card order survives a reload', order === [c.id, a.id, b.id].join(), order);
@@ -563,18 +581,58 @@ async function gUi() {
   for (const [who, theme] of [['maksym', 'light'], ['anastasiia', 'dark']]) {
     const T = await tab(B, await ctx(B));
     await T.theme(theme);
-    // round 3, adjustment 12: a person who has not seen the welcome gets it once (prefs.welcomeSeen; put back in cleanup)
+    // round 3, adjustment 12, then 2026-10-29 (version 3): the welcome is one card (what is new, then the Urgency and Card
+    // layout forms, then Later and Save); it shows once per person and version (prefs.welcomeVersion < 3; put back in cleanup)
     const c0 = who === 'maksym' ? MK : AN;
-    const pr = await c0.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c0.uid + '&app=eq.tasksdashboard');
-    if (pr.ok && pr.json.length) await c0.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c0.uid, Object.assign({}, pr.json[0].prefs, { welcomeSeen: false })), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    const readPrefs = async () => { const r = await c0.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c0.uid + '&app=eq.tasksdashboard'); return r.ok && r.json.length ? r.json[0].prefs : null; };
+    const p0 = await readPrefs();
+    if (p0) await c0.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c0.uid, Object.assign({}, p0, { welcomeSeen: true, welcomeVersion: 2 })), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    const P = core.prefsFromRow(p0), S = P.settings; // the person's values
+    const WL = `document.getElementById('welcome')`;
+    // the card's values as the page reads them, and where its parts sit
+    const wlState = `(()=>{const el=${WL};if(!el)return null;const q=s=>el.querySelector(s),leg=[...el.querySelectorAll('legend')].map(l=>l.textContent);return {win:+q('[data-u=win]').value,th:+q('[data-u=th]').value,lim:+q('[data-u=lim]').value,
+      sw:q('input[name=s-switch]:checked')?.value,mode:q('input[name=cl-mode]:checked')?.value,auto:+q('[data-cl-auto]').value,fields:${JSON.stringify(core.CARD_FIELDS)}.every(k=>q('[data-cl="'+k+'"]').checked===!!${JSON.stringify(P.cardLayout)}[k]),tags:q('input[name=cl-tags]:checked')?.value,
+      cards:[...el.querySelectorAll('.wl-card h3')].map(h=>h.textContent),order:leg.indexOf('Moving between tasks')<leg.indexOf('Cards open')&&leg.indexOf('Cards open')>=0,text:el.textContent,
+      focus:document.activeElement===q('[data-u=win]'),dialog:el.tagName==='DIALOG'||el.getAttribute('role')==='dialog',beacon:document.getElementById('profile').classList.contains('beacon'),old:!!q('#wl-next,#wl-back,#wl-urg,#wl-cl'),
+      ids:[...el.querySelectorAll('[id]')].every(x=>document.querySelectorAll('#'+CSS.escape(x.id)).length===1)}})()`;
     T.keepWelcome = true;
     check(G, `${who}: opens signed in`, await open(T, await grantFor(who)));
-    check(G, `${who}: the welcome shows once, with the urgency values from the settings, and highlights the profile menu`, await T.wait('!!document.getElementById("welcome")', 5000) &&
-      await T.ev(`(()=>{const w=document.getElementById('welcome').textContent;return /Welcome to TasksDashboard/.test(w)&&/Urgency window/.test(w)&&/Due soon/.test(w)&&/Do limit/.test(w)&&document.getElementById('profile').classList.contains('beacon')})()`));
-    for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(500); await T.shot(`ui-welcome-${who}-${w}x${h}-${theme}`); }
-    await T.size(1440, 900);
-    await T.click('#wl-later'); T.keepWelcome = false;
-    check(G, `${who}: Later closes it and the highlight goes`, await T.ev('!document.getElementById("welcome")&&!document.getElementById("profile").classList.contains("beacon")'));
+    const w0 = (await T.wait(`!!${WL}`, 5000)) ? await T.ev(wlState) : null;
+    check(G, `${who}: someone who closed the two-panel note (welcomeVersion 2) sees the welcome card once`, !!w0);
+    check(G, `${who}: the welcome is one card: the new task window text, then Urgency and Card layout forms, no Next or Back, not a dialog, the profile menu highlighted`,
+      !!w0 && JSON.stringify(w0.cards) === '["Urgency","Card layout"]' && /previous or next task/.test(w0.text) && /Do, then Plan, Delegate, Eliminate/.test(w0.text) && /Unsaved changes ask first/.test(w0.text) && !w0.old && !w0.dialog && w0.beacon && w0.ids,
+      w0 && JSON.stringify({ cards: w0.cards, old: w0.old, dialog: w0.dialog, beacon: w0.beacon, ids: w0.ids }));
+    check(G, `${who}: the card's forms hold the person's values (Urgency window, Due soon, Do limit, Moving between tasks, Cards open, Shorten, A card shows, Tags)`,
+      !!w0 && w0.win === S.windowDays && w0.th === S.threshold && w0.lim === S.doLimit && w0.sw === P.taskSwitcher && w0.mode === P.cards.mode && w0.auto === P.cardLayout.autoCollapse && w0.fields && w0.tags === P.cardLayout.tags,
+      w0 && JSON.stringify({ win: w0.win, th: w0.th, lim: w0.lim, sw: w0.sw, mode: w0.mode, auto: w0.auto, fields: w0.fields, tags: w0.tags }));
+    await T.shot(`welcome-card-1440x900-${theme}`);
+    const wlRow = n => `(()=>{const t=[...${WL}.querySelectorAll('input[name=${n}]')].map(i=>i.closest('label').getBoundingClientRect());return t.length===2&&Math.abs(t[0].top-t[1].top)<=2&&t[1].left>t[0].right})()`;
+    check(G, `${who}: on the card Moving between tasks comes before Cards open, each radio group on one row; focus starts on the first field and Tab goes down`, !!w0 && w0.order && w0.focus &&
+      await T.ev(wlRow('s-switch')) && await T.ev(wlRow('cl-mode')) && (await T.key('Tab'), await T.ev(`document.activeElement===${WL}.querySelector('[data-u=th]')`)));
+    check(G, `${who}: at 1440 the card ends inside the screen, its body scrolls and Save stays in view`, await T.ev(`(()=>{const el=${WL},r=el.getBoundingClientRect(),b=el.querySelector('.wl-body'),s=el.querySelector('#wl-save').getBoundingClientRect();return r.bottom<=innerHeight&&s.bottom<=r.bottom&&s.top>=r.top&&(b.scrollHeight<=b.clientHeight||getComputedStyle(b).overflowY==='auto')})()`));
+    await T.size(390, 844); await sleep(500);
+    check(G, `${who}: at 390 px the card fits the screen, Save in view, nothing is wider than the screen or the card`, await T.ev(`(()=>{const el=${WL},r=el.getBoundingClientRect(),b=el.querySelector('.wl-body'),s=el.querySelector('#wl-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight+1&&s.bottom<=innerHeight&&document.documentElement.scrollWidth<=innerWidth&&b.scrollWidth<=b.clientWidth})()`));
+    await T.shot(`welcome-card-390x844-${theme}`);
+    await T.size(1440, 900); await sleep(300);
+    // the board stays usable behind it: the search box takes focus and text while the card is open
+    check(G, `${who}: the board stays usable while the card is open (search takes text)`, await T.ev(`(()=>{const s=document.querySelector('#q, input[type=search]');if(!s)return false;s.focus();return document.activeElement===s&&!!${WL}})()`));
+    // Tasks Grouping asks first on the card too; Cancel puts the tick back and the card stays
+    const grpWas = await T.ev(`${WL}.querySelector('[data-cl=group]').checked`);
+    await T.click('#welcome [data-cl=group]');
+    check(G, `${who}: changing Tasks Grouping on the card asks first; Cancel puts the tick back, the card stays`, await T.wait('!!document.querySelector("dialog[open] #grp-ok")', 2000) &&
+      (await T.click('#grp-cancel'), await T.wait(`!document.querySelector('dialog[open]')&&!!${WL}&&${WL}.querySelector('[data-cl=group]').checked===${grpWas}`, 2000)));
+    // a change on the card + Save is saved: settings and Card layout, read back from the database
+    const lim0 = who === 'maksym' ? 8 : 5, auto0 = 280, sw0 = P.taskSwitcher === 'coverflow' ? 'standard' : 'coverflow';
+    await T.ev(`(()=>{const el=${WL};el.querySelector('[data-u=lim]').value='${lim0}';el.querySelector('[data-cl-auto]').value='${auto0}';el.querySelector('input[name=s-switch][value=${sw0}]').checked=true;el.querySelector('#wl-save').click();return true})()`);
+    check(G, `${who}: Save closes the card and the highlight goes`, await T.wait(`!${WL}&&!document.getElementById('profile').classList.contains('beacon')`, 3000));
+    await sleep(2000);
+    const pS = await readPrefs();
+    check(G, `${who}: Save on the card saves both forms and marks it seen (Do limit ${lim0}, Shorten ${auto0}, ${sw0}, welcomeVersion 3, welcomeSeen true)`,
+      !!pS && pS.settings.doLimit === lim0 && pS.settings.windowDays === S.windowDays && pS.cardLayout.autoCollapse === auto0 && pS.taskSwitcher === sw0 && pS.welcomeVersion === 3 && pS.welcomeSeen === true,
+      pS ? JSON.stringify({ doLimit: pS.settings.doLimit, autoCollapse: pS.cardLayout.autoCollapse, taskSwitcher: pS.taskSwitcher, welcomeVersion: pS.welcomeVersion, welcomeSeen: pS.welcomeSeen }) : 'no row');
+    // back to the person's own switcher (cleanup puts all preferences back too)
+    await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+    await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('input[name=s-switch][value=${P.taskSwitcher}]').checked=true;d.querySelector('#cl-save').click();return true})()`);
     // the board opens on the person's last list (a preference); the round-4 card checks need All lists
     await pick(T, 'all');
     await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
@@ -583,6 +641,11 @@ async function gUi() {
     // round 3, adjustment 13: Card layout (cards open expanded, owner shown, auto-collapse 300)
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     await T.shot(`ui-cardlayout-${who}-1440x900-${theme}`);
+    // 2026-10-29: Moving between tasks above Cards open, and each radio group on one row
+    check(G, `${who}: Card layout: Moving between tasks comes before Cards open, each radio group on one row at 1440`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),leg=[...d.querySelectorAll('legend')].map(l=>l.textContent);
+      const row=n=>{const t=[...d.querySelectorAll('input[name='+n+']')].map(i=>i.closest('label').getBoundingClientRect());return t.length===2&&Math.abs(t[0].top-t[1].top)<=2&&t[1].left>t[0].right};
+      return leg.indexOf('Moving between tasks')===0&&leg.indexOf('Cards open')===1&&row('s-switch')&&row('cl-mode')})()`));
+    await T.shot(`cardlayout-order-1440x900-${theme}`);
     const archivedTl = ((await c0.rest('GET', 'tag_lists?select=id&archived_at=not.is.null')).json || []).map(x => x.id);
     check(G, `${who}: Card layout has no "Who it is for" and lists no archived tag list (edit window, items 3, 4; ${archivedTl.length} archived)`,
       await T.ev(`(()=>{const d=document.querySelector('dialog[open]');const a=new Set(${JSON.stringify(archivedTl)});return !d.querySelector('[data-cl=owner]')&&!/Who it is for/.test(d.textContent)&&![...d.querySelectorAll('[data-cl-list]')].some(b=>a.has(b.dataset.clList))})()`));
@@ -596,9 +659,27 @@ async function gUi() {
     await sleep(2000);
     await T.reload(); await T.ready();
     check(G, `${who}: the welcome does not come back after a reload`, await T.ev('!document.getElementById("welcome")'));
+    // General settings → Welcome card: Show again brings the card back with the values saved since; Later saves nothing; Escape closes it
+    T.keepWelcome = true;
+    await T.click('#profile'); await T.click('[data-menu=general]'); await T.wait('!!document.getElementById("s-welcome")'); await T.click('#s-welcome');
+    const w1 = (await T.wait(`!!${WL}`, 3000)) ? await T.ev(wlState) : null;
+    check(G, `${who}: Show again brings the welcome card back, its forms holding the values saved since (Do limit ${lim}, Shorten 300, Expanded)`, !!w1 && w1.lim === lim && w1.auto === 300 && w1.mode === 'expanded' && w1.focus,
+      w1 && JSON.stringify({ lim: w1.lim, auto: w1.auto, mode: w1.mode, focus: w1.focus }));
+    await T.ev(`(()=>{const el=${WL};el.querySelector('[data-u=lim]').value='33';el.querySelector('[data-cl-auto]').value='111';return true})()`);
+    await T.click('#wl-later');
+    check(G, `${who}: Later closes the card`, await T.wait(`!${WL}`, 2000));
+    await sleep(2000);
+    const pL = await readPrefs();
+    check(G, `${who}: Later saves nothing from the card and marks it seen (Do limit ${lim}, Shorten 300, welcomeVersion 3)`, !!pL && pL.settings.doLimit === lim && pL.cardLayout.autoCollapse === 300 && pL.welcomeVersion === 3,
+      pL ? JSON.stringify({ doLimit: pL.settings.doLimit, autoCollapse: pL.cardLayout.autoCollapse, welcomeVersion: pL.welcomeVersion }) : 'no row');
+    await T.click('#profile'); await T.click('[data-menu=general]'); await T.wait('!!document.getElementById("s-welcome")'); await T.click('#s-welcome');
+    await T.wait(`!!${WL}`, 3000); await T.key('Escape');
+    check(G, `${who}: Escape closes the welcome card`, await T.wait(`!${WL}`, 2000));
+    T.keepWelcome = false;
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     check(G, `${who}: Card layout survives a reload`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.querySelector('input[name=cl-mode][value=expanded]').checked&&d.querySelector('[data-cl=creator]').checked&&d.querySelector('#cl-auto').value==='300'})()`));
-    await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
+// Tasks Grouping (2026-10-29): Reset that changes grouping asks first; the run applies it (grp-ok) so no confirm stays open
+    await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();document.getElementById("cl-save").click();true');
     // round 4, item 5: a small card shows its number and a second line with what Card layout switches on (by default End)
     check(G, `${who}: a small card shows its number and an End line (round 4, item 5)`, await T.wait(`!!${r4c}?.classList.contains('compact')&&!!${r4c}.querySelector('.ref')&&/End \\d{4}-/.test(${r4c}.querySelector('.sub')?.textContent||'')`, 5000),
       await T.ev(`${r4c}?.querySelector('.sub')?.textContent`));
@@ -634,7 +715,7 @@ async function gUi() {
       await T.ev(owns ? `!!document.querySelector('#pop [data-share-list]')&&!document.querySelector('#pop [data-people-list]')` : `!!document.querySelector('#pop [data-people-list]')&&!document.querySelector('#pop [data-share-list]')`));
     await pick(T, 'all');
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
-    await T.ev('document.querySelector("dialog[open] #cl-reset").click();document.querySelector("dialog[open] #cl-save").click();true');
+    await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();document.getElementById("cl-save").click();true');
     await T.click('#profile'); await T.click('[data-menu=urgency]'); await T.wait('!!document.getElementById("s-lim")');
     check(G, `${who}: settings and preferences survive a reload (Do limit ${lim})`, await T.ev(`document.getElementById('s-lim').value==='${lim}'`));
     check(G, `${who}: Urgency settings hold only window, due soon % and Do limit`, await T.ev('!!document.getElementById("s-win")&&!!document.getElementById("s-th")&&!document.getElementById("s-wd")&&!document.getElementById("s-hpd")&&!document.getElementById("s-name")'));
@@ -760,7 +841,7 @@ async function gUi() {
       // scrolls inside about 40% of the height and Save stays in view (U8); at 1440 Title and End are in view too
       for (const [w, h] of [[1440, 900], [390, 844]]) {
         await T.size(w, h); await sleep(400); await T.shot(`ui-task-${who}-${w}x${h}-${theme}`);
-        const m = await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),r=d.getBoundingClientRect(),b=d.querySelector('.tagbox'),cs=getComputedStyle(b),inV=e=>{if(!e)return false;const x=e.getBoundingClientRect();return x.top>=r.top-1&&x.bottom<=r.bottom+1&&x.bottom<=innerHeight+1};
+        const m = await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),r=(d.querySelector('.tk-card')||d).getBoundingClientRect(),b=d.querySelector('.tagbox'),cs=getComputedStyle(b),inV=e=>{if(!e)return false;const x=e.getBoundingClientRect();return x.top>=r.top-1&&x.bottom<=r.bottom+1&&x.bottom<=innerHeight+1};
           const g=d.querySelector('.tgg:not(.shut)'),gh=g&&g.querySelector('.tgg-h').getBoundingClientRect(),gc=g&&g.querySelector('.tgg-c').getBoundingClientRect();
           return {w:Math.round(r.width),maxH:parseFloat(cs.maxHeight),oy:cs.overflowY,vh:innerHeight,save:inV(d.querySelector('#fs')||d.querySelector('.actions button:last-child')),title:inV(d.querySelector('#ft')),end:inV(d.querySelector('#fd')),
             noX:d.scrollWidth<=d.clientWidth&&document.documentElement.scrollWidth<=innerWidth,label:[...d.querySelectorAll('.flabel')].some(x=>x.textContent.trim()==='Tags'),search:!!d.querySelector('#tg-q'),
@@ -907,6 +988,10 @@ async function gLinks() {
   const ps = await item(par.id);
   check(G, 'Start is saved (start_at)', !!ps.start_at && new Date(ps.start_at).getDate() === new Date(day(1)).getDate(), ps.start_at);
   // the board: badges, then Group by parent
+  // the badges need Waiting for and Subtask progress on and Tasks Grouping off, whatever the account stored (cleanup puts the preferences back);
+  // set without a click, so the grouping confirm does not open
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("dialog[open] #cl-save")', 4000);
+  await T.ev("(()=>{const d=document.querySelector('dialog[open]');d.querySelector('[data-cl=waiting]').checked=true;d.querySelector('[data-cl=progress]').checked=true;d.querySelector('[data-cl=group]').checked=false;d.querySelector('#cl-save').click();return true})()");
   await T.wait(`!!document.querySelector('[data-card="${par.id}"] .tb.pg')`, 8000);
   check(G, 'badges: no P badge and the progress 0/4 on the parent, "Waiting for 1" on a task with an open predecessor', await T.ev(`(()=>{const p=document.querySelector('[data-card="${par.id}"]');const w=document.querySelector('[data-card="${k2.id}"] .tb.wt');return !p.querySelector('.tb.pr')&&p.querySelector('.tb.pg').textContent==='0/4'&&!!w&&w.querySelector('.wl').textContent.trim()==='Waiting for'&&w.textContent.endsWith('1')})()`));
   await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("[data-cl=group]")', 4000);
@@ -940,36 +1025,145 @@ async function gLinks() {
   const kx = await until(async () => { const k = await keysOf([par.id, k1.id, k3.id, gx.id]); return k[gx.id] > k[par.id] && k; });
   check(G, 'grouped drag: a task dropped on a parent\'s lower half lands after its whole subtree, where the board shows it', !!kx && kx[gx.id] > kx[k1.id] && kx[gx.id] > kx[k3.id] &&
     await T.wait(`(()=>{const ids=[...document.querySelectorAll('[data-body=A] [data-card]')].map(c=>c.dataset.card);return ids.indexOf('${gx.id}')>ids.indexOf('${k1.id}')&&ids.indexOf('${gx.id}')>ids.indexOf('${k3.id}')})()`, 4000), JSON.stringify(kx));
-  // the task window: previous / next by the side areas, ghosts at 1440, ‹ › everywhere, unsaved changes ask first, a new task closes
+  // the task deck (edit-nav plan, 2026-10-29): the band left / right of the window (between its top and bottom edge) switches task,
+  // the bands above and below close it, a side with no neighbour closes; one modal for the whole session, no ‹ › buttons; unsaved
+  // changes ask first (zones, bands, Esc); Alt+arrows; on a phone the edge tabs and a swipe on the header. Standard (default) first, then Coverflow
   const shown = async () => T.ev(`[...document.querySelectorAll('[data-body=A] [data-card]')].map(c=>c.dataset.card)`);
   const titleOf = id => T.ev(`document.querySelector('[data-card="${id}"]').getAttribute('aria-label')`);
-  const side = right => T.ev(`(()=>{const d=document.querySelector('dialog[open]');const r=d.getBoundingClientRect();d.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:${right ? 'r.right+40' : 'r.left-40'},clientY:r.top+60}));return true})()`);
   const openTitle = () => T.ev(`(document.querySelector('dialog[open] #ft')||{}).textContent||''`);
+  const isOpen = async id => T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(id))}`, 4000);
+  const zoneAt = z => T.ev(`(()=>{const r=document.querySelector('dialog[open] [data-zone=${z}]').getBoundingClientRect();return [Math.round(r.left+r.width/2),Math.round(r.top+r.height/2)]})()`);
+  const press = async z => { const [x, y] = await zoneAt(z); await T.mouse(x, y); };
+  const closed = () => T.wait('!document.querySelector("dialog[open]")', 3000);
+  // the run starts in Standard whatever Maksym chose (cleanup puts his preferences back): Card layout → Moving between tasks
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("dialog[open] input[name=s-switch]")', 5000);
+  await T.click('dialog[open] input[name=s-switch][value=standard]'); await T.click('#cl-save'); await T.wait('!document.querySelector("dialog[open]")', 3000); await sleep(300);
   let ids = await shown();
-  await T.click(`[data-card="${ids[0]}"]`); await T.wait('!!document.querySelector("dialog[open] #ft")', 5000);
-  check(G, 'window at 1440: a ghost of the next card beside it, none before the first; ‹ disabled, › enabled', await T.wait('!!document.querySelector("dialog[open] .tk-ghost.next:popover-open")', 3000) &&
-    await T.ev('!document.querySelector("dialog[open] .tk-ghost.prev")&&document.querySelector("dialog[open] [data-nav=prev]").disabled&&!document.querySelector("dialog[open] [data-nav=next]").disabled'));
-  await sleep(300); await T.shot('ui-nav-1440x900-light');
-  await side(true);
-  check(G, 'a click right of the window opens the next card of the quadrant (shown order)', await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[1]))}`, 4000), await openTitle());
-  await side(false);
-  check(G, 'a click left of it goes back', await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[0]))}`, 4000), await openTitle());
+  await T.click(`[data-card="${ids[0]}"]`); await T.wait('!!document.querySelector("dialog.tk-deck[open] #ft")', 5000);
+  // Standard is the default (prefs.taskSwitcher, Card layout): each side with a neighbour is a shadow over its whole zone, from
+  // the card's edge (under its rounded edge) to the screen edge, darkest at the card, a big arrow near the card; no copies, no dots
+  check(G, 'window at 1440 (Standard, the default): the next side is a shadow band beside the card with an arrow, the first card\'s left side is an empty close zone, "1 of n in A Do", no ‹ › buttons',
+    await T.wait('!!document.querySelector("dialog[open] [data-zone=next][data-act=switch] .tk-g[data-nav=next]")', 3000) &&
+    await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return d.dataset.switcher==='standard'&&d.querySelector('[data-zone=prev]').dataset.act==='close'&&!d.querySelector('[data-zone=prev]').textContent.trim()&&!d.querySelector('.tk-nav')&&d.querySelector('#tk-pos').textContent==='1 of ${ids.length} in A Do'})()`),
+    await T.text('dialog[open] #tk-pos'));
+  await sleep(450); // the window's pop animation (scale) has ended
+  const band = await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),g=d.querySelector('.tk-g[data-nav=next]'),b=g.getBoundingClientRect(),c=d.querySelector('.tk-card').getBoundingClientRect(),v=g.querySelector('svg').getBoundingClientRect();return {left:Math.round(b.left-c.right),out:Math.round(b.right-c.right),dt:Math.round(b.top-c.top),db:Math.round(b.bottom-c.bottom),scr:Math.round(innerWidth-b.right),svg:Math.round(v.width),ax:Math.round(v.left+v.width/2-c.right),bg:/gradient/.test(getComputedStyle(g).backgroundImage),tl:(()=>{const k=d.querySelector('.tk-card'),p=document.createElement('i');p.style.color='var(--c)';k.append(p);const col=getComputedStyle(p).color;p.remove();return d.dataset.q==='A'&&getComputedStyle(k).backgroundImage.includes(col)})(),label:g.getAttribute('aria-label'),keys:g.getAttribute('aria-keyshortcuts'),pv:[...d.querySelectorAll('.tk-pv')].every(p=>p.hidden),dots:d.querySelector('.tk-dots').hidden}})()`);
+  check(G, 'Standard: the shadow starts under the card\'s edge and reaches the screen edge, as tall as the card, a 40 px arrow near the card; aria-label "Next task: …", arrow shortcuts; no copies, no dots; the card\'s top line in the quadrant colour',
+    band.left < 0 && Math.abs(band.scr) <= 1 && Math.abs(band.dt) <= 1 && Math.abs(band.db) <= 1 && band.svg === 40 && band.ax >= 30 && band.ax <= 80 && band.bg && band.tl &&
+    /^Next task: /.test(band.label) && band.keys === 'ArrowRight Alt+ArrowRight Alt+PageDown' && band.pv && band.dots, JSON.stringify(band));
+  await T.hover(720, 450); await sleep(400); await T.shot('std-1440x900-light'); await T.shot('ui-nav-1440x900-light');
+  await T.theme('dark'); await T.ev("(document.documentElement.dataset.theme='dark',true)"); await sleep(350); await T.shot('std-1440x900-dark');
+  await T.theme('light'); await T.ev("(document.documentElement.dataset.theme='light',true)"); await sleep(250);
+  // a sampler for every frame: the same dialog node, never a frame without the modal, no close event while switching
+  await T.ev(`(()=>{const d0=document.querySelector('dialog[open]');window.__nav={gaps:0,other:0,closes:0,frames:0,card:d0.querySelector('.tk-card'),turns:0};d0.addEventListener('close',()=>__nav.closes++);const f=()=>{const d=document.querySelector('dialog[open]');__nav.frames++;if(!d)__nav.gaps++;else if(d!==d0)__nav.other++;if(document.getAnimations().some(a=>a.id==='deck-move'))__nav.turns++;if(!__nav.stop)requestAnimationFrame(f)};requestAnimationFrame(f);return true})()`);
+  // the pointer far out in the zone (not on the band): the whole zone is the hit area, the band darkens and its arrow nudges outward
+  const [hx, hy] = await zoneAt('next'); await T.hover(hx, hy); await sleep(350); await T.shot('std-hover-next-1440x900-light'); await T.shot('ui-nav-hover-next-1440x900-light');
+  check(G, 'Standard: hovering anywhere in the right zone darkens the band and moves its arrow outward', await T.ev(`(()=>{const g=document.querySelector('dialog[open] .tk-g[data-nav=next]');const m=new DOMMatrix(getComputedStyle(g.querySelector('svg')).transform);return +getComputedStyle(g,'::after').opacity>0.9&&m.m41>=3})()`));
+  await press('next');
+  check(G, 'a click in the zone right of the window opens the next card of the quadrant (shown order), "2 of n"', await isOpen(ids[1]) && await T.text('dialog[open] #tk-pos') === `2 of ${ids.length} in A Do`, await openTitle());
+  await T.key('ArrowLeft', 1);
+  check(G, 'Alt+← goes back', await isOpen(ids[0]), await openTitle());
+  await T.ev("(document.querySelector('dialog[open] .tk-h').focus(),true)"); await T.key('ArrowRight');
+  check(G, 'a plain → (focus outside the fields) goes on', await isOpen(ids[1]), await openTitle());
+  await T.ev("(document.querySelector('dialog[open] #ft').focus(),true)"); await T.key('ArrowLeft'); await sleep(400);
+  check(G, 'a plain ← while typing in the title moves the caret, not the window', await isOpen(ids[1]), await openTitle());
+  await T.key('ArrowLeft', 1); await isOpen(ids[0]);
+  await T.key('PageDown', 1);
+  check(G, 'Alt+PageDown goes on', await isOpen(ids[1]), await openTitle());
+  await press('prev'); await isOpen(ids[0]);
+  const nav = await T.ev('(()=>{__nav.stop=true;const c=document.querySelector("dialog[open] .tk-card");return {gaps:__nav.gaps,other:__nav.other,closes:__nav.closes,frames:__nav.frames,turns:__nav.turns,sameCard:c===__nav.card}})()');
+  check(G, 'switching keeps one modal: the same dialog node and card, no frame without it, no close event; Standard never turns the row', nav.gaps === 0 && nav.other === 0 && nav.closes === 0 && nav.frames > 10 && nav.sameCard && nav.turns === 0, JSON.stringify(nav));
+  const fn = await T.ev(`(()=>{const r=document.querySelector('dialog[open] #fn').getBoundingClientRect();return [Math.round(r.left+20),Math.round(r.top+r.height/2)]})()`);
+  await T.mouse(fn[0], fn[1], hx, hy); await sleep(400);
+  check(G, 'a text selection dragged from the description into the right zone does not switch', await openTitle() === await titleOf(ids[0]), await openTitle());
   await T.ev("(()=>{const f=document.querySelector('dialog[open] #fn');f.textContent=f.textContent+' unsaved';return true})()");
-  await side(true);
-  check(G, 'unsaved changes: the move asks first (Save and go, Discard and go, Stay)', await T.wait('!!document.querySelector("dialog[open] .tk-ask [data-ask=discard]")', 3000) &&
-    await T.ev('[...document.querySelectorAll("dialog[open] .tk-ask [data-ask]")].map(b=>b.dataset.ask).join()==="save,discard,stay"'));
+  await press('top');
+  check(G, 'unsaved changes: the band above asks first (Save and close, Discard and close, Stay)', await T.wait('!!document.querySelector("dialog[open] .tk-ask [data-ask=discard]")', 3000) &&
+    await T.ev('[...document.querySelectorAll("dialog[open] .tk-ask [data-ask]")].map(b=>b.dataset.ask+":"+b.textContent).join()==="save:Save and close,discard:Discard and close,stay:Stay"'));
+  await sleep(200); await T.shot('ui-nav-ask-close-1440x900-light');
+  check(G, 'unsaved changes: the question is in view and on top (its middle is not covered by the button row), focus on its first button', await T.ev(`(()=>{const b=document.querySelector('dialog[open] .tk-ask'),r=b.getBoundingClientRect(),c=document.querySelector('dialog[open] .tk-card').getBoundingClientRect();const el=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=c.top&&r.bottom<=c.bottom+1&&!!el&&b.contains(el)&&b.contains(document.activeElement)})()`));
+  await T.click('dialog[open] .tk-ask [data-ask=stay]');
+  await T.key('Escape');
+  check(G, 'unsaved changes: Esc asks too, Stay keeps the window', await T.wait('!!document.querySelector("dialog[open] .tk-ask")', 3000) &&
+    (await T.click('dialog[open] .tk-ask [data-ask=stay]'), await T.ev('!!document.querySelector("dialog[open]")&&!document.querySelector("dialog[open] .tk-ask")')));
+  await press('next');
+  check(G, 'unsaved changes: the zone right of it asks Save and go, Discard and go, Stay', await T.wait('!!document.querySelector("dialog[open] .tk-ask [data-ask=discard]")', 3000) &&
+    await T.ev('[...document.querySelectorAll("dialog[open] .tk-ask [data-ask]")].map(b=>b.textContent).join()==="Save and go,Discard and go,Stay"'));
   await T.click('dialog[open] .tk-ask [data-ask=discard]');
-  check(G, 'Discard and go opens the next card and saves nothing', await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[1]))}`, 4000) &&
+  check(G, 'Discard and go opens the next card and saves nothing', await isOpen(ids[1]) &&
     !/unsaved/.test((await MK.rest('GET', 'items?select=body_md&id=eq.' + ids[0])).json[0].body_md || ''));
+  await press('bottom');
+  check(G, 'a click in the band below the window closes it', await closed());
+  // to the end of the board by Alt+→ (the window moves A Do → B Plan → C Delegate → D Eliminate): on the way, the last task of one
+  // quadrant leads to the first task of the next non-empty one; at the very end the right side is a close zone
+  ids = await shown(); await sleep(300);
+  await T.click(`[data-card="${ids[0]}"]`); await T.wait('!!document.querySelector("dialog[open] #ft")', 5000);
+  const where = () => T.ev('(document.querySelector("dialog[open] #tk-pos")?.textContent||"")');
+  let crossed = null;
+  for (let i = 0; i < 40 && await T.ev('document.querySelector("dialog[open] [data-zone=next]")?.dataset.act==="switch"'); i++) {
+    const a = await where(); await T.key('ArrowRight', 1); await sleep(250); const b = await where();
+    if (!crossed && /^(\d+) of \1 in A /.test(a) && / in [BCD] /.test(b)) crossed = [a, b];
+  }
+  const qs = await T.ev('[..."BCD"].filter(q=>document.querySelector("[data-body="+q+"] [data-card]"))');
+  check(G, 'across quadrants: after the last task in A Do, Alt+→ opens the first task of the next non-empty quadrant ("1 of n in B Plan")', !qs.length || (!!crossed && /^1 of \d+ in [BCD] /.test(crossed[1])), JSON.stringify(crossed) + ' ' + qs.join(''));
+  check(G, 'the last task of the board: its right side is an empty close zone with no band, a click there closes', await T.ev('!document.querySelector("dialog[open] [data-zone=next]").textContent.trim()&&!document.querySelector("dialog[open] .tk-g[data-nav=next]")') &&
+    (await press('next'), await closed()), await T.ev('JSON.stringify([document.querySelector("dialog[open] #tk-pos")?.textContent,document.querySelector("dialog[open] [data-zone=next]")?.textContent,!!document.querySelector("dialog[open]")])') + ' ' + ids.length);
   await T.size(390, 844); await sleep(500);
-  check(G, 'window at 390: no ghosts, the ‹ › buttons move between cards', await T.ev('!document.querySelector("dialog[open] .tk-ghost:popover-open")') &&
-    (await T.click('dialog[open] [data-nav=prev]'), await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[0]))}`, 4000)));
-  await T.shot('ui-nav-390x844-light');
+  await T.click(`[data-card="${ids[0]}"]`); await T.wait('!!document.querySelector("dialog[open] #ft")', 5000); await sleep(400);
+  check(G, 'window at 390: the next card is an edge tab at the screen edge (24 px wide, 44 px or taller, the band\'s ink and arrow), it moves on', await T.ev(`(()=>{const g=document.querySelector('dialog[open] .tk-g[data-nav=next]'),r=g.getBoundingClientRect();return r.width<=30&&r.height>=44&&r.right>=innerWidth-1&&!!g.querySelector('svg')&&g.querySelector('svg').getBoundingClientRect().width>8})()`) &&
+    (await T.click('dialog[open] .tk-g[data-nav=next]'), await isOpen(ids[1])));
+  const hd = await T.ev(`(()=>{const r=document.querySelector('dialog[open] .tk-head').getBoundingClientRect();return [Math.round(r.left+40),Math.round(r.top+r.height/2)]})()`);
+  await T.swipe(hd[0], hd[1], 140);
+  check(G, 'window at 390: a swipe right on the header goes back', await isOpen(ids[0]), await openTitle());
+  await sleep(300); await T.shot('std-390x844-light'); await T.shot('ui-nav-390x844-light');
   for (const theme of ['dark']) { await T.theme(theme); await T.ev(`(document.documentElement.dataset.theme='${theme}',true)`); await sleep(300); await T.shot(`ui-nav-390x844-${theme}`); await T.size(1440, 900); await sleep(500); await T.shot(`ui-nav-1440x900-${theme}`); await T.theme('light'); await T.ev("(document.documentElement.dataset.theme='light',true)"); }
-  await T.size(1440, 900); await closeDialogs(T);
+  check(G, 'no ‹ › buttons anywhere in the window', await T.ev('!document.querySelector("dialog[open] .tk-nav")'));
+  await T.size(1440, 900); await closeDialogs(T); await sleep(300);
   await T.click('[data-add="A"]'); await T.wait('!!document.querySelector("dialog[open] #ft")', 4000);
-  await side(false);
-  check(G, 'a new task: a click beside the window closes it', await T.wait('!document.querySelector("dialog[open]")', 3000));
+  await press('prev');
+  check(G, 'a new task: a click beside the window closes it', await closed());
+  // Coverflow (the other choice): Card layout → Moving between tasks, saved in prefs (taskSwitcher), read when a window opens
+  const savedSwitcher = async v => !!(await until(async () => { const r = await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard'); return r.ok && r.json[0] && (r.json[0].prefs.taskSwitcher || 'standard') === v; }, 8000));
+  const pickSwitcher = async v => {
+    await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("dialog[open] input[name=s-switch]")', 5000);
+    await T.click(`dialog[open] input[name=s-switch][value=${v}]`); await sleep(150);
+    if (v === 'coverflow') await T.shot('settings-switcher-1440x900-light');
+    await T.click('#cl-save'); await T.wait('!document.querySelector("dialog[open]")', 3000);
+  };
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]');
+  check(G, 'Card layout: "Moving between tasks" with Standard (chosen) and Coverflow carousel', await T.wait('!!document.querySelector("dialog[open] input[name=s-switch]")', 5000) &&
+    await T.ev(`(()=>{const f=document.querySelector('dialog[open] .s-switch');return /Moving between tasks/.test(f.querySelector('legend').textContent)&&[...f.querySelectorAll('label')].map(l=>l.textContent.trim()).join()==='Standard,Coverflow carousel'&&f.querySelector('input[value=standard]').checked})()`));
+  await closeDialogs(T); await sleep(200);
+  await pickSwitcher('coverflow');
+  check(G, 'Card layout: Coverflow carousel is saved to the preferences row (taskSwitcher)', await savedSwitcher('coverflow'));
+  ids = await shown(); await sleep(300);
+  await T.click(`[data-card="${ids[0]}"]`); await T.wait('!!document.querySelector("dialog.tk-deck[open] #ft")', 5000);
+  check(G, 'Coverflow at 1440: the whole window of the next task is a read-only copy beside the card (inert, aria-hidden, no ids, same title), set aside by a transform; no previous copy at the first card; no band',
+    await T.wait('document.querySelector("dialog[open]").dataset.switcher==="coverflow"', 3000) &&
+    await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),p=d.querySelector('.tk-pv[data-side=next]'),q=d.querySelector('.tk-pv[data-side=prev]');const want=document.querySelector('[data-card="${ids[1]}"]').getAttribute('aria-label');return !!p&&!p.hidden&&p.inert&&p.getAttribute('aria-hidden')==='true'&&!p.querySelector('[id]')&&!!p.querySelector('.tagbox')&&p.querySelector('.rt.one').textContent===want&&getComputedStyle(p).transform!=='none'&&q.hidden&&p.dataset.q==='A'&&getComputedStyle(d.querySelector('.tk-g[data-nav=next] .chev')).display==='none'})()`));
+  const far = ids[Math.min(2, ids.length - 1)], farN = ids.indexOf(far) + 1;
+  check(G, 'Coverflow: dots under the window, buttons "Go to task k of n: …", the current one aria-current, at most 9, below the card',
+    await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),b=[...d.querySelectorAll('.tk-dots .tk-dot')],c=d.querySelector('.tk-card').getBoundingClientRect(),r=d.querySelector('.tk-dots').getBoundingClientRect();return b.length===Math.min(9,${ids.length})&&b[0].getAttribute('aria-current')==='true'&&b.filter(x=>x.getAttribute('aria-current')==='true').length===1&&/^Go to task 1 of ${ids.length}: /.test(b[0].getAttribute('aria-label'))&&r.top>=c.bottom-1&&r.top<c.bottom+24})()`));
+  await T.hover(720, 450); await sleep(450); await T.shot('coverflow-1440x900-light');
+  await T.send('Animation.enable');
+  await T.send('Animation.setPlaybackRate', { playbackRate: 0.02 });
+  await press('next'); await sleep(300);
+  const mid = await T.ev(`(()=>{const a=document.getAnimations().filter(x=>x.id==='deck-move');a.forEach(x=>{x.pause();x.currentTime=x.effect.getTiming().duration*0.35});return a.length})()`);
+  await T.hover(720, 20); await sleep(150); await T.shot('coverflow-midswitch');
+  await T.send('Animation.setPlaybackRate', { playbackRate: 1 });
+  await T.ev(`(document.getAnimations().filter(x=>x.id==='deck-move').forEach(x=>x.finish()),true)`);
+  check(G, 'Coverflow: a click right of the window turns the row (copy in, card out, previous copy away), then the next task is the window', mid >= 3 && await isOpen(ids[1]) && await T.ev('!document.querySelector("dialog[open].is-moving")'), String(mid));
+  await T.key('ArrowLeft', 1); await isOpen(ids[0]); await sleep(400);
+  const dxy = await T.ev(`(()=>{const r=document.querySelector('dialog[open] .tk-dot[data-dot="${far}"]').getBoundingClientRect();return [Math.round(r.left+r.width/2),Math.round(r.top+r.height/2)]})()`);
+  await T.mouse(dxy[0], dxy[1]);
+  check(G, 'Coverflow: a dot click goes to that task ("k of n"), its dot becomes the current one, the window stays open', await isOpen(far) && await T.text('dialog[open] #tk-pos') === `${farN} of ${ids.length} in A Do` &&
+    await T.ev(`document.querySelector('dialog[open] .tk-dot[data-dot="${far}"]').getAttribute('aria-current')==='true'`), await openTitle());
+  await closeDialogs(T); await sleep(300);
+  // back to Standard (the default; cleanup puts the person's own prefs back as well)
+  await pickSwitcher('standard');
+  await T.click(`[data-card="${ids[0]}"]`); await T.wait('!!document.querySelector("dialog.tk-deck[open] #ft")', 5000);
+  check(G, 'Card layout: back to Standard, saved, and the next window opens in Standard', await savedSwitcher('standard') && await T.ev('document.querySelector("dialog[open]").dataset.switcher==="standard"&&document.querySelector("dialog[open] .tk-dots").hidden'));
+  await closeDialogs(T); await sleep(200);
   for (const theme of ['light', 'dark']) {
     await T.theme(theme);
     await T.ev(`(document.documentElement.dataset.theme='${theme}',true)`);
