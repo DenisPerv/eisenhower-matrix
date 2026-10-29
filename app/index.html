@@ -347,9 +347,8 @@ textarea.inp{min-height:110px;resize:vertical}
 .tlhead{display:flex;align-items:flex-start;gap:8px;margin:0 0 6px 4px}
 .tlhead>div{flex:1;min-width:0}
 .tlhead h3{margin:0;font:500 22px/1.2 var(--serif)}
-.tlhead .def{display:inline-flex;align-items:center;gap:3px;font:600 12px/1 var(--ui);color:var(--accent-ink);vertical-align:middle;margin-left:6px}
 svg.star{width:14px;height:14px;flex:none;color:var(--accent-ink);vertical-align:-2px;margin-left:4px}
-.tlhead .def svg.star{margin-left:0}
+.ib.fav[aria-pressed="true"]{color:var(--accent-ink)}
 .tlhead p{margin:2px 0 0;font:500 13px/1.35 var(--ui);color:var(--ink2)}
 .tlg .rowb{min-height:52px}
 .tlg .rowb .ib{margin-right:-8px}
@@ -800,6 +799,7 @@ h2[tabindex="-1"]:focus{outline:none}
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-star-o" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></symbol>
@@ -1250,9 +1250,11 @@ const TPO = {};
 const tagName = id => (D.tags[id] || PEND.find(g => g.id === id) || { name: '' }).name;
 const tagListOf = id => (D.tags[id] || PEND.find(g => g.id === id) || {}).tag_list_id || (PEND.find(g => g.id === id) || {}).list;
 function groupsNow() { return C.tagGroups(D.tagLists, D.tags, me() && me().id, D.names, { order: D.prefs.tagListOrder }); }
-function tpOpen(p, list, picked) {
+/* web: drawTags (tags round): a favourite list (prefs tagListFavs) starts open, every other list starts closed on each open of the
+   window; the chevron then toggles within this screen only (TPO, cleared by resetPicker) */
+function tpOpen(p, list) {
   const k = p + ':' + list.id; if (k in TPO) return TPO[k];
-  return C.tagGroupOpen(list, me() && me().id, new Set(picked.map(tagListOf).filter(Boolean)), D.prefs.tagListsOpen);
+  return C.tagGroupOpen(list, D.prefs.tagListFavs);
 }
 function resetPicker(p) { for (const k in TPO) if (k.startsWith(p + ':')) delete TPO[k]; PEND = PEND.filter(g => g.p !== p); }
 function tlShare(l) { return me() && l.owner_id !== me().id ? `Shared by ${D.names[l.owner_id] || 'someone'}` : ''; }
@@ -1262,8 +1264,8 @@ function tagPicker(p, picked) {
     const l = g.list, add = C.tagListRights(l).has('addTag');
     const ids = g.tags.concat(PEND.filter(x => x.p === p && x.list === l.id).map(x => x.id)).filter(id => !q || tagName(id).toLowerCase().includes(q));
     if (!ids.length && (q || !add)) continue;
-    const open = q ? true : tpOpen(p, l, picked), sh = tlShare(l), def = l.is_default && me() && l.owner_id === me().id;
-    h += `<div class="tgrp"><button type="button" class="tgh" data-act="tp-grp" data-p="${p}" data-id="${l.id}" aria-expanded="${open}"><span class="tgn">${esc(l.name)}${def ? '<svg class="star" aria-hidden="true" focusable="false"><use href="#i-star"/></svg><span class="vh">, default</span>' : ''}</span>${sh ? `<span class="vh">, </span><small>${esc(sh)}</small>` : ''}${ic('chev')}</button>${open ? `<div class="chips tchips">${ids.map(id => `<button type="button" class="chip" data-act="tp-tag" data-p="${p}" data-id="${id}" aria-pressed="${picked.includes(id)}">${esc(tagName(id))}${id.startsWith('new:') ? '<span class="vh">, new</span>' : ''}</button>`).join('')}${add && !q ? `<button type="button" class="chip ghost" data-act="tp-new" data-p="${p}" data-id="${l.id}">${ic('plus')}New tag<span class="vh"> in ${esc(l.name)}</span></button>` : ''}</div>` : ''}</div>`;
+    const open = q ? true : tpOpen(p, l), sh = tlShare(l), fav = C.tagGroupOpen(l, D.prefs.tagListFavs);
+    h += `<div class="tgrp"><button type="button" class="tgh" data-act="tp-grp" data-p="${p}" data-id="${l.id}" aria-expanded="${open}"><span class="tgn">${esc(l.name)}${fav ? '<svg class="star" aria-hidden="true" focusable="false"><use href="#i-star"/></svg><span class="vh">, favourite</span>' : ''}</span>${sh ? `<span class="vh">, </span><small>${esc(sh)}</small>` : ''}${ic('chev')}</button>${open ? `<div class="chips tchips">${ids.map(id => `<button type="button" class="chip" data-act="tp-tag" data-p="${p}" data-id="${id}" aria-pressed="${picked.includes(id)}">${esc(tagName(id))}${id.startsWith('new:') ? '<span class="vh">, new</span>' : ''}</button>`).join('')}${add && !q ? `<button type="button" class="chip ghost" data-act="tp-new" data-p="${p}" data-id="${l.id}">${ic('plus')}New tag<span class="vh"> in ${esc(l.name)}</span></button>` : ''}</div>` : ''}</div>`;
   }
   return h || '<p class="src" style="margin:6px 0 0">No tag matches.</p>';
 }
@@ -1750,7 +1752,7 @@ document.addEventListener('click', async e => {
     case 'lists': openDlg('dlg-lists'); renderLists(); break;
     case 'add': openAdd(b.dataset.q); break;
     case 'add-close': tryCloseAdd(); break;
-    case 'tp-grp': { const tl = b.dataset.id, pp = b.dataset.p, open = b.getAttribute('aria-expanded') === 'true'; TPO[pp + ':' + tl] = !open; D.setPrefs({ tagListsOpen: Object.assign({}, D.prefs.tagListsOpen, { [tl]: !open }) }); if (pp === 'add') renderAddTags(); else renderTTags(); const nb = $(`#${pp}-tags [data-act="tp-grp"][data-id="${tl}"]`); if (nb) nb.focus(); break; }
+    case 'tp-grp': { const tl = b.dataset.id, pp = b.dataset.p, open = b.getAttribute('aria-expanded') === 'true'; TPO[pp + ':' + tl] = !open; if (pp === 'add') renderAddTags(); else renderTTags(); const nb = $(`#${pp}-tags [data-act="tp-grp"][data-id="${tl}"]`); if (nb) nb.focus(); break; }
     case 'tp-tag': { const tg = b.dataset.id, pp = b.dataset.p; if (pp === 'add') { AD.tags = AD.tags.includes(tg) ? AD.tags.filter(x => x !== tg) : [...AD.tags, tg]; renderAddTags(); } else { TS.tags = TS.tags.includes(tg) ? TS.tags.filter(x => x !== tg) : [...TS.tags, tg]; renderTTags(); onTaskInput(); } const nb = $(`#${pp}-tags [data-id="${tg}"]`); if (nb) nb.focus(); break; }
     case 'tp-new': {
       const pp = b.dataset.p, tl = D.tagLists[b.dataset.id]; if (!tl) break;
@@ -2258,8 +2260,10 @@ function renderTagGroups() {
     if (q && !ts.length) return '';
     const who = mine ? 'Yours' : `Shared by ${D.names[l.owner_id] || 'someone'}. You are ${(l.role || '').toLowerCase()}`;
     const add = !l.archived_at && !l.hidden && R.has('addTag');
-    return `<section class="tlg${l.archived_at || l.hidden ? ' arch' : ''}" aria-labelledby="tlh-${l.id}"><div class="tlhead"><div><h3 id="tlh-${l.id}">${esc(l.name)}${l.is_default && mine ? ' <span class="def"><svg class="star" aria-hidden="true" focusable="false"><use href="#i-star"/></svg>Default</span>' : ''}</h3><p>${esc(who)}${l.archived_at ? '. Archived, read only' : l.hidden ? '. Hidden from your pickers' : ''}</p></div>
-      <button class="ib" data-act="tl-menu" data-id="${l.id}" aria-label="Tag list actions: ${esc(l.name)}">${ic('more')}</button></div>
+    /* web: openTags trayHtml (tags round): every live list has a ★ toggle (favourite: opens in the task window; prefs tagListFavs) */
+    const fav = l.archived_at ? null : C.tagGroupOpen(l, D.prefs.tagListFavs);
+    return `<section class="tlg${l.archived_at || l.hidden ? ' arch' : ''}" aria-labelledby="tlh-${l.id}"><div class="tlhead"><div><h3 id="tlh-${l.id}">${esc(l.name)}</h3><p>${esc(who)}${l.archived_at ? '. Archived, read only' : l.hidden ? '. Hidden from your pickers' : ''}</p></div>
+      ${fav === null ? '' : `<button class="ib fav" data-act="tl-fav" data-id="${l.id}" aria-pressed="${fav}" title="Favourite: opens in the task window" aria-label="Favourite: ${esc(l.name)}">${ic(fav ? 'star' : 'star-o')}</button>`}<button class="ib" data-act="tl-menu" data-id="${l.id}" aria-label="Tag list actions: ${esc(l.name)}">${ic('more')}</button></div>
       <ul class="rows">${ts.map(id => { const tg = D.tags[id], mi = mineTag(id); return `<li><div class="rowb"><span class="badge tag${mi ? ' mine' : ''}">${esc(tg.name)}${mi ? '<span class="vh">, counts as Mine</span>' : ''}</span><span class="v">${n(id)} open</span>${!l.archived_at ? `<button class="ib" data-act="tag-menu" data-id="${id}" aria-label="Tag actions: ${esc(tg.name)}">${ic('more')}</button>` : ''}</div></li>`; }).join('') || '<li><div class="rowb"><span class="src" style="margin:0">No tags yet.</span></div></li>'}</ul>
       ${add && !q ? `<button class="btn quiet" data-act="tag-add" data-id="${l.id}" style="margin:2px 0 0;padding:0 6px">${ic('plus')}Add tag<span class="vh"> to ${esc(l.name)}</span></button>` : ''}</section>`;
   };
@@ -2267,25 +2271,36 @@ function renderTagGroups() {
   box.innerHTML = (G.live.map(grp).join('') + (hid ? `<div class="group"><h3>Hidden</h3>${hid}</div>` : '') + (arch ? `<details class="group"${MTQ.trim() ? ' open' : ''}><summary><h3 style="display:inline">Archived (${G.arch.length})</h3></summary>${arch}</details>` : '')) || '<p class="src">No tag matches.</p>';
 }
 const rOk = (r, msg) => { if (r && r.ok) { if (msg) toast(msg); } else toast(r && r.err ? r.err.message : 'That did not go through.'); renderAll(); renderTagGroups(); return r && r.ok; };
+/* web: openTags placeList (tags round): every live list moves among all of them, own and shared (C.tagListReorder into my full
+   order); TDData.saveTagListOrder writes prefs tagListOrder and tag_lists.sort for my own lists */
+const tlLive = () => C.tagGroups(D.tagLists, D.tags, me().id, D.names, { order: D.prefs.tagListOrder });
 async function reorderTagList(id, dir) {
-  const r = C.tagListReorder(C.tagGroups(D.tagLists, D.tags, me().id, D.names, { order: D.prefs.tagListOrder }), me().id, id, { dir });
+  const r = C.tagListReorder(tlLive(), me().id, id, { dir }, D.prefs.tagListOrder);
   if (!r) return;
-  if (r.kind === 'shared') D.setPrefs({ tagListOrder: r.order });
-  else for (const w of C.sortWrites(r.order, x => D.tagLists[x].sort)) { const x = await D.sortTagList(w.id, w.sort); if (!x.ok || !x.json.length) { toast(x.ok ? 'You may not reorder these lists.' : x.err.message); break; } }
+  const w = D.saveTagListOrder(r.order);
   renderTagGroups();
+  const x = await w;
+  renderTagGroups(); const f = $(`#mt-groups [data-act="tl-menu"][data-id="${id}"]`); if (f) f.focus();
+  toast(x.ok ? `Moved ${D.tagLists[id] ? D.tagLists[id].name : 'the list'} ${dir < 0 ? 'up' : 'down'}.` : x.err.message);
+}
+/* web: toggleTagListFav: ★ on the Tags screen, focus stays on the toggle */
+function favTagList(id) {
+  const l = D.tagLists[id]; if (!l) return;
+  const on = D.toggleTagListFav(id); renderTagGroups();
+  const f = $(`#mt-groups [data-act="tl-fav"][data-id="${id}"]`); if (f) f.focus();
+  toast(on ? `${l.name} opens in the task window.` : `${l.name} starts closed in the task window.`);
 }
 function tlMenu(id) {
   const l = D.tagLists[id]; if (!l) return; const R = C.tagListRights(l), mine = l.owner_id === me().id, it = [];
-  const live = C.tagGroups(D.tagLists, D.tags, me().id, D.names, { order: D.prefs.tagListOrder });
+  const live = tlLive(), ord = D.prefs.tagListOrder;
   if (l.archived_at) { if (R.has('restore')) it.push({ label: 'Restore tag list', icon: 'back', run: async () => rOk(await D.archiveTagList(id, false), `Restored ${l.name}.`) }); }
   else if (l.hidden) { it.push({ label: 'Show again', icon: 'check', run: async () => rOk(await D.hideTagList(id, false), `${l.name} is back in your pickers.`) }); if (!mine) it.push({ label: 'Leave tag list', icon: 'back', warn: true, run: () => leaveTL(l) }); }
   else {
     if (R.has('renameList')) it.push({ label: 'Rename', icon: 'lists', run: async () => { const v = await promptDlg({ title: 'Rename tag list', label: 'Name', value: l.name }); if (v && v !== l.name) rOk(await D.renameTagList(id, v), 'Renamed.'); } });
-    if (R.has('setDefault')) it.push({ label: 'Make default', icon: 'check', run: async () => rOk(await D.setDefaultTagList(id), `${l.name} is your default tag list.`) });
     if (R.has('share')) it.push({ label: 'Share tag list', icon: 'share', run: () => openShare('tag_list', id) });
     else it.push({ label: 'People', icon: 'people', run: () => openShare('tag_list', id) });
-    if (C.tagListReorder(live, me().id, id, { dir: -1 })) it.push({ label: 'Move up', icon: 'up', run: () => reorderTagList(id, -1) });
-    if (C.tagListReorder(live, me().id, id, { dir: 1 })) it.push({ label: 'Move down', icon: 'down', run: () => reorderTagList(id, 1) });
+    if (R.has('sortList') && C.tagListReorder(live, me().id, id, { dir: -1 }, ord)) it.push({ label: 'Move up', icon: 'up', run: () => reorderTagList(id, -1) });
+    if (R.has('sortList') && C.tagListReorder(live, me().id, id, { dir: 1 }, ord)) it.push({ label: 'Move down', icon: 'down', run: () => reorderTagList(id, 1) });
     if (!mine) { it.push({ label: 'Hide for me', icon: 'x', run: async () => { const r = await D.hideTagList(id, true); if (r.ok) toast(`Hid ${l.name}.`, async () => rOk(await D.hideTagList(id, false))); else rOk(r); renderAll(); renderTagGroups(); } }); it.push({ label: 'Leave tag list', icon: 'back', warn: true, run: () => leaveTL(l) }); }
     if (R.has('archive')) it.push({ label: 'Delete tag list', icon: 'x', warn: true, run: async () => { if (await confirmDlg({ title: `Delete ${l.name}?`, body: 'It moves to Archived with its tags, off every picker and card. An owner or editor can restore it.', yes: 'Delete', no: 'Cancel' })) rOk(await D.archiveTagList(id, true), `Deleted ${l.name}. Find it under Archived.`); } });
   }
@@ -2552,6 +2567,7 @@ async function part2Click(a, b) {
     case 'sh-revoke': { const r = await D.revokeInvite(id); said(r, r.ok ? 'Invitation revoked.' : SH && SH.owner ? '' : 'Only the owner revokes an invitation someone else sent.'); loadPeople(); break; }
     case 'tl-new': { const v = await promptDlg({ title: 'New tag list', label: 'Name', yes: 'Create' }); if (v) rOk(await D.createTagList(v), `Created ${v}.`); break; }
     case 'tl-menu': tlMenu(id); break;
+    case 'tl-fav': favTagList(id); break;
     case 'tag-menu': tagMenu(id); break;
     case 'tag-add': { const l = D.tagLists[id]; if (!l) break; const v = await promptDlg({ title: `Add a tag to ${l.name}`, label: 'Tag name', yes: 'Add' }); if (!v) break; if (Object.values(D.tags).some(x => x.tag_list_id === id && x.name.toLowerCase() === v.toLowerCase())) { toast(`${l.name} already has ${v}.`); break; } const made = await D.ensureTags([{ list: id, name: v }]); if (made.length) toast(`Added ${v} to ${l.name}.`); renderTagGroups(); break; }
     case 'tl-fold': { TLW.fold.has(tid) ? TLW.fold.delete(tid) : TLW.fold.add(tid); renderMe(); const f = $(`[data-act="tl-fold"][data-tid="${tid}"]`); if (f) f.focus(); break; }

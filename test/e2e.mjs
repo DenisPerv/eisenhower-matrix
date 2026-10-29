@@ -192,6 +192,11 @@ const SUPA = env.TASKSDB_URL ? new URL(env.TASKSDB_URL).host : null;
 const cli = (...a) => spawnSync(process.execPath, [path.join(HERE, '..', 'cli', 'tasks.mjs'), ...a, '--env', args.env, '--run-id', RUN], { encoding: 'utf8' });
 
 let B, MK, AN, ST, prefsSnap = {}, testLists = [], testTagLists = [];
+// tags round: Maksym's own live tag lists' sort before the run (a list move writes tag_lists.sort; put back in cleanup), and the
+// undo steps of the tags-round checks (share by name, Anastasiia's shared test tag list), run first in cleanup
+let ownSortSnap = {};
+const tagUndo = [];
+const canon = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(y => [y, x[y]])) : x);
 const clients = []; // every session this run made is logged out at the end
 const grantFor = async who => { const c = await connect(env, who, { core, via: 'script:e2e', runId: RUN }); clients.push(c); return c.session; };
 const mkItem = async (title, extra = {}) => {
@@ -211,6 +216,8 @@ async function setup() {
     const r = await c.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c.uid + '&app=eq.tasksdashboard');
     prefsSnap[who] = r.ok && r.json.length ? r.json[0].prefs : null;
   }
+  const os0 = await MK.rest('GET', `tag_lists?select=id,sort&archived_at=is.null&owner_id=eq.${MK.uid}`);
+  if (os0.ok) ownSortSnap = Object.fromEntries(os0.json.map(x => [x.id, x.sort]));
   if (want.includes('smoke')) return;
   const rl = cli('restore-list', '--list', '_selftest', '--as', 'maksym');
   check('setup', '_selftest restored with cli/tasks.mjs restore-list (exit 0, or 8 when not archived)', rl.status === 0 || rl.status === 8, 'exit ' + rl.status);
@@ -221,12 +228,26 @@ async function setup() {
 async function cleanup() {
   if (!MK) return;
   for (const undo of guestUndo.reverse()) { try { await undo(); } catch (e) { leftovers.push('guests cleanup step failed: ' + e.message); } }
+  for (const undo of tagUndo.reverse()) { try { await undo(); } catch (e) { leftovers.push('tags-round cleanup step failed: ' + e.message); } }
   for (const [who, c] of [['maksym', MK], ['anastasiia', AN]]) {
     if (prefsSnap[who] === undefined) continue;
     if (prefsSnap[who] === null) { leftovers.push(`a preferences row for ${who} that did not exist before`); continue; }
-    const r = await c.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c.uid, prefsSnap[who]), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    const want = core.rowFromPrefs(c.uid, prefsSnap[who]);
+    const r = await c.rest('POST', 'preferences?on_conflict=profile_id,app', want, { Prefer: 'resolution=merge-duplicates,return=minimal' });
     if (!r.ok) leftovers.push(`preferences of ${who} not restored: ${r.err.message}`);
+    // read back: the whole row equals the snapshot (tagListFavs, tagListOrder, tagListOrderV, taskSwitcher, cardLayout included)
+    const back = await c.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c.uid + '&app=eq.tasksdashboard');
+    const same = back.ok && back.json[0] && canon(back.json[0].prefs) === canon(want.prefs);
+    rows.push(`| cleanup | preferences of ${who} read back equal the snapshot (incl. tagListFavs, tagListOrder, tagListOrderV, taskSwitcher, cardLayout) | ${same ? 'pass' : 'FAIL'} | |`);
+    same ? pass++ : fail++;
   }
+  // tags round: Maksym's own tag lists back to their sort before the run (a list move writes tag_lists.sort for own lists)
+  const os1 = await MK.rest('GET', `tag_lists?select=id,sort&owner_id=eq.${MK.uid}&id=in.(${Object.keys(ownSortSnap).join(',') || '00000000-0000-0000-0000-000000000000'})`);
+  const moved = os1.ok ? os1.json.filter(x => ownSortSnap[x.id] !== undefined && x.sort !== ownSortSnap[x.id]) : [];
+  for (const x of moved) await MK.rest('PATCH', 'tag_lists?id=eq.' + x.id, { sort: ownSortSnap[x.id] });
+  const os2 = await MK.rest('GET', `tag_lists?select=id,sort&owner_id=eq.${MK.uid}&id=in.(${Object.keys(ownSortSnap).join(',') || '00000000-0000-0000-0000-000000000000'})`);
+  const sortsOk = os2.ok && os2.json.every(x => x.sort === ownSortSnap[x.id]);
+  rows.push(`| cleanup | Maksym's own tag lists: sort as before the run (${moved.length} put back) | ${sortsOk ? 'pass' : 'FAIL'} | |`);
   if (!ST) return;
   await MK.rest('PATCH', `list_members?list_id=eq.${ST.id}&profile_id=eq.${AN.uid}`, { role: 'editor' });
   for (const l of [ST].concat(testLists)) {
@@ -706,7 +727,8 @@ async function gUi() {
     // the app's state lives inside its script's closure (not page globals): select the list through its chip
     await pick(T, ST.id);
     check(G, `${who}: Source on, one list selected: no badge and no Sources (round 4, item 3)`, await T.wait(`!!${r4c}&&!${r4c}.querySelector('.tbs .tb:not(.ai)')`, 5000) &&
-      (await T.ev(`(${r4c}.click(),true)`), await T.wait('!!document.querySelector("dialog[open] #ft")', 5000)) && await T.ev('!document.querySelector("dialog[open] #srcs")'));
+      (await T.ev(`(${r4c}.click(),true)`), await T.wait('!!document.querySelector("dialog[open] #ft")', 5000)) && await T.ev('!document.querySelector("dialog[open] #srcs")'),
+      await T.ev(`JSON.stringify({pressed:document.querySelector('[data-list="${ST.id}"]')?.getAttribute('aria-pressed'),chip:!!document.querySelector('.lists [data-list="${ST.id}"]'),card:!!${r4c},tbs:(${r4c}?.querySelector('.tbs')?.textContent||'').slice(0,80),dlg:!!document.querySelector('dialog[open] #ft'),srcs:!!document.querySelector('dialog[open] #srcs')})`));
     await closeDialogs(T);
     // round 4, item 2: an owner's list menu has Share and no People; a member's has People and no Share
     const owns = (await MK.rest('GET', `lists?select=owner_id&id=eq.${ST.id}`)).json[0]?.owner_id === (who === 'maksym' ? MK : AN).uid;
@@ -825,9 +847,14 @@ async function gUi() {
     check(G, `${who}: General settings hold display name and time zone`, await T.wait('!!document.getElementById("s-name")&&!!document.getElementById("s-tz")&&!document.getElementById("s-lim")', 5000));
     await T.ev('document.querySelector("dialog[open]")?.close(),true');
     await T.click('[data-view=matrix]');
-    // round 3, adjustments 5 and 6: Account menu → Tags (trays, ★ on my default first) and the task window's tags grouped by tag list
+    // round 3, adjustments 5 and 6, then the tags round: Account menu → Tags shows every tag list as an open tray in my one order,
+    // each live one with a grip and a ★ toggle (favourite), no "default" wording; the task window's tags grouped by tag list
     await T.click('#profile'); await T.click('[data-menu=tags]');
-    check(G, `${who}: Tags shows my tag lists as trays, my default first with ★`, await T.wait('!!document.querySelector("dialog[open] .tgl:first-child .tgl-star.on")', 5000));
+    const tgw = (await T.wait('!!document.querySelector("dialog[open] .tgl")', 5000)) ? await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),live=[...d.querySelectorAll('.tgl:not(.arch)')];
+      const attrs=[...d.querySelectorAll('[title],[aria-label]')].map(e=>(e.getAttribute('title')||'')+' '+(e.getAttribute('aria-label')||'')).join(' ');
+      return {n:live.length,grip:live.every(s=>!!s.querySelector('.tgl-grip[data-grip]')),star:live.every(s=>{const b=s.querySelector('button.tgl-star[data-fav]');return !!b&&['true','false'].includes(b.getAttribute('aria-pressed'))&&b.title==='Favourite: opens in the task window'}),
+        open:live.every(s=>{const t=s.querySelector('.tgl-tags');return !!t&&t.getBoundingClientRect().height>0})&&!d.querySelector('.tgl.shut'),noDefault:!/default/i.test(d.textContent+' '+attrs)}})()`) : null;
+    check(G, `${who}: Tags shows every tag list as an open tray, each live one with a grip and a ★ toggle (aria-pressed); no "default" wording (tags round)`, !!tgw && tgw.n > 0 && tgw.grip && tgw.star && tgw.open && tgw.noDefault, JSON.stringify(tgw));
     for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-tags-${who}-${w}x${h}-${theme}`); }
     await T.size(1440, 900); await closeDialogs(T);
     // a saved list with no open card (prefs.list, maybe set by someone using the app meanwhile): look in All
@@ -835,8 +862,14 @@ async function gUi() {
     const anyCard = await T.ev('document.querySelector("[data-card]")?.dataset.card||""');
     if (anyCard) {
       await T.click(`[data-card="${anyCard}"]`);
-      check(G, `${who}: the task window groups tags under their tag lists, my default first; the title wraps (two lines at most)`, await T.wait('!!document.querySelector("dialog[open] .tgg:first-child .tgg-h .star")', 5000) &&
-        await T.ev(`getComputedStyle(document.querySelector('dialog[open] #ft')).whiteSpace!=='nowrap'`));
+      // tags round: my favourites (★ on the head) start open, every other group closed; the order is my one order (prefs tagListOrder)
+      // (a row from before the tags round is migrated and saved by the page on load: wait for tagListOrderV 2)
+      const favs = core.prefsFromRow(await until(async () => { const p = await readPrefs(); return p && p.tagListOrderV === core.TAG_LIST_ORDER_V ? p : null; }, 8000) || await readPrefs()).tagListFavs;
+      check(G, `${who}: the task window groups tags under their tag lists; my ${favs.length} favourite(s) open with ★, the others closed; the title wraps (two lines at most)`,
+        await T.wait('document.querySelectorAll("dialog[open] .tgg[data-tgg]").length>0', 5000) &&
+        await T.ev(`(()=>{const f=new Set(${JSON.stringify(favs)});return [...document.querySelectorAll('dialog[open] .tgg[data-tgg]')].every(g=>g.classList.contains('shut')===!f.has(g.dataset.tgg)&&!!g.querySelector('.tgg-h .star')===f.has(g.dataset.tgg))})()`) &&
+        await T.ev(`getComputedStyle(document.querySelector('dialog[open] #ft')).whiteSpace!=='nowrap'`),
+        await T.ev(`[...document.querySelectorAll('dialog[open] .tgg[data-tgg]')].map(g=>(g.classList.contains('shut')?'-':'+')+(g.querySelector('.tgg-h .star')?'*':'')).join('')`));
       // round 3 P1: no "Tags" label, a search box (U1, U6); names above chips, not buttons (U2, U4); wider window (U5); the tag box
       // scrolls inside about 40% of the height and Save stays in view (U8); at 1440 Title and End are in view too
       for (const [w, h] of [[1440, 900], [390, 844]]) {
@@ -919,7 +952,14 @@ async function gUi() {
   check(G, 'CLI add-task as homeos-agent (needs review, confidence 0.42)', !!low, 'exit ' + r.status);
   if (low) {
     await T.ev('dispatchEvent(new Event("focus")),true'); await pick(T, ST.id);
-    check(G, 'the low-confidence marker shows on the card', await T.wait(`!!document.querySelector('[data-card="${low.id}"].lowc .tb.ai')`, 8000));
+    const lowSel = `!!document.querySelector('[data-card="${low.id}"].lowc .tb.ai')`;
+    let lowOk = await T.wait(lowSel, 8000), lowNote = '';
+    if (!lowOk) { // a card the poll has not brought yet: one reload (noted)
+      lowNote = 'before reload: ' + await T.ev(`(()=>{const c=document.querySelector('[data-card="${low.id}"]');return c?'card '+c.className:'no card; list '+(document.querySelector('.lists [aria-pressed=true]')?.dataset.list===${JSON.stringify(ST.id)}?'_selftest':'other')})()`);
+      await T.reload(); await T.ready(); await pick(T, ST.id); lowOk = await T.wait(lowSel, 8000);
+      lowNote += '; after reload: ' + (lowOk ? 'shown' : await T.ev(`(()=>{const c=document.querySelector('[data-card="${low.id}"]');return c?'card '+c.className:'no card'})()`));
+    }
+    check(G, 'the low-confidence marker shows on the card', lowOk, lowNote);
     await T.click('#lowc');
     check(G, 'the "To check" filter shows only those items', await T.ev(`[...document.querySelectorAll('[data-card]')].every(c=>c.classList.contains('lowc')) && !!document.querySelector('[data-card="${low.id}"]')`));
     await T.click('#lowc');
@@ -977,6 +1017,8 @@ async function gLinks() {
   check(G, 'the parent search leaves out the subtasks (each would make a loop)', await T.wait('document.querySelectorAll("#lk-opts li[data-i]").length===0', 3000));
   await T.key('Escape');
   check(G, 'Escape closes the search box and keeps the window', await T.wait('!document.getElementById("lk-q")&&!!document.querySelector("dialog[open] #lk")', 3000));
+  // tags round (1): Links shows the chips only (no "Waiting for" note, no "N subtasks still open" line)
+  check(G, 'Links: chips only, no "Waiting for" note and no "subtasks still open" line (tags round)', await T.ev(`(()=>{const k=document.querySelector('dialog[open] #lk');return !!k&&!k.querySelector('.lk-wait,.lk-open')&&!/still open|Waiting for/i.test(k.textContent)&&k.querySelectorAll('.lk-chip').length>=2})()`));
   for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`links-window-maksym-${w}x${h}-light`); }
   await T.size(1440, 900);
   await T.ev(`(()=>{const e=document.getElementById('fsd');e.value='${day(1).slice(0, 10)}T09:00';e.dispatchEvent(new Event('input'));return true})()`);
@@ -987,6 +1029,13 @@ async function gLinks() {
   check(G, 'the created subtask is in the same list and quadrant as its parent', !!nk && nk.list_id === ST.id && nk.quadrant === 'A');
   const ps = await item(par.id);
   check(G, 'Start is saved (start_at)', !!ps.start_at && new Date(ps.start_at).getDate() === new Date(day(1)).getDate(), ps.start_at);
+  // tags round (1): child two waits for child one (open): its predecessor chip is .waiting with the title "Not done yet: this task
+  // waits for it"; its parent chip is not
+  await closeDialogs(T); await T.wait(`!!document.querySelector('[data-card="${k2.id}"]')`, 8000); await T.click(`[data-card="${k2.id}"]`);
+  await T.wait('!!document.querySelector("dialog[open] #lk .lk-chip")', 5000);
+  check(G, 'Links: an open predecessor\'s chip is amber (.waiting) with the title "Not done yet: this task waits for it"; the parent chip is not; no note (tags round)', await T.ev(`(()=>{const k=document.querySelector('dialog[open] #lk'),w=[...k.querySelectorAll('.lk-chip.waiting')];return w.length===1&&w[0].classList.contains('lk-pred')&&w[0].title==='Not done yet: this task waits for it'&&!k.querySelector('.lk-chip.lk-parent.waiting')&&!!k.querySelector('.lk-chip.lk-parent')&&!k.querySelector('.lk-wait,.lk-open')&&getComputedStyle(w[0]).borderTopStyle==='dashed'})()`));
+  await T.ev('(document.querySelector("dialog[open] #lk")?.scrollIntoView({block:"center"}),true)'); await sleep(300); await T.shot('links-chips-1440x900-light');
+  await closeDialogs(T);
   // the board: badges, then Group by parent
   // the badges need Waiting for and Subtask progress on and Tasks Grouping off, whatever the account stored (cleanup puts the preferences back);
   // set without a click, so the grouping confirm does not open
@@ -1232,6 +1281,19 @@ async function gUiTags(G, T) {
     await T.ev('!!document.querySelector("dialog[open] .tgm-menu [data-m=rename]")&&!!document.querySelector("dialog[open] .tgm-menu [data-m=delete]")&&!!document.querySelector("dialog[open] .tgm-menu [data-m=move]")'));
   await T.shot('ui-tags-menu-maksym-1440x900');
   await T.ev('document.querySelector("dialog[open] .tgm-menu")?.remove(),true');
+  // tags round (5): a double-click on a tag renames it in place (the single click's menu waits ~250 ms and does not open); Enter saves
+  let tn = 'e2e-a';
+  if (tag) {
+    await T.ev(`(()=>{const b=document.querySelector('dialog[open] [data-tag-menu="${tag.id}"]'),o=d=>({bubbles:true,cancelable:true,detail:d});b.dispatchEvent(new MouseEvent('click',o(1)));b.dispatchEvent(new MouseEvent('click',o(2)));b.dispatchEvent(new MouseEvent('dblclick',o(2)));return true})()`);
+    const inPlace = await T.wait('document.activeElement?.matches("dialog[open] .tgm-body input.tag-new")', 2000);
+    await sleep(400);
+    const noMenu = await T.ev('!document.querySelector("dialog[open] .tgm-menu")');
+    await T.ev(`(()=>{const i=document.activeElement;i.value='e2e-r';i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));return true})()`);
+    const renamed = await until(async () => (await MK.rest('GET', `tags?select=name&id=eq.${tag.id}`)).json[0]?.name === 'e2e-r');
+    check(G, 'Tags: a double-click on a tag renames it in place (no menu after the clicks); Enter saves the new name', inPlace && noMenu && !!renamed && await T.wait(`document.querySelector('dialog[open] [data-tag-menu="${tag.id}"]')?.textContent==='e2e-r'`, 3000),
+      JSON.stringify({ inPlace, noMenu, renamed: !!renamed }));
+    if (renamed) tn = 'e2e-r';
+  }
   await T.ev(`(()=>{const i=document.querySelector('dialog[open] [data-tgl-name="${tl.id}"]');i.value=${JSON.stringify(name + ' 2')};i.dispatchEvent(new Event('change'));return true})()`);
   check(G, 'Tags: renaming a tray renames the tag list', !!(await until(async () => (await MK.rest('GET', 'tag_lists?select=id&name=eq.' + encodeURIComponent(name + ' 2'))).json[0])));
   tl.name = name + ' 2';
@@ -1242,18 +1304,19 @@ async function gUiTags(G, T) {
   await closeDialogs(T);
   // round 3 P1 (U3, U6, U7): the task window. The test tag list is not used on the task: it starts closed as one row
   const it = await mkItem('tags header');
-  await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200); await pick(T, ST.id);
-  await T.wait(`!!document.querySelector('[data-card="${it.id}"]')`, 8000); await T.click(`[data-card="${it.id}"]`);
+  await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200);
   const G1 = `dialog[open] .tgg[data-tgg="${tl.id}"]`, GB = `dialog[open] .tgg[data-tgg="${bl && bl.id}"]`;
-  await T.wait(`!!document.querySelector('${G1}')`, 5000);
-  check(G, 'task window: a tag list the task does not use starts closed: one row "name · 1" and a chevron, no chips (U7)', await T.ev(`(()=>{const g=document.querySelector('${G1}');return !!g&&g.classList.contains('shut')&&!g.querySelector('.tagchip')&&g.querySelector('[data-tgg-open]').getAttribute('aria-expanded')==='false'&&/· 1$/.test(g.querySelector('.tgg-k').textContent)&&g.getBoundingClientRect().height<=48})()`));
-  // my default list starts open unless my saved prefs (tagListsOpen, restored after the run) say I closed it
-  const dfl = (await MK.rest('GET', `tag_lists?select=id&is_default=eq.true&owner_id=eq.${MK.uid}`)).json[0];
-  const dSaved = dfl && prefsSnap.maksym && prefsSnap.maksym.tagListsOpen ? prefsSnap.maksym.tagListsOpen[dfl.id] : undefined;
-  const dOpen = typeof dSaved === 'boolean' ? dSaved : true;
-  check(G, `task window: my default list starts ${dOpen ? 'open' : 'closed, as my saved prefs left it'} (U7)`, !!dfl && await T.ev(`(()=>{const g=document.querySelector('dialog[open] .tgg[data-tgg="${dfl && dfl.id}"]');return !!g&&g.classList.contains('shut')===${!dOpen}})()`));
-  await T.insert('dialog[open] #tg-q', 'e2e-a');
-  check(G, 'task window: the search shows only matching chips, across groups, closed ones included (U6)', await T.wait(`(()=>{const c=[...document.querySelectorAll('dialog[open] .tagbox .tagchip')];return c.length>0&&c.every(b=>b.textContent.includes('e2e-a'))&&!!document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')})()`, 3000));
+  check(G, 'task window: the test task opens with the test tag list among its groups', await openCard(T, it.id, G1), await T.ev('document.querySelector("dialog[open]")?.className||"no dialog"'));
+  check(G, 'task window: a tag list that is not a favourite starts closed: one row "name · 1" and a chevron, no chips (tags round)', await T.ev(`(()=>{const g=document.querySelector('${G1}');return !!g&&g.classList.contains('shut')&&!g.querySelector('.tagchip')&&g.querySelector('[data-tgg-open]').getAttribute('aria-expanded')==='false'&&/· 1$/.test(g.querySelector('.tgg-k').textContent)&&g.getBoundingClientRect().height<=48})()`));
+  // tags round: only my favourites start open (prefs tagListFavs, restored after the run; Maksym's are Assignee and My tags)
+  // (a row from before the tags round is migrated by the page on load and saved: read the stored row once it has tagListOrderV 2)
+  const rp = async () => (await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard')).json?.[0]?.prefs || null;
+  const favs0 = core.prefsFromRow(await until(async () => { const p = await rp(); return p && p.tagListOrderV === core.TAG_LIST_ORDER_V ? p : null; }, 8000) || await rp()).tagListFavs;
+  const grpState = await T.ev(`[...document.querySelectorAll('dialog[open] .tgg[data-tgg]')].map(g=>[g.dataset.tgg,!g.classList.contains('shut')])`);
+  check(G, `task window: my ${favs0.length} favourite tag list(s) start open, every other list closed (tags round)`, grpState.length > 0 && grpState.every(([id, open]) => open === favs0.includes(id)) && favs0.some(id => grpState.some(g => g[0] === id)),
+    grpState.map(g => (g[1] ? '+' : '-') + (favs0.includes(g[0]) ? '*' : '')).join(''));
+  await T.insert('dialog[open] #tg-q', tn);
+  check(G, 'task window: the search shows only matching chips, across groups, closed ones included (U6)', await T.wait(`(()=>{const c=[...document.querySelectorAll('dialog[open] .tagbox .tagchip')];return c.length>0&&c.every(b=>b.textContent.includes(${JSON.stringify(tn)}))&&!!document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')})()`, 3000));
   await T.shot('ui-task-search-maksym-1440x900');
   await T.key('Enter');
   check(G, 'task window: Enter in the search picks the first hit; the window stays open (U6)', await T.wait(`!!document.querySelector('dialog[open]')&&document.querySelector('dialog[open] .tagchip[data-t="${tag && tag.id}"]')?.getAttribute('aria-pressed')==='true'`, 3000));
@@ -1262,35 +1325,45 @@ async function gUiTags(G, T) {
   await T.click(`${G1} [data-tgg-open]`);
   const closed = await T.ev(`document.querySelector('${G1}').classList.contains('shut')`);
   await T.click(`${G1} [data-tgg-open]`);
-  const prefsOpen = async () => { const r = await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard'); return r.ok && r.json[0] && (r.json[0].prefs.tagListsOpen || {})[tl.id] === true; };
-  check(G, 'task window: the chevron closes and opens a list; the open state is saved (prefs tagListsOpen) (U7)', closed && await T.ev(`!document.querySelector('${G1}').classList.contains('shut')`) && !!(await until(prefsOpen)));
+  await sleep(1500);
+  const pc = (await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard')).json?.[0]?.prefs || {};
+  check(G, 'task window: the chevron closes and opens a list within the window only (no tagListsOpen saved, favourites unchanged) (tags round)', closed && await T.ev(`!document.querySelector('${G1}').classList.contains('shut')`) &&
+    pc.tagListsOpen === undefined && canon(pc.tagListFavs || []) === canon(favs0), JSON.stringify({ closed, tagListsOpen: pc.tagListsOpen !== undefined, favs: (pc.tagListFavs || []).length }));
   // U3: Alt+Up on the second list's chevron puts it above the first (tag_lists.sort, the order of the Tags window); only those two change
   const sorts = async () => Object.fromEntries((await MK.rest('GET', 'tag_lists?select=id,sort&archived_at=is.null&owner_id=eq.' + MK.uid)).json.map(r => [r.id, r.sort]));
   const s0 = await sorts();
   if (bl) {
     await T.ev(`document.querySelector('${GB} [data-tgg-open]').focus()`); await T.key('ArrowUp', 1);
     const s1 = await until(async () => { const s = await sorts(); return s[bl.id] < s[tl.id] ? s : null; });
-    const same = !!s1 && Object.keys(s0).filter(k => k !== tl.id && k !== bl.id).every(k => s1[k] === s0[k]);
-    check(G, 'task window: Alt+Up moves my tag list up (tag_lists.sort); no other list changes (U3)', !!s1 && same && await T.wait(`(()=>{const a=[...document.querySelectorAll('dialog[open] .tgg[data-tgg]')].map(g=>g.dataset.tgg);return a.indexOf('${bl.id}')===a.indexOf('${tl.id}')-1})()`, 3000),
+    // tags round: the move writes my one order (prefs tagListOrder) and tag_lists.sort of my own live lists in their relative place
+    // in it (C.tagListOwnSorts); lists whose sort already followed that order keep it
+    const ord = await until(async () => { const p = (await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard')).json?.[0]?.prefs; const o = p && p.tagListOrder || []; return o.indexOf(bl.id) >= 0 && o.indexOf(bl.id) < o.indexOf(tl.id) ? o : null; });
+    const s2 = s1 && await until(async () => { const s = await sorts(); const own = (ord || []).filter(id => s[id] !== undefined); return own.every((id, i) => !i || s[own[i - 1]] < s[id]) ? s : null; }, 5000);
+    const same = !!s2;
+    check(G, 'task window: Alt+Up moves my tag list up: my order (prefs tagListOrder) and tag_lists.sort of my own lists follow it (U3, tags round)', !!s1 && !!ord && same && await T.wait(`(()=>{const a=[...document.querySelectorAll('dialog[open] .tgg[data-tgg]')].map(g=>g.dataset.tgg);return a.indexOf('${bl.id}')===a.indexOf('${tl.id}')-1})()`, 3000),
       s1 ? `${s0[tl.id]},${s0[bl.id]} → ${s1[tl.id]},${s1[bl.id]}` : 'no change');
     await T.ev(`(()=>{const dt=new DataTransfer(),g=document.querySelector('${G1} [data-tgg-grip]'),t=document.querySelector('${GB}'),r=t.getBoundingClientRect(),o={bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+20,clientY:r.top+2};g.dispatchEvent(new DragEvent('dragstart',o));t.dispatchEvent(new DragEvent('dragover',o));t.dispatchEvent(new DragEvent('drop',o));g.dispatchEvent(new DragEvent('dragend',o));return true})()`);
     check(G, 'task window: dragging a list by its grip onto another moves it back above (U3)', !!(await until(async () => { const s = await sorts(); return s[tl.id] < s[bl.id]; })));
   } else skip(G, 'task window: moving tag lists (U3)', 'the second test tag list was not made');
   await T.click('dialog[open] #fs');
   check(G, 'task window: Save writes the tag (item_tags)', !!(await until(async () => (await MK.rest('GET', `item_tags?select=tag_id&item_id=eq.${it.id}&tag_id=eq.${tag && tag.id}&removed_at=is.null`)).json[0])));
-  // U7: the next task opens the first test list as I left it (open) and the second one closed
+  // tags round: the next task opens both test lists closed again (the chevron is the window's own; neither is a favourite)
   const it2 = await mkItem('tags open');
   await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200);
-  await T.wait(`!!document.querySelector('[data-card="${it2.id}"]')`, 8000); await T.click(`[data-card="${it2.id}"]`);
-  check(G, 'task window: the next task opens the list as I left it (open) and the other test list closed (U7)', await T.wait(`!!document.querySelector('${G1}')&&!document.querySelector('${G1}').classList.contains('shut')&&!!document.querySelector('${GB}.shut')`, 5000));
+  await closeDialogs(T); await openCard(T, it2.id, G1);
+  check(G, 'task window: the next task opens the list I opened with the chevron closed again, the other test list closed too (tags round)', await T.wait(`!!document.querySelector('${G1}.shut')&&!!document.querySelector('${GB}.shut')`, 5000));
   for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`ui-task-groups-maksym-${w}x${h}`); }
   await T.size(1440, 900); await closeDialogs(T);
+  // tags round: favourites and one free order with a shared tag list; Card layout's tag filter; share by name
+  if (bl) await gTagsFavs(G, T, tl, bl); else skip(G, 'tags round: favourites and order', 'the second test tag list was not made');
+  await gCardFilter(G, T, tl, tag);
+  await gShareByName(G, T);
   // Delete list = archive: its chip leaves the card; Archived tags shows it read only with Restore
   await T.click('#profile'); await T.click('[data-menu=tags]'); await T.wait(`!!document.querySelector('dialog[open] [data-tl-del="${tl.id}"]')`, 5000);
   await T.click(`dialog[open] [data-tl-del="${tl.id}"]`); await T.wait('!!document.getElementById("cf-ok")', 3000); await T.click('#cf-ok');
   check(G, 'Tags: Delete list archives the tag list (set_tag_list_archived)', !!(await until(async () => (await MK.rest('GET', `tag_lists?select=id&id=eq.${tl.id}&archived_at=not.is.null`)).json[0])));
   await closeDialogs(T); await sleep(300);
-  check(G, 'its tags leave the cards', await T.ev(`![...document.querySelectorAll('[data-card="${it.id}"] .tagtxt')].some(x=>x.textContent==='e2e-a')`));
+  check(G, 'its tags leave the cards', await T.ev(`![...document.querySelectorAll('[data-card="${it.id}"] .tagtxt')].some(x=>x.textContent===${JSON.stringify(tn)})`));
   await T.click('#profile'); await T.click('[data-menu=tags]'); await T.wait('!!document.getElementById("tgm-switch")', 5000); await T.click('#tgm-switch');
   check(G, 'Archived tags: the list read only (chips disabled, no rename) with Restore', await T.wait(`!!document.querySelector('dialog[open] [data-tl-restore="${tl.id}"]')`, 5000) &&
     await T.ev(`[...document.querySelectorAll('dialog[open] .tgl[data-tgl="${tl.id}"] .tagchip')].every(b=>b.disabled) && !document.querySelector('dialog[open] [data-tgl-name="${tl.id}"]')`));
@@ -1335,6 +1408,178 @@ async function gUiTags(G, T) {
   await A.close();
 }
 
+// tags round (3)-(4), V11: Anastasiia's test tag list shared to Maksym by id (share_tag_list_with, db/022). In the Tags window ★ on a
+// test list and on the shared one (prefs tagListFavs); the shared list dragged between my two test lists (prefs tagListOrder v2,
+// my own tag_lists.sort in the same relative order). The task window opens exactly the favourites, in that order, also after a
+// reload; the chevron is the window's own; unstar closes. Undone in cleanup (membership removed, the tag list archived, prefs and
+// sorts put back)
+async function gTagsFavs(G, T, tl, bl) {
+  const readP = async () => (await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard')).json?.[0]?.prefs || null;
+  const sn = `${RUN} shared tags`;
+  const cr = await AN.rest('POST', 'rpc/create_tag_list', { p_name: sn });
+  const sl = cr.ok ? (Array.isArray(cr.json) ? cr.json[0] : cr.json) : null;
+  if (!sl || !sl.id) { skip(G, 'tags round: a shared tag list among my own', 'create_tag_list as anastasiia failed: ' + (cr.err ? cr.err.message : 'no id')); return; }
+  const S = sl.id;
+  tagUndo.push(async () => {
+    for (const n of (await MK.rest('GET', `shared_notices?select=id&tag_list_id=eq.${S}&seen_at=is.null`)).json || []) await MK.rest('POST', 'rpc/answer_shared_notice', { p_notice: n.id, p_action: 'seen' });
+    await AN.rest('DELETE', `tag_list_members?tag_list_id=eq.${S}&profile_id=eq.${MK.uid}`);
+    const left = (await AN.rest('GET', `tag_list_members?select=profile_id&tag_list_id=eq.${S}&profile_id=eq.${MK.uid}`)).json;
+    const a = await AN.rest('POST', 'rpc/set_tag_list_archived', { p_tag_list: S, p_archived: true });
+    rows.push(`| cleanup | Anastasiia's test tag list ${sn}: Maksym removed (read back), list archived | ${a.ok && left && !left.length ? 'pass' : 'FAIL'} | ${a.ok ? '' : a.err.message} |`);
+    leftovers.push(`archived test tag list ${sn} (Anastasiia's)`);
+  });
+  await AN.rest('POST', 'tags', { tag_list_id: S, name: 'e2e-s', sort: 1 });
+  const sh = await AN.rest('POST', 'rpc/share_tag_list_with', { p_tag_list: S, p_profile: MK.uid, p_role: 'viewer' });
+  const joined = await until(async () => ((await MK.rest('GET', `tag_list_members?select=role&tag_list_id=eq.${S}&profile_id=eq.${MK.uid}`)).json || [])[0], 6000);
+  check(G, 'tags round: Anastasiia shares a test tag list with Maksym by id (share_tag_list_with answers {"ok": true}; Maksym a viewer at once)', sh.ok && !!sh.json && sh.json.ok === true && !!joined && joined.role === 'viewer', sh.ok ? JSON.stringify(sh.json) : sh.err.message);
+  if (!joined) return;
+  const sSort = async () => (await MK.rest('GET', `tag_lists?select=sort&id=eq.${S}`)).json?.[0]?.sort;
+  const sSort0 = await sSort();
+  await closeDialogs(T); await T.reload(); await T.ready(); await T.theme('light'); await T.ev("(document.documentElement.dataset.theme='light',true)");
+  const openTagsW = async () => { await closeDialogs(T); await T.click('#profile'); await T.click('[data-menu=tags]'); return T.wait(`!!document.querySelector('dialog[open] .tgl[data-tgl="${S}"]')`, 8000); };
+  const tagsDom = () => T.ev(`[...document.querySelectorAll('dialog[open] .tgl[data-tgl]')].map(s=>s.dataset.tgl)`);
+  const trio = o => { const a = o.indexOf(tl.id), b = o.indexOf(S), c = o.indexOf(bl.id); return a >= 0 && b === a + 1 && c === b + 1; };
+  check(G, 'Tags window: the shared tag list shows with a grip and a ★ toggle', await openTagsW() && await T.ev(`!!document.querySelector('dialog[open] .tgl[data-tgl="${S}"] .tgl-grip[data-grip]')&&!!document.querySelector('dialog[open] [data-fav="${S}"][aria-pressed]')`));
+  // ★ on my test list and on the shared one
+  for (const id of [tl.id, S]) if (await T.ev(`document.querySelector('dialog[open] [data-fav="${id}"]')?.getAttribute('aria-pressed')==='false'`)) { await T.click(`dialog[open] [data-fav="${id}"]`); await sleep(250); }
+  const fv = await until(async () => { const f = ((await readP()) || {}).tagListFavs || []; return f.includes(tl.id) && f.includes(S) ? f : null; });
+  check(G, 'Tags window: ★ on two lists (mine and the shared one): both pressed, saved in prefs tagListFavs', !!fv && await T.ev(`[${JSON.stringify(tl.id)},${JSON.stringify(S)}].every(id=>document.querySelector('dialog[open] [data-fav="'+id+'"]').getAttribute('aria-pressed')==='true')`), fv ? fv.length + ' favourites' : 'not saved');
+  for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.ev(`(document.querySelector('dialog[open] .tgl[data-tgl="${S}"]')?.scrollIntoView({block:'center'}),true)`); await sleep(150); await T.shot(`tags-favs-${w}x${h}-light`); }
+  await T.size(1440, 900); await sleep(300);
+  // drag the shared list by its grip onto the upper half of my second test list: it lands between my two test lists
+  const before = await tagsDom();
+  await T.ev(`(()=>{const dt=new DataTransfer(),g=document.querySelector('dialog[open] [data-grip="${S}"]'),t=document.querySelector('dialog[open] .tgl[data-tgl="${bl.id}"]');t.scrollIntoView({block:'center'});const r=t.getBoundingClientRect(),o={bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+20,clientY:r.top+2};g.dispatchEvent(new DragEvent('dragstart',o));t.dispatchEvent(new DragEvent('dragover',o));t.dispatchEvent(new DragEvent('drop',o));g.dispatchEvent(new DragEvent('dragend',o));return true})()`);
+  const po = await until(async () => { const p = await readP(); return p && trio(p.tagListOrder || []) ? p : null; });
+  check(G, 'Tags window: the shared list dragged by its grip between my two test lists lands there, on screen and in prefs tagListOrder (v2)', !!po && po.tagListOrderV === 2 && trio(await tagsDom()) && !trio(before), po ? `order of ${po.tagListOrder.length} lists` : 'not saved; before ' + before.indexOf(S) + '/' + before.length);
+  const so = await until(async () => { const s = Object.fromEntries(((await MK.rest('GET', `tag_lists?select=id,sort&id=in.(${tl.id},${bl.id})`)).json || []).map(r => [r.id, r.sort])); return s[tl.id] < s[bl.id] ? s : null; }, 6000);
+  check(G, 'Tags window: my own lists keep tag_lists.sort in that relative order; the shared list\'s sort is not written', !!so && await sSort() === sSort0, JSON.stringify(so));
+  await T.ev(`(document.querySelector('dialog[open] .tgl[data-tgl="${S}"]')?.scrollIntoView({block:'center'}),true)`); await sleep(200);
+  await T.shot('tags-window-1440x900-light');
+  // the task window: exactly the favourites open, in the Tags window's order
+  await closeDialogs(T);
+  const it3 = await mkItem('tags favourites');
+  await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200); await pick(T, ST.id);
+  const openTask = async () => { await closeDialogs(T); return openCard(T, it3.id, `dialog[open] .tgg[data-tgg="${S}"]`); };
+  const twState = () => T.ev(`[...document.querySelectorAll('dialog[open] .tgg[data-tgg]')].map(g=>({id:g.dataset.tgg,open:!g.classList.contains('shut'),star:!!g.querySelector('.tgg-h .star')}))`);
+  const favOk = (s, f) => s.length > 0 && s.every(g => g.open === f.includes(g.id) && g.star === f.includes(g.id));
+  const sh3 = s => s.map(g => (g.open ? '+' : '-') + (g.star ? '*' : '')).join('');
+  await openTask();
+  let st = await twState();
+  check(G, 'task window: both ★ lists (mine and the shared one) open with ★ on their heads, every other list closed (V11)', !!fv && favOk(st, fv) && !!st.find(g => g.id === S)?.open && !!st.find(g => g.id === tl.id)?.open && !st.find(g => g.id === bl.id)?.open, sh3(st));
+  check(G, 'task window: the same order as the Tags window (the shared list between my two test lists)', trio(st.map(g => g.id)));
+  await T.theme('dark'); await T.ev("(document.documentElement.dataset.theme='dark',true)"); await sleep(350);
+  await T.ev(`(document.querySelector('dialog[open] .tgg[data-tgg="${S}"]')?.scrollIntoView({block:'center'}),true)`); await sleep(150);
+  await T.shot('tagpick-favs-1440x900-dark');
+  await T.click(`dialog[open] .tgg[data-tgg="${bl.id}"] [data-tgg-open]`);
+  check(G, 'task window: the chevron opens a closed list in this window', await T.wait(`!document.querySelector('dialog[open] .tgg[data-tgg="${bl.id}"]').classList.contains('shut')`, 2000));
+  await T.ev(`(document.querySelector('dialog[open] .tgg[data-tgg="${bl.id}"]')?.scrollIntoView({block:'center'}),true)`); await sleep(150);
+  await T.shot('tagpick-open-1440x900-dark');
+  await T.theme('light'); await T.ev("(document.documentElement.dataset.theme='light',true)");
+  // after a reload: the same order in both windows, the same favourites open, the list opened by the chevron closed again
+  await closeDialogs(T); await sleep(1500); await T.reload(); await T.ready(); await pick(T, ST.id);
+  await openTask(); st = await twState();
+  check(G, 'after a reload: the task window keeps the order and opens the ★ lists only (the chevron-opened list is closed again) (V11)', trio(st.map(g => g.id)) && !!fv && favOk(st, fv), sh3(st));
+  check(G, 'after a reload: the Tags window keeps the shared list between my two test lists, every tray open', await openTagsW() && trio(await tagsDom()) && await T.ev('!document.querySelector("dialog[open] .tgl.shut")'));
+  // unstar the shared list: it starts closed in the next task window
+  await T.click(`dialog[open] [data-fav="${S}"]`);
+  const fv2 = await until(async () => { const f = ((await readP()) || {}).tagListFavs || []; return !f.includes(S) && f.includes(tl.id) ? f : null; });
+  await openTask(); st = await twState();
+  const sg = st.find(g => g.id === S), tg = st.find(g => g.id === tl.id);
+  check(G, 'unstar: the shared list starts closed (no ★) in the next task window; my starred test list still open', !!fv2 && !!sg && !sg.open && !sg.star && !!tg && tg.open, sh3(st));
+  await closeDialogs(T);
+}
+
+// tags round (6), V6: Card layout "Only from these tag lists" with My tags unticked: none of its tags on cards or in the Coverflow
+// previews; another person's list is labelled "name — owner". Items in _selftest carry an existing My tags tag (nothing is written
+// to My tags) and the run's test tag. Card layout and the switcher come back with the prefs in cleanup; set back here too
+async function gCardFilter(G, T, tl, tag) {
+  const dfl = (await MK.rest('GET', `tag_lists?select=id,name&is_default=eq.true&owner_id=eq.${MK.uid}&archived_at=is.null`)).json?.[0];
+  const mt = dfl ? (await MK.rest('GET', `tags?select=id,name&tag_list_id=eq.${dfl.id}&deleted_at=is.null&order=sort&limit=1`)).json?.[0] : null;
+  if (!mt || !tag) { skip(G, 'Card layout filter with My tags unticked (V6)', !dfl ? 'no landing tag list' : !mt ? 'My tags has no tag to put on a test item' : 'no test tag'); return; }
+  const tName = (await MK.rest('GET', `tags?select=name&id=eq.${tag.id}`)).json?.[0]?.name || tag.name;
+  const a = await mkItem('card filter a', { quadrant: 'A', sort_key: 1 }), b = await mkItem('card filter b', { quadrant: 'A', sort_key: 2 }), c = await mkItem('card filter c', { quadrant: 'A', sort_key: 3 });
+  const ins = await MK.rest('POST', 'item_tags', [{ item_id: b.id, tag_id: mt.id }, { item_id: b.id, tag_id: tag.id }], { Prefer: 'return=minimal' });
+  if (!ins.ok) { skip(G, 'Card layout filter with My tags unticked (V6)', 'item_tags insert failed: ' + ins.err.message); return; }
+  const is = (n, x) => `(${x}===${JSON.stringify(n)}||${x}.startsWith(${JSON.stringify(n + ' ')}))`;
+  const has = (list, n) => list.some(x => x === n || x.startsWith(n + ' '));
+  await closeDialogs(T); await T.reload(); await T.ready(); await pick(T, ST.id);
+  await T.wait(`!!document.querySelector('[data-card="${b.id}"]')`, 8000);
+  // Card layout: Only from these tag lists, every offered list ticked but My tags; another person's list says whose it is
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("dialog[open] [data-cl-list]")', 5000);
+  const lab = await T.ev(`(()=>{const r={};document.querySelectorAll('dialog[open] [data-cl-list]').forEach(b=>{r[b.dataset.clList]=b.closest('label').textContent.trim()});return r})()`);
+  const others = ((await MK.rest('GET', `tag_lists?select=id,name,owner_id&archived_at=is.null&owner_id=neq.${MK.uid}`)).json || []).filter(l => lab[l.id]);
+  check(G, `Card layout: another person's tag list is labelled "name — owner", mine without (${others.length} of others' lists shown)`, others.every(l => lab[l.id].startsWith(l.name) && /— \S/.test(lab[l.id])) &&
+    Object.keys(lab).filter(id => !others.some(l => l.id === id)).every(id => !lab[id].includes('—')), others.map(l => lab[l.id]).join(' / ').slice(0, 150));
+  await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),r=d.querySelector('input[name=cl-tags][value=lists]');r.checked=true;r.dispatchEvent(new Event('change',{bubbles:true}));d.querySelectorAll('[data-cl-list]').forEach(x=>{x.disabled=false;x.checked=x.dataset.clList!==${JSON.stringify(dfl.id)}});d.querySelector('#cl-save').click();return true})()`);
+  await T.wait('!document.querySelector("dialog[open]")', 3000);
+  const cardOk = await T.wait(`(()=>{const t=[...document.querySelectorAll('[data-card="${b.id}"] .tagtxt')].map(x=>x.textContent.trim());return t.some(x=>${is(tName, 'x')})&&!t.some(x=>${is(mt.name, 'x')})})()`, 5000);
+  check(G, 'Card layout filter, My tags unticked: the card shows the test tag and no tag from My tags (V6)', cardOk, await T.ev(`[...document.querySelectorAll('[data-card="${b.id}"] .tagtxt')].length+' tags on the card'`));
+  await T.ev(`(document.querySelector('[data-card="${b.id}"]')?.scrollIntoView({block:'center'}),true)`); await sleep(300);
+  await T.shot('cardlayout-filter-1440x900-light');
+  // the Coverflow previews follow the same filter (cardTags)
+  const setSwitcher = async v => { await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("dialog[open] input[name=s-switch]")', 5000); await T.click(`dialog[open] input[name=s-switch][value=${v}]`); await T.click('#cl-save'); await T.wait('!document.querySelector("dialog[open]")', 3000); await sleep(300); };
+  await setSwitcher('coverflow');
+  const pv = async id => { await closeDialogs(T); await sleep(200); await T.click(`[data-card="${id}"]`); await T.wait('!!document.querySelector("dialog.tk-deck[open] #ft")', 5000); await sleep(600);
+    return T.ev(`(()=>{const p=document.querySelector('dialog[open] .tk-pv[data-id="${b.id}"]:not([hidden])');return p?[...p.querySelectorAll('.pv-tag')].map(x=>x.textContent.trim()):null})()`); };
+  let pt = await pv(a.id); if (!pt) pt = await pv(c.id);
+  check(G, 'Card layout filter, My tags unticked: the Coverflow preview of the card shows the test tag and no tag from My tags (V6)', !!pt && has(pt, tName) && !has(pt, mt.name), pt ? pt.length + ' tags in the preview' : 'no preview of the card');
+  await T.hover(720, 450); await sleep(300); await T.shot('cardlayout-filter-preview-1440x900-light');
+  await closeDialogs(T);
+  await setSwitcher('standard');
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("dialog[open] input[name=cl-tags]")', 5000);
+  await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('input[name=cl-tags][value=all]').checked=true;d.querySelector('#cl-save').click();return true})()`);
+  await T.wait('!document.querySelector("dialog[open]")', 3000);
+}
+
+// tags round (2), V4: the Share window's one box "Name or email" suggests whitelisted people by name (rpc/shareable_profiles, db/022:
+// never an email); arrows and Enter pick; Share shares by id (share_list_with); text that is neither gives the error; people
+// already on the list are left out. On a test list the run makes; the membership is removed in cleanup and read back there
+async function gShareByName(G, T) {
+  const pp = await MK.rest('POST', 'rpc/shareable_profiles', {});
+  const an = pp.ok ? pp.json.find(p => p.id === AN.uid) : null;
+  check(G, 'rpc/shareable_profiles as Maksym: id and display name only (no email), Anastasiia listed, never me', pp.ok && !!an && pp.json.every(p => Object.keys(p).sort().join() === 'display_name,id' && p.id !== MK.uid && !String(p.display_name).includes('@')), pp.ok ? `${pp.json.length} row(s)` : pp.err.message);
+  if (!an || !an.display_name) return;
+  const l = await mkList(MK, `${RUN} by name`, true);
+  tagUndo.push(async () => {
+    for (const n of (await AN.rest('GET', `shared_notices?select=id&list_id=eq.${l.id}&seen_at=is.null`)).json || []) await AN.rest('POST', 'rpc/answer_shared_notice', { p_notice: n.id, p_action: 'seen' });
+    await MK.rest('DELETE', `list_members?list_id=eq.${l.id}&profile_id=eq.${AN.uid}`);
+    const left = (await MK.rest('GET', `list_members?select=profile_id&list_id=eq.${l.id}&profile_id=eq.${AN.uid}`)).json;
+    rows.push(`| cleanup | share by name: Anastasiia's membership of ${l.slug} removed (read back ${left ? left.length : 'n/a'} rows) | ${left && !left.length ? 'pass' : 'FAIL'} | |`);
+  });
+  await closeDialogs(T); await T.reload(); await T.ready(); await T.theme('light');
+  await T.click('#profile'); await T.click('[data-menu=sharing]'); await T.wait(`!!document.querySelector('dialog[open] [data-share-list="${l.id}"]')`, 8000);
+  await T.click(`dialog[open] [data-share-list="${l.id}"]`);
+  const box = await T.wait('!!document.getElementById("sh-email")', 5000);
+  check(G, 'Share window: one box "Name or email", a combobox (aria-controls sh-opts)', box && await T.ev(`(()=>{const e=document.getElementById('sh-email');return e.getAttribute('role')==='combobox'&&e.getAttribute('aria-controls')==='sh-opts'&&/Name or email/.test(e.closest('label').textContent)})()`));
+  if (!box) return;
+  const setBox = v => T.ev(`(()=>{const e=document.getElementById('sh-email');e.value=${JSON.stringify(v)};e.dispatchEvent(new Event('input'));e.focus();return true})()`);
+  const q = an.display_name.slice(0, 3);
+  await T.wait('!document.querySelector("#sh-people")?.textContent.includes("Loading")', 5000); await sleep(600); // shareable_profiles answered
+  await T.insert('#sh-email', q);
+  const sug = await T.wait(`[...document.querySelectorAll('#sh-opts li[role=option]')].length>0&&!document.getElementById('sh-opts').hidden`, 5000)
+    ? await T.ev(`(()=>{const e=document.getElementById('sh-email'),o=[...document.querySelectorAll('#sh-opts li[role=option]')];return {names:o.map(x=>x.textContent),ids:o.map(x=>x.id),exp:e.getAttribute('aria-expanded'),act:e.getAttribute('aria-activedescendant')}})()`) : null;
+  check(G, `Share window: typing "${q}" suggests the person by name (options sh-o<i>, aria-expanded, aria-activedescendant), never an email`, !!sug && sug.names.includes(an.display_name) && sug.names.every(n => !n.includes('@')) && sug.ids[0] === 'sh-o0' && sug.exp === 'true' && sug.act === 'sh-o0', JSON.stringify(sug && { n: sug.names.length, exp: sug.exp, act: sug.act }));
+  for (const [w, h] of [[1440, 900], [390, 844]]) { await T.size(w, h); await sleep(400); await T.shot(`share-name-${w}x${h}-light`); }
+  await T.size(1440, 900); await sleep(300);
+  const shares = () => T.requests.filter(u => /rpc\/share_list/.test(u)).length, s0 = shares();
+  await setBox(''); await T.insert('#sh-email', 'zz no such person'); await T.click('#sh-go');
+  check(G, 'Share window: text that is neither a name from the list nor an email gives "Pick a name from the list or enter an email"; nothing is sent', await T.wait(`document.getElementById('sh-e').textContent==='Pick a name from the list or enter an email'`, 3000) && shares() === s0);
+  await setBox(''); await T.insert('#sh-email', q); await T.wait('!document.getElementById("sh-opts").hidden', 3000);
+  const idx = await T.ev(`[...document.querySelectorAll('#sh-opts li[role=option]')].findIndex(x=>x.textContent===${JSON.stringify(an.display_name)})`);
+  for (let i = 0; i < idx; i++) await T.key('ArrowDown');
+  await T.key('Enter');
+  const pickedOk = await T.wait(`document.getElementById('sh-email').value===${JSON.stringify(an.display_name)}&&document.getElementById('sh-opts').hidden`, 2000);
+  await T.click('#sh-go');
+  const toastOk = await T.wait(`(document.querySelector('.toast span')||{}).textContent===${JSON.stringify('Shared with ' + an.display_name + ' as Viewer')}`, 6000);
+  const mem = await until(async () => ((await MK.rest('GET', `list_members?select=role&list_id=eq.${l.id}&profile_id=eq.${AN.uid}`)).json || [])[0], 6000);
+  check(G, 'Share window: arrows and Enter pick the name, Share shares by id (share_list_with): toast "Shared with … as Viewer", the member read back as a viewer', pickedOk && toastOk && mem?.role === 'viewer' && T.requests.some(u => /rpc\/share_list_with/.test(u)),
+    JSON.stringify({ pickedOk, toastOk, role: mem && mem.role, err: await T.text('#sh-e') }));
+  await T.wait(`(document.getElementById('sh-people')?.textContent||'').includes(${JSON.stringify(an.display_name)})`, 5000);
+  await setBox(''); await T.insert('#sh-email', q); await sleep(800);
+  check(G, 'Share window: a person already on the list is not suggested again', await T.ev(`![...document.querySelectorAll('#sh-opts li[role=option]')].some(x=>x.textContent===${JSON.stringify(an.display_name)})`));
+  await closeDialogs(T);
+}
+
 async function gSmoke() {
   const G = 'smoke', T = await tab(B, await ctx(B));
   check(G, 'opens signed in from ' + (ORIGIN || path.basename(path.dirname(PAGE))), await open(T, await grantFor('maksym')));
@@ -1354,6 +1599,15 @@ async function gSmoke() {
 // household's tags never reach a guest (the tag-list share goes from the guest to Maksym). Every step is undone in cleanup().
 const guestUndo = [];
 const closeDialogs = T => T.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
+// a card in _selftest opened in its task window; a card the poll has not brought yet gets one reload. ready: what the open window must show
+async function openCard(T, id, ready) {
+  for (let i = 0; i < 2; i++) {
+    if (i) { await closeDialogs(T); await T.reload(); await T.ready(); }
+    await pick(T, ST.id);
+    if (await T.wait(`!!document.querySelector('[data-card="${id}"]')`, 8000)) { await T.click(`[data-card="${id}"]`); if (await T.wait(`!!document.querySelector(${JSON.stringify(ready)})`, 5000)) return true; }
+  }
+  return false;
+}
 const rpcOf = async (c, fn, body) => { const r = await c.rest('POST', 'rpc/' + fn, body || {}); return r.ok ? r.json : null; };
 async function mkList(c, name, own) {
   const r = await c.rest('POST', 'rpc/create_list', { p_name: name, p_shared: false });
@@ -1769,8 +2023,9 @@ try {
 } catch (e) {
   check('setup', 'setup', false, e.message);
 } finally {
+  // the browser goes first: an open page saving its preferences late would undo the restore in cleanup
+  if (B) { B.close(); await sleep(800); }
   try { await cleanup(); } catch (e) { leftovers.push('cleanup failed: ' + e.message); }
-  if (B) B.close();
   for (const c of clients.reverse()) await c.close();
   const report = ['# TasksDashboard e2e', '', `Run \`${RUN}\`, ${new Date().toISOString()}, ${Math.round((Date.now() - t0) / 1000)} s. Page \`${ORIGIN ? ORIGIN + '/' + (ACCESS ? '` (Access service token)' : '`') : PAGE + '`'}. Groups: ${want.join(', ')}. Logins from the env file; no values printed.`, '',
     `**${pass} of ${pass + fail} passed${skipped ? `, ${skipped} skipped` : ''}.**`, '', '| Group | Check | Result | Note |', '|---|---|---|---|', ...rows, '', '## Leftovers', '', ...(leftovers.length ? leftovers.map(x => '- ' + x) : ['- none']), '',

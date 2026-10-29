@@ -977,13 +977,14 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .sh-note{margin:8px 0 0;color:var(--ink3);font:400 13px/1.45 var(--font)}
 .sh-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
 .sh-form label{margin-top:var(--s4)}
+.sh-form .sh-opts{grid-column:1/-1;order:2;margin:0}
 .tg-row{display:flex;gap:6px;align-items:center;margin-top:6px}
 .tg-row input{flex:1;min-width:0}
 .tg-row button{min-height:38px;min-width:38px}
 .tg-share{margin-top:10px}
 .tg-list{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .tg-list .tagtxt{font-size:12px;line-height:20px;padding:0 8px;border-radius:var(--r-sm);background:var(--accent-bg);color:var(--accent-ink)}
-@media (max-width:700px){.al{flex-wrap:wrap}.al-b{justify-content:flex-start}.sh-form{grid-template-columns:1fr}}
+@media (max-width:700px){.al{flex-wrap:wrap}.al-b{justify-content:flex-start}.sh-form{grid-template-columns:1fr}.sh-form .sh-opts{order:0}}
 
 /* cards: status, category and "check" badges; the low-confidence marker uses the Delegate yellow */
 .card.compact{grid-template-columns:auto minmax(0,1fr) auto auto auto auto}
@@ -1216,7 +1217,7 @@ dialog input.tg-q#lk-q{width:100%}
 .lk-opts li .k{font:500 11.5px var(--mono);color:var(--ink3)}
 .lk-opts li[aria-selected="true"],.lk-opts li:hover{background:var(--accent-bg);color:var(--accent-ink)}
 .lk-opts li.create{border-top:1px solid var(--hair);font-style:italic}
-.lk-wait{margin:4px 0 6px}
+.lk-list .lk-chip.waiting{border-style:dashed;border-color:color-mix(in srgb,var(--qc) 75%,transparent);background:color-mix(in srgb,var(--qc) 10%,var(--solid))}
 @media (max-width:700px){.lk-row{grid-template-columns:1fr auto}.lk-chips{grid-column:1 / -1;order:3}.lk-x{width:32px;height:32px;min-height:32px}}
 .tgg{position:relative;padding:4px 0 6px 10px;box-shadow:inset 2px 0 0 var(--hair2)}
 .tgg + .tgg{margin-top:4px}
@@ -1249,6 +1250,7 @@ dialog:has(form.tgm){width:min(640px,94vw)}
 .tgl-grip{cursor:grab;color:var(--ink3);font:600 12px/1 var(--mono);letter-spacing:-3px;padding:4px 6px 4px 0;user-select:none}
 .tgl-star{display:inline-flex;align-items:center;justify-content:center;width:28px;min-width:28px;min-height:28px;padding:0;border:0;background:transparent;color:var(--ink3);font-size:15px;flex:none}
 button.tgl-star:hover{color:var(--accent-ink);background:var(--accent-bg)}
+button.tgl-star[aria-pressed="true"]{background:transparent;box-shadow:none;color:var(--accent)}button.tgl-star[aria-pressed="true"]:hover{background:var(--accent-bg)}
 dialog .tgl-h input.tgl-name{flex:1;width:auto;min-width:6em;min-height:30px;padding:0 6px;border-color:transparent;background:transparent;font:500 14px var(--ui)}
 dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 .tgl-h span.tgl-name{flex:0 1 auto;font:500 14px var(--ui);padding:0 6px;overflow-wrap:anywhere}
@@ -1379,7 +1381,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     // round 3 (db/012): tag lists, notices
     'tag list limit reached': 'You have reached your limit of tag lists.',
     'a tag list name has 1 to 60 characters': 'A tag list name has 1 to 60 characters.',
-    'the default tag list is not archived': 'The default tag list can\'t be deleted. Make another list the default first.',
+    'the default tag list is not archived': 'This tag list can\'t be deleted: tags typed by name land here.',
     'only owners and editors share a tag list': 'Only owners and editors share this tag list.',
     'only owners and editors delete tags': 'Only owners and editors delete tags.',
     'only owners and editors archive a tag list': 'Only owners and editors delete a tag list.',
@@ -1457,9 +1459,12 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
     group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
   const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
-  // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
+  // tags round (2026-10-29): tagListOrder = my one free order of every tag list, own and shared (v2, tagListOrderV = TAG_LIST_ORDER_V;
+  // before it: only the shared ones, migrated once by tagListPrefsMigrate); tagListFavs = my favourite (★) tag lists, any number, own
+  // or shared: they open in the task window. tagListsOpen (U7) is gone: groups open and close within the window only
+  const TAG_LIST_ORDER_V = 2;
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
-    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListsOpen: {}, taskSwitcher: 'standard' };
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard' };
   // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
   // WELCOME_VERSION. welcomeSeen stays for clients that only know it
   const WELCOME_VERSION = 3;
@@ -1496,8 +1501,11 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     if (Number.isInteger(raw.welcomeVersion) && raw.welcomeVersion >= 0 && raw.welcomeVersion <= 1000) p.welcomeVersion = raw.welcomeVersion;
     if (TASK_SWITCHERS.includes(raw.taskSwitcher)) p.taskSwitcher = raw.taskSwitcher;
     const tls = known && known.tagListIds ? new Set(known.tagListIds) : null, tlOk = x => typeof x === 'string' && (!tls || tls.has(x));
-    if (strs(raw.tagListOrder)) p.tagListOrder = raw.tagListOrder.filter(tlOk);
-    if (isObj(raw.tagListsOpen)) Object.keys(raw.tagListsOpen).forEach(k => { if (tlOk(k) && typeof raw.tagListsOpen[k] === 'boolean') p.tagListsOpen[k] = raw.tagListsOpen[k]; });
+    // ids of tag lists that no longer exist are dropped; archived and hidden ones are known (the caller passes every tag list it can
+    // see) and keep their place
+    if (strs(raw.tagListOrder)) p.tagListOrder = [...new Set(raw.tagListOrder.filter(tlOk))];
+    if (Number.isInteger(raw.tagListOrderV) && raw.tagListOrderV >= 0 && raw.tagListOrderV <= 1000) p.tagListOrderV = raw.tagListOrderV;
+    if (strs(raw.tagListFavs)) p.tagListFavs = [...new Set(raw.tagListFavs.filter(tlOk))];
     return p;
   }
   function readCardLayout(raw, tagListIds) {
@@ -1812,49 +1820,79 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 
   // ---- round 3, A5-A7: several tag lists with roles, first-share notices, the tag filter by id, the side menu by keyboard ----
   // what the caller may do on a tag list (db/012): viewer uses its tags on items; contributor also adds, renames and reorders tags;
-  // editor also deletes tags, renames the list, archives ("Delete list"), moves tags out and shares; owner also chooses the default,
-  // reorders the lists and removes people. An archived list is read only until an owner or editor restores it.
-  const TAG_LIST_RIGHTS = { viewer: ['use'], contributor: ['use', 'addTag', 'renameTag', 'sortTag'] };
+  // editor also deletes tags, renames the list, archives ("Delete list"), moves tags out and shares; owner also removes people.
+  // Every role places the list in its own order (sortList: prefs tagListOrder, tags round). The landing list for tags typed by name
+  // (is_default, hidden in the UI) is never archived. An archived list is read only until an owner or editor restores it.
+  const TAG_LIST_RIGHTS = { viewer: ['use', 'sortList'], contributor: ['use', 'sortList', 'addTag', 'renameTag', 'sortTag'] };
   TAG_LIST_RIGHTS.editor = TAG_LIST_RIGHTS.contributor.concat(['deleteTag', 'renameList', 'archive', 'move', 'share']);
-  TAG_LIST_RIGHTS.owner = TAG_LIST_RIGHTS.editor.concat(['setDefault', 'sortList', 'removePeople']);
+  TAG_LIST_RIGHTS.owner = TAG_LIST_RIGHTS.editor.concat(['removePeople']);
   function tagListRights(l) {
     if (!l || !l.role) return new Set();
     if (l.archived_at) return new Set(l.role === 'owner' || l.role === 'editor' ? ['restore'] : []);
     const r = new Set(TAG_LIST_RIGHTS[l.role] || []);
-    if (l.is_default) { r.delete('archive'); r.delete('setDefault'); }
+    if (l.is_default) r.delete('archive');
     return r;
   }
   // where a tag of list `from` may move: another live list of the same owner, with move rights on both (move_tags checks the same)
   const moveTargets = (from, tagLists) => !from || !tagListRights(from).has('move') ? [] :
     Object.values(tagLists || {}).filter(l => l && l.id !== from.id && l.owner_id === from.owner_id && tagListRights(l).has('move'));
-  // tag lists in picker order: my default first, my other lists by sort, then shared lists (those in o.order first, in that order:
-  // the person's own order, prefs tagListOrder) by owner name and sort; each with its tag ids by sort, then name. Live lists the
-  // caller may see (hidden ones only with o.hidden); o.archived gives the archived ones instead
+  // tag lists in picker order (tags round): those in o.order first, in that order (the person's one free order, prefs tagListOrder),
+  // then the rest: my lists by sort, then shared lists by owner name and sort. No list is pinned. Each with its tag ids by sort, then
+  // name. Live lists the caller may see (hidden ones only with o.hidden); o.archived gives the archived ones instead
   function tagGroups(tagLists, tags, meId, names, opts) {
     const o = opts || {}, nm = id => String((names || {})[id] || '');
     const mine = l => l.owner_id === meId;
     const at = l => { const i = (o.order || []).indexOf(l.id); return i < 0 ? 1e6 : i; };
     const lists = Object.values(tagLists || {}).filter(l => l && l.role && !!l.archived_at === !!o.archived && (o.hidden || !l.hidden));
-    lists.sort((a, b) => mine(b) - mine(a) || (mine(a) ? !!b.is_default - !!a.is_default : at(a) - at(b) || nm(a.owner_id).localeCompare(nm(b.owner_id)) || String(a.owner_id).localeCompare(String(b.owner_id)))
+    lists.sort((a, b) => at(a) - at(b) || mine(b) - mine(a) || (mine(a) ? 0 : nm(a.owner_id).localeCompare(nm(b.owner_id)) || String(a.owner_id).localeCompare(String(b.owner_id)))
       || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name)));
     const by = {};
     Object.values(tags || {}).forEach(t => { (by[t.tag_list_id] = by[t.tag_list_id] || []).push(t); });
     return lists.map(l => ({ list: l, tags: (by[l.id] || []).sort((a, b) => (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name))).map(t => t.id) }));
   }
-  // round 3 P1, U3: a tag list moved in the task window (groups as tagGroups gives them). My lists move among my lists (the default
-  // stays first and does not move), shared lists among shared lists. to = { dir: -1 | 1 } (Alt+Up / Alt+Down) or { targetId, before }
-  // (a drop). Returns { kind: 'own' | 'shared', order: [ids of that kind] }, or null when it cannot move or nothing changes
-  function tagListReorder(groups, meId, id, to) {
+  // tags round: a tag list moved in the task window or the Tags window (groups as tagGroups gives them: the lists on screen). Every
+  // live list moves among all of them, own and shared alike. to = { dir: -1 | 1 } (Alt+Up / Alt+Down) or { targetId, before } (a
+  // drop). The new row is merged into the full stored order (order = prefs tagListOrder): lists not on screen (hidden, archived)
+  // keep their slots, lists missing from it are added in screen order. Returns { order: [every id] }, or null when it cannot move
+  // or nothing changes. meId is kept for older callers and not used
+  function tagListReorder(groups, meId, id, to, order) {
     const ls = (groups || []).map(g => g.list || g);
-    const kindOf = l => l.owner_id === meId ? (l.is_default ? null : 'own') : 'shared';
-    const self = ls.find(l => l.id === id), kind = self && kindOf(self);
-    if (!kind || !to) return null;
-    const row = ls.filter(l => kindOf(l) === kind).map(l => l.id), rest = row.filter(x => x !== id);
+    const self = ls.find(l => l.id === id);
+    if (!self || self.archived_at || !to) return null;
+    const row = ls.filter(l => !l.archived_at).map(l => l.id), rest = row.filter(x => x !== id);
     let at;
     if (to.dir) { at = row.indexOf(id) + (to.dir < 0 ? -1 : 1); if (at < 0 || at > rest.length) return null; }
     else { if (!rest.includes(to.targetId)) return null; at = rest.indexOf(to.targetId) + (to.before ? 0 : 1); }
     rest.splice(at, 0, id);
-    return rest.join() === row.join() ? null : { kind, order: rest };
+    if (rest.join() === row.join()) return null;
+    const full = [...new Set((order || []).filter(x => typeof x === 'string'))];
+    row.forEach(x => { if (!full.includes(x)) full.push(x); });
+    const slots = []; full.forEach((x, i) => { if (row.includes(x)) slots.push(i); });
+    slots.forEach((s, i) => { full[s] = rest[i]; });
+    return { order: full };
+  }
+  // tags round: the tag_lists.sort writes that keep my own live lists in their relative place in the order (the CLI and Telegram
+  // read sort); C.sortWrites, so only the lists that change are written
+  const tagListOwnSorts = (order, tagLists, meId) => sortWrites((order || []).filter(id => tagLists && tagLists[id] && tagLists[id].owner_id === meId && !tagLists[id].archived_at), id => tagLists[id].sort);
+  // tags round, prefs migration: a row without tagListOrderV = TAG_LIST_ORDER_V gets the full order of what it showed before (my
+  // lists by sort with the landing list first, then the shared ones in their stored order, then archived lists the same way) and
+  // tagListFavs seeded with my landing list. A stored order that already holds one of my lists was written by this version and
+  // dropped its marker in an older client: it is kept, the lists it lacks added in the old order. p: prefs as prefsFromRow gives
+  // them. Returns { tagListOrder, tagListFavs, tagListOrderV } or null when nothing is to do
+  function tagListPrefsMigrate(p, tagLists, meId, names) {
+    const q = p || {};
+    if (q.tagListOrderV === TAG_LIST_ORDER_V) return null;
+    const nm = id => String((names || {})[id] || ''), mine = l => l.owner_id === meId, stored = strs(q.tagListOrder) ? q.tagListOrder : [];
+    const at = l => { const i = stored.indexOf(l.id); return i < 0 ? 1e6 : i; };
+    const legacy = (a, b) => mine(b) - mine(a) || (mine(a) ? !!b.is_default - !!a.is_default : at(a) - at(b) || nm(a.owner_id).localeCompare(nm(b.owner_id)) || String(a.owner_id).localeCompare(String(b.owner_id)))
+      || (a.sort || 0) - (b.sort || 0) || String(a.name).localeCompare(String(b.name));
+    const all = Object.values(tagLists || {}).filter(l => l && l.role);
+    const old = all.filter(l => !l.archived_at).sort(legacy).concat(all.filter(l => !!l.archived_at).sort(legacy)).map(l => l.id);
+    const keep = stored.some(id => tagLists && tagLists[id] && mine(tagLists[id]));
+    const order = keep ? [...new Set(stored.concat(old))] : old;
+    const def = all.find(l => mine(l) && l.is_default && !l.archived_at);
+    const favs = strs(q.tagListFavs) && q.tagListFavs.length ? q.tagListFavs.slice() : def ? [def.id] : [];
+    return { tagListOrder: order, tagListFavs: favs, tagListOrderV: TAG_LIST_ORDER_V };
   }
   // the sort values for ids in their new order: the same values handed out again in order, written only where one changes (so a
   // move touches only the lists it passes); equal or missing values are raised to keep the order strict. sortOf: id → its sort now
@@ -1864,10 +1902,9 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     (ids || []).forEach((id, i) => { const v = vals[i] > prev ? vals[i] : prev + 1; prev = v; if (v !== now(id)) out.push({ id, sort: v }); });
     return out;
   }
-  // U7: a group of the task window opens when the task carries one of its tags (used: tag list ids), else as I last left it
-  // (prefs tagListsOpen), else only when it is my default list
-  const tagGroupOpen = (list, meId, used, openPref) => !!(used && used.has(list.id)) ||
-    (openPref && typeof openPref[list.id] === 'boolean' ? openPref[list.id] : !!list.is_default && list.owner_id === meId);
+  // tags round: a group of the task window starts open when its list is one of my favourites (favs: prefs tagListFavs, an array or a
+  // Set), every other group starts closed, on each open of the window; the chevron then toggles within the window only
+  const tagGroupOpen = (list, favs) => !!list && (favs instanceof Set ? favs.has(list.id) : Array.isArray(favs) && favs.includes(list.id));
   // U6: the task window's tag search: per group, the tags whose name holds the text (case and outer spaces ignored); groups with
   // no hit are left out; an empty text gives the groups as they are. nameOf: tag id → name (a function or an object)
   function tagSearch(groups, text, nameOf) {
@@ -2376,7 +2413,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
-    tagListReorder, sortWrites, tagGroupOpen, tagSearch,
+    tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
     cancelTimes, isTestList, chipSelect, kpiTicks,
     KPI_COLUMNS, kpiHistory, kpiStateAt, kpiStatus, kpiQuadrant, KPI_DAILY_MAX, kpiTimes, kpiSeries, kpiPie, kpiClosure, kpiOverall,
@@ -2456,6 +2493,9 @@ const canDo = (action, t, list) => C.can(ROLE[t ? t.list : list], action, t, me 
 const canAddSomewhere = () => st.list === 'all' ? LISTS.some(l => canDo('add', null, l)) : canDo('add', null, st.list);
 // tags (item_tags): t.tags holds tag ids; a chip shows its label (owner's initial on a name clash); tags of hidden tag lists don't show
 const shownTags = t => t.tags.filter(id => LABEL[id] !== undefined);
+// the tags a card shows (C.cardTagIds with Card layout's All / Only from these tag lists / Off): the board's cards and the
+// Coverflow copies of the task window alike (tags round, item 6)
+const cardTags = t => { const ids = shownTags(t), of = {}; ids.forEach(x => { of[x] = TAG[x] && TAG[x].tag_list_id; }); return C.cardTagIds(ids, cardLayout, of); };
 const tagText = t => shownTags(t).map(id => LABEL[id]).join(' ');
 const myDefault = () => Object.values(TAG_LISTS).find(l => l.owner_id === (me && me.id) && l.is_default) || null;
 // round 3: what my role allows on a tag list (C.tagListRights: use, addTag, renameTag, sortTag, deleteTag, renameList, archive, move, …)
@@ -2865,11 +2905,15 @@ async function loadAll() {
   await loadLinks(); // a database without db/018 answers 400: the links UI stays off
   prefsExists = prefs.json.length > 0;
   applyPrefs(C.prefsFromRow(prefsExists ? prefs.json[0].prefs : null, { listIds: LISTS, itemIds: tasks.map(t => t.id), tagListIds: Object.keys(TAG_LISTS) }));
+  // tags round: a row from before the one free order (no tagListOrderV 2) gets the full order of what it showed and my landing
+  // list as its first favourite, saved below
+  const mig = me ? C.tagListPrefsMigrate({ tagListOrder, tagListFavs, tagListOrderV }, TAG_LISTS, me.id, NAMES) : null;
+  if (mig) { tagListOrder = mig.tagListOrder; tagListFavs = mig.tagListFavs; tagListOrderV = mig.tagListOrderV; }
   boot.gate = null;
   render();
   // the axes clamp to the window on the first render, so "unchanged" is measured after it
-  lastWritten = prefsExists ? prefsText() : null;
-  if (!prefsExists) savePrefsSoon();
+  lastWritten = prefsExists && !mig ? prefsText() : null;
+  if (!prefsExists || mig) savePrefsSoon();
   startPolling();
   flushAll();
   if (C.welcomeDue({ welcomeVersion }) && me.kind === 'human') showWelcome();
@@ -3106,7 +3150,7 @@ const collectPrefs = () => ({
   version: 2, theme: themePref, view: st.view, list: st.list, listOrder: LISTS.slice(), tagOrder: tagOrder.slice(),
   axes: window.tdAxes && window.tdAxes.get ? window.tdAxes.get() : { fx: 0.5, fy: 0.5 },
   menuCollapsed: QS.filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] }, settings: Object.assign({}, settings),
-  cardLayout: JSON.parse(JSON.stringify(cardLayout)), welcomeSeen, welcomeVersion, tagListOrder: tagListOrder.slice(), tagListsOpen: Object.assign({}, tagListsOpen), taskSwitcher,
+  cardLayout: JSON.parse(JSON.stringify(cardLayout)), welcomeSeen, welcomeVersion, tagListOrder: tagListOrder.slice(), tagListOrderV, tagListFavs: tagListFavs.slice(), taskSwitcher,
 });
 const prefsText = () => JSON.stringify(collectPrefs());
 // stale entries (a list, item or tag that no longer exists) are dropped
@@ -3117,7 +3161,7 @@ function applyPrefs(p) {
   st.list = p.list === 'all' || LIST[p.list] ? p.list : 'all';
   const known = new Set(Object.keys(TAG)); // tag ids (before multi-user: names, dropped here)
   tagOrder = p.tagOrder.filter(x => known.has(x));
-  tagListOrder = p.tagListOrder.slice(); tagListsOpen = Object.assign({}, p.tagListsOpen);
+  tagListOrder = p.tagListOrder.slice(); tagListOrderV = p.tagListOrderV; tagListFavs = p.tagListFavs.slice();
   st.collapsed = new Set(p.menuCollapsed);
   st.cardMode = p.cards.mode;
   st.flip = new Set(p.cards.flipped);
@@ -3210,8 +3254,7 @@ function cardHtml(t, q, g) {
     (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
     (t.category !== 'task' && C.showSource(L, st.list !== 'all') ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
   const num = L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>';
-  const tagListOf = {}; shownTags(t).forEach(x => { tagListOf[x] = TAG[x] && TAG[x].tag_list_id; });
-  const tagIds = C.cardTagIds(shownTags(t), L, tagListOf);
+  const tagIds = cardTags(t);
   const facts = C.cardFacts(t, L).map(factText);
   // round 4, item 5: a small card shows what Card layout switches on too: the number in front, then one thin line of facts and tags
   if (!expanded) {
@@ -3608,8 +3651,25 @@ function moveGrouped(t, q, targetId, before, from) {
 // round 3: tags are ordered by tags.sort inside their tag list (shared, set in Account menu → Tags); the preference tagOrder of
 // older rows is kept as it was and no longer read
 let tagOrder = [];
-// round 3 P1: my order of the tag lists shared with me (U3) and which task-window groups I left open or closed (U7); preferences
-let tagListOrder = [], tagListsOpen = {};
+// tags round: my one free order of every tag list (prefs tagListOrder, v2) and my favourite tag lists (prefs tagListFavs)
+let tagListOrder = [], tagListOrderV = 0, tagListFavs = [];
+// a move of a tag list (task window or Tags window): the new full order goes to my preferences; my own lists also get
+// tag_lists.sort in their new relative order (C.tagListOwnSorts), so the CLI and Telegram keep in step. false: a sort write refused
+async function saveTagListOrder(order) {
+  tagListOrder = order.slice(); savePrefsSoon();
+  for (const w of C.tagListOwnSorts(order, TAG_LISTS, me.id)) {
+    const x = await rest('PATCH', 'tag_lists?id=eq.' + w.id, { sort: w.sort }, { Prefer: 'return=representation' });
+    if (!x.ok || !x.json.length) { toast(x.ok ? 'You may not reorder these lists.' : x.err.message); return false; }
+    TAG_LISTS[w.id].sort = w.sort;
+  }
+  return true;
+}
+// ★: a favourite tag list opens in the task window (any number, own or shared; my view only, prefs tagListFavs)
+function toggleTagListFav(id) {
+  tagListFavs = tagListFavs.includes(id) ? tagListFavs.filter(x => x !== id) : tagListFavs.concat(id);
+  savePrefsSoon();
+  return tagListFavs.includes(id);
+}
 // a name typed in the task window: 'new:<tag list id>:<name>', created in that tag list on Save
 const isNew = x => String(x).startsWith('new:');
 const newKey = (list, name) => 'new:' + list + ':' + name;
@@ -3641,14 +3701,14 @@ async function deleteTagDb(id) {
   renderSoon();
   return true;
 }
-// new names go into a tag list (round 3: the one the person chose, else my default), at its end; a name it already holds (a deleted
-// one too) is reused. items: [{ list: tag list id, name }]
+// new names go into a tag list (round 3: the one the person chose, else my landing list, is_default, where tags typed by name land),
+// at its end; a name it already holds (a deleted one too) is reused. items: [{ list: tag list id, name }]
 async function ensureTags(items) {
   const d = myDefault();
   const out = [];
   for (const { list, name } of items) {
     const tl = list || (d && d.id);
-    if (!tl) { toast('This login has no default tag list'); continue; }
+    if (!tl) { toast('No tag list for the new tag'); continue; }
     const own = Object.values(TAG).find(x => x.tag_list_id === tl && x.name.toLowerCase() === name.toLowerCase());
     if (own) { out.push(own.id); continue; }
     const sort = Math.max(0, ...Object.values(TAG).filter(x => x.tag_list_id === tl).map(x => x.sort || 0)) + C.SPACING;
@@ -3842,7 +3902,7 @@ function openTask(id, quad, opts) {
   const listDefault = dr.list || (t ? t.list : (st.list === 'all' ? C.defaultAddList({ lists: LISTS, roles: ROLE, byId: LIST, meId: me.id, cats: CATS }) : st.list));
   const choices = t ? LISTS.filter(l => l === t.list || canDo('add', null, l)) : addLists;
   const listSel = (listDefault === '' ? '<option value="" selected>—</option>' : '') + choices.map(l => '<option value="' + esc(l) + '"' + (listDefault === l ? ' selected' : '') + '>' + esc(label(l)) + '</option>').join('');
-  // round 3, adjustment 6: tags grouped under their tag list (my default first, my other lists by sort, then shared lists by owner).
+  // round 3, adjustment 6: tags grouped under their tag list, in my one free order (prefs tagListOrder, tags round).
   // Every live tag list I can see is usable (viewer and up, db/012). Tags of hidden or archived tag lists don't show and are kept.
   const groupsNow = () => C.tagGroups(TAG_LISTS, TAG, me.id, NAMES, { order: tagListOrder });
   const usable = () => new Set(groupsNow().flatMap(g => g.tags));
@@ -3870,6 +3930,7 @@ function openTask(id, quad, opts) {
   const nav = t ? C.navNeighbours(C.deckSequence({ A: quadOrder('A'), B: quadOrder('B'), C: quadOrder('C'), D: quadOrder('D') }), t.id) : { prev: null, next: null };
   const pos = t ? C.deckPos(order, t.id, t.q, QN[t.q]) : null;
   const ROLE_GLYPH = { parent: '↑', child: '↓', pred: '←', next: '→' }, ROLE_KIND = { parent: 'Parent', child: 'Subtask', pred: 'Comes after', next: 'Next' };
+  const LK_WAIT_TITLE = 'Not done yet: this task waits for it'; // the title of an open predecessor's chip (.waiting)
   const formHtml = '<form method="dialog"><div class="tk-head"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
@@ -3896,12 +3957,13 @@ function openTask(id, quad, opts) {
     el.innerHTML = formHtml; el.dataset.id = t.id; el.dataset.q = t.q; // its own top line in its own quadrant colour
     el.querySelectorAll('[contenteditable]').forEach(x => x.setAttribute('contenteditable', 'false'));
     const tb = el.querySelector('.tagbox'), lk = el.querySelector('#lk'), sb = el.querySelector('#srcs');
-    if (tb) tb.innerHTML = t.tags.filter(x => TAG[x]).map(x => '<span class="pv-tag">' + esc(lab(x)) + '</span>').join('') || '<span class="n">No tags</span>';
+    // its tags as a card shows them: shown tag lists only, and Card layout's tag filter (cardTags; tags round, item 6)
+    if (tb) tb.innerHTML = cardTags(t).map(x => '<span class="pv-tag">' + esc(lab(x)) + '</span>').join('') || '<span class="n">No tags</span>';
     if (lk) {
       const by = {}; all().forEach(x => { by[x.id] = x; });
       const ix = C.linkIndex(new Map(LINKS), by);
       const of = role => role === 'parent' ? (ix.parentOf[t.id] ? [ix.parentOf[t.id]] : []) : ((role === 'child' ? ix.childrenOf : role === 'pred' ? ix.predsOf : ix.succsOf)[t.id] || []);
-      const chips = C.LINK_ROLES.map(role => of(role).map(x => by[x]).filter(Boolean).map(x => '<span class="lk-chip lk-' + role + (C.CLOSED.includes(x.status) ? ' closed' : '') + '"><span class="lk-g">' + ROLE_GLYPH[role] + '</span><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) + '</span>').join('')).join('');
+      const chips = C.LINK_ROLES.map(role => of(role).map(x => by[x]).filter(Boolean).map(x => '<span class="lk-chip lk-' + role + (C.CLOSED.includes(x.status) ? ' closed' : role === 'pred' ? ' waiting' : '') + '"><span class="lk-g">' + ROLE_GLYPH[role] + '</span><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) + '</span>').join('')).join('');
       lk.innerHTML = '<div class="lk-list">' + (chips || '<span class="n">No links</span>') + '</div>';
     }
     if (sb && DECK) DECK.refs(t.id).then(r => { if (el.dataset.id !== t.id || !sb.isConnected) return; sb.innerHTML = r.ok && r.json.length ? r.json.map(x => '<div><span class="k">' + esc(x.kind) + '</span> ' + esc(x.target) + (x.note ? ' <span class="n">' + esc(x.note) + '</span>' : '') + '</div>').join('') : r.ok ? 'None' : esc(r.err.message); });
@@ -3947,30 +4009,26 @@ function openTask(id, quad, opts) {
   syncFmt();
   const box = dlg.querySelector('.tagbox'), qEl = dlg.querySelector('#tg-q');
   // tags (round 3 P1): one group per tag list, its name on top (not a button), its chips below (pressed = on the task). The chevron
-  // opens or closes the group (C.tagGroupOpen: open when the task carries one of its tags, else as I left it, else my default list;
-  // remembered in prefs tagListsOpen); a closed group is one row, "name · count". The grip (drag) or Alt+Up / Alt+Down on the chevron
-  // moves a list: my own lists save tag_lists.sort (the Tags window's order, C.sortWrites), shared ones my prefs tagListOrder. The
-  // search box filters the chips of every group (C.tagSearch); Enter there picks the first hit. The + of a list I may add to
+  // opens or closes the group within this window only (C.tagGroupOpen: my favourite lists, ★ on their head, start open and every
+  // other list starts closed, on each open; tags round); a closed group is one row, "name · count". The grip (drag) or Alt+Up /
+  // Alt+Down on the chevron moves any list among all of them: one free order in my prefs tagListOrder, plus tag_lists.sort for my
+  // own lists (saveTagListOrder). The search box filters the chips of every group and opens them all (C.tagSearch); Enter there
+  // picks the first hit. The + of a list I may add to
   // (contributor and up) turns into a text box: the new name is created in that list on Save. Double-click or F2 renames a tag
   // (contributor and up), the corner cross or Delete deletes it after a question (editor and up). Tag order and moves between lists
   // live in Account menu → Tags.
   const listOf = x => isNew(x) ? newList(x) : (TAG[x] || {}).tag_list_id;
   const nameOf = x => isNew(x) ? newName(x) : (TAG[x] || {}).name;
-  const used = new Set([...chosen].map(listOf).filter(Boolean));
   const openNow = {}; // this window only: groups opened or closed here, and the group of a tag picked through the search
-  const isOpenG = l => openNow[l.id] !== undefined ? openNow[l.id] : C.tagGroupOpen(l, me.id, used, tagListsOpen);
+  const isOpenG = l => openNow[l.id] !== undefined ? openNow[l.id] : C.tagGroupOpen(l, tagListFavs);
   let dragG = null;
   const clearDrop = keep => box.querySelectorAll('.drop-before,.drop-after' + (keep ? '' : ',.dragging')).forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging'));
   const reorderGroup = async (id, to) => {
-    const r = C.tagListReorder(groupsNow(), me.id, id, to);
+    const r = C.tagListReorder(groupsNow(), me.id, id, to, tagListOrder);
     if (!r) return;
-    if (r.kind === 'shared') { tagListOrder = r.order; savePrefsSoon(); }
-    else for (const w of C.sortWrites(r.order, x => TAG_LISTS[x].sort)) {
-      const x = await rest('PATCH', 'tag_lists?id=eq.' + w.id, { sort: w.sort }, { Prefer: 'return=representation' });
-      if (!x.ok || !x.json.length) { toast(x.ok ? 'You may not reorder these lists.' : x.err.message); break; }
-      TAG_LISTS[w.id].sort = w.sort;
-    }
+    const done = saveTagListOrder(r.order);
     drawTags(false); box.querySelector('[data-tgg-open="' + id + '"]')?.focus();
+    await done;
   };
   const editBox = (value, onDone) => {
     const inp = document.createElement('input'); inp.className = 'tag-new'; inp.setAttribute('aria-label', value ? 'Rename tag' : 'New tag'); inp.size = 1; inp.value = value; inp.maxLength = 40;
@@ -4013,7 +4071,7 @@ function openTask(id, quad, opts) {
     const total = id => (all.find(g => g.list.id === id) || { tags: [] }).tags.length;
     box.innerHTML = shown.map(g => {
       const R = C.tagListRights(g.list), ids = g.tags, own = g.list.owner_id === me.id, open = !!q || isOpenG(g.list), id = esc(g.list.id), nm = esc(g.list.name);
-      const moves = !q && !!(C.tagListReorder(all, me.id, g.list.id, { dir: -1 }) || C.tagListReorder(all, me.id, g.list.id, { dir: 1 }));
+      const moves = !q && !!(C.tagListReorder(all, me.id, g.list.id, { dir: -1 }, tagListOrder) || C.tagListReorder(all, me.id, g.list.id, { dir: 1 }, tagListOrder));
       const chips = !open ? '' : ids.map(x => {
         const ren = isNew(x) || R.has('renameTag'), del = isNew(x) || R.has('deleteTag');
         const keys = [ren ? 'F2' : '', del ? 'Delete' : ''].filter(Boolean).join(' ');
@@ -4022,7 +4080,7 @@ function openTask(id, quad, opts) {
       }).join('');
       const add = open && !q && editable && R.has('addTag') ? '<button type="button" class="tag-add" data-add-to="' + id + '" aria-label="New tag in ' + nm + '">' + I.plus + '</button>' : '';
       const head = '<div class="tgg-h">' + (moves ? '<span class="tgl-grip tgg-g" draggable="true" data-tgg-grip="' + id + '" title="Drag to reorder" aria-hidden="true">⋮⋮</span>' : '') +
-        '<span class="tgg-n">' + nm + '</span>' + (g.list.is_default && own ? '<span class="star" aria-label="default">★</span>' : '') + (own ? '' : '<span class="n">' + esc(displayName(g.list.owner_id)) + '</span>') +
+        '<span class="tgg-n">' + nm + '</span>' + (C.tagGroupOpen(g.list, tagListFavs) ? '<span class="star" title="Favourite: opens in the task window">★<span class="sr"> favourite</span></span>' : '') + (own ? '' : '<span class="n">' + esc(displayName(g.list.owner_id)) + '</span>') +
         (q ? '<span class="n tgg-k">· ' + ids.length + ' of ' + total(g.list.id) + '</span>' : open ? '' : '<span class="n tgg-k">· ' + ids.length + '</span>') +
         (q ? '' : '<button type="button" class="tgg-t" data-tgg-open="' + id + '" aria-expanded="' + open + '" aria-label="' + (open ? 'Hide' : 'Show') + ' the tags of ' + nm + '"' +
           (moves ? ' aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" title="Alt+Up or Alt+Down moves the list"' : '') + '>' + (open ? I.chevD : I.chevR) + '</button>') + '</div>';
@@ -4032,7 +4090,7 @@ function openTask(id, quad, opts) {
     // open, close and move groups: also on a task I may only read (it changes my view, not the task)
     box.querySelectorAll('[data-tgg-open]').forEach(b => {
       const l = TAG_LISTS[b.dataset.tggOpen];
-      b.onclick = () => { const v = !isOpenG(l); openNow[l.id] = v; tagListsOpen[l.id] = v; savePrefsSoon(); drawTags(false); box.querySelector('[data-tgg-open="' + l.id + '"]')?.focus(); };
+      b.onclick = () => { openNow[l.id] = !isOpenG(l); drawTags(false); box.querySelector('[data-tgg-open="' + l.id + '"]')?.focus(); };
       b.onkeydown = e => { if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); reorderGroup(l.id, { dir: e.key === 'ArrowUp' ? -1 : 1 }); } };
     });
     box.querySelectorAll('[data-tgg-grip]').forEach(gr => {
@@ -4040,7 +4098,7 @@ function openTask(id, quad, opts) {
       gr.ondragend = () => { dragG = null; clearDrop(); };
     });
     box.querySelectorAll('.tgg[data-tgg]').forEach(sec => {
-      const spot = e => { if (!dragG) return null; const r = sec.getBoundingClientRect(), to = { targetId: sec.dataset.tgg, before: e.clientY < r.top + r.height / 2 }; return C.tagListReorder(all, me.id, dragG, to) ? to : null; };
+      const spot = e => { if (!dragG) return null; const r = sec.getBoundingClientRect(), to = { targetId: sec.dataset.tgg, before: e.clientY < r.top + r.height / 2 }; return C.tagListReorder(all, me.id, dragG, to, tagListOrder) ? to : null; };
       sec.ondragover = e => { const to = spot(e); if (!to) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; clearDrop(true); sec.classList.add(to.before ? 'drop-before' : 'drop-after'); };
       sec.ondragleave = e => { if (!sec.contains(e.relatedTarget)) sec.classList.remove('drop-before', 'drop-after'); };
       sec.ondrop = e => { const to = spot(e), id = dragG; dragG = null; clearDrop(); if (!to) return; e.preventDefault(); reorderGroup(id, to); };
@@ -4112,15 +4170,15 @@ function openTask(id, quad, opts) {
   function drawLinks() {
     if (!lkBox) return;
     const { ix, by } = lkState();
-    const wait = C.waitingFor(by[selfId], ix, by), prog = C.subtaskProgress(by[selfId], ix, by);
-    const chip = (role, x) => '<span class="lk-chip lk-' + role + (C.CLOSED.includes(x.status) ? ' closed' : '') + '" data-role="' + role + '" title="' + ROLE_KIND[role] + ' · ' + esc(label(x.list)) + '"><span class="lk-g" aria-hidden="true">' + ROLE_GLYPH[role] + '</span><span class="sr">' + ROLE_KIND[role] + ': </span><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) +
-      (editable ? '<button type="button" class="lk-x" data-lk-del="' + role + '|' + x.id + '" aria-label="Remove link to ' + esc(plain(x.title)) + '">×</button>' : '') + '</span>';
+    // tags round: chips only (no "Waiting for …" note, no "N subtasks still open" line: the chips say it); an open predecessor's
+    // chip is .waiting (amber, the board's Waiting badge colour)
+    const chip = (role, x) => { const w = role === 'pred' && !C.CLOSED.includes(x.status); return '<span class="lk-chip lk-' + role + (C.CLOSED.includes(x.status) ? ' closed' : '') + (w ? ' waiting' : '') + '" data-role="' + role + '" title="' + (w ? LK_WAIT_TITLE : ROLE_KIND[role] + ' · ' + esc(label(x.list))) + '"><span class="lk-g" aria-hidden="true">' + ROLE_GLYPH[role] + '</span><span class="sr">' + ROLE_KIND[role] + (w ? ', not done yet' : '') + ': </span><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) +
+      (editable ? '<button type="button" class="lk-x" data-lk-del="' + role + '|' + x.id + '" aria-label="Remove link to ' + esc(plain(x.title)) + '">×</button>' : '') + '</span>'; };
     const chips = C.LINK_ROLES.map(role => ofRole(ix, role).map(id => by[id]).filter(Boolean).map(x => chip(role, x)).join('') +
       pend.filter(p => p.op === 'new' && p.role === role).map(p => '<span class="lk-chip lk-' + role + ' new" data-role="' + role + '"><span class="lk-g" aria-hidden="true">' + ROLE_GLYPH[role] + '</span><span class="sr">' + ROLE_KIND[role] + ': </span><span class="k">new</span> ' + esc(p.title) + '<button type="button" class="lk-x" data-lk-delnew="' + pend.indexOf(p) + '" aria-label="Do not create ' + esc(p.title) + '">×</button></span>').join('')).join('');
-    const open = prog && prog.done < prog.total ? prog.total - prog.done : 0, hasParent = !!ofRole(ix, 'parent').length;
+    const hasParent = !!ofRole(ix, 'parent').length;
     const adds = editable ? '<div class="lk-adds">' + ADD_ORDER.map(role => '<button type="button" class="lk-add quiet lk-' + role + '" data-lk-add="' + role + '" aria-expanded="' + (lkOpen === role) + '"><span class="lk-g" aria-hidden="true">' + ROLE_GLYPH[role] + '</span>' + (role === 'parent' && hasParent ? 'Change parent' : ROLE_TEXT[role][1]) + '</button>').join('') + '</div>' : '';
-    lkBox.innerHTML = (wait.length ? '<p class="note lk-wait">Waiting for ' + wait.map(x => esc(ref(x) + ' ' + plain(x.title))).join(', ') + '</p>' : '') +
-      '<div class="lk-list">' + (chips || '<span class="n">No links</span>') + '</div>' + (open ? '<p class="n lk-open">' + open + (open === 1 ? ' subtask' : ' subtasks') + ' still open</p>' : '') +
+    lkBox.innerHTML = '<div class="lk-list">' + (chips || '<span class="n">No links</span>') + '</div>' +
       (lkOpen ? '<div class="lk-pick"><input id="lk-q" class="tg-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="lk-opts" aria-label="Find a task for ' + ROLE_TEXT[lkOpen][0] + '" placeholder="' + ROLE_TEXT[lkOpen][1].slice(2) + ': find by title or #number" autocomplete="off" spellcheck="false" maxlength="300"><ul class="lk-opts" id="lk-opts" role="listbox"></ul></div>' : '') + adds;
     if (lkOpen) { const q = lkBox.querySelector('#lk-q'); q.oninput = () => { lkAct = 0; drawOpts(); }; q.onkeydown = lkKey; drawOpts(); q.focus(); }
   }
@@ -4619,7 +4677,7 @@ function cardLayoutFields(p) {
     '<p class="s-hint" id="' + p + 'cl-auto-h">An open card shows this many characters of the description, then Show more. 0 shows the whole description; default ' + D.autoCollapse + '.</p>' +
     '<fieldset><legend>A card shows</legend><div class="cl-grid">' + C.CARD_FIELDS.map(k => '<label class="cb"><input type="checkbox" data-cl="' + k + '"' + (L[k] ? ' checked' : '') + '> ' + CL_NAMES[k] + '</label>').join('') + '</div></fieldset>' +
     '<fieldset><legend>Tags</legend>' + clRadio('cl-tags', 'all', 'All tags', L.tags === 'all') + clRadio('cl-tags', 'lists', 'Only from these tag lists', L.tags === 'lists') +
-    '<div class="cl-lists">' + (lists.length ? lists.map(l => '<label class="cb"><input type="checkbox" data-cl-list="' + esc(l.id) + '"' + (L.tagLists.includes(l.id) ? ' checked' : '') + '> ' + esc(l.name) + (l.owner_id !== me.id ? ' <span class="n">' + esc(personName(l.owner_id)) + '</span>' : '') + '</label>').join('') : '<p class="s-hint">No tag lists yet.</p>') + '</div>' +
+    '<div class="cl-lists">' + (lists.length ? lists.map(l => '<label class="cb"><input type="checkbox" data-cl-list="' + esc(l.id) + '"' + (L.tagLists.includes(l.id) ? ' checked' : '') + '> ' + esc(l.name) + (l.owner_id !== me.id ? ' <span class="n">— ' + esc(personName(l.owner_id)) + '</span>' : '') + '</label>').join('') : '<p class="s-hint">No tag lists yet.</p>') + '</div>' +
     clRadio('cl-tags', 'off', 'No tags', L.tags === 'off') + '</fieldset>';
 }
 // the tag-list ticks follow the Tags choice; Tasks Grouping asks first (C.groupingNotice), Cancel or Escape puts the tick back.
@@ -4901,21 +4959,22 @@ function openShare(kind, id, opener) {
     : 'They see these tags on items they can already see. Viewer puts them on items; Contributor also adds, renames and reorders tags; Editor also deletes and moves tags, deletes the list and shares it.';
   const dlg = dialogShell('<form method="dialog"><strong>' + (sharer ? 'Share ' : 'People on ') + '“' + esc(target.name) + '”</strong>' +
     (sharer ? '<p class="sh-note">' + esc(what) + '</p>' : '') + '<div id="sh-people" class="sh-people" aria-live="polite">Loading…</div>' +
-    (sharer ? '<div class="sh-form"><label>Email<input id="sh-email" type="email" autocomplete="off" spellcheck="false" maxlength="254"></label>' +
+    (sharer ? '<div class="sh-form"><label>Name or email<input id="sh-email" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sh-opts" autocomplete="off" spellcheck="false" maxlength="254"></label><ul class="lk-opts sh-opts" id="sh-opts" role="listbox" aria-label="People" hidden></ul>' +
       '<label>Role' + roleSelect(roles, 'viewer', 'id="sh-role"') + '</label></div><div class="err" id="sh-e" aria-live="polite"></div>' +
-      '<p class="sh-note">No email is sent. Someone who already has an account sees it at once the first time you share with them; anyone else signs in to TasksDashboard with Google and accepts it under Sharing.</p>' : '') +
+      '<p class="sh-note">No email is sent. Pick a person by name, or enter an email. Someone who already has an account sees it at once the first time you share with them; anyone else signs in to TasksDashboard with Google and accepts it under Sharing.</p>' : '') +
     '<div class="actions"><button value="close"' + (sharer ? '' : ' autofocus') + '>Close</button>' + (sharer ? '<button id="sh-go" value="share">Share</button>' : '') + '</div></form>', opener || '#profile');
   const box = dlg.querySelector('#sh-people'), err = dlg.querySelector('#sh-e');
   const memberAt = pid => (isList ? 'list_members?list_id=eq.' : 'tag_list_members?tag_list_id=eq.') + id + '&profile_id=eq.' + pid;
   // round 3 P1, F2: read again on open, after each action, on focus and every SHARE_REFRESH_MS while the window is open (someone may
   // leave meanwhile). A quiet read redraws only when the people changed, and never under an open role menu; the newest read wins
-  let seq = 0, lastRows = null;
+  let seq = 0, lastRows = null, onList = new Set();
   const load = async quiet => {
     const n = ++seq;
     const r = await rpc(isList ? 'list_people' : 'tag_list_people', isList ? { p_list: id } : { p_tag_list: id });
     if (n !== seq || !dlg.open) return;
     if (!r.ok) { if (!quiet) box.textContent = r.err.message; return; }
     const rows = r.json.slice().sort((a, b) => (a.state === 'member' ? 0 : 1) - (b.state === 'member' ? 0 : 1) || (a.role === 'owner' ? -1 : 0) - (b.role === 'owner' ? -1 : 0));
+    onList = new Set(rows.filter(p => p.state === 'member' && p.profile_id).map(p => p.profile_id));
     const key = JSON.stringify(rows);
     if (quiet && (key === lastRows || (box.contains(document.activeElement) && document.activeElement.tagName === 'SELECT'))) return;
     lastRows = key;
@@ -4946,18 +5005,60 @@ function openShare(kind, id, opener) {
   dlg.addEventListener('close', () => { clearInterval(tick); removeEventListener('focus', onFocus); });
   const go = dlg.querySelector('#sh-go');
   if (go) {
-    const email = dlg.querySelector('#sh-email');
-    email.focus(); email.oninput = () => { err.textContent = ''; };
+    // tags round: one box "Name or email", a combobox like the link picker (arrows, Enter, aria-activedescendant). Suggestions are
+    // the whitelisted people (rpc/shareable_profiles, db/022: id and display name, never an email), minus those already on the
+    // list. A picked name is shared by id (share_list_with / share_tag_list_with); a typed email takes the email path. Without
+    // db/022 (404) the box works by email only, after one toast
+    const email = dlg.querySelector('#sh-email'), ul = dlg.querySelector('#sh-opts');
+    const NO_PICK = 'Pick a name from the list or enter an email';
+    let people = null, picked = null, act = 0, shown = [];
+    const byName = () => { toast('Sharing by name is not available yet: enter an email'); people = false; drawOpts(); };
+    const hits = () => {
+      const q = email.value.trim().toLowerCase();
+      if (!people || !q || q.includes('@')) return [];
+      return people.filter(p => p && p.id !== me.id && !onList.has(p.id) && String(p.display_name || '').toLowerCase().includes(q))
+        .sort((a, b) => String(a.display_name).localeCompare(String(b.display_name))).slice(0, 8);
+    };
+    const drawOpts = () => {
+      shown = hits(); act = Math.max(0, Math.min(act, shown.length - 1));
+      ul.innerHTML = shown.map((p, i) => '<li role="option" id="sh-o' + i + '" data-i="' + i + '" aria-selected="' + (i === act) + '">' + esc(p.display_name || 'someone') + '</li>').join('');
+      ul.hidden = !shown.length; email.setAttribute('aria-expanded', String(!!shown.length));
+      email.setAttribute('aria-activedescendant', shown.length ? 'sh-o' + act : '');
+      ul.querySelectorAll('[data-i]').forEach(li => { li.onmousedown = e => e.preventDefault(); li.onclick = () => pick(shown[Number(li.dataset.i)]); });
+    };
+    const pick = p => { if (!p) return; picked = p; email.value = p.display_name || ''; err.textContent = ''; shown = []; ul.hidden = true; ul.innerHTML = ''; email.setAttribute('aria-expanded', 'false'); email.setAttribute('aria-activedescendant', ''); email.focus(); };
+    rpc('shareable_profiles', {}).then(r => {
+      if (!dlg.open) return;
+      if (r.ok && Array.isArray(r.json)) { people = r.json; drawOpts(); } else if (r.status === 404) byName(); else people = false;
+    });
+    email.focus();
+    email.oninput = () => { err.textContent = ''; if (picked && email.value.trim() !== picked.display_name) picked = null; act = 0; drawOpts(); };
+    email.onblur = () => setTimeout(() => { if (document.activeElement !== email) { ul.hidden = true; email.setAttribute('aria-expanded', 'false'); } }, 0);
+    email.onkeydown = e => {
+      const open = !ul.hidden && shown.length;
+      if (e.key === 'ArrowDown' && open) { e.preventDefault(); act = Math.min(act + 1, shown.length - 1); drawOpts(); }
+      else if (e.key === 'ArrowUp' && open) { e.preventDefault(); act = Math.max(act - 1, 0); drawOpts(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (open) pick(shown[act]); else go.click(); }
+      else if (e.key === 'Escape' && open) { e.preventDefault(); e.stopPropagation(); ul.hidden = true; email.setAttribute('aria-expanded', 'false'); }
+    };
     go.onclick = async e => {
       e.preventDefault();
       const v = email.value.trim(), role = dlg.querySelector('#sh-role').value;
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { err.textContent = 'Enter an email address'; email.focus(); return; }
+      // a name: the picked one, else the one person whose name is exactly what was typed
+      const same = people ? people.filter(p => p.id !== me.id && String(p.display_name || '').trim().toLowerCase() === v.toLowerCase()) : [];
+      const who = picked && picked.display_name === v ? picked : same.length === 1 ? same[0] : null;
+      const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+      if (!who && !isEmail) { err.textContent = NO_PICK; email.focus(); return; }
       go.disabled = true;
-      // p_join: true (db/012): a first share joins a person who has an account; the answer is { ok: true } either way
-      const r = await rpc(isList ? 'share_list' : 'share_tag_list', isList ? { p_list: id, p_email: v, p_role: role, p_join: true } : { p_tag_list: id, p_email: v, p_role: role, p_join: true });
+      // p_join: true (db/012): a first share joins a person who has an account; the answer is { ok: true } either way. By id
+      // (db/022) the server finds the person's verified email and does the same
+      const r = who ? await rpc(isList ? 'share_list_with' : 'share_tag_list_with', isList ? { p_list: id, p_profile: who.id, p_role: role } : { p_tag_list: id, p_profile: who.id, p_role: role })
+        : await rpc(isList ? 'share_list' : 'share_tag_list', isList ? { p_list: id, p_email: v, p_role: role, p_join: true } : { p_tag_list: id, p_email: v, p_role: role, p_join: true });
       go.disabled = false;
+      if (!r.ok && who && r.status === 404) { byName(); err.textContent = NO_PICK; email.focus(); return; }
       if (!r.ok) { err.textContent = r.err.message; email.focus(); return; }
-      email.value = ''; toast('Shared with ' + v + ' as ' + ROLE_NAMES[role]); load();
+      email.value = ''; picked = null; drawOpts();
+      toast('Shared with ' + (who ? who.display_name : v) + ' as ' + ROLE_NAMES[role]); load();
     };
   }
 }
@@ -5020,30 +5121,36 @@ function openHiddenLists() {
   dlg.querySelectorAll('[data-unhide-list]').forEach(b => b.onclick = async () => { b.disabled = true; await hideList(b.dataset.unhideList, false); dlg.close(); });
 }
 
-// Account menu → Tags (round 3, adjustment 5): every tag list I can see, stacked in the task window's order (my default, ★, first).
-// Each action shows only when my role allows it (C.tagListRights). A list I may rename has its name as a text box. A tag opens its
-// menu on click or right-click: Rename, Move to list (another live list of the same owner; move_tags merges a name already there),
-// Count as Mine (profiles.mine_tag_ids), Delete. Drag a tag onto another list to move it, or between tags of its list to reorder
-// it (tags.sort, Alt+Left / Alt+Right); drag my lists by their grip to reorder them (tag_lists.sort, Alt+Up / Alt+Down on the name).
-// "Delete list" archives it (set_tag_list_archived): its chips leave every card. "Archived tags" shows the archived lists the same
-// way, read only, with Restore.
+// Account menu → Tags (round 3, adjustment 5; tags round): every tag list I can see, stacked in my one free order (prefs
+// tagListOrder, the task window's order), every tray open. Each action shows only when my role allows it (C.tagListRights). A list
+// I may rename has its name as a text box. Every live list has a grip (drag) and a ★ toggle (favourite: opens in the task window,
+// prefs tagListFavs); Alt+Up / Alt+Down on the name or the ★ moves it (saveTagListOrder: the order, plus tag_lists.sort for my own
+// lists). A tag opens its menu on click (after ~250 ms, so a double-click can rename it in place instead) or right-click: Rename,
+// Move to list (another live list of the same owner; move_tags merges a name already there), Count as Mine (profiles.mine_tag_ids),
+// Delete; F2 renames. Drag a tag onto another list to move it, or between tags of its list to reorder it (tags.sort, Alt+Left /
+// Alt+Right). "Delete list" archives it (set_tag_list_archived): its chips leave every card; the landing list for tags typed by
+// name (is_default) has none. "Archived tags" shows the archived lists the same way, read only, with Restore.
+const TAG_CLICK_MS = 250;
 function openTags(archivedView) {
   const dlg = dialogShell('<form method="dialog" class="tgm"><strong>' + (archivedView ? 'Archived tags' : 'Tags') + '</strong>' +
-    '<p class="sh-note">' + (archivedView ? 'These tag lists are read only and their tags show on no card. Restore one to use or change it.' : 'Drag a tag onto another list to move it, or between tags to reorder. Click a tag for more.') + '</p>' +
+    '<p class="sh-note">' + (archivedView ? 'These tag lists are read only and their tags show on no card. Restore one to use or change it.' : 'Drag a tag onto another list to move it, or between tags to reorder. Double-click a tag to rename it; click it for more. Drag a list by its grip to reorder; ★ opens a list in the task window.') + '</p>' +
     '<div id="tgm-body" class="tgm-body"></div><div class="err" id="tgm-e" aria-live="polite"></div>' +
     (archivedView ? '' : '<div class="tg-row tgm-new"><input id="tgl-new" maxlength="60" placeholder="New tag list" aria-label="Name of a new tag list"><button type="button" id="tgl-add">Create list</button></div>') +
     '<div class="actions"><button type="button" id="tgm-switch" class="quiet">' + (archivedView ? 'Back to tags' : 'Archived tags') + '</button><span class="sp"></span><button value="close">Close</button></div></form>', '#profile');
   const body = dlg.querySelector('#tgm-body'), err = dlg.querySelector('#tgm-e');
   const say = m => { err.textContent = m || ''; };
-  let drag = null;
+  let drag = null, clickTimer = 0;
+  dlg.addEventListener('close', () => clearTimeout(clickTimer));
   const groupsNow = () => C.tagGroups(TAG_LISTS, TAG, me.id, NAMES, { archived: !!archivedView, hidden: true, order: tagListOrder });
   const after = (msg, focus) => { relabel(); renderSoon(); draw(focus); if (msg) toast(msg); };
   const trayHtml = g => {
     const l = g.list, id = esc(l.id), R = C.tagListRights(l), own = l.owner_id === me.id, mine = new Set(me.mine_tag_ids || []);
-    const sortable = R.has('sortList') && !l.is_default;
-    const star = !own || l.archived_at ? '' : l.is_default ? '<span class="tgl-star on" title="The default list: new tags go here">★<span class="sr"> default</span></span>'
-      : '<button type="button" class="tgl-star" data-default="' + id + '" title="Make this the default list" aria-label="Make ' + esc(l.name) + ' the default list">☆</button>';
-    const name = R.has('renameList') ? '<input class="tgl-name" data-tgl-name="' + id + '" value="' + esc(l.name) + '" maxlength="60" aria-label="Name of the tag list ' + esc(l.name) + '"' + (sortable ? ' aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' : '<span class="tgl-name">' + esc(l.name) + '</span>';
+    const sortable = R.has('sortList'), fav = C.tagGroupOpen(l, tagListFavs);
+    const star = l.archived_at ? '' : '<button type="button" class="tgl-star' + (fav ? ' on' : '') + '" data-fav="' + id + '" aria-pressed="' + fav + '" title="Favourite: opens in the task window" aria-label="Favourite: ' + esc(l.name) + '"' +
+      (sortable ? ' aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' + (fav ? '★' : '☆') + '</button>';
+    // the landing list for tags typed by name has no "Delete list"; its name says why to those who would otherwise see the button
+    const noDel = l.is_default && !l.archived_at && (l.role === 'owner' || l.role === 'editor') ? ' title="' + esc(l.name) + ' can\'t be deleted: tags typed by name land here"' : '';
+    const name = R.has('renameList') ? '<input class="tgl-name" data-tgl-name="' + id + '" value="' + esc(l.name) + '" maxlength="60" aria-label="Name of the tag list ' + esc(l.name) + '"' + noDel + (sortable ? ' aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' : '<span class="tgl-name"' + noDel + '>' + esc(l.name) + '</span>';
     const who = own ? '' : '<span class="n">' + esc(displayName(l.owner_id)) + ', ' + ROLE_NAMES[l.role] + (l.hidden ? ', hidden' : '') + '</span>';
     const acts = (R.has('share') ? '<button type="button" class="quiet" data-tl-share="' + id + '">Share</button>' : '') +
       (R.has('archive') ? '<button type="button" class="quiet danger" data-tl-del="' + id + '">Delete list</button>' : '') +
@@ -5065,7 +5172,8 @@ function openTags(archivedView) {
     bindTrays(groups);
     if (focus) body.querySelector(focus)?.focus();
   };
-  // order: a tag between its neighbours (tags.sort, a midpoint; the list renumbered when the gap is too small); my lists 1, 2, 3 …
+  // order: a tag between its neighbours (tags.sort, a midpoint; the list renumbered when the gap is too small); a list anywhere among
+  // all lists (C.tagListReorder into my full order; to = { dir } or { targetId, before }), focus back on what moved it
   const placeTag = async (x, ids, to) => {
     const order = ids.filter(y => y !== x); order.splice(Math.max(0, Math.min(order.length, to)), 0, x);
     const i = order.indexOf(x), prev = TAG[order[i - 1]], next = TAG[order[i + 1]];
@@ -5078,16 +5186,12 @@ function openTags(archivedView) {
     }
     after('', '[data-tag-menu="' + x + '"]');
   };
-  const placeList = async (id, to) => {
-    const own = groupsNow().map(g => g.list).filter(l => C.tagListRights(l).has('sortList') && !l.is_default).map(l => l.id);
-    own.splice(own.indexOf(id), 1); own.splice(Math.max(0, Math.min(own.length, to)), 0, id);
-    for (const [i, lid] of own.entries()) {
-      if (TAG_LISTS[lid].sort === i + 1) continue;
-      const r = await rest('PATCH', 'tag_lists?id=eq.' + lid, { sort: i + 1 }, { Prefer: 'return=representation' });
-      if (!r.ok || !r.json.length) { say(r.ok ? 'You may not reorder these lists.' : r.err.message); break; }
-      TAG_LISTS[lid].sort = i + 1;
-    }
-    after('', '[data-tgl-name="' + id + '"]');
+  const placeList = async (id, to, focus) => {
+    const r = C.tagListReorder(groupsNow(), me.id, id, to, tagListOrder);
+    if (!r) return;
+    const done = saveTagListOrder(r.order);
+    after('', focus || (C.tagListRights(TAG_LISTS[id]).has('renameList') ? '[data-tgl-name="' + id + '"]' : '[data-fav="' + id + '"]'));
+    if (!(await done)) draw();
   };
   const moveTag = async (x, to) => {
     const name = TAG[x].name, target = TAG_LISTS[to];
@@ -5158,8 +5262,16 @@ function openTags(archivedView) {
     const clear = () => body.querySelectorAll('.drop,.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop', 'drop-before', 'drop-after', 'dragging'));
     body.querySelectorAll('[data-tag-menu]').forEach(b => {
       const x = b.dataset.tagMenu, l = TAG[x].tag_list_id;
-      b.onclick = e => { e.stopPropagation(); openMenu(x, b); };
-      b.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); openMenu(x, b); };
+      // a mouse click opens the menu after TAG_CLICK_MS unless a second click follows (then the double-click renames in place);
+      // Enter or Space (a click with detail 0) opens it at once
+      b.onclick = e => {
+        e.stopPropagation(); clearTimeout(clickTimer);
+        if (!e.detail) return openMenu(x, b);
+        if (e.detail > 1) return;
+        clickTimer = setTimeout(() => { if (b.isConnected) openMenu(x, b); }, TAG_CLICK_MS);
+      };
+      b.ondblclick = e => { e.preventDefault(); e.stopPropagation(); clearTimeout(clickTimer); if (tagCan(x, 'renameTag')) renameInPlace(x); else openMenu(x, b); };
+      b.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); clearTimeout(clickTimer); openMenu(x, b); };
       b.onkeydown = e => {
         if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && C.tagListRights(TAG_LISTS[l]).has('sortTag')) { e.preventDefault(); const row = ids(l); placeTag(x, row, row.indexOf(x) + (e.key === 'ArrowLeft' ? -1 : 1)); }
         else if (e.key === 'F2' && tagCan(x, 'renameTag')) { e.preventDefault(); renameInPlace(x); }
@@ -5175,16 +5287,15 @@ function openTags(archivedView) {
     });
     body.querySelectorAll('.tgl[data-tgl]').forEach(sec => {
       const to = sec.dataset.tgl, L = TAG_LISTS[to];
-      // where a drop lands: a tag in its own list (reorder) or in a list it may move to; a list among my sortable lists
+      // where a drop lands: a tag in its own list (reorder) or in a list it may move to; a list before or after any live list
       const verdict = e => {
         if (!drag) return null;
         if (drag.kind === 'tag') {
           if (drag.from === to) { if (!C.tagListRights(L).has('sortTag')) return null; const over = e.target.closest('.tagwrap[data-t]'); return { reorder: over && over.dataset.t !== drag.id ? over : null }; }
           return C.moveTargets(TAG_LISTS[drag.from], TAG_LISTS).some(t2 => t2.id === to) ? { move: true } : null;
         }
-        if (drag.id === to || !C.tagListRights(L).has('sortList') || L.is_default) return null;
-        const r = sec.getBoundingClientRect();
-        return { list: true, before: e.clientY < r.top + r.height / 2 };
+        const r = sec.getBoundingClientRect(), spot = { targetId: to, before: e.clientY < r.top + r.height / 2 };
+        return C.tagListReorder(groups, me.id, drag.id, spot, tagListOrder) ? { list: spot, before: spot.before } : null;
       };
       sec.ondragover = e => {
         const v = verdict(e); if (!v) return;
@@ -5200,7 +5311,7 @@ function openTags(archivedView) {
         if (!v || !d) return;
         e.preventDefault();
         if (v.move) moveTag(d.id, to);
-        else if (v.list) { const own = groups.map(g => g.list).filter(l => C.tagListRights(l).has('sortList') && !l.is_default).map(l => l.id).filter(x => x !== d.id); placeList(d.id, own.indexOf(to) + (v.before ? 0 : 1)); }
+        else if (v.list) placeList(d.id, v.list);
         else if (v.reorder) { const r = v.reorder.getBoundingClientRect(), row = ids(to).filter(x => x !== d.id); placeTag(d.id, ids(to), row.indexOf(v.reorder.dataset.t) + (e.clientX < r.left + r.width / 2 ? 0 : 1)); }
       };
     });
@@ -5215,18 +5326,18 @@ function openTags(archivedView) {
       };
       inp.onkeydown = e => {
         if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
-        else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && C.tagListRights(TAG_LISTS[id]).has('sortList') && !TAG_LISTS[id].is_default) {
-          e.preventDefault();
-          const own = groups.map(g => g.list).filter(l => C.tagListRights(l).has('sortList') && !l.is_default).map(l => l.id);
-          placeList(id, own.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1));
+        else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && C.tagListRights(TAG_LISTS[id]).has('sortList')) {
+          e.preventDefault(); placeList(id, { dir: e.key === 'ArrowUp' ? -1 : 1 }, '[data-tgl-name="' + id + '"]');
         }
       };
     });
-    body.querySelectorAll('[data-default]').forEach(b => b.onclick = async () => {
-      const id = b.dataset.default, r = await rpc('set_default_tag_list', { p_tag_list: id });
-      if (!r.ok) return say(r.err.message);
-      Object.values(TAG_LISTS).forEach(l => { if (l.owner_id === me.id) l.is_default = l.id === id; });
-      after('New tags now go to ' + TAG_LISTS[id].name, '[data-tgl="' + id + '"] .tgl-star');
+    // ★ favourite (my view only, prefs tagListFavs); Alt+Up / Alt+Down here moves the list too (every role, also without a name box)
+    body.querySelectorAll('[data-fav]').forEach(b => {
+      const id = b.dataset.fav;
+      b.onclick = () => { const on = toggleTagListFav(id); after(on ? TAG_LISTS[id].name + ' opens in the task window' : TAG_LISTS[id].name + ' starts closed in the task window', '[data-fav="' + id + '"]'); };
+      b.onkeydown = e => {
+        if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && C.tagListRights(TAG_LISTS[id]).has('sortList')) { e.preventDefault(); placeList(id, { dir: e.key === 'ArrowUp' ? -1 : 1 }, '[data-fav="' + id + '"]'); }
+      };
     });
     body.querySelectorAll('[data-tl-share]').forEach(b => b.onclick = () => openShare('tag_list', b.dataset.tlShare, '[data-menu="tags"]'));
     body.querySelectorAll('[data-tl-del]').forEach(b => b.onclick = () => {

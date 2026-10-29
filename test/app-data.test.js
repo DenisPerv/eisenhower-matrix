@@ -380,3 +380,62 @@ test('saveProfile: PATCH profiles with display_name and timezone, names follow; 
   refuse = true;
   assert.equal((await d.saveProfile({ display_name: 'X' })).err.kind, 'denied');
 });
+
+test('tag lists (tags round): an old prefs row is migrated to the full order with the landing list as favourite and saved; ★ and a move write prefs and own sort', async () => {
+  const A = 'cccccccc-cccc-4ccc-8ccc-cccccccccc01', B = 'cccccccc-cccc-4ccc-8ccc-cccccccccc02', S = 'cccccccc-cccc-4ccc-8ccc-cccccccccc03';
+  const sorts = { [A]: 2, [B]: 1 }, saved = [], patched = [];
+  let refuse = false;
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/tag_lists/, () => [200, [
+      { id: A, owner_id: UID, name: 'My tags', is_default: true, sort: sorts[A], archived_at: null },
+      { id: B, owner_id: UID, name: 'Assignee', is_default: false, sort: sorts[B], archived_at: null },
+      { id: S, owner_id: OTHER, name: 'Shared', is_default: false, sort: 1, archived_at: null }]]],
+    ['GET', /^\/rest\/v1\/tag_list_members/, () => [200, [{ tag_list_id: A, role: 'owner', hidden_at: null }, { tag_list_id: B, role: 'owner', hidden_at: null }, { tag_list_id: S, role: 'viewer', hidden_at: null }]]],
+    ['GET', /^\/rest\/v1\/preferences/, () => [200, [{ prefs: { version: 2, tagListOrder: [S], tagListsOpen: { [A]: true } } }]]],
+    ['POST', /^\/rest\/v1\/preferences/, (m, body) => { saved.push(body.prefs); return [201, undefined]; }],
+    ['PATCH', /^\/rest\/v1\/tag_lists\?id=eq\.([^&]+)/, (m, body) => { if (refuse) return [200, []]; patched.push([m[1], body.sort]); sorts[m[1]] = body.sort; return [200, [{ id: m[1], sort: body.sort }]]; }],
+  ]);
+  const d = make(f);
+  await d.signIn('me@example.com', 'pw', true);
+  assert.equal((await d.loadAll()).ok, true);
+  // web: load + C.tagListPrefsMigrate: own lists first (landing list first, then by sort), then the shared ones; favourite = landing list
+  assert.deepEqual(d.prefs.tagListOrder, [A, B, S]);
+  assert.deepEqual(d.prefs.tagListFavs, [A]);
+  assert.equal(d.prefs.tagListOrderV, C.TAG_LIST_ORDER_V);
+  assert.equal('tagListsOpen' in d.prefs, false);
+  await until(() => saved.length > 0);
+  assert.deepEqual(saved[0].tagListOrder, [A, B, S]);
+  assert.equal(saved[0].tagListOrderV, 2);
+  assert.equal('tagListsOpen' in saved[0], false);
+  // ★ (web: toggleTagListFav): any number, also a shared list; off again
+  assert.equal(d.toggleTagListFav(S), true);
+  assert.deepEqual(d.prefs.tagListFavs, [A, S]);
+  assert.equal(d.toggleTagListFav(A), false);
+  assert.deepEqual(d.prefs.tagListFavs, [S]);
+  // a move (web: saveTagListOrder): the shared list between my own; my own get sort in their new relative order (Assignee before My tags)
+  const groups = C.tagGroups(d.tagLists, d.tags, UID, d.names, { order: d.prefs.tagListOrder });
+  const r = C.tagListReorder(groups, UID, S, { dir: -1 }, d.prefs.tagListOrder);
+  assert.deepEqual(r.order, [A, S, B]);
+  assert.deepEqual(await d.saveTagListOrder(r.order), { ok: true });
+  assert.deepEqual(d.prefs.tagListOrder, [A, S, B]);
+  assert.deepEqual(patched, [[A, 1], [B, 2]]);
+  assert.equal(d.tagLists[A].sort, 1);
+  // the same order again writes nothing
+  patched.length = 0;
+  assert.deepEqual(await d.saveTagListOrder([A, S, B]), { ok: true });
+  assert.deepEqual(patched, []);
+  // a refused sort write is an error; the order is kept in prefs
+  refuse = true;
+  const r3 = await d.saveTagListOrder([B, S, A]);
+  assert.equal(r3.ok, false);
+  assert.equal(r3.err.message, 'You may not reorder these lists.');
+  // a row already on v2 is not migrated again
+  const d2 = make(fakeSupabase([
+    ['GET', /^\/rest\/v1\/preferences/, () => [200, [{ prefs: { version: 2, tagListOrder: [], tagListOrderV: 2, tagListFavs: [] } }]]],
+  ]));
+  await d2.signIn('me@example.com', 'pw', true);
+  await d2.loadAll();
+  assert.equal(d2.prefs.tagListOrderV, 2);
+  assert.deepEqual(d2.prefs.tagListFavs, []);
+  assert.equal(typeof d2.setDefaultTagList, 'undefined');
+});

@@ -504,8 +504,12 @@
       await loadLinks();
       prefsExists = pr.json.length > 0;
       applyPrefs(C.prefsFromRow(prefsExists ? pr.json[0].prefs : null, { listIds: LISTS, itemIds: tasks.map(t => t.id), tagListIds: Object.keys(TAG_LISTS) }));
-      lastWritten = prefsExists ? JSON.stringify(prefs) : null;
-      if (!prefsExists) savePrefsSoon();
+      // web: load (tags round): a row from before the one free order (no tagListOrderV 2) gets the full order of what it showed and
+      // my landing list as its first favourite (C.tagListPrefsMigrate), saved below
+      const mig = C.tagListPrefsMigrate(prefs, TAG_LISTS, me.id, NAMES);
+      if (mig) applyPrefs(Object.assign(JSON.parse(JSON.stringify(prefs)), mig));
+      lastWritten = prefsExists && !mig ? JSON.stringify(prefs) : null;
+      if (!prefsExists || mig) savePrefsSoon();
       loaded = true;
       await withLock(LOCK_QUEUE, async () => { await rehydrate(); await flushQueued(); });
       startPolling();
@@ -984,7 +988,7 @@
       const d = myDefault(), out = [], errors = [];
       for (const { list, name } of items) {
         const tl = list || (d && d.id);
-        if (!tl) { errors.push('This login has no default tag list'); continue; }
+        if (!tl) { errors.push('No tag list for the new tag'); continue; }
         const own = Object.values(TAG).find(x => x.tag_list_id === tl && x.name.toLowerCase() === name.toLowerCase());
         if (own) { out.push(own.id); continue; }
         const sort = Math.max(0, ...Object.values(TAG).filter(x => x.tag_list_id === tl).map(x => x.sort || 0)) + C.SPACING;
@@ -1025,7 +1029,24 @@
     async function createTagList(name) { const r = await rpc('create_tag_list', { p_name: name }); if (r.ok) await refreshMeta(); return r; }
     async function renameTagList(id, name) { const r = await rest('PATCH', 'tag_lists?id=eq.' + id, { name }, { Prefer: 'return=representation' }); if (r.ok && r.json.length) { TAG_LISTS[id].name = r.json[0].name; relabel(); changed('tags'); } return r; }
     async function sortTagList(id, sort) { const r = await rest('PATCH', 'tag_lists?id=eq.' + id, { sort }, { Prefer: 'return=representation' }); if (r.ok && r.json.length) { TAG_LISTS[id].sort = sort; changed('tags'); } return r; }
-    async function setDefaultTagList(id) { const r = await rpc('set_default_tag_list', { p_tag_list: id }); if (r.ok) await refreshMeta(); return r; }
+    // web: saveTagListOrder (tags round): a moved tag list gives my new full order (C.tagListReorder) to prefs tagListOrder; my own
+    // live lists also get tag_lists.sort in their new relative order (C.tagListOwnSorts), so the CLI and Telegram keep in step.
+    // { ok } or the first refused sort write ({ ok: false, err })
+    async function saveTagListOrder(order) {
+      setPrefs({ tagListOrder: order.slice() });
+      for (const w of C.tagListOwnSorts(order, TAG_LISTS, me && me.id)) {
+        const x = await sortTagList(w.id, w.sort);
+        if (!x.ok || !x.json.length) return { ok: false, err: x.ok ? { kind: 'denied', message: 'You may not reorder these lists.' } : x.err };
+      }
+      return { ok: true };
+    }
+    // web: toggleTagListFav (tags round): ★ a favourite tag list opens in the task window (any number, own or shared; my view only,
+    // prefs tagListFavs). Returns whether the list is a favourite now
+    function toggleTagListFav(id) {
+      const f = prefs.tagListFavs || [];
+      setPrefs({ tagListFavs: f.includes(id) ? f.filter(x => x !== id) : f.concat(id) });
+      return prefs.tagListFavs.includes(id);
+    }
     async function archiveTagList(id, archived) { const r = await rpc('set_tag_list_archived', { p_tag_list: id, p_archived: !!archived }); if (r.ok) await refreshMeta(); return r; }
     async function hideTagList(id, hidden) { const r = await rpc('set_tag_list_hidden', { p_tag_list: id, p_hidden: !!hidden }); if (r.ok) await refreshMeta(); return r; }
     async function leaveTagList(id) { const r = await rpc('leave_tag_list', { p_tag_list: id }); if (r.ok) await refreshMeta(); return r; }
@@ -1068,7 +1089,7 @@
       all, find, canDo, myDefault, linkIx, shownOrder, derive,
       // writes
       edit, makeTask, create: createTask, saveTask, flush, flushAll, undoEdit, markDone, cancelTask, removeTask, restoreTask, moveTask, moveToList, placeIn, topKey,
-      linkOp, setTags, ensureTags, renameTag, deleteTag, sortTag, moveTags, createTagList, renameTagList, sortTagList, setDefaultTagList, archiveTagList, hideTagList, leaveTagList, setMineTags, saveProfile,
+      linkOp, setTags, ensureTags, renameTag, deleteTag, sortTag, moveTags, createTagList, renameTagList, sortTagList, saveTagListOrder, toggleTagListFav, archiveTagList, hideTagList, leaveTagList, setMineTags, saveProfile,
       createList, renameList, reorderLists, archiveList, restoreList, archivedLists, hideList, leaveList,
       people, share, setRole, removeMember, revokeInvite, acceptInvite, declineInvite, answerNotice,
       setPrefs, writePrefs,
