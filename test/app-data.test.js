@@ -203,6 +203,47 @@ test('durable queue: an offline edit is stored, a new page sends it after loadAl
   assert.equal(d2.find(ITEM).title, 'Call the plumber');
 });
 
+test('durable queue: an edit made after "Session ended" is stored too; sign-out clears that person\'s queue and app keys', async () => {
+  const q = memQueue(), local = memStore();
+  const f = fakeSupabase([
+    ['POST', /grant_type=refresh_token/, () => [400, { error_code: 'refresh_token_already_used' }]],
+    ['PATCH', /^\/rest\/v1\/items/, () => [401, { code: 'PGRST301' }]],
+  ]);
+  const d = make(f, { idb: q, storage: { local, session: memStore() } });
+  await d.signIn('me@example.com', 'pw', true);
+  await d.loadAll();
+  local.setItem('td.app.list', LIST); local.setItem('td.app.lastList', LIST);
+  d.edit(ITEM, t => { t.title = 'first'; });
+  await until(() => d.syncState().state === 'ended');
+  d.edit(ITEM, t => { t.notes = 'typed after the session ended'; });
+  await until(() => q.m.size === 1 && (([...q.m.values()][0].values || {}).notes === 'typed after the session ended'));
+  assert.deepEqual([...q.m.values()][0].fields.sort(), ['notes', 'title']);
+  assert.equal((await d.signOut(true)).ok, true);
+  assert.equal(q.m.size, 0, 'the dropped changes do not come back at the next sign-in');
+  for (const k of D.USER_KEYS) assert.equal(local.getItem(k), null, k);
+});
+
+test('a queued change sent twice (a second tab, a restored record) is not a conflict when the row already holds it', async () => {
+  let remote = row({ version: 2, title: 'Call the plumber' }); // the first copy landed: version 1 -> 2
+  let patches = 0;
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [row({ version: 1 })]]],
+    ['GET', /^\/rest\/v1\/items\?select=\*&id=eq\./, () => [200, [remote]]],
+    ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => { patches++; if (Number(m[1]) !== remote.version) return [200, []]; remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]]; }],
+  ]);
+  const d = make(f);
+  const conflicts = [];
+  d.on('conflict', c => conflicts.push(c));
+  await d.signIn('me@example.com', 'pw', true);
+  await d.loadAll();
+  d.edit(ITEM, t => { t.title = 'Call the plumber'; });
+  await until(() => d.pending === 0);
+  assert.equal(conflicts.length, 0);
+  assert.equal(patches, 1, 'not sent again');
+  assert.equal(d.find(ITEM).version, 2);
+  assert.notEqual(d.syncState().state, 'conflict');
+});
+
 test('durable queue fails open: a throwing store turns durability off, the edit still goes out from memory', async () => {
   const bad = { all: async () => { throw new Error('quota'); }, put: async () => { throw new Error('quota'); }, del: async () => {}, clear: async () => {} };
   const f = fakeSupabase([

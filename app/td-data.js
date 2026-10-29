@@ -13,6 +13,8 @@
   const PKCE_TTL_MS = 10 * 60 * 1000;  // an installed iOS app may come back in a new page: the verifier lives 10 minutes, used once
   const LOCK_REFRESH = 'td.refresh', LOCK_QUEUE = 'td.queue', CHANNEL = 'td.auth';
   const IDB_NAME = 'td-app', IDB_STORE = 'queue';
+  // the app's localStorage keys that belong to the signed-in person (list ids, a Google sign-in in flight): gone on sign-out
+  const USER_KEYS = ['td.app.list', 'td.app.lastList', PKCE_KEY];
   const PREFS_DELAY_MS = 1000;         // web: PREFS_DELAY_MS
   const LINK_RETRY_MS = 3000;          // web: runLinks retry pause
   const VIA = { 'x-homeos-via': 'app' };
@@ -335,12 +337,13 @@
       }
       await writePrefs();
       if (session && C.needsRefresh(session, now())) await refreshSession(false);
-      const token = session && session.access_token, uid = session && session.user.id;
+      const token = session && session.access_token, uid = queueUid();
       if (token) await authCall('logout?scope=local', null, token);
       clearAuth(); storeKind = null; session = null; ended = false;
-      if (bc && uid) bc.postMessage({ type: 'signout', uid });
+      if (bc && uid && session) bc.postMessage({ type: 'signout', uid });
       Q.clear(); LQ.length = 0; tasks = []; stopPolling(); NOTICES = []; loaded = false;
       if (qstore && uid) { try { await qstore.clear(uid); } catch (e) { durable = false; } }
+      USER_KEYS.forEach(k => ls.del(k));
       me = null;
       emit('session', { state: 'signin', msg: '' }); syncChanged();
       return { ok: true };
@@ -535,15 +538,19 @@
 
     // ---- durable queue (analysis §4): every change is mirrored to IndexedDB td-app/queue, keyed uid:itemId ----
     const LINKS_KEY = uid => uid + ':links';
+    // whose queue this is: the signed-in person, or after "Session ended" the person it ended for (edits made meanwhile wait in
+    // IndexedDB too, so a Google sign-in, which leaves the page, does not lose them)
+    const queueUid = () => session ? session.user.id : ended && me ? me.id : null;
     function persist(id) {
-      if (!qstore || !durable || !session) return;
-      const uid = session.user.id, e = Q.get(id), t = find(id);
+      const uid = queueUid();
+      if (!qstore || !durable || !uid) return;
+      const e = Q.get(id), t = find(id);
       const p = e && t && (e.create || e.fields.size || e.sending) ? qstore.put(queueRecord(uid, t, e)) : qstore.del(uid + ':' + id);
       Promise.resolve(p).catch(() => { durable = false; });
     }
     function persistLinks() {
-      if (!qstore || !durable || !session) return;
-      const uid = session.user.id;
+      const uid = queueUid();
+      if (!qstore || !durable || !uid) return;
       const p = LQ.length ? qstore.put({ key: LINKS_KEY(uid), uid, id: null, links: LQ.map(x => ({ op: x.op, l: x.l })) }) : qstore.del(LINKS_KEY(uid));
       Promise.resolve(p).catch(() => { durable = false; });
     }
@@ -691,12 +698,15 @@
         return { ok: true };
       }
       const remote = C.rowToTask(row);
-      const clash = [...sending.fields].filter(f => !same(val(remote, f), sending.base[f]));
+      // app only (not in the web's conflict): a field the row already holds with my value has landed (the same queued change sent
+      // by a second tab, or restored from IndexedDB after it went out): it is neither a clash nor sent again
+      const open = [...sending.fields].filter(f => !same(val(remote, f), val(t, f)));
+      const clash = open.filter(f => !same(val(remote, f), sending.base[f]));
       if (!clash.length) {
-        const mine = {}; sending.fields.forEach(f => { mine[f] = val(t, f); });
+        const mine = {}; open.forEach(f => { mine[f] = val(t, f); });
         applyRow(t, row, e.fields);
         Object.assign(t, mine);
-        sending.fields.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
+        open.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
         return { ok: true };
       }
       const draft = { title: t.title, notes: t.notes };
@@ -1068,5 +1078,5 @@
 
   function safe(fn) { try { return fn(); } catch (e) { return null; } }
 
-  return { create, queueRecord, queueRestore, idbQueueStore, gateFrom, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS };
+  return { create, queueRecord, queueRestore, idbQueueStore, gateFrom, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS, USER_KEYS };
 });
