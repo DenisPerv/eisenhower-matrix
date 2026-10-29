@@ -364,7 +364,7 @@ async function gData() {
   await T.click('[data-add="B"]');
   await dialogSave(T, { title: `${RUN} added`, list: ST.id });
   const added = await until(async () => (await MK.rest('GET', `items?select=*&list_id=eq.${ST.id}&title=eq.${encodeURIComponent(RUN + ' added')}`)).json[0]);
-  check(G, 'add: stored with a client uuid, quadrant B, created_via app, start_at set', added && added.quadrant === 'B' && added.created_via === 'app' && !!added.start_at && typeof added.sort_key === 'number');
+  check(G, 'add: stored with a client uuid, quadrant B, created_via app, start_at empty (task links: a new task starts blank)', added && added.quadrant === 'B' && added.created_via === 'app' && !added.start_at && typeof added.sort_key === 'number');
   await undo(T);
   check(G, 'undo add: soft-deleted', await until(async () => (await item(added.id)).deleted_at));
   // edit, quadrant move, undo
@@ -609,7 +609,7 @@ async function gUi() {
     const rowAt = `(()=>{const d=document.querySelector('dialog[open]'),f=d.querySelector('.fbar .fmt'),w=d.querySelector('.fbar #fwho');if(!f||!w)return null;const a=f.getBoundingClientRect(),b=w.getBoundingClientRect();return {same:Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<=4,below:b.top>=a.bottom-1,right:b.left>a.right,fits:d.scrollWidth<=d.clientWidth,fq:!!d.querySelector('#fq'),forText:d.querySelector('#fwho').textContent.split(' ').includes('For')}})()`;
     const wide = await T.ev(rowAt);
     check(G, `${who}: task window at 1440: no Quadrant, no For, the info line on the formatting row, right of the buttons (edit window, items 1-3)`, !!wide && wide.same && wide.right && !wide.fq && !wide.forText, JSON.stringify(wide));
-    await T.shot(`ui-edit-window-${who}-1440x900-${theme}`);
+    await sleep(400); await T.shot(`ui-edit-window-${who}-1440x900-${theme}`);
     await T.size(390, 844); await sleep(400);
     const narrow = await T.ev(rowAt);
     check(G, `${who}: task window at 390: the info line wraps under the buttons, no horizontal scroll (edit window, item 2)`, !!narrow && narrow.below && narrow.fits, JSON.stringify(narrow));
