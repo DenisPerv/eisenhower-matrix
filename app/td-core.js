@@ -173,9 +173,9 @@
   // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
     cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListsOpen: {}, taskSwitcher: 'standard' };
-  // the welcome note shows while welcomeVersion < WELCOME_VERSION (2: the Urgency and Card layout panels, 2026-10-29); closing it sets
+  // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
   // WELCOME_VERSION. welcomeSeen stays for clients that only know it
-  const WELCOME_VERSION = 2;
+  const WELCOME_VERSION = 3;
   const welcomeDue = p => !isObj(p) || !(Number.isInteger(p.welcomeVersion) && p.welcomeVersion >= WELCOME_VERSION);
   const clone = o => JSON.parse(JSON.stringify(o));
   function readSettings(raw) {
