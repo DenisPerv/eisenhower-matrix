@@ -64,3 +64,12 @@ test('navNeighbours: previous and next in the shown order, null at the ends', ()
   assert.deepEqual(C.navNeighbours(['a', 'b'], 'a'), { prev: null, next: 'b' });
   assert.deepEqual(C.navNeighbours(['a'], 'z'), { prev: null, next: null });
 });
+
+test('Tasks Grouping: the confirm says what changes (view now, stored order on drags, no way back)', () => {
+  const on = C.groupingNotice(true), off = C.groupingNotice(false);
+  assert.match(on.title, /Turn on Tasks Grouping/);
+  assert.match(off.title, /Turn off Tasks Grouping/);
+  for (const n of [on, off]) assert.match(n.text, /no automatic way back/);
+  assert.match(on.text, /every card you drag is stored in this grouped order/);
+  assert.match(off.text, /stay as they are/);
+});

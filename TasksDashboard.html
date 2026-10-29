@@ -985,7 +985,7 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 @media (max-width:700px){.tb.wt .wl{display:none}.tb.wt .ws{display:inline}.card.lk-kid{margin-left:calc(var(--lk-d,1) * 12px)}.card.lk-kid::after{left:-9px;width:7px}}
 .tb.pg{position:relative;overflow:hidden;padding-bottom:1px;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .tb.pg i{position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,var(--c) var(--p),var(--hair) var(--p))}
-/* children under their parent (Card layout → Subtasks under their parent): indent per level, an elbow from the parent's
+/* children under their parent (Card layout → Tasks Grouping): indent per level, an elbow from the parent's
    colour stripe; a faded copy of a parent that lives in another quadrant heads its children there */
 .qb{--lk-line:color-mix(in srgb,var(--ink3) 55%,transparent)}
 .card.lk-kid{margin-left:calc(var(--lk-d,1) * 18px)}
@@ -1066,6 +1066,9 @@ dialog.tk form{position:relative}
 @media (prefers-reduced-motion:reduce){.tk-ghost{transition:none}}
 .tk-ask{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:var(--s3);padding:10px 12px;border:1px solid var(--accent-line);border-radius:var(--r);background:var(--accent-bg)}
 .tk-ask p{margin:0 auto 0 0;font-size:13px}
+/* Tasks Grouping confirm: a short title, the consequence in plain text */
+.grp-ask{max-width:46ch}
+.grp-ask p{margin:var(--s3) 0 0;font-size:14px;line-height:1.5;color:var(--ink2)}
 .lk-pick{padding:6px 0 8px}
 dialog input.tg-q#lk-q{width:100%}
 .lk-opts{list-style:none;margin:4px 0 0;padding:0;max-height:240px;overflow-y:auto;border:1px solid var(--hair);border-radius:var(--r-sm);background:var(--solid)}
@@ -2118,6 +2121,11 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return moving.map((t, k) => ({ id: t.id, sortKey: lo === null && hi === null ? (k + 1) * SPACING : lo === null ? hi - (n - k) * SPACING
       : hi === null ? lo + (k + 1) * SPACING : lo + (hi - lo) * (k + 1) / (n + 1) }));
   }
+  // Tasks Grouping (2026-10-29): what the confirm says before the switch changes. Ticking it only changes the view; the stored
+  // order (sort_key, the priority AI and the scripts read) changes when a card is dragged while it is on (placeGrouped)
+  const groupingNotice = on => on
+    ? { title: 'Turn on Tasks Grouping?', text: 'Subtasks will sit under their parent on the board. A task\'s priority is its position in its quadrant: while grouping is on, every card you drag is stored in this grouped order, and AI and the scripts read that order. There is no automatic way back to the earlier order.' }
+    : { title: 'Turn off Tasks Grouping?', text: 'The board will show each quadrant in its stored order, without subtasks under their parent. Orders you changed while grouping was on stay as they are: AI and the scripts keep reading them, and there is no automatic way back.' };
   // previous and next task of the task window: the neighbours in the quadrant's shown order (null at the ends)
   const navNeighbours = (ids, id) => { const i = ids.indexOf(id); return i < 0 ? { prev: null, next: null } : { prev: ids[i - 1] || null, next: ids[i + 1] || null }; };
   // the Timeline: one row per task. base = the tasks the view picked (open, filters, a date in the window); their parent
@@ -2168,7 +2176,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
-    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
+    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
@@ -4229,7 +4237,7 @@ function openSettings(kind) {
 function openCardLayout() {
   const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
   const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', source: 'Source (category, Sources)',
-    group: 'Subtasks under their parent', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
+    group: 'Tasks Grouping', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
   const lists = C.cardLayoutTagLists(TAG_LISTS, me && me.id); // edit window, item 4: archived tag lists are not offered
   const radio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' +
@@ -4244,8 +4252,21 @@ function openCardLayout() {
   const q = s => dlg.querySelector(s);
   const syncLists = () => { const on = q('input[name=cl-tags]:checked').value === 'lists'; dlg.querySelectorAll('[data-cl-list]').forEach(b => { b.disabled = !on; }); };
   dlg.querySelectorAll('input[name=cl-tags]').forEach(r => r.onchange = syncLists); syncLists();
+  // Tasks Grouping: a change is confirmed first (C.groupingNotice); Cancel or Escape puts the switch back
+  const grp = q('[data-cl=group]');
+  const askGrouping = was => {
+    const n = C.groupingNotice(grp.checked);
+    const c = dialogShell('<form method="dialog" class="grp-ask"><strong>' + esc(n.title) + '</strong><p>' + esc(n.text) + '</p><div class="actions"><span class="sp"></span><button value="cancel" id="grp-cancel">Cancel</button><button id="grp-ok" value="ok">Apply</button></div></form>', '[data-cl=group]');
+    let ok = false;
+    c.querySelector('#grp-ok').onclick = () => { ok = true; };
+    c.addEventListener('close', () => { if (!ok) grp.checked = was; });
+    c.querySelector('#grp-cancel').focus();
+  };
+  grp.onchange = () => askGrouping(!grp.checked);
   q('#cl-reset').onclick = () => {
+    const was = grp.checked;
     C.CARD_FIELDS.forEach(k => { q('[data-cl="' + k + '"]').checked = D[k]; });
+    if (grp.checked !== was) askGrouping(was);
     q('#cl-auto').value = D.autoCollapse; q('input[name=cl-tags][value=all]').checked = true; q('input[name=cl-mode][value=collapsed]').checked = true; syncLists();
   };
   q('#cl-save').onclick = () => {

@@ -911,6 +911,18 @@ async function gLinks() {
   check(G, 'badges: no P badge and the progress 0/4 on the parent, "Waiting for 1" on a task with an open predecessor', await T.ev(`(()=>{const p=document.querySelector('[data-card="${par.id}"]');const w=document.querySelector('[data-card="${k2.id}"] .tb.wt');return !p.querySelector('.tb.pr')&&p.querySelector('.tb.pg').textContent==='0/4'&&!!w&&w.querySelector('.wl').textContent.trim()==='Waiting for'&&w.textContent.endsWith('1')})()`));
   await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("[data-cl=group]")', 4000);
   check(G, 'Card layout lists the three link switches (no Priority), grouping off by default', await T.ev(`['group','waiting','progress'].every(k=>!!document.querySelector('[data-cl='+k+']'))&&!document.querySelector('[data-cl=priority]')`) && core.CARD_LAYOUT_DEFAULTS.group === false); // the default, not the account's stored choice
+  // Tasks Grouping (2026-10-29): the switch has the new name; a tick asks first, Cancel puts it back, Apply keeps it
+  check(G, 'Card layout names the switch Tasks Grouping', await T.ev("document.querySelector('[data-cl=group]').closest('label').textContent.trim()==='Tasks Grouping'"));
+  const g0 = await T.ev("document.querySelector('[data-cl=group]').checked");
+  await T.click('[data-cl=group]');
+  check(G, 'ticking or unticking Tasks Grouping opens a confirm that says the stored order changes on drags, with no way back', await T.wait('!!document.getElementById("grp-ok")', 3000) &&
+    await T.ev(`/no automatic way back/.test(document.querySelector(".grp-ask").textContent)&&/Turn ${g0 ? 'off' : 'on'} Tasks Grouping/.test(document.querySelector(".grp-ask strong").textContent)`));
+  for (const [w, h] of [[1440, 900], [390, 844]]) for (const theme of ['light', 'dark']) { await T.size(w, h); await T.theme(theme); await T.ev(`(document.documentElement.dataset.theme='${theme}',true)`); await sleep(350); await T.shot(`ui-grouping-confirm-${w}x${h}-${theme}`); }
+  await T.size(1440, 900); await T.theme('light'); await T.ev("(document.documentElement.dataset.theme='light',true)");
+  await T.click('#grp-cancel');
+  check(G, 'Cancel puts the switch back', await T.wait(`!document.getElementById("grp-ok")&&document.querySelector("[data-cl=group]").checked===${g0}`, 3000));
+  await T.click('[data-cl=group]'); await T.wait('!!document.getElementById("grp-ok")', 3000); await T.click('#grp-ok');
+  check(G, 'Apply keeps the change', await T.wait(`!document.getElementById("grp-ok")&&document.querySelector("[data-cl=group]").checked===${!g0}`, 3000));
   await T.ev(`(document.querySelector('[data-cl=group]').checked=true,true)`); await T.click('#cl-save');
   await T.wait(`!!document.querySelector('[data-card="${k1.id}"].lk-kid')`, 5000);
   check(G, 'Group by parent: the parent first, its subtasks indented after it in Do', await T.ev(`(()=>{const ids=[...document.querySelectorAll('[data-body=A] [data-card]')].map(c=>c.dataset.card);const i=ids.indexOf('${par.id}');return i>=0&&ids.indexOf('${k1.id}')>i&&ids.indexOf('${k3.id}')>i&&document.querySelector('[data-card="${k3.id}"]').classList.contains('lk-kid')})()`));
