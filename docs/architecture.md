@@ -43,6 +43,24 @@ TasksDashboard has no server of its own. A static page talks straight to a Supab
 4a. **Task links:** loaded with the items (`item_links`, live rows of kinds `depends_on` and `parent`), shown only when both ends are loaded, changed through `rpc/link_items` / `rpc/unlink_items` in one serial queue. The board's badges and grouping and the Timeline's tree and arrows are computed in the core (`linkIndex`, `groupCards`, `timelineRows`).
 5. **Review and Visuals:** the Review view computes the weekly report in the browser from the loaded items (and the cancel times from `item_events`); Visuals read `rpc/kpi_events` once and compute the charts in the core. The same report is available as an API, `rpc/review_report` ([api/README.md](api/README.md)), computed in SQL with the same rules; an e2e check keeps the two equal.
 
+## Task deck
+
+The task window is a small reusable component, the **task deck** (`deckOpen`, `let DECK`, `TasksDashboard.html`). It keeps one full-screen modal open for a whole edit session, so moving between tasks never closes and reopens a window (the flicker the earlier close-and-reopen caused: one frame with no modal, a board render and a fade-in per switch).
+
+| Part | What it is |
+|---|---|
+| deck | one `<dialog class="tk-deck">`, a transparent 3×3 grid (`data-switcher` = `standard` or `coverflow`), opened once with `showModal()` and removed on close, which runs `render()` once |
+| card | `.tk-card`, the middle cell and the visible window. `openTask(id, quad, opts)` builds one task's form into it; `deck.swap(build, dir, to)` replaces the content in place (slide 60 ms out, 100 ms in; Coverflow turns the row) |
+| zones | real elements beside and around the card: `[data-zone=prev]` and `[data-zone=next]` between its top and bottom edge, `top` and `bottom` above and below. Each side with a neighbour holds one `<button data-nav>` (a shadow band from 1000 px in Standard, edge tabs below); a side with none closes |
+| previews | Coverflow only: `.tk-pv`, read-only copies of the neighbours made by `openTask(id, null, { preview })`, inert and `aria-hidden`, posed by `C.deckGeo` |
+| dots | Coverflow only: `.tk-dots`, at most 9 buttons (`C.dotWindow`) that jump to a task of the quadrant |
+
+Rules without DOM or clock live in the core and are unit-tested (`test/edit-nav.test.js`): `deckSequence` (the order across the quadrants A to D), `deckAct` (zone and press start give `prev`, `next`, `close` or nothing), `swipeDir`, `deckPos`, `deckGeo`, `dotWindow`. The mode is `prefs.taskSwitcher` (`TASK_SWITCHERS`), read when the deck opens.
+
+**Leave paths.** Every way out goes to `DECK.cur.leave(kind, to)`, set by the content builder: `prev` and `next` (a zone, the keys, a swipe, an edge tab), `close` (a band, an end, Esc) and `jump` (a dot). If the form changed (`dirty()`), `leave` asks first in the sticky button row (Save and go, Discard and go, Stay) and does nothing else while the question is open. Mark cancelled, Delete and Save close the deck directly. Per-content listeners use one `AbortController` (`DECK.cur.ac`), aborted on every swap and on close. The Undo toast is appended to the open deck so it shows above the window, and moves to `<body>` when the deck closes.
+
+**Reusing it.** Another window can use the deck by (1) giving its content builder the same contract (fill `deck.card`, set `deck.cur = { ac, nav: { prev, next }, isNew, q, id, order, leave, onClose }`, call `deck.show(c)`), (2) getting its neighbours from a core function like `deckSequence` so the order is testable, and (3) routing every exit through `leave`. The zones, the pointer rule, the keys, the swap and the unsaved question then come with the deck.
+
 ## Design choices
 
 - **The database is the lock.** The page hides what a role cannot do, but RLS, protected-column triggers and `security definer` RPCs with `search_path = ''` enforce it. The publishable key is public; without a login it reads nothing.
