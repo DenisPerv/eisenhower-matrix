@@ -1,22 +1,26 @@
 #!/usr/bin/env node
-// TasksDashboard CLI: add-task, add-reminder, overdue, do, restore-list against TasksDashboardDB.
+// TasksDashboard CLI: add-task, add-reminder, overdue, do, restore-list, link, unlink against TasksDashboardDB.
 // node cli/tasks.mjs <command> [options]; README "CLI" lists the options and exit codes. Never prints an env value.
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { EXIT, TdError, readEnv, missingEnv, connect, loadCore, errorExit, parseWhen, localStamp } from './lib.mjs';
 
 const TZ = 'Europe/Lisbon';
-const COMMANDS = ['add-task', 'add-reminder', 'overdue', 'do', 'restore-list'];
+const COMMANDS = ['add-task', 'add-reminder', 'overdue', 'do', 'restore-list', 'link', 'unlink'];
 const FLAGS = new Set(['json', 'dry-run', 'needs-review', 'help']);
 const USAGE = `usage: node cli/tasks.mjs <command> [options]
   add-task      --title T [--list LIST] [--q A|B|C|D] [--due WHEN] [--tags a,b] [--owner HANDLE|none] [--notify a,b] [--body MD] [--priority 0-5] [--confidence 0-1] [--needs-review]
+                [--start WHEN] [--parent REF] [--after REF]
   add-reminder  --title T --due WHEN [--list LIST] [--owner HANDLE|none] [--notify a,b] [--body MD]
   overdue       [--limit 10] [--list slug]
   do            [--list slug] [--limit N]
   restore-list  --list slug                      (people only: --as maksym or anastasiia)
+  link          REF --parent REF | --after REF   (task links, db/018: REF becomes a child of, or comes after, the other)
+  unlink        REF --parent REF | --after REF   (removes that link)
 common: --env FILE  --as HANDLE (default homeos-agent)  --for HANDLE  --via CHANNEL (default script:tasks-cli)  --run-id ID  --json  --dry-run
 WHEN: YYYY-MM-DD (09:00) or YYYY-MM-DD HH:mm in ${TZ}, or ISO with an offset
 LIST: a slug, or OWNER/slug when two owners use the same slug (slugs are unique per owner)
+REF: LIST#num, a task by its list and number (backlog#12, maksym/backlog#12)
 who: --owner and --notify take people's handles; maksym, anastasiia or shared in --tags set the owner instead (shared = none)
 exit: 0 ok, 1 error, 2 env missing, 3 conflict, 4 duplicate, 5 sensitive, 6 unreachable, 7 auth failed, 8 list archived or not restorable, 9 limit reached`;
 
@@ -71,6 +75,32 @@ async function people(c) {
   const r = await c.rest('GET', 'profiles?select=id,handle,kind,is_household');
   if (!r.ok) throw new TdError(errorExit(r.err), r.err.message);
   return Object.fromEntries(r.json.map(p => [p.id, p]));
+}
+// a task by LIST#num (live, not deleted); errors name the reference only
+export function parseRef(ref) {
+  const m = String(ref || '').match(/^(.+)#(\d+)$/);
+  if (!m) throw new TdError(EXIT.error, `a task reference is LIST#num: ${ref}`);
+  return { list: m[1], num: Number(m[2]) };
+}
+async function itemByRef(c, ls, ppl, ref) {
+  const p = parseRef(ref), l = findList(ls, p.list, ppl);
+  if (!l) throw new TdError(EXIT.error, 'list not found: ' + p.list);
+  const r = await c.rest('GET', `items?select=id,num,list_id,title&list_id=eq.${l.id}&num=eq.${p.num}&deleted_at=is.null`);
+  if (!r.ok) throw new TdError(errorExit(r.err), r.err.message);
+  if (!r.json.length) throw new TdError(EXIT.error, 'task not found: ' + ref);
+  return r.json[0];
+}
+// --parent P: the task becomes a child of P; --after P: the task comes after P (rpc/link_items, rpc/unlink_items)
+export function linkArgs(a) {
+  if (a.parent !== undefined && a.after !== undefined) throw new TdError(EXIT.error, 'give --parent or --after, not both');
+  if (a.parent !== undefined) return { other: a.parent, kind: 'parent' };
+  if (a.after !== undefined) return { other: a.after, kind: 'depends_on' };
+  return null;
+}
+async function linkRpc(c, fn, from, to, kind) {
+  const r = await c.rest('POST', 'rpc/' + fn, { p_from: from, p_to: to, p_kind: kind });
+  if (!r.ok) throw new TdError(errorExit(r.err), r.err.message);
+  return r.json;
 }
 // every write first reads its list: an archived list is exit 8 and nothing is sent
 function writable(l, slug) {
@@ -132,7 +162,9 @@ async function command(a, cmd, c, out) {
   if (cmd === 'add-task' || cmd === 'add-reminder') {
     if (!a.title || !String(a.title).trim()) throw new TdError(EXIT.error, '--title is required');
     const reminder = cmd === 'add-reminder';
-    const due = parseWhen(a.due, TZ);
+    const due = parseWhen(a.due, TZ), start = parseWhen(a.start, TZ);
+    const lk = linkArgs(a);
+    const other = lk ? await itemByRef(c, ls, ppl, lk.other) : null;
     if (reminder && !due) throw new TdError(EXIT.error, '--due is required for a reminder');
     const cats = await c.rest('GET', 'categories?select=slug,default_list_id');
     if (!cats.ok) throw new TdError(errorExit(cats.err), cats.err.message);
@@ -152,7 +184,7 @@ async function command(a, cmd, c, out) {
     for (const h of tagsOf(a.notify)) { await profileId(c, h, '--notify'); notify.push(h.toLowerCase()); }
     const body = await common({
       category: cat, title: String(a.title).trim(), body_md: a.body || '', tags: who.tags, quadrant: a.q || null, priority, owner_id,
-      due_at: due ? due.toISOString() : null, start_at: new Date(now).toISOString(), sort_key: await topKey(c, ls, l.id, draft, now),
+      due_at: due ? due.toISOString() : null, start_at: start ? start.toISOString() : null, sort_key: await topKey(c, ls, l.id, draft, now),
       dedup_key: reminder ? reminderKey(new Date(now)) : taskKey(String(a.title).trim(), due, l.slug),
       details: notify.length ? { notify: [...new Set(notify)] } : {},
     }, l);
@@ -160,7 +192,20 @@ async function command(a, cmd, c, out) {
     if (a['needs-review']) body.review_state = 'needs_review';
     const r = await insert(c, body, a, ls);
     if (r.dry) { out(a.json ? JSON.stringify(r.body, null, 2) : 'dry run, nothing sent: ' + body.title + ' -> ' + l.slug + ' (' + body.dedup_key + ')'); return EXIT.ok; }
+    // task links: the new task becomes a child of, or comes after, the task named by --parent / --after
+    if (lk) await linkRpc(c, 'link_items', r.item.id, other.id, lk.kind);
     print([r.item], a.json ? null : 'added');
+    return EXIT.ok;
+  }
+  if (cmd === 'link' || cmd === 'unlink') {
+    const lk = linkArgs(a);
+    if (!a._[1] || !lk) throw new TdError(EXIT.error, cmd + ' needs REF and --parent REF or --after REF');
+    const self = await itemByRef(c, ls, ppl, a._[1]), other = await itemByRef(c, ls, ppl, lk.other);
+    writable(ls[self.list_id], a._[1]);
+    const what = a._[1] + (lk.kind === 'parent' ? ' under ' : ' after ') + lk.other;
+    if (a['dry-run']) { out('dry run, nothing sent: ' + cmd + ' ' + what); return EXIT.ok; }
+    const res = await linkRpc(c, cmd === 'link' ? 'link_items' : 'unlink_items', self.id, other.id, lk.kind);
+    out(a.json ? JSON.stringify({ [cmd]: res, from: self.id, to: other.id, kind: lk.kind }) : (cmd === 'link' ? 'linked ' : res === 'none' ? 'no such link: ' : 'unlinked ') + what);
     return EXIT.ok;
   }
   if (cmd === 'overdue') {

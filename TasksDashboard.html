@@ -82,10 +82,10 @@
   --toast-bg:rgba(238,237,255,.92);--toast-ink:#16142E;
 }}
 /* each quadrant element carries its own colour as --c */
-[data-q="A"],.card.A,.tl-bar.A{--c:var(--qa);--c-on:var(--qa-on)}
-[data-q="B"],.card.B,.tl-bar.B{--c:var(--qb);--c-on:var(--qb-on)}
-[data-q="C"],.card.C,.tl-bar.C{--c:var(--qc);--c-on:var(--qc-on)}
-[data-q="D"],.card.D,.tl-bar.D{--c:var(--qd);--c-on:var(--qd-on)}
+[data-q="A"],.card.A,.tl-bar.A,.lk-ghost.A,.tl-row.A{--c:var(--qa);--c-on:var(--qa-on)}
+[data-q="B"],.card.B,.tl-bar.B,.lk-ghost.B,.tl-row.B{--c:var(--qb);--c-on:var(--qb-on)}
+[data-q="C"],.card.C,.tl-bar.C,.lk-ghost.C,.tl-row.C{--c:var(--qc);--c-on:var(--qc-on)}
+[data-q="D"],.card.D,.tl-bar.D,.lk-ghost.D,.tl-row.D{--c:var(--qd);--c-on:var(--qd-on)}
 
 /* base: aurora + grain behind everything */
 *{box-sizing:border-box}
@@ -308,21 +308,56 @@ html:not(.settled) .rail{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
 .ar-act [data-del]:hover{background:var(--danger-bg);border-color:var(--danger)}
 .empty{padding:32px;text-align:center;color:var(--ink3);font:italic 500 20px var(--serif)}
 
-/* timeline */
+/* timeline (task links): one row per task; a fixed day width (--dw) so bars, the today line and the arrow layer share px */
 #tl-prev,#tl-next{width:32px;padding:0;border-radius:50%}
-.tl{overflow-x:auto;background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);padding:6px 16px 8px}
-.tl-row{display:grid;align-items:center;min-height:38px;border-bottom:1px solid var(--hair)}
-.tl-row:last-child{border-bottom:0}
-.tl-head{min-height:34px}
-.tl-load{background:var(--well);margin:0 -16px;padding:0 16px}
-.tl-name{padding-right:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:500}
+.tl{overflow-x:auto;background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--rim);border-radius:var(--r-xl);box-shadow:var(--depth);padding:6px 0 0;overscroll-behavior-x:contain}
+.tl-in{width:var(--tlw);min-width:100%}
+.tl-head,.tl-load,.tl-row{display:grid;grid-template-columns:var(--nw) 1fr;align-items:center}
+.tl-head{min-height:34px;border-bottom:1px solid var(--hair);position:sticky;top:0}
+.tl-days{display:grid;grid-template-columns:repeat(auto-fill,var(--dw))}
 .tl-d{text-align:center;font:12px/1 var(--mono);color:var(--ink3);padding:9px 0;font-variant-numeric:tabular-nums}
-.tl-d.we{background:var(--well)}
-.tl-d.td{font-weight:700;color:#FFFFFF;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:10px;box-shadow:0 0 22px -4px var(--glow)}
+.tl-d.we{color:color-mix(in srgb,var(--ink3) 70%,transparent)}
+.tl-d.td{font-weight:700;color:#FFFFFF;background:var(--accent);border-radius:var(--r-sm);box-shadow:0 0 18px -4px var(--glow)}
 .tl-d.over{font-weight:700;color:var(--danger-ink)}
-.tl-bar{height:16px;min-height:16px;border-radius:999px;padding:0;border:0;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 70%,#fff),var(--c));box-shadow:0 0 16px -3px var(--c)}
-.tl-bar:hover{background:var(--c);transform:scaleY(1.15)}
+.tl-body{position:relative}
+.tl-cols{position:absolute;left:var(--nw);top:0;bottom:0;right:0;pointer-events:none}
+.tl-we{position:absolute;top:0;bottom:0;background:var(--well)}
+.tl-now{position:absolute;top:0;bottom:0;width:0;border-left:1.5px solid color-mix(in srgb,var(--accent) 70%,transparent)}
+.tl-row{position:relative;height:34px;border-bottom:1px solid var(--hair)}
+.tl-row:hover{background:color-mix(in srgb,var(--c) 6%,transparent)}
+.tl-name{display:flex;align-items:center;gap:2px;min-width:0;height:100%;padding:0 10px 0 calc(8px + var(--ind,0) * 16px);border-right:1px solid var(--hair);position:sticky;left:0;z-index:2;background:var(--solid)}
+.tl-chev,.tl-chev-sp{flex:none;width:22px;height:22px;min-height:22px}
+.tl-chev{padding:0;border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink3)}
+.tl-chev:hover{background:var(--hover);color:var(--ink)}
+.tl-chev .ic{width:14px;height:14px}
+.tl-t{display:block;flex:1;min-width:0;min-height:28px;padding:0 4px;border:0;background:transparent;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 13px/28px var(--ui);color:var(--ink)}
+.tl-t .k{font:600 11.5px var(--mono);color:var(--ink3)}
+.tl-row.parent .tl-t{font-weight:650}
+.tl-row.closed .tl-t{color:var(--ink3);text-decoration:line-through}
+.tl-track{position:relative;height:100%}
+.tl-bar{position:absolute;top:9px;height:16px;min-height:16px;padding:0;border:0;border-radius:var(--r-sm);background:var(--c);box-shadow:0 0 14px -4px var(--c);z-index:1}
+.tl-bar:hover{filter:brightness(1.08);box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 35%,transparent),0 0 16px -3px var(--c)}
+.tl-bar.cut-l{border-top-left-radius:0;border-bottom-left-radius:0}
+.tl-bar.cut-r{border-top-right-radius:0;border-bottom-right-radius:0}
 .tl-bar.overdue{outline:2px solid var(--danger);outline-offset:2px}
+.tl-row.closed .tl-bar{background:var(--hair2);box-shadow:none}
+.tl-sum{position:absolute;bottom:4px;height:3px;border-radius:2px;background:color-mix(in srgb,var(--c) 55%,transparent);pointer-events:none}
+.tl-sum::before,.tl-sum::after{content:"";position:absolute;bottom:0;width:2px;height:7px;background:inherit;border-radius:1px}
+.tl-sum::before{left:0}.tl-sum::after{right:0}
+.tl-nd{position:absolute;left:8px;top:9px;font:italic 400 12px var(--ui);color:var(--ink3)}
+.tl-off{position:absolute;top:7px;min-height:20px;padding:0 6px;border:1px dashed var(--hair2);border-radius:var(--r-sm);background:transparent;font:11.5px var(--mono);color:var(--ink3)}
+.tl-off.l{left:4px}.tl-off.r{right:4px}
+.tl-links{position:absolute;left:var(--nw);top:0;overflow:visible;pointer-events:none;z-index:1}
+.tl-links path{fill:none;stroke:var(--ink2);stroke-width:1.5;stroke-linejoin:round}
+.tl-links marker path{fill:var(--ink2);stroke:none}
+.tl-links path.late{stroke:var(--danger);stroke-dasharray:4 3}
+.tl-links marker.late path{fill:var(--danger)}
+.tl-key{display:inline-flex;align-items:center;gap:6px}
+.tl-key-a{display:inline-block;width:18px;height:0;border-top:1.5px solid var(--ink2);margin-left:6px}
+.tl-key-a.late{border-top:1.5px dashed var(--danger)}
+.tl-load{background:var(--well);min-height:34px}
+.tl-load .tl-name{background:var(--well)}
+@media (max-width:700px){.tl-key{display:none}}
 
 /* dialogs: deep glass */
 dialog{border:1px solid var(--rim);border-radius:24px;background:var(--glass3);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);color:var(--ink);width:min(520px,92vw);max-height:90vh;padding:22px 24px;box-shadow:var(--depth),0 40px 100px -30px var(--glow)}
@@ -588,10 +623,6 @@ mark{border-radius:1px;box-shadow:none;background:var(--mark);border-bottom:2px 
 .ar{border-radius:var(--r-xl);box-shadow:var(--depth)}
 .ar th{font:500 13px var(--ui);letter-spacing:.02em;border-bottom:1px solid var(--hair2)}
 .ar-act [data-restore]{border-radius:var(--r)}
-.tl{border-radius:var(--r-xl)}
-.tl-d.td{border-radius:var(--r-sm);background:var(--accent);box-shadow:0 0 18px -4px var(--glow)}
-.tl-d.we{background:repeating-linear-gradient(90deg,transparent 0 3px,var(--well) 3px 4px)}
-.tl-bar{border-radius:var(--r-sm);background:var(--c);height:14px;min-height:14px}
 #tl-prev,#tl-next{border-radius:var(--r)}
 /* round 3, adjustments 8 and 9: Weekly review as a rail view. Weeks are instrument tiles under an orange week line (--week);
    this week carries a "now" tag, picked weeks the accent underline. Tasks by quadrant (its colour as a top rule), then list. */
@@ -948,6 +979,27 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .card .more:hover{text-decoration:underline}
 .tbs{display:inline-flex;gap:4px;align-items:center}
 .tb{display:inline-flex;align-items:center;min-height:18px;padding:0 6px;border:1px solid var(--hair2);border-radius:var(--r-sm);font:500 11.5px/1 var(--ui);color:var(--ink2);white-space:nowrap;letter-spacing:.01em}
+/* task links on cards: priority, waiting for open predecessors, a parent's progress (Card layout switches) */
+.tb.pr{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink3)}
+.tb.pr.hi{color:var(--ink);border-color:color-mix(in srgb,var(--c) 60%,transparent)}
+.tb.wt{border-style:dashed;border-color:color-mix(in srgb,var(--qc) 75%,transparent);color:var(--ink2)}
+.tb.wt .ws{display:none}
+@media (max-width:700px){.tb.wt .wl{display:none}.tb.wt .ws{display:inline}.card.lk-kid{margin-left:calc(var(--lk-d,1) * 12px)}.card.lk-kid::after{left:-9px;width:7px}}
+.tb.pg{position:relative;overflow:hidden;padding-bottom:1px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tb.pg i{position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,var(--c) var(--p),var(--hair) var(--p))}
+/* children under their parent (Card layout → Subtasks under their parent): indent per level, an elbow from the parent's
+   colour stripe; a faded copy of a parent that lives in another quadrant heads its children there */
+.qb{--lk-line:color-mix(in srgb,var(--ink3) 55%,transparent)}
+.card.lk-kid{margin-left:calc(var(--lk-d,1) * 18px)}
+.card.lk-kid::after{content:"";position:absolute;left:-12px;top:-9px;bottom:-9px;width:10px;border-left:1.5px solid var(--lk-line);pointer-events:none;
+  background:linear-gradient(var(--lk-line),var(--lk-line)) no-repeat 0 calc(50% + 1px)/100% 1.5px}
+.card.lk-kid.lk-last::after{bottom:auto;height:calc(50% + 9px);background:none;border-bottom:1.5px solid var(--lk-line);border-bottom-left-radius:7px}
+.lk-ghost{position:relative;display:flex;align-items:center;gap:8px;width:100%;min-height:30px;margin-top:7px;padding:2px 12px 2px 14px;border:1px dashed var(--hair2);border-radius:13px;
+  background:transparent;color:var(--ink3);font:500 13px var(--ui);text-align:left;cursor:pointer}
+.lk-ghost::before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--c);opacity:.45}
+.lk-ghost .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lk-ghost .gq{flex:none;font-size:11.5px}
+.lk-ghost:hover{color:var(--ink2);border-color:color-mix(in srgb,var(--c) 45%,transparent)}
 .tb.ai{border-color:color-mix(in srgb,var(--qc) 75%,transparent);background:color-mix(in srgb,var(--qc) 18%,transparent);color:var(--ink)}
 #listmenu{width:32px;padding:0;color:var(--ink3)}
 .who-am{padding:6px 10px 8px;color:var(--ink3);font:500 12px var(--ui)}
@@ -974,6 +1026,28 @@ dialog.tk .actions{position:sticky;bottom:-22px;z-index:2;margin:var(--s5) -24px
 dialog input.tg-q{width:min(260px,100%);min-height:32px;padding:0 10px;font-size:13px;border-radius:var(--r-sm)}
 .tagbox{display:block;max-height:40vh;overflow-y:auto;overscroll-behavior:contain;margin-top:var(--s3);padding:2px 4px 2px 0}
 .tagbox > .n{margin:6px 0;font-size:12.5px}
+/* task links: the window's Links block; one row per role, chips, a search box with a list of tasks under the row */
+.links{margin-top:var(--s2);display:grid;gap:2px}
+.lk-row{display:grid;grid-template-columns:minmax(96px,128px) 1fr auto;align-items:center;gap:8px;min-height:34px;padding:2px 0;border-bottom:1px solid var(--hair)}
+.lk-l{font:500 12.5px var(--ui);color:var(--ink2);display:flex;flex-direction:column;line-height:1.25}
+.lk-l .lk-open{font-size:11.5px;font-weight:400}
+.lk-chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.lk-chip{display:inline-flex;align-items:center;gap:4px;max-width:100%;min-height:26px;padding:0 4px 0 8px;border:1px solid var(--hair2);border-radius:999px;background:var(--solid);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk-chip .k{font:500 11.5px var(--mono);color:var(--ink3)}
+.lk-chip.closed{color:var(--ink3);text-decoration:line-through}
+.lk-chip.new{border-style:dashed}
+.lk-x{width:22px;height:22px;min-height:22px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--ink3);flex:none}
+.lk-x:hover{background:var(--danger-bg);color:var(--danger-ink)}
+.lk-add{min-height:28px;font-size:12.5px;white-space:nowrap}
+.lk-pick{padding:6px 0 8px}
+dialog input.tg-q#lk-q{width:100%}
+.lk-opts{list-style:none;margin:4px 0 0;padding:0;max-height:240px;overflow-y:auto;border:1px solid var(--hair);border-radius:var(--r-sm);background:var(--solid)}
+.lk-opts li{padding:7px 10px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk-opts li .k{font:500 11.5px var(--mono);color:var(--ink3)}
+.lk-opts li[aria-selected="true"],.lk-opts li:hover{background:var(--accent-bg);color:var(--accent-ink)}
+.lk-opts li.create{border-top:1px solid var(--hair);font-style:italic}
+.lk-wait{margin:4px 0 6px}
+@media (max-width:700px){.lk-row{grid-template-columns:1fr auto}.lk-chips{grid-column:1 / -1;order:3}.lk-x{width:32px;height:32px;min-height:32px}}
 .tgg{position:relative;padding:4px 0 6px 10px;box-shadow:inset 2px 0 0 var(--hair2)}
 .tgg + .tgg{margin-top:4px}
 .tgg.shut{padding-bottom:4px}
@@ -1143,6 +1217,12 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     'tags move only between lists of one owner that you may edit': 'Tags move only between one owner\'s tag lists that you may edit.',
     'no such tag list': 'This tag list is gone, or you may not change it.',
     'no such notice': 'This note is no longer open.',
+    // task links (db/018)
+    'this link would make a loop': 'This link would make a loop: one of these tasks already leads to the other.',
+    'this task already has a parent': 'This task already has a parent.',
+    'a linked task is deleted': 'One of these tasks was deleted.',
+    'too many links on this task': 'This task has too many links.',
+    'a task cannot link to itself': 'A task can\'t link to itself.',
   };
 
   const PROFILE_COLUMNS = 'id,handle,display_name,kind,timezone,locale,mine_tags,mine_tag_ids,reminder_channel';
@@ -1168,7 +1248,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     };
   }
   // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
-  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at' };
+  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', priority: 'priority', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at' };
   function taskToPatch(t, fields, nowIso) {
     const p = {};
     (fields || Object.keys(FIELD_COLUMNS)).forEach(f => {
@@ -1179,6 +1259,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
       else if (f === 'pin') p.urgent_pin = t.pin === undefined ? null : !!t.pin;
       else if (f === 'deadline') p.due_at = iso(t.deadline);
       else if (f === 'start') p.start_at = iso(t.start);
+      else if (f === 'priority') p.priority = Number.isInteger(t.priority) && t.priority >= 0 && t.priority <= 5 ? t.priority : null;
       else if (f === 'status') p.status = STATUSES.includes(t.status) ? t.status : 'open';
       else if (f === 'sortKey') p.sort_key = typeof t.sortKey === 'number' ? t.sortKey : null;
       else if (f === 'list') p.list_id = t.list;
@@ -1197,13 +1278,15 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   // preferences v2, one row per person and app. List keys are list ids; flipped holds item ids.
   // round 3: workingDays and hoursPerDay are gone (never read); readSettings drops them from older rows
   const SETTINGS_DEFAULTS = { threshold: 50, windowDays: 7, doLimit: 5 };
-  // the rail's tabs are matrix, archive and review; timeline opens from the account menu ("Timeline (draft)")
+  // the rail's tabs are matrix, archive, review and timeline (task links: the Timeline left the account menu)
   const VIEWS = ['matrix', 'archive', 'review', 'timeline'];
   // round 3, adjustment 13: what a card shows (Account menu → Card layout). The defaults are today's card. tags: 'all', 'lists'
   // (only the tag lists in tagLists) or 'off'; autoCollapse: an expanded-mode card whose description is longer starts collapsed (0 = off).
   // Round 4: source = the category badge on cards and Sources in the task window (off by default; never with one list selected)
-  const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, source: false, tags: 'all', tagLists: [], autoCollapse: 100 };
-  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'owner', 'source'];
+  // task links: group (children under their parent; off by default), priority (P0-P5), waiting (open predecessors), progress (n/m)
+  const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, owner: false, source: false,
+    group: false, priority: true, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
+  const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'owner', 'source', 'group', 'priority', 'waiting', 'progress'];
   // round 3 P1: tagListOrder = my order of the tag lists shared with me (U3); tagListsOpen = { tag list id: open } in the task window (U7)
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
     cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, tagListOrder: [], tagListsOpen: {} };
@@ -1853,6 +1936,174 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     return { from: d.getTime(), to: now };
   }
 
+  // ---------- task links (db/018) ----------
+  // item_links rows keep "from" = the dependent side: depends_on (from comes after to, its predecessor) and parent (from is a
+  // child of to). The app shows only these two kinds; a link shows only when both ends are loaded (live items it can read).
+  const LINK_KINDS = ['depends_on', 'parent'];
+  const linkKey = r => r.from_item + '|' + r.to_item + '|' + r.kind;
+  // rows from a load or a poll into the Map key -> { from, to, kind }; a removed row leaves it; other kinds are skipped
+  function mergeLinkRows(links, rows) {
+    const m = new Map(links || []);
+    let changed = 0;
+    (rows || []).forEach(r => {
+      if (!r || !LINK_KINDS.includes(r.kind)) return;
+      const k = linkKey(r);
+      if (r.removed_at) { if (m.delete(k)) changed++; }
+      else if (!m.has(k)) { m.set(k, { from: r.from_item, to: r.to_item, kind: r.kind }); changed++; }
+    });
+    return { links: m, changed };
+  }
+  const linkPollFilter = maxSeen => 'changed_at=gte.' + encodeURIComponent(new Date(maxSeen - POLL_OVERLAP_MS).toISOString());
+  const getter = byId => typeof byId === 'function' ? byId : id => (byId || {})[id];
+  // parentOf: child id -> parent id; childrenOf, predsOf (my predecessors), succsOf (my next tasks): id -> [ids]
+  function linkIndex(links, byId) {
+    const get = getter(byId), ix = { parentOf: {}, childrenOf: {}, predsOf: {}, succsOf: {} };
+    const push = (o, k, v) => { (o[k] = o[k] || []).push(v); };
+    for (const l of (links instanceof Map ? links.values() : links || [])) {
+      if (!get(l.from) || !get(l.to)) continue;
+      if (l.kind === 'parent') { ix.parentOf[l.from] = l.to; push(ix.childrenOf, l.to, l.from); }
+      else if (l.kind === 'depends_on') { push(ix.predsOf, l.from, l.to); push(ix.succsOf, l.to, l.from); }
+    }
+    return ix;
+  }
+  const isClosed = t => CLOSED.includes(t.status);
+  // the predecessors still open (soft: a done or cancelled one releases the task)
+  const waitingFor = (t, ix, byId) => { const get = getter(byId); return (ix.predsOf[t.id] || []).map(get).filter(x => x && !isClosed(x)); };
+  // a parent's children that count (cancelled ones do not): { done, total }, or null without children
+  function subtaskProgress(t, ix, byId) {
+    const get = getter(byId), kids = (ix.childrenOf[t.id] || []).map(get).filter(x => x && x.status !== 'cancelled');
+    return kids.length ? { done: kids.filter(x => x.status === 'done').length, total: kids.length } : null;
+  }
+  // the four ways the task window links a task (self) to another one, as the stored row
+  const LINK_ROLES = ['parent', 'child', 'pred', 'next'];
+  function linkFor(role, self, other) {
+    return ({ parent: { from: self, to: other, kind: 'parent' }, child: { from: other, to: self, kind: 'parent' },
+      pred: { from: self, to: other, kind: 'depends_on' }, next: { from: other, to: self, kind: 'depends_on' } })[role] || null;
+  }
+  // would from -> to (kind) close a loop? Same walk as the database (db/018 link_would_loop): does "to" already reach "from"
+  function wouldLoop(ix, from, to, kind) {
+    if (from === to) return true;
+    const seen = new Set(), stack = [to];
+    while (stack.length) {
+      const x = stack.pop();
+      if (x === from) return true;
+      if (seen.has(x)) continue;
+      seen.add(x);
+      if (kind === 'parent') { if (ix.parentOf[x]) stack.push(ix.parentOf[x]); }
+      else (ix.predsOf[x] || []).forEach(y => stack.push(y));
+    }
+    return false;
+  }
+  const linked = (ix, a, b) => ix.parentOf[a] === b || ix.parentOf[b] === a || (ix.predsOf[a] || []).includes(b) || (ix.predsOf[b] || []).includes(a);
+  // picker options for a role: words of the title, "#12" or "12" (number), "list#12" (list name or slug and number).
+  // Left out: self, deleted, a task already linked to self in any way, loops, closed tasks (except as a predecessor), and
+  // tasks I may not link (opts.canEdit: when I cannot edit self, the other end must be one I can edit). Sorted: a number
+  // hit, same list, then recently changed. opts: { listName(id), canEdit(t), max }
+  function linkCandidates(tasks, ix, self, role, query, opts) {
+    const o = opts || {}, max = o.max || 8, q = String(query || '').trim().toLowerCase();
+    const canEdit = o.canEdit || (() => true), selfOk = canEdit(self);
+    const m = q.match(/^(?:(.*?)\s*#\s*)?(\d+)$/), num = m ? Number(m[2]) : null, listQ = m && m[1] ? m[1].trim() : '';
+    const words = m ? [] : q.split(/\s+/).filter(Boolean);
+    const plainT = s => String(s || '').replace(/[*_`]/g, '').toLowerCase();
+    const hits = [];
+    (tasks || []).forEach(t => {
+      if (!t || t.id === self.id || t.deleted) return;
+      if (isClosed(t) && role !== 'pred') return;
+      if (linked(ix, t.id, self.id)) return;
+      const l = linkFor(role, self.id, t.id);
+      if (wouldLoop(ix, l.from, l.to, l.kind)) return;
+      if (!selfOk && !canEdit(t)) return;
+      let rank = 2;
+      if (num !== null) {
+        if (t.num !== num) return;
+        if (listQ && !String(o.listName ? o.listName(t.list) : '').toLowerCase().startsWith(listQ)) return;
+        rank = 0;
+      } else if (words.length) {
+        const ti = plainT(t.title);
+        if (!words.every(w => ti.includes(w))) return;
+      }
+      hits.push({ t, rank: rank + (t.list === self.list ? 0 : 1) });
+    });
+    hits.sort((a, b) => a.rank - b.rank || ((b.t.updatedAt || 0) - (a.t.updatedAt || 0)) || a.t.num - b.t.num);
+    return hits.slice(0, max).map(h => h.t);
+  }
+  // a quadrant's cards grouped by parent: a parent first, then its children (their own order), any depth (indent capped at
+  // cap). A child whose parent is not in this quadrant sits under a faded copy of the parent (ghost: shown once, not a card).
+  // In: cards in board order. Out: rows { t, depth, deep, ghost, last } (last = the last child under its parent row)
+  function groupCards(cards, ix, byId, opts) {
+    const get = getter(byId), cap = (opts && opts.cap) || 3, inQ = new Set(cards.map(t => t.id));
+    const anc = id => { const seen = new Set(); let p = ix.parentOf[id]; while (p && !seen.has(p)) { if (inQ.has(p)) return p; seen.add(p); p = ix.parentOf[p]; } return null; };
+    const kids = {}, roots = [];
+    cards.forEach(t => { const a = anc(t.id); if (a) (kids[a] = kids[a] || []).push(t); else roots.push(t); });
+    const rows = [], done = new Set();
+    const emit = (t, d) => {
+      if (done.has(t.id)) return;
+      done.add(t.id);
+      rows.push({ t, depth: Math.min(d, cap), deep: d > cap, ghost: false });
+      (kids[t.id] || []).forEach(k => emit(k, d + 1));
+    };
+    roots.forEach(t => {
+      if (done.has(t.id)) return;
+      const p = ix.parentOf[t.id], pt = p && get(p);
+      if (pt && !inQ.has(p)) {
+        rows.push({ t: pt, depth: 0, deep: false, ghost: true });
+        roots.filter(r => ix.parentOf[r.id] === p).forEach(r => emit(r, 1));
+      } else emit(t, 0);
+    });
+    rows.forEach((r, i) => {
+      if (!r.depth) { r.last = false; return; }
+      let last = true;
+      for (let j = i + 1; j < rows.length && rows[j].depth >= r.depth; j++) if (rows[j].depth === r.depth) { last = false; break; }
+      r.last = last;
+    });
+    return rows;
+  }
+  // the Timeline: one row per task. base = the tasks the view picked (open, filters, a date in the window); their parent
+  // trees join them (ancestors and children). Rows run depth first, siblings by start (or end), then number. A bar is in day
+  // indexes from opts.start (a Date at local midnight) over opts.days; a parent gets a summary span over its tree. Edges go
+  // from a predecessor's bar end to the next task's bar start; late = the next one starts before the predecessor ends.
+  // opts: { start, days, collapsed: Set, cap }. Out: { rows: [{ t, depth, kids, collapsed, closed, bar, sum }], edges }
+  function timelineRows(base, ix, byId, opts) {
+    const get = getter(byId), o = opts || {}, cap = o.cap || 5, collapsed = o.collapsed || new Set();
+    const t0 = new Date(o.start).setHours(0, 0, 0, 0), days = o.days || 14;
+    const dayIx = x => Math.round((new Date(x).setHours(0, 0, 0, 0) - t0) / DAY);
+    const set = new Map();
+    const add = t => { if (t && !t.deleted && !set.has(t.id)) set.set(t.id, t); };
+    // the whole tree of each picked task: up to its top ancestor, then every task under it
+    const down = id => (ix.childrenOf[id] || []).forEach(c => { if (!set.has(c)) { add(get(c)); down(c); } });
+    (base || []).forEach(t => {
+      add(t);
+      const seen = new Set([t.id]); let top = t.id, p = ix.parentOf[t.id];
+      while (p && !seen.has(p) && get(p)) { seen.add(p); add(get(p)); top = p; p = ix.parentOf[p]; }
+      down(top);
+    });
+    const span = t => { const a = t.start || t.deadline, b = t.deadline || t.start; return a ? { a: dayIx(a), b: Math.max(dayIx(a), dayIx(b)) } : null; };
+    const when = t => (t.start || t.deadline || Infinity) - 0;
+    const order = (a, b) => when(a) - when(b) || a.num - b.num;
+    const kidsOf = id => (ix.childrenOf[id] || []).map(c => set.get(c)).filter(Boolean).sort(order);
+    const tree = t => { const s = span(t), out = s ? [s] : []; kidsOf(t.id).forEach(k => out.push(...tree(k).spans)); return { spans: out }; };
+    const rows = [], seen = new Set();
+    const walk = (t, d) => {
+      if (seen.has(t.id)) return;
+      seen.add(t.id);
+      const kids = kidsOf(t.id), bar = span(t);
+      let sum = null;
+      if (kids.length) { const sp = tree(t).spans; if (sp.length) sum = { a: Math.min(...sp.map(x => x.a)), b: Math.max(...sp.map(x => x.b)) }; }
+      const isCol = collapsed.has(t.id) && kids.length > 0;
+      rows.push({ t, depth: Math.min(d, cap), kids: kids.length, collapsed: isCol, closed: isClosed(t), bar, sum, days });
+      if (!isCol) kids.forEach(k => walk(k, d + 1));
+    };
+    [...set.values()].filter(t => !set.has(ix.parentOf[t.id])).sort(order).forEach(t => walk(t, 0));
+    const at = new Map(rows.map((r, i) => [r.t.id, i]));
+    const edges = [];
+    rows.forEach((r, i) => (ix.predsOf[r.t.id] || []).forEach(p => {
+      const j = at.get(p);
+      if (j === undefined || !r.bar || !rows[j].bar) return;
+      edges.push({ from: j, to: i, fromDay: rows[j].bar.b, toDay: r.bar.a, late: r.bar.a < rows[j].bar.b });
+    }));
+    return { rows, edges };
+  }
+
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
@@ -1866,7 +2117,9 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     tagListReorder, sortWrites, tagGroupOpen, tagSearch,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
     cancelTimes, isTestList, chipSelect, kpiTicks,
-    KPI_COLUMNS, kpiHistory, kpiStateAt, kpiStatus, kpiQuadrant, KPI_DAILY_MAX, kpiTimes, kpiSeries, kpiPie, kpiClosure, kpiOverall };
+    KPI_COLUMNS, kpiHistory, kpiStateAt, kpiStatus, kpiQuadrant, KPI_DAILY_MAX, kpiTimes, kpiSeries, kpiPie, kpiClosure, kpiOverall,
+    LINK_KINDS, LINK_ROLES, linkKey, mergeLinkRows, linkPollFilter, linkIndex, waitingFor, subtaskProgress, linkFor, wouldLoop,
+    linkCandidates, groupCards, timelineRows };
 });
 </script>
 <script>
@@ -1925,7 +2178,7 @@ const label = l => LIST[l] ? LIST[l].name : '?';
 const initial = l => (label(l)[0] || '?').toUpperCase();
 const all = () => tasks.filter(t => !t.deleted && LIST[t.list]);
 const find = id => tasks.find(t => t.id === id);
-const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), more: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2 };
+const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), more: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2, tlCollapsed: new Set(), tlDayW: 0 };
 const THEMES = ['light', 'dark'];
 let toastTimer = null, lastUndo = null, dragId = null;
 const overdue = t => t.deadline && t.deadline < TODAY;
@@ -2255,6 +2508,69 @@ async function takeTagDefs(rows) {
   if (m.changed) relabel();
   return m.changed > 0;
 }
+// ---- task links (db/018): LINKS = Map key -> { from, to, kind } of live depends_on and parent links. LINKS_READY is false on a
+// database without 017 (no removed_at column, no rpc/link_items): the links UI is then not drawn. Writes go through
+// rpc/link_items and rpc/unlink_items in one serial queue (LQ); a link to a task still being created waits for its insert.
+let LINKS = new Map(), LINKS_READY = false, maxLinkSeen = 0;
+const LINK_COLS = 'item_links?select=from_item,to_item,kind,removed_at,changed_at&kind=in.(depends_on,parent)';
+const noteLinkMax = rows => rows.forEach(r => { const u = Date.parse(r.changed_at); if (u > maxLinkSeen) maxLinkSeen = u; });
+async function loadLinks() {
+  const r = await getAll(LINK_COLS + '&removed_at=is.null', 'from_item,to_item,kind');
+  LINKS_READY = r.ok;
+  if (!r.ok) { LINKS = new Map(); return r; }
+  noteLinkMax(r.json);
+  if (!maxLinkSeen) maxLinkSeen = Date.now();
+  LINKS = C.mergeLinkRows(null, r.json).links;
+  return r;
+}
+async function pollLinks() {
+  if (!LINKS_READY) return 0;
+  const r = await getAll(LINK_COLS + '&' + C.linkPollFilter(maxLinkSeen || Date.now()), 'from_item,to_item,kind');
+  if (!r.ok) return 0;
+  noteLinkMax(r.json);
+  const pending = new Set(LQ.map(x => C.linkKey({ from_item: x.l.from, to_item: x.l.to, kind: x.l.kind })));
+  const m = C.mergeLinkRows(LINKS, r.json.filter(x => !pending.has(C.linkKey(x))));
+  LINKS = m.links;
+  return m.changed;
+}
+// the index over links whose both ends are on the board (live items of lists I read)
+function linkIx() { const by = {}; all().forEach(t => { by[t.id] = t; }); return { ix: C.linkIndex(LINKS, by), by }; }
+const LQ = [];
+let lqBusy = false;
+// add or remove one link; shown at once, sent in order, put back with the database's reason when refused
+function linkOp(op, l) {
+  const key = C.linkKey({ from_item: l.from, to_item: l.to, kind: l.kind });
+  const before = new Map(LINKS);
+  if (op === 'add') {
+    if (l.kind === 'parent') [...LINKS].forEach(([k, x]) => { if (x.kind === 'parent' && x.from === l.from) LINKS.delete(k); });
+    LINKS.set(key, { from: l.from, to: l.to, kind: l.kind });
+  } else LINKS.delete(key);
+  LQ.push({ op, l, before });
+  runLinks();
+}
+const waitCreated = async id => { for (let i = 0; i < 150 && Q.get(id) && Q.get(id).create; i++) await new Promise(r => setTimeout(r, 200)); };
+async function runLinks() {
+  if (lqBusy) return;
+  lqBusy = true;
+  try {
+    while (LQ.length) {
+      const x = LQ[0];
+      await waitCreated(x.l.from); await waitCreated(x.l.to);
+      const r = await rest('POST', 'rpc/' + (x.op === 'add' ? 'link_items' : 'unlink_items'), { p_from: x.l.from, p_to: x.l.to, p_kind: x.l.kind });
+      if (!r.ok && (r.err.retry || r.status === 401)) { await new Promise(res => setTimeout(res, 3000)); if (!session) return; continue; }
+      LQ.shift();
+      if (!r.ok) {
+        // put back only what this step changed: its own link, and the parent link an add replaced
+        const key = C.linkKey({ from_item: x.l.from, to_item: x.l.to, kind: x.l.kind });
+        if (x.op === 'add') { LINKS.delete(key); x.before.forEach((v, k) => { if (v.kind === 'parent' && v.from === x.l.from && x.l.kind === 'parent') LINKS.set(k, v); }); }
+        else if (x.before.has(key)) LINKS.set(key, x.before.get(key));
+        toast(r.err.message); renderSoon();
+      }
+    }
+  } finally { lqBusy = false; }
+  if (!document.querySelector('dialog[open]') && !dragId) renderSoon();
+}
+
 async function loadAll() {
   boot.gate = 'loading'; render();
   const keep = new Map([...Q.keys()].map(id => [id, find(id)]).filter(x => x[1])); // edits still waiting survive a sign-in
@@ -2278,6 +2594,8 @@ async function loadAll() {
   const it = await loadItemTags();
   if (!it.ok) return loadFailed(it);
   if (!maxTagSeen) maxTagSeen = Date.now();
+  maxLinkSeen = 0;
+  await loadLinks(); // a database without db/018 answers 400: the links UI stays off
   prefsExists = prefs.json.length > 0;
   applyPrefs(C.prefsFromRow(prefsExists ? prefs.json[0].prefs : null, { listIds: LISTS, itemIds: tasks.map(t => t.id), tagListIds: Object.keys(TAG_LISTS) }));
   boot.gate = null;
@@ -2310,12 +2628,14 @@ async function refreshMeta() {
   }
   // a list or a tag list that became readable brings tags the poll would not see (their item_tags rows did not change)
   if (fresh.length || Object.keys(TAG_LISTS).filter(id => !TAG_LISTS[id].hidden).sort().join() !== tagListsBefore) await loadItemTags();
+  // a list that became readable brings links whose rows did not change
+  if (fresh.length && LINKS_READY) await loadLinks();
 }
 
 // ---- writes: one serial queue per item, merged per item; every PATCH carries the version the last response returned ----
 // Q: item id -> { fields: Set of task fields waiting, base: their values before the first waiting change, create, inflight, origin }
 const Q = new Map();
-const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'status', 'sortKey', 'list', 'deleted'];
+const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'priority', 'status', 'sortKey', 'list', 'deleted'];
 const dbField = f => f === 'qStored' ? 'q' : f; // taskToPatch names the stored quadrant "q"
 const val = (t, f) => f === 'tags' ? t.tags.slice() : t[f];
 const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
@@ -2367,7 +2687,7 @@ async function flush(id) {
   e.inflight = true;
   let res, sending = null;
   if (e.create) {
-    const body = Object.assign({ id: t.id, list_id: t.list, category: t.category, owner_id: t.ownerId || null }, C.taskToPatch(t, ['title', 'notes', 'q', 'pin', 'deadline', 'start', 'status', 'sortKey']));
+    const body = Object.assign({ id: t.id, list_id: t.list, category: t.category, owner_id: t.ownerId || null }, C.taskToPatch(t, ['title', 'notes', 'q', 'pin', 'deadline', 'start', 'priority', 'status', 'sortKey']));
     res = await rest('POST', 'items', body, { Prefer: 'return=representation' });
     // a retry after a lost response: the client id is already stored, so a 409 / 23505 counts as success
     if (!res.ok && res.err.kind === 'duplicate') res = await rest('GET', 'items?select=*&id=eq.' + t.id);
@@ -2431,7 +2751,7 @@ async function conflict(t, e, sending) {
   }
   const draft = { title: t.title, notes: t.notes };
   applyRow(t, row, e.fields);
-  const names = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start' };
+  const names = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start', priority: 'priority' };
   const what = clash.map(f => names[f] || f).join(', ');
   if (e.origin === 'dialog') openTask(t.id, null, { draft, notice: 'Changed by someone else while you edited: ' + what + '. Their version is saved; your text is below. Save again to replace it.' });
   else toast('Changed by someone else: ' + what);
@@ -2441,7 +2761,7 @@ async function conflict(t, e, sending) {
 function failed(t, e, sending, err) {
   if (e.create) {
     Q.delete(t.id); tasks = tasks.filter(x => x !== t);
-    if (e.origin === 'dialog' && (err.kind === 'sensitive' || err.kind === 'invalid')) openTask(null, t.qStored, { draft: { title: t.title, notes: t.notes, list: t.list, tags: t.tags, deadline: t.deadline }, error: err.message });
+    if (e.origin === 'dialog' && (err.kind === 'sensitive' || err.kind === 'invalid')) openTask(null, t.qStored, { draft: { title: t.title, notes: t.notes, list: t.list, tags: t.tags, deadline: t.deadline, start: t.start, priority: t.priority }, error: err.message });
     else toast(err.message);
     render(); return;
   }
@@ -2501,7 +2821,8 @@ async function poll(meta) {
       const d = await getAll('tags?select=*&' + C.tagDefsFilter(maxTagDefSeen || Date.now()));
       if (d.ok && d.json.length) defs = (await takeTagDefs(d.json)) || defs;
     }
-    if (m.changed || tm.changed || tm.unknownTags.length || defs || meta) { if (!document.querySelector('dialog[open]') && !dragId) renderSoon(); }
+    const lc = await pollLinks();
+    if (m.changed || tm.changed || tm.unknownTags.length || defs || meta || lc) { if (!document.querySelector('dialog[open]') && !dragId) renderSoon(); }
   } finally { polling = false; }
 }
 
@@ -2603,16 +2924,22 @@ function gate(kind) {
 }
 
 // round 3: what a card shows follows Card layout (cardLayout); the grid keeps an empty cell where a part is switched off
-function cardHtml(t, q) {
+// g: the groupCards row when Card layout groups children under their parent (depth, last)
+function cardHtml(t, q, g) {
   const L = cardLayout;
   const expanded = C.cardExpanded(t, st.cardMode, L, st.flip);
   const editable = canDo('edit', t);
   const arrow = L.arrow ? '<button class="exp" data-flip="' + t.id + '" aria-expanded="' + expanded + '" aria-label="' + (expanded ? 'Collapse card' : 'Expand card') + '">' + (expanded ? I.chevD : I.chevR) + '</button>' : '<span></span>';
-  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (soon(t) ? ' soon' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '');
-  const open = '<div class="' + cls + '" data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
+  const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (soon(t) ? ' soon' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '') + (g && g.depth ? ' lk-kid' + (g.last ? ' lk-last' : '') : '');
+  const open = '<div class="' + cls + '"' + (g && g.depth ? ' style="--lk-d:' + g.depth + '"' : '') + ' data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
   const meta = t.deadline ? '<span class="meta"' + (soon(t) ? ' title="Due soon: less than ' + settings.threshold + '% of the ' + settings.windowDays + '-day urgency window left"' : '') + '>' + rel(t) + (soon(t) ? '<span class="sr">, due soon</span>' : '') + '</span>' : '<span></span>';
   const done = editable ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>' : '<span></span>';
-  const badges = '<span class="tbs">' + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
+  // task links: P0-P5, Waiting for N (open predecessors), a parent's done/total (Card layout priority, waiting, progress)
+  const lx = RLX, wt = L.waiting && lx ? C.waitingFor(t, lx.ix, lx.by) : [], pg = L.progress && lx ? C.subtaskProgress(t, lx.ix, lx.by) : null;
+  const linkBadges = (L.priority && Number.isInteger(t.priority) ? '<span class="tb pr' + (t.priority >= 3 ? ' hi' : '') + '" title="Priority ' + t.priority + ' of 5">P' + t.priority + '</span>' : '') +
+    (wt.length ? '<span class="tb wt" title="Waiting for ' + esc(wt.map(x => ref(x) + ' ' + plain(x.title)).join(', ')) + '"><span class="wl">Waiting for&nbsp;</span><span class="ws" aria-hidden="true">Wait&nbsp;</span>' + wt.length + '</span>' : '') +
+    (pg ? '<span class="tb pg" title="' + pg.done + ' of ' + pg.total + ' subtasks done">' + pg.done + '/' + pg.total + '<i style="--p:' + Math.round(100 * pg.done / pg.total) + '%"></i></span>' : '');
+  const badges = '<span class="tbs">' + linkBadges + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
     (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
     (t.category !== 'task' && C.showSource(L, st.list !== 'all') ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
   const num = L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>';
@@ -2634,6 +2961,9 @@ function cardHtml(t, q) {
   return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
     (body ? '<div class="details">' + body + '</div>' : '') + '</div>';
 }
+// the faded parent of children whose parent is in another quadrant (not a card: no drag, not counted); it opens the parent
+const ghostHtml = p => '<button type="button" class="lk-ghost ' + p.q + '" data-open="' + p.id + '" aria-label="Parent: ' + esc(plain(p.title)) + ', in ' + QN[p.q] + '"><span aria-hidden="true">↑</span><span class="t">' + mdInline(p.title) + '</span><span class="gq">' + QN[p.q] + '</span></button>';
+let RLX = null; // the link index of the current render (linkIx)
 const factText = f => ({ end: 'End ' + ymd(f.at), created: 'Created ' + ymd(f.at), creator: 'By ' + displayName(f.id), owner: 'For ' + displayName(f.id) })[f.k];
 
 const archivedIn = () => all().filter(t => t.doneAt && inList(t));
@@ -2655,26 +2985,84 @@ function archiveHtml() {
       : '<div class="empty n">' + (total ? 'No matches' : '0') + '</div>');
 }
 
-// timeline: one bar per dated open task from start (or deadline day) to deadline; weekends and today marked; load row below
+// Timeline (task links): one row per task. The picked tasks are the open ones that pass the filters and have a date in the
+// window; their parent trees join them (C.timelineRows). A row shows the tree indent (a chevron folds a parent, this session
+// only: st.tlCollapsed), the number and title, and a bar from Start (or the End day) to End in the quadrant's colour; a parent
+// also gets a thin span over its whole tree. One SVG layer draws an arrow from each predecessor's bar end to the next task's bar
+// start, red and dashed when the next one starts before the predecessor ends. Closed tasks in a tree are greyed. Geometry is
+// in px from the day width st.tlDayW, measured once after a render (tlFit), so no row reads the layout.
+const TL_ROW = 34;
 function timelineHtml() {
+  const t0 = performance.now();
   const mon = x => { const y = new Date(x); y.setHours(0, 0, 0, 0); y.setDate(y.getDate() - ((y.getDay() + 6) % 7)); return y; };
   if (!st.tlStart) st.tlStart = mon(TODAY);
   const days = st.tlWeeks * 7, start = st.tlStart, end = new Date(start.getTime() + days * DAY);
-  const dayIx = x => Math.floor((new Date(x).setHours(0, 0, 0, 0) - start) / DAY);
-  const shown = all().filter(t => !t.doneAt && inList(t) && t.deadline && passFilters(t) && t.deadline >= start && (t.start || t.deadline) < end);
-  const today = dayIx(TODAY);
-  const cols = 'grid-template-columns:minmax(140px,220px) repeat(' + days + ',minmax(18px,1fr))';
-  const head = [...Array(days)].map((_, i) => { const x = new Date(start.getTime() + i * DAY), we = x.getDay() === 0 || x.getDay() === 6; return '<div class="tl-d' + (we ? ' we' : '') + (i === today ? ' td' : '') + '">' + x.getDate() + '</div>'; }).join('');
-  const bars = shown.map(t => {
-    const a = Math.max(0, dayIx(t.start || t.deadline)), b = Math.min(days - 1, dayIx(t.deadline));
-    return '<div class="tl-row" style="' + cols + '"><div class="tl-name"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + '</div><button class="tl-bar ' + t.q + (overdue(t) ? ' overdue' : '') + '" data-open="' + t.id + '" style="grid-column:' + (a + 2) + ' / ' + (b + 3) + '" aria-label="' + esc(plain(t.title)) + ', end ' + fmtDay(t.deadline) + '"></button></div>';
+  const phone = matchMedia('(max-width:700px)').matches, nw = phone ? 132 : 248, dw = st.tlDayW || (phone ? 22 : 30), W = days * dw;
+  const lx = linkIx();
+  const base = all().filter(t => !t.doneAt && inList(t) && passFilters(t) && (t.start || t.deadline) && (t.start || t.deadline) < end && (t.deadline || t.start) >= start);
+  const { rows, edges } = C.timelineRows(base, lx.ix, lx.by, { start, days, collapsed: st.tlCollapsed, cap: 5 });
+  const today = Math.round((new Date(TODAY).setHours(0, 0, 0, 0) - start) / DAY);
+  const dayAt = i => new Date(start.getTime() + i * DAY);
+  const head = [...Array(days)].map((_, i) => { const x = dayAt(i), we = x.getDay() === 0 || x.getDay() === 6; return '<div class="tl-d' + (we ? ' we' : '') + (i === today ? ' td' : '') + '">' + x.getDate() + '</div>'; }).join('');
+  const cols = [...Array(days)].map((_, i) => { const x = dayAt(i); return x.getDay() === 0 || x.getDay() === 6 ? '<i class="tl-we" style="left:' + i * dw + 'px;width:' + dw + 'px"></i>' : ''; }).join('') +
+    (today >= 0 && today < days ? '<i class="tl-now" style="left:' + (today * dw + dw / 2) + 'px"></i>' : '');
+  const clip = (a, b) => ({ a: Math.max(0, a), b: Math.min(days - 1, b) });
+  const barHtml = r => {
+    const t = r.t, title = esc(plain(t.title));
+    let h = '';
+    if (r.sum && r.kids) { const c = clip(r.sum.a, r.sum.b); if (c.a <= c.b) h += '<i class="tl-sum" style="left:' + c.a * dw + 'px;width:' + (c.b - c.a + 1) * dw + 'px"></i>'; }
+    if (!r.bar) return h + (r.sum && r.kids ? '' : '<span class="tl-nd">no dates</span>');
+    if (r.bar.b < 0) return h + '<button class="tl-off l" data-open="' + t.id + '" aria-label="' + title + ', ended before these weeks">‹ ' + fmtDay(t.deadline || t.start) + '</button>';
+    if (r.bar.a > days - 1) return h + '<button class="tl-off r" data-open="' + t.id + '" aria-label="' + title + ', starts after these weeks">' + fmtDay(t.start || t.deadline) + ' ›</button>';
+    const c = clip(r.bar.a, r.bar.b);
+    return h + '<button class="tl-bar ' + t.q + (overdue(t) ? ' overdue' : '') + (c.a !== r.bar.a ? ' cut-l' : '') + (c.b !== r.bar.b ? ' cut-r' : '') + '" data-open="' + t.id + '" style="left:' + c.a * dw + 'px;width:' + (c.b - c.a + 1) * dw + 'px"' +
+      ' aria-label="' + title + (t.start ? ', start ' + fmtDay(t.start) : '') + (t.deadline ? ', end ' + fmtDay(t.deadline) : '') + '"></button>';
+  };
+  const rowsHtml = rows.map(r => {
+    const t = r.t;
+    const chev = r.kids ? '<button class="tl-chev" data-tlcol="' + t.id + '" aria-expanded="' + !r.collapsed + '" aria-label="' + (r.collapsed ? 'Show' : 'Hide') + ' the ' + r.kids + ' subtasks of ' + esc(plain(t.title)) + '">' + (r.collapsed ? I.chevR : I.chevD) + '</button>' : '<span class="tl-chev-sp"></span>';
+    return '<div class="tl-row ' + t.q + (r.closed ? ' closed' : '') + (r.kids ? ' parent' : '') + '" data-tl="' + t.id + '"><div class="tl-name" style="--ind:' + r.depth + '">' + chev +
+      '<button class="tl-t" data-open="' + t.id + '"><span class="k">' + ref(t) + '</span> ' + esc(plain(t.title)) + '</button></div><div class="tl-track">' + barHtml(r) + '</div></div>';
   }).join('');
-  const load = [...Array(days)].map((_, i) => { const n = shown.filter(t => dayIx(t.start || t.deadline) <= i && dayIx(t.deadline) >= i).length; return '<div class="tl-d' + (n > 3 ? ' over' : '') + '">' + (n || '') + '</div>'; }).join('');
-  return '<div class="ar-tools"><button id="tl-prev" aria-label="Previous week">' + I.left + '</button><button id="tl-today">Today</button><button id="tl-next" aria-label="Next week">' + I.right + '</button>' +
-    '<span class="n">' + fmtDay(start) + ' – ' + fmtDay(new Date(end.getTime() - DAY)) + '</span><span class="sp"></span><label>Weeks <select id="tl-weeks">' + [2, 4, 8].map(w => '<option' + (st.tlWeeks === w ? ' selected' : '') + '>' + w + '</option>').join('') + '</select></label></div>' +
-    '<div class="tl"><div class="tl-row tl-head" style="' + cols + '"><div class="tl-name"></div>' + head + '</div>' + (bars || '<div class="empty n">0</div>') +
-    '<div class="tl-row tl-load" style="' + cols + '"><div class="tl-name n">Load</div>' + load + '</div></div>';
+  // arrows: from a predecessor's bar end to the next task's bar start, clipped to the window
+  const y = i => i * TL_ROW + TL_ROW / 2, X = d => Math.max(0, Math.min(W, d * dw));
+  const paths = edges.map(e => {
+    const x1 = X(e.fromDay + 1), x2 = X(e.toDay), y1 = y(e.from), y2 = y(e.to);
+    if ((e.fromDay + 1 < 0 && e.toDay < 0) || (e.fromDay >= days && e.toDay >= days)) return '';
+    // forward: out of the bar end, down, into the next bar's start; backward (the next one starts too early): out, up to the
+    // row's top edge, back past its start, down, and in from the left, so the line never runs over a bar
+    let d;
+    if (x2 - x1 >= 16) { const xm = x1 + 8; d = 'M' + x1 + ' ' + y1 + 'H' + xm + 'V' + y2 + 'H' + (x2 - 2); }
+    else { const xa = Math.min(W, x1 + 8), xb = Math.max(0, x2 - 8), yt = y2 + (y2 > y1 ? -TL_ROW / 2 + 2 : TL_ROW / 2 - 2); d = 'M' + x1 + ' ' + y1 + 'H' + xa + 'V' + yt + 'H' + xb + 'V' + y2 + 'H' + (x2 - 2); }
+    return '<path class="' + (e.late ? 'late' : '') + '" d="' + d + '" marker-end="url(#tl-ah' + (e.late ? '-late' : '') + ')"/>';
+  }).join('');
+  const svg = paths ? '<svg class="tl-links" width="' + W + '" height="' + rows.length * TL_ROW + '" viewBox="0 0 ' + W + ' ' + rows.length * TL_ROW + '" aria-hidden="true" focusable="false">' +
+    '<defs><marker id="tl-ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z"/></marker>' +
+    '<marker id="tl-ah-late" class="late" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z"/></marker></defs>' + paths + '</svg>' : '';
+  const load = [...Array(days)].map((_, i) => { const n = rows.filter(r => !r.closed && r.bar && r.bar.a <= i && r.bar.b >= i).length; return '<div class="tl-d' + (n > 3 ? ' over' : '') + '">' + (n || '') + '</div>'; }).join('');
+  const html = '<div class="ar-tools"><button id="tl-prev" aria-label="Previous week">' + I.left + '</button><button id="tl-today">Today</button><button id="tl-next" aria-label="Next week">' + I.right + '</button>' +
+    '<span class="n">' + fmtDay(start) + ' – ' + fmtDay(new Date(end.getTime() - DAY)) + '</span><span class="sp"></span>' +
+    (edges.length ? '<span class="n tl-key"><i class="tl-key-a" aria-hidden="true"></i>comes before<i class="tl-key-a late" aria-hidden="true"></i>starts too early</span>' : '') +
+    '<label>Weeks <select id="tl-weeks">' + [2, 4, 8].map(w => '<option' + (st.tlWeeks === w ? ' selected' : '') + '>' + w + '</option>').join('') + '</select></label></div>' +
+    '<div class="tl" id="tl" style="--nw:' + nw + 'px;--dw:' + dw + 'px;--tlw:' + (nw + W) + 'px"><div class="tl-in">' +
+    '<div class="tl-head"><div class="tl-name"></div><div class="tl-days">' + head + '</div></div>' +
+    (rows.length ? '<div class="tl-body"><div class="tl-cols" aria-hidden="true">' + cols + '</div>' + rowsHtml + svg + '</div>' : '<div class="empty n">No tasks with dates in these weeks</div>') +
+    '<div class="tl-load"><div class="tl-name n">Load</div><div class="tl-days">' + load + '</div></div></div></div>';
+  tlBuildMs = performance.now() - t0;
+  return html;
 }
+let tlBuildMs = 0, tlResize = 0;
+// after a Timeline render: the day width that fills the panel (one layout read), then a second render if it changed; the time
+// of the render is published as performance measure td:tl-render and window.tdTimelineMs (read by the e2e runner)
+function tlFit(t0) {
+  const box = document.getElementById('tl'); if (!box) return;
+  const nw = parseFloat(box.style.getPropertyValue('--nw')) || 248, days = st.tlWeeks * 7;
+  const want = Math.max(18, Math.floor((box.clientWidth - nw - 2) / days));
+  window.tdTimelineMs = performance.now() - t0;
+  try { performance.measure('td:tl-render', { start: t0, end: performance.now() }); } catch (e) {}
+  if (want !== st.tlDayW) { st.tlDayW = want; render(); }
+}
+addEventListener('resize', () => { if (st.view !== 'timeline') return; clearTimeout(tlResize); tlResize = setTimeout(() => { st.tlDayW = 0; render(); }, 150); });
 
 function confirmAsk(text, yes, onYes, opener) {
   const dlg = dialogShell('<form method="dialog"><strong>' + esc(text) + '</strong><div class="actions"><button value="cancel" id="cf-cancel" autofocus>Cancel</button><button id="cf-ok" value="ok">' + esc(yes) + '</button></div></form>', opener || '[data-view="archive"]');
@@ -2753,6 +3141,7 @@ function bindListDrag(app) {
 
 function render() {
   if (boot.gate) return gate(boot.gate);
+  const tR0 = performance.now();
   TODAY = new Date(); // "now" is recomputed on every render
   const live = all();
   live.forEach(t => { t.q = C.deriveQuadrant(t, settings, TODAY.getTime()); });
@@ -2782,14 +3171,16 @@ function render() {
         (canDo('edit', t) ? ' draggable="true" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"' : '') + '>' + ref(t) + ' ' + esc(plain(t.title)) + (overdue(t) ? '<span class="sr"> overdue</span>' : '') + '</button>').join(''));
   }).join('');
   const addable = canAddSomewhere();
+  RLX = LINKS_READY ? linkIx() : null;
   const quad = q => {
     const cards = shown.filter(t => t.q === q);
+    const body = cardLayout.group && RLX ? C.groupCards(cards, RLX.ix, RLX.by).map(r => r.ghost ? ghostHtml(r.t) : cardHtml(r.t, q, r)).join('') : cards.map(t => cardHtml(t, q)).join('');
     const total = open.filter(t => inList(t) && t.q === q).length;
     const over = q === 'A' && settings.doLimit > 0 && total > settings.doLimit;
     const ex = st.expanded === q;
     return '<section class="q" data-q="' + q + '" aria-label="' + QN[q] + '"><div class="qh"><span class="ql" data-q="' + q + '" aria-hidden="true">' + q + '</span><span>' + QN[q] + '</span><span class="cnt' + (over ? ' over' : '') + '">' + total + '</span><span class="sp"></span>' +
       (addable ? '<button data-add="' + q + '" aria-label="Add to ' + QN[q] + '">' + I.plus + '</button>' : '') + '<button data-expand="' + q + '" aria-label="' + (ex ? 'Collapse ' : 'Expand ') + QN[q] + '" aria-pressed="' + ex + '">' + I.expand + '</button></div>' +
-      '<div class="qb" data-body="' + q + '">' + cards.map(t => cardHtml(t, q)).join('') + '</div></section>';
+      '<div class="qb" data-body="' + q + '">' + body + '</div></section>';
   };
   let dd = '';
   if (st.q.trim()) {
@@ -2813,7 +3204,7 @@ function render() {
     profile: () => '<div class="who-am" role="none"><strong>' + esc(me.display_name) + '</strong>' + (session.user.email ? '<span>' + esc(session.user.email) + '</span>' : '') + '</div>' +
       (human ? '<button data-menu="tags">Tags</button><button data-menu="sharing">Sharing' + (INVITES.length ? ' <span class="badge" aria-label="' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '">' + INVITES.length + '</span>' : '') + '</button>' : '') +
       (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
-      '<hr><button data-menu="timeline">Timeline (draft)</button><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
+      '<hr><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
       (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : '') +
       '<hr><button data-signout>Sign out</button>',
     more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
@@ -2843,11 +3234,12 @@ function render() {
     '<button class="f" id="mine" aria-pressed="' + st.mine + '">Mine</button>' +
     (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop + '</header>' +
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
-    [['matrix', '▦'], ['archive', '▤'], ['review', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v || (st.view === 'timeline' && v === 'matrix') ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
+    [['matrix', '▦'], ['archive', '▤'], ['review', '▬'], ['timeline', '☰']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
     '</div><nav class="groups" aria-label="Items by quadrant">' + menuGroups + '</nav></aside>' +
     '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : esc(label(st.list))) + '</h1>' +
     (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : st.view === 'review' ? reviewHtml() : matrix) + '</main></div>';
   bind();
+  if (st.view === 'timeline') tlFit(tR0);
   anchorPop();
   const qi = document.getElementById('q'); if (st.focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); st.focusQ = false; }
   if (st.sel >= 0) qi.setAttribute('aria-activedescendant', 'opt' + st.sel);
@@ -2973,7 +3365,11 @@ function openTask(id, quad, opts) {
   if (id && !t) return;
   const opener = id ? '[data-card="' + id + '"]' : (quad ? '[data-add="' + quad + '"]' : null);
   const editable = t ? canDo('edit', t) : true;
-  const start = t ? t.start || null : new Date(); // a new task's start is the moment it is created, fixed
+  // task links: Start is a field (planned start); a new task starts blank. selfId is the new task's id before it exists, so
+  // links picked in this window can be sent once its insert is through
+  const start = dr.start !== undefined ? dr.start : t ? t.start || null : null;
+  const prio = dr.priority !== undefined ? dr.priority : t && Number.isInteger(t.priority) ? t.priority : null;
+  const selfId = t ? t.id : crypto.randomUUID();
   const addLists = LISTS.filter(l => canDo('add', null, l));
   // A6: with All selected, a new item goes to the task category's default list when I may add there, else my own first list
   const listDefault = dr.list || (t ? t.list : (st.list === 'all' ? C.defaultAddList({ lists: LISTS, roles: ROLE, byId: LIST, meId: me.id, cats: CATS }) : st.list));
@@ -2990,7 +3386,9 @@ function openTask(id, quad, opts) {
   const dl = dr.deadline !== undefined ? dr.deadline : t && t.deadline;
   const tagKey = a => JSON.stringify(a.slice().sort());
   // what the window showed: Save sends only what the person changed, and checks it against changes made meanwhile
-  const shown = t ? { version: t.version, title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q } : null;
+  const shown = t ? { version: t.version, title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q,
+    start: t.start ? t.start.getTime() : null, priority: Number.isInteger(t.priority) ? t.priority : null } : null;
+  const dtl = d => d ? new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '';
   const ro = editable ? '' : ' disabled';
   const src = C.showSource(cardLayout, st.list !== 'all'); // round 4, item 3: Sources follow Card layout's Source switch
   const wfacts = t ? (cardLayout.number ? [refText(t)] : []).concat(C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText)) : [];
@@ -3006,11 +3404,16 @@ function openTask(id, quad, opts) {
     '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
     (t ? '<div><label>Quadrant<select id="fq"' + ro + '>' + QS.map(q => '<option value="' + q + '"' + (t.q === q ? ' selected' : '') + '>' + q + ' ' + QN[q] + '</option>').join('') + '</select></label></div>' : '') +
     '<div><label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div></div></div>' +
+    // task links: Start (the Timeline's bar starts here) and Priority (0-5, higher = more important; deriveQuadrant reads it)
+    '<div class="frow"><div><label>Start<input id="fsd" type="datetime-local"' + ro + ' value="' + dtl(start) + '"></label><div class="err" id="fsde" aria-live="polite"></div></div>' +
+    '<div><label>Priority<select id="fp"' + ro + ' aria-describedby="fp-h"><option value="">—</option>' + [0, 1, 2, 3, 4, 5].map(n => '<option value="' + n + '"' + (prio === n ? ' selected' : '') + '>P' + n + '</option>').join('') + '</select></label>' +
+    '<div class="s-hint" id="fp-h">Higher = more important</div></div></div>' +
     // round 4, item 5: the read-only facts follow Card layout (number, created, who created it, who it is for); End is a field
     (t && wfacts.length ? '<p class="fwho" id="fwho">' + wfacts.map(esc).join(' · ') + '</p>' : '') +
     // U1, U6, U8: no "Tags" label; a search box over the groups; the groups scroll inside a box of about 40% of the window's height
     '<div class="tagpick"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' +
     '<div class="tagbox" role="group" aria-label="Tags"></div></div>' +
+    (LINKS_READY ? '<div class="flabel" id="lk-l">Links</div><div class="links" id="lk" role="group" aria-labelledby="lk-l"></div>' : '') +
     (t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
     '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
     '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
@@ -3186,10 +3589,109 @@ function openTask(id, quad, opts) {
   drawTags(false);
   qEl.oninput = () => drawTags(false);
   qEl.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); const b = qEl.value.trim() && box.querySelector('.tagchip:not(:disabled)'); if (b) b.click(); } };
+  // ---- task links: Parent, Subtasks, Comes after (predecessors), Next. "+ …" opens a search box under its row (title words,
+  // #12 or list#12; C.linkCandidates leaves out loops and tasks already linked); "Create …" adds a new task in this list and
+  // quadrant. Nothing is sent until Save: pend holds the changes, applied after the item's own write (rpc/link_items).
+  const lkBox = dlg.querySelector('#lk');
+  const pend = []; // { op: 'add' | 'remove' | 'new', role, id, title }
+  const ROLE_TEXT = { parent: ['Parent', '+ Parent'], child: ['Subtasks', '+ Subtask'], pred: ['Comes after', '+ Predecessor'], next: ['Next', '+ Next'] };
+  const selfTask = () => t || { id: selfId, list: dlg.querySelector('#fl').value, num: 0, title: '', status: 'open' };
+  // links as they will be after Save: the stored ones plus pend
+  const lkState = () => {
+    const by = {}; all().forEach(x => { by[x.id] = x; });
+    by[selfId] = selfTask();
+    const lm = new Map(LINKS);
+    pend.forEach(p => {
+      if (p.op === 'new') return;
+      const l = C.linkFor(p.role, selfId, p.id), k = C.linkKey({ from_item: l.from, to_item: l.to, kind: l.kind });
+      if (p.op === 'add') { if (l.kind === 'parent') [...lm].forEach(([kk, x]) => { if (x.kind === 'parent' && x.from === l.from) lm.delete(kk); }); lm.set(k, l); }
+      else lm.delete(k);
+    });
+    return { ix: C.linkIndex(lm, by), by };
+  };
+  const ofRole = (ix, role) => role === 'parent' ? (ix.parentOf[selfId] ? [ix.parentOf[selfId]] : []) : (role === 'child' ? ix.childrenOf : role === 'pred' ? ix.predsOf : ix.succsOf)[selfId] || [];
+  let lkOpen = null, lkAct = 0;
+  function drawLinks() {
+    if (!lkBox) return;
+    const { ix, by } = lkState();
+    const wait = C.waitingFor(by[selfId], ix, by), prog = C.subtaskProgress(by[selfId], ix, by);
+    lkBox.innerHTML = (wait.length ? '<p class="note lk-wait">Waiting for ' + wait.map(x => esc(ref(x) + ' ' + plain(x.title))).join(', ') + '</p>' : '') +
+      C.LINK_ROLES.map(role => {
+        const ids = ofRole(ix, role), news = pend.filter(p => p.op === 'new' && p.role === role);
+        const chips = ids.map(id => by[id]).filter(Boolean).map(x => '<span class="lk-chip' + (C.CLOSED.includes(x.status) ? ' closed' : '') + '" title="' + esc(label(x.list)) + '"><span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) +
+          (editable ? '<button type="button" class="lk-x" data-lk-del="' + role + '|' + x.id + '" aria-label="Remove link to ' + esc(plain(x.title)) + '">×</button>' : '') + '</span>').join('') +
+          news.map((p, i) => '<span class="lk-chip new"><span class="k">new</span> ' + esc(p.title) + '<button type="button" class="lk-x" data-lk-delnew="' + pend.indexOf(p) + '" aria-label="Do not create ' + esc(p.title) + '">×</button></span>').join('');
+        const extra = role === 'child' && prog && prog.done < prog.total ? '<span class="n lk-open">' + (prog.total - prog.done) + (prog.total - prog.done === 1 ? ' subtask' : ' subtasks') + ' still open</span>' : '';
+        const add = editable && !(role === 'parent' && ids.length && lkOpen !== role) ? '<button type="button" class="lk-add quiet" data-lk-add="' + role + '" aria-expanded="' + (lkOpen === role) + '">' + ROLE_TEXT[role][1] + '</button>'
+          : editable && role === 'parent' ? '<button type="button" class="lk-add quiet" data-lk-add="parent" aria-expanded="false">Change</button>' : '';
+        return '<div class="lk-row" data-role="' + role + '"><span class="lk-l">' + ROLE_TEXT[role][0] + extra + '</span><span class="lk-chips">' + (chips || '<span class="n">—</span>') + '</span>' + add + '</div>' +
+          (lkOpen === role ? '<div class="lk-pick"><input id="lk-q" class="tg-q" type="text" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="lk-opts" aria-label="Find a task for ' + ROLE_TEXT[role][0] + '" placeholder="Find by title or #number" autocomplete="off" spellcheck="false" maxlength="300"><ul class="lk-opts" id="lk-opts" role="listbox"></ul></div>' : '');
+      }).join('');
+    if (lkOpen) { const q = lkBox.querySelector('#lk-q'); q.oninput = () => { lkAct = 0; drawOpts(); }; q.onkeydown = lkKey; drawOpts(); q.focus(); }
+  }
+  function lkOptions() {
+    const q = lkBox.querySelector('#lk-q'), text = q ? q.value.trim() : '';
+    const { ix } = lkState();
+    const hits = C.linkCandidates(all(), ix, selfTask(), lkOpen, text, { listName: id => label(id), canEdit: x => canDo('edit', x), max: 8 });
+    const opts = hits.map(x => ({ id: x.id, html: '<span class="k">' + esc(ref(x)) + '</span> ' + esc(plain(x.title)) + ' <span class="n">' + esc(label(x.list)) + '</span>' }));
+    if (text && !/^#?\d+$/.test(text) && (lkOpen === 'child' || lkOpen === 'next')) opts.push({ create: text, html: 'Create “' + esc(text) + '” as a new ' + (lkOpen === 'child' ? 'subtask' : 'next task') });
+    return opts;
+  }
+  function drawOpts() {
+    const ul = lkBox.querySelector('#lk-opts'), opts = lkOptions();
+    lkAct = Math.max(0, Math.min(lkAct, opts.length - 1));
+    ul.innerHTML = opts.length ? opts.map((o, i) => '<li role="option" id="lk-o' + i + '" data-i="' + i + '" aria-selected="' + (i === lkAct) + '"' + (o.create ? ' class="create"' : '') + '>' + o.html + '</li>').join('') : '<li class="n" aria-disabled="true">No task fits</li>';
+    lkBox.querySelector('#lk-q').setAttribute('aria-activedescendant', opts.length ? 'lk-o' + lkAct : '');
+    ul.querySelectorAll('[data-i]').forEach(li => { li.onmousedown = e => e.preventDefault(); li.onclick = () => lkPick(opts[Number(li.dataset.i)]); });
+  }
+  function lkPick(o) {
+    if (!o) return;
+    if (o.create) pend.push({ op: 'new', role: lkOpen, title: o.create });
+    else {
+      const i = pend.findIndex(p => p.op === 'remove' && p.role === lkOpen && p.id === o.id);
+      if (i >= 0) pend.splice(i, 1); else pend.push({ op: 'add', role: lkOpen, id: o.id });
+    }
+    lkOpen = null; drawLinks();
+    const b = lkBox.querySelector('[data-lk-add]'); if (b) b.focus();
+  }
+  function lkKey(e) {
+    const opts = lkOptions();
+    if (e.key === 'ArrowDown') { e.preventDefault(); lkAct = Math.min(lkAct + 1, opts.length - 1); drawOpts(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); lkAct = Math.max(lkAct - 1, 0); drawOpts(); }
+    else if (e.key === 'Enter') { e.preventDefault(); lkPick(opts[lkAct]); }
+  }
+  if (lkBox) {
+    lkBox.addEventListener('click', e => {
+      const a = e.target.closest('[data-lk-add]'), d = e.target.closest('[data-lk-del]'), dn = e.target.closest('[data-lk-delnew]');
+      if (a) { lkOpen = lkOpen === a.dataset.lkAdd ? null : a.dataset.lkAdd; lkAct = 0; drawLinks(); }
+      else if (d) {
+        const [role, id] = d.dataset.lkDel.split('|'), i = pend.findIndex(p => p.op === 'add' && p.role === role && p.id === id);
+        if (i >= 0) pend.splice(i, 1); else pend.push({ op: 'remove', role, id });
+        drawLinks();
+      } else if (dn) { pend.splice(Number(dn.dataset.lkDelnew), 1); drawLinks(); }
+    });
+    drawLinks();
+  }
+  // after Save: the window's link changes, in order (new tasks first get their own insert)
+  function applyLinks(list, fq) {
+    pend.forEach(p => {
+      let other = p.id;
+      if (p.op === 'new') {
+        const cat = LIST[list].default_category || 'task';
+        const nt = { id: crypto.randomUUID(), list, num: 0, qStored: fq, q: fq, title: p.title, notes: '', tags: [], deadline: null, start: null, status: 'open', doneAt: null, pin: undefined,
+          sortKey: topKey(list, fq), category: cat, priority: null, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
+        create(nt); other = nt.id;
+      }
+      linkOp(p.op === 'remove' ? 'remove' : 'add', C.linkFor(p.role, selfId, other));
+    });
+    return pend.length;
+  }
+
   // Escape closes a tag box being typed in, then clears the search, and only then closes the window
   dlg.addEventListener('cancel', e => {
     const a = document.activeElement;
-    if (a && a.classList.contains('tag-new')) e.preventDefault();
+    if (a && a.id === 'lk-q') { e.preventDefault(); lkOpen = null; drawLinks(); const b = lkBox.querySelector('[data-lk-add]'); if (b) b.focus(); }
+    else if (a && a.classList.contains('tag-new')) e.preventDefault();
     else if (a === qEl && qEl.value) { e.preventDefault(); qEl.value = ''; drawTags(false); }
   });
   const fc = dlg.querySelector('#fcancel');
@@ -3203,8 +3705,9 @@ function openTask(id, quad, opts) {
     if (!plain(title).trim()) { dlg.querySelector('#fe').textContent = 'Title can\'t be empty'; bad = true; }
     else if (title.length > 300) { dlg.querySelector('#fe').textContent = 'The title is over 300 characters (' + title.length + ')'; bad = true; }
     if (!list) { dlg.querySelector('#fle').textContent = 'Choose a list'; bad = true; }
-    const endV = dlg.querySelector('#fd').value;
-    if (endV && start && new Date(endV) <= start) { dlg.querySelector('#fde').textContent = 'End must be after ' + ymd(start); bad = true; }
+    const endV = dlg.querySelector('#fd').value, startV = dlg.querySelector('#fsd').value, startD = startV ? new Date(startV) : null;
+    const pv = dlg.querySelector('#fp').value, priority = pv === '' ? null : Number(pv);
+    if (endV && startD && new Date(endV) < startD) { dlg.querySelector('#fsde').textContent = 'Start is after End.'; bad = true; }
     if (bad) { e.preventDefault(); (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
     const fq = t ? dlg.querySelector('#fq').value : (quad || 'B');
     const deadline = endV ? new Date(endV) : null;
@@ -3212,13 +3715,14 @@ function openTask(id, quad, opts) {
     const save = created => {
       const tags = [...new Set(untouched().concat(picked.filter(x => !isNew(x)), created))];
       if (t) {
-        const now = { title, notes, tags: tagKey(tags), deadline: deadline ? deadline.getTime() : null, list, q: fq };
+        const now = { title, notes, tags: tagKey(tags), deadline: deadline ? deadline.getTime() : null, list, q: fq, start: startD ? startD.getTime() : null, priority };
         const mine = Object.keys(now).filter(k => now[k] !== shown[k]);
-        const cur = { title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q };
+        const cur = { title: t.title, notes: t.notes, tags: tagKey(t.tags), deadline: t.deadline ? t.deadline.getTime() : null, list: t.list, q: t.q,
+          start: t.start ? t.start.getTime() : null, priority: Number.isInteger(t.priority) ? t.priority : null };
         const theirs = t.version !== shown.version ? mine.filter(k => cur[k] !== shown[k] && cur[k] !== now[k]) : [];
         if (theirs.length) {
-          const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', q: 'quadrant' };
-          setTimeout(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
+          const names = { title: 'title', notes: 'description', tags: 'tags', deadline: 'end', list: 'list', q: 'quadrant', start: 'start', priority: 'priority' };
+          setTimeout(() => openTask(t.id, null, { draft: { title, notes, list, tags, deadline, start: startD, priority }, notice: 'Changed by someone else while you edited: ' + theirs.map(k => names[k]).join(', ') + '. Their version is saved; your text is below. Save again to replace it.' }), 0);
           return;
         }
         const moved = mine.includes('list'), fromQ = t.q;
@@ -3229,17 +3733,22 @@ function openTask(id, quad, opts) {
           if (mine.includes('notes')) x.notes = notes;
           if (mine.includes('tags')) x.tags = tags;
           if (mine.includes('deadline')) x.deadline = deadline;
+          if (mine.includes('start')) x.start = startD;
+          if (mine.includes('priority')) x.priority = priority;
           if (moved) x.list = list;
           x.sortKey = key;
         }, { origin: 'dialog' });
         st.keep.add(t.id);
+        const nl = applyLinks(list, fq);
         if (r) toast(moved ? 'Moved to ' + label(list) : 'Saved', undoEdit(t, r));
+        else if (nl) toast(nl === 1 ? 'Link saved' : nl + ' links saved');
       } else {
         const cat = LIST[list].default_category || 'task';
         // the person who adds it is who it is for (owner_id; "Mine"), as the owner tag was before multi-user
-        const nt = { id: crypto.randomUUID(), list, num: 0, qStored: fq, q: fq, title, notes, tags, deadline, start, status: 'open', doneAt: null, pin: undefined,
-          sortKey: topKey(list, fq), category: cat, priority: null, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
+        const nt = { id: selfId, list, num: 0, qStored: fq, q: fq, title, notes, tags, deadline, start: startD, status: 'open', doneAt: null, pin: undefined,
+          sortKey: topKey(list, fq), category: cat, priority, reviewState: 'none', aiConfidence: null, createdAt: new Date(), createdBy: me.id, ownerId: me.kind === 'human' ? me.id : null, version: 1, deleted: false, updatedAt: null };
         create(nt, { origin: 'dialog' }); st.keep.add(nt.id);
+        applyLinks(list, fq);
         toast('Added to ' + label(list) + ': ' + plain(title), canDo('delete', null, list) ? () => removeTask(nt, true) : null);
       }
     };
@@ -3251,7 +3760,8 @@ function openTask(id, quad, opts) {
   dlg.addEventListener('close', () => { dlg.remove(); render(); const back = opener && document.querySelector(opener); if (back) back.focus(); });
   dlg.querySelector('#ft').addEventListener('input', () => dlg.querySelector('#fe').textContent = '');
   dlg.querySelector('#fl').addEventListener('change', () => dlg.querySelector('#fle').textContent = '');
-  dlg.querySelector('#fd').addEventListener('input', () => dlg.querySelector('#fde').textContent = '');
+  dlg.querySelector('#fd').addEventListener('input', () => { dlg.querySelector('#fde').textContent = ''; dlg.querySelector('#fsde').textContent = ''; });
+  dlg.querySelector('#fsd').addEventListener('input', () => dlg.querySelector('#fsde').textContent = '');
 }
 // soft delete (deleted_at); Undo within 8 s restores it, after that only admin SQL does (no trash view)
 function removeTask(t, quiet) {
@@ -3573,7 +4083,8 @@ function openSettings(kind) {
 // round 3, adjustment 13: Card layout (prefs.cardLayout and cards.mode). Defaults are today's card.
 function openCardLayout() {
   const L = cardLayout, D = C.CARD_LAYOUT_DEFAULTS;
-  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', owner: 'Who it is for', source: 'Source (category, Sources)' };
+  const names = { description: 'Description', number: 'Task number', arrow: 'Expand arrow', end: 'End date', created: 'Created date', creator: 'Who created it', owner: 'Who it is for', source: 'Source (category, Sources)',
+    group: 'Subtasks under their parent', priority: 'Priority (P0-P5)', waiting: 'Waiting for (open predecessors)', progress: 'Subtask progress' };
   const lists = Object.values(TAG_LISTS).filter(l => !l.hidden).sort((a, b) => (a.owner_id !== (me && me.id)) - (b.owner_id !== (me && me.id)) || (a.sort || 0) - (b.sort || 0));
   const radio = (nm, v, label, on) => '<label class="cb"><input type="radio" name="' + nm + '" value="' + v + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' +
@@ -4324,6 +4835,7 @@ function bind() {
     });
   };
   const shift = w => { st.tlStart = new Date(st.tlStart.getTime() + w * 7 * DAY); render(); };
+  app.querySelectorAll('[data-tlcol]').forEach(b => b.onclick = () => { const id = b.dataset.tlcol; if (!st.tlCollapsed.delete(id)) st.tlCollapsed.add(id); render(); });
   const tp = document.getElementById('tl-prev'); if (tp) { tp.onclick = () => shift(-1); document.getElementById('tl-next').onclick = () => shift(1); document.getElementById('tl-today').onclick = () => { st.tlStart = null; render(); }; document.getElementById('tl-weeks').onchange = e => { st.tlWeeks = Number(e.target.value); render(); }; }
 }
 document.addEventListener('keydown', e => {

@@ -31,7 +31,7 @@ TasksDashboard has no server of its own. A static page talks straight to a Supab
 | Privacy page | `privacy.html` | static, no script; the Google consent screen's privacy link |
 | CLI | `cli/tasks.mjs`, `cli/lib.mjs` | add tasks and reminders, list overdue items and the Do quadrant, restore a list; signs in as a login, never with a secret key |
 | Access CLI | `cli/access.mjs` | turns approved access requests into the host's Access policy (Cloudflare API); dry run unless `--apply` |
-| Database | `db/001` … `db/016`, selftests `db/900` … `db/904` | schema, triggers, RLS, RPCs; applied in file order ([database.md](database.md)) |
+| Database | `db/001` … `db/018`, selftests `db/900` … `db/906` | schema, triggers, RLS, RPCs; applied in file order ([database.md](database.md)) |
 | Docs | `README.md` (technical reference), `docs/` | this folder |
 
 ## Data flow
@@ -39,7 +39,8 @@ TasksDashboard has no server of its own. A static page talks straight to a Supab
 1. **Sign in** ([auth.md](auth.md)): a password grant or Google PKCE gives an access token (memory only) and a refresh token (`localStorage` or `sessionStorage`, key `td.auth`).
 2. **Load:** lists, memberships, categories, profiles, tag lists and tags, then items in pages of 1000, each request with `apikey: <publishable key>` and `Authorization: Bearer <access token>`. RLS returns only what the login may see.
 3. **Write:** a change shows at once and joins the item's queue. Each PATCH carries `version=eq.<n>`; zero rows updated means someone saved first, and the page merges or reopens the window. Triggers stamp `updated_at`, numbers, `completed_at` and an `item_events` row per change (the audit trail the KPI and the review read).
-4. **Poll:** every `pollMs` (default 30 s) while visible, and on focus: rows changed since the last poll, tags, notes of first shares.
+4. **Poll:** every `pollMs` (default 30 s) while visible, and on focus: rows changed since the last poll, tags, task links (`item_links.changed_at`, removed ones too), notes of first shares.
+4a. **Task links:** loaded with the items (`item_links`, live rows of kinds `depends_on` and `parent`), shown only when both ends are loaded, changed through `rpc/link_items` / `rpc/unlink_items` in one serial queue. The board's badges and grouping and the Timeline's tree and arrows are computed in the core (`linkIndex`, `groupCards`, `timelineRows`).
 5. **Review and Visuals:** the Review view computes the weekly report in the browser from the loaded items (and the cancel times from `item_events`); Visuals read `rpc/kpi_events` once and compute the charts in the core. The same report is available as an API, `rpc/review_report` ([api/README.md](api/README.md)), computed in SQL with the same rules; an e2e check keeps the two equal.
 
 ## Design choices

@@ -23,17 +23,20 @@ node --test "test/*.test.js"
 | `902_selftest_round3.sql` | list names and slugs, first shares, notices, blocks, tag-list roles, `urgency_settings`, the nonce | 66 of 66 |
 | `903_selftest_access.sql` | access requests: who may ask, the row and task, decisions, caps, rights | 47 of 47 |
 | `904_selftest_review_report.sql` | `review_report`: kinds done / cancelled (by its event) / overdue / due, `late`, quadrants incl. stored and pinned, groups, period and time zone, sorting, `p_lists`, test lists, guests and other people see nothing of a private list, bad input 22023, rights | 23 of 23 |
+| `905_selftest_telegram.sql` | the chat bot's scope and opt-out (`db/017`, `db/019`, the Telegram track) | 35 of 35 |
+| `906_selftest_task_links.sql` | task links: links by the owner, viewer and contributor rights, `depends_on` and `parent` loops, a second parent, no read on one end (no row, a refusal naming nothing), cross-list links, soft unlink and `changed_at`, archived and deleted ends, `blocks`, self links and bad kinds, the agent, the guest, rights | 42 of 42 |
 
 ## End-to-end runner
 
 ```
-node test/e2e.mjs --env <env file> --out <dir> [--group auth,data,sync,archive,errors,ui,guests,request] [--smoke] [--url <https origin> [--access-env <file>]]
+node test/e2e.mjs --env <env file> --out <dir> [--group auth,data,sync,archive,errors,ui,links,guests,request] [--smoke] [--url <https origin> [--access-env <file>]]
 ```
 
 - Headless Chrome or Edge over DevTools, Node 22+, no Playwright package needed. Report `e2e-report.md` and screenshots (1440×900 and 390×844) in `<dir>`.
 - Logins come from the env file (`TASKSDB_URL`, `TASKSDB_ANON_KEY`, `TASKSDB_<HANDLE>_EMAIL` / `_PASSWORD`, optional `TASKSDB_GUEST_A_*`, `TASKSDB_GUEST_B_*`); values are never printed. Sessions are seeded into the page, so no real password is typed into it.
 - Writes stay in the `_selftest` list and test lists the run creates and archives; both people's preferences are put back at the end.
 - Group `ui` includes the parity check of the review API: for the weeks picked in the Review, `rpc/review_report` as the same person must give the same ids, kinds and quadrants as the page, in under 2 s (timings in the report's "Review API" table).
+- Group `links` makes a parent tree and a predecessor chain in `_selftest` through the task window and `rpc/link_items`, checks the badges, Group by parent and the Timeline (tree, arrows, fold), and draws 200 more rows in under 100 ms (report table "Timeline render").
 - `--url` runs the same checks against a hosted copy; `--access-env` adds the Access service-token headers to that origin only.
 
 ## Branches and release
