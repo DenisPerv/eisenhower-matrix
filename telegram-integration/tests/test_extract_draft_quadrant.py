@@ -88,7 +88,7 @@ class Quadrant(unittest.TestCase):
         self.assertEqual(QN, data["names"])
         for c in data["cases"]:
             dl = None if c["deadline_h"] is None else now() + timedelta(hours=c["deadline_h"])
-            got = derive_quadrant(stored=c["stored"], priority=c["priority"], category=c["category"], pin=c["pin"],
+            got = derive_quadrant(stored=c["stored"], category=c["category"], pin=c["pin"],
                                   deadline=dl, now=now(), window_days=c["window"])
             self.assertEqual(got, c["expect"], c)
 

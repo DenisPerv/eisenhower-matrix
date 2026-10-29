@@ -87,7 +87,7 @@ test('reviewGroups: four quadrants, then lists in list order, rows by day then n
 
 // synthetic history: rows as the database has them now, events with { old, new } diffs (as db/002 writes them)
 const S = { threshold: 50, windowDays: 7, doLimit: 5 };
-const row = (id, o) => Object.assign({ id, list_id: 'L1', quadrant: null, status: 'open', due_at: null, urgent_pin: null, priority: null, category: 'task', deleted_at: null, created_at: '2026-10-01T09:00:00Z' }, o);
+const row = (id, o) => Object.assign({ id, list_id: 'L1', quadrant: null, status: 'open', due_at: null, urgent_pin: null, category: 'task', deleted_at: null, created_at: '2026-10-01T09:00:00Z' }, o);
 const ev = (item_id, at, diff, id) => ({ id, item_id, at, diff });
 
 test('kpiHistory / kpiStateAt: the current row with later diffs undone; nothing before created_at; flat diff columns too', () => {
@@ -115,7 +115,7 @@ test('kpiStatus and kpiQuadrant: deleted, closed, archived (open in a list archi
   assert.equal(C.kpiStatus({ status: 'cancelled', list_id: 'L2' }, T, arch), 'closed');
   assert.equal(C.kpiStatus({ status: 'open', list_id: 'L2' }, T, arch), 'archived');
   assert.equal(C.kpiStatus({ status: 'open', list_id: 'L2' }, Date.parse('2026-10-14T00:00:00Z'), arch), 'open');
-  const s = { quadrant: null, priority: 4, category: 'task', urgent_pin: null, due_at: '2026-10-25T00:00:00Z' };
+  const s = { quadrant: null, category: 'reminder', urgent_pin: null, due_at: '2026-10-25T00:00:00Z' };
   assert.equal(C.kpiQuadrant(s, S, Date.parse('2026-10-10T00:00:00Z')), 'B', 'important, 15 days left');
   assert.equal(C.kpiQuadrant(s, S, Date.parse('2026-10-20T00:00:00Z')), 'A', 'important, inside the 7-day window');
   assert.equal(C.kpiQuadrant(Object.assign({}, s, { quadrant: 'D' }), S, Date.parse('2026-10-20T00:00:00Z')), 'D', 'stored wins');

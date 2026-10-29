@@ -93,8 +93,8 @@ paths:
         and test lists (slug starting with `_`) never appear. `late` = the end is before the close (or before now while
         open). Groups are the four quadrants A-D (Do, Plan, Delegate, Eliminate), always all four; inside a group the
         lists follow the caller's list order (the app's `listOrder` preference, else the list's `sort`, then name); rows
-        are sorted by `at`, then `num`. The quadrant is the stored one, else derived like the app: important = priority
-        3 or more or category reminder, tbd or decision; urgent = the pin when set, else an end within the caller's
+        are sorted by `at`, then `num`. The quadrant is the stored one, else derived like the app: important = category
+        reminder, tbd or decision (no priority number since 2026-10-29; db/020); urgent = the pin when set, else an end within the caller's
         urgency window (`windowDays`, default 7). Weeks start on Monday 00:00 in the caller's `profiles.timezone`.
 
         Security invoker: RLS decides, so a login only gets rows of lists it can read. Read only; no rate limit of its
@@ -147,7 +147,7 @@ paths:
       summary: The KPI history of some lists (items and their KPI events)
       description: |
         `db/013_kpi.sql`, security invoker. The lists' items (deleted ones too) and the `item_events` whose `diff`
-        touches a KPI column (`quadrant status due_at urgent_pin priority category deleted_at list_id`), one jsonb
+        touches a KPI column (`quadrant status due_at urgent_pin category deleted_at list_id`), one jsonb
         answer. The app rebuilds the Visuals from it in the browser (core `kpiHistory`, `kpiSeries`, `kpiPie`,
         `kpiClosure`); the charts are not computed in the database.
       requestBody:
@@ -178,7 +178,6 @@ paths:
                         status: { type: string }
                         due_at: { type: [string, "null"], format: date-time }
                         urgent_pin: { type: [boolean, "null"] }
-                        priority: { type: [integer, "null"] }
                         category: { type: string }
                         deleted_at: { type: [string, "null"], format: date-time }
                         created_at: { type: string, format: date-time }
@@ -612,7 +611,6 @@ components:
         status: { type: string }
         quadrant: { type: [string, "null"], enum: [A, B, C, D, null] }
         urgent_pin: { type: [boolean, "null"] }
-        priority: { type: [integer, "null"], minimum: 0, maximum: 5, description: "higher = more important" }
         start_at: { type: [string, "null"], format: date-time }
         due_at: { type: [string, "null"], format: date-time }
         completed_at: { type: [string, "null"], format: date-time }

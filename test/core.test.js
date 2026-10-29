@@ -6,7 +6,7 @@ let C;
 test.before(async () => { C = (await import('../cli/lib.mjs')).loadCore(); });
 const NOW = Date.parse('2026-10-27T10:00:00Z');
 const row = (o = {}) => Object.assign({ id: 'i1', list_id: 'L1', num: 3, quadrant: 'B', title: 'T', body_md: '', tags: ['a'], due_at: null, start_at: null, status: 'open',
-  completed_at: null, urgent_pin: null, sort_key: 1024, category: 'task', priority: null, review_state: 'none', ai_confidence: null, created_by: 'u1', version: 2,
+  completed_at: null, urgent_pin: null, sort_key: 1024, category: 'task', review_state: 'none', ai_confidence: null, created_by: 'u1', version: 2,
   deleted_at: null, updated_at: '2026-10-27T09:00:00Z' }, o);
 
 test('readAppConfig: valid, missing, secret key, bad poll', () => {
@@ -80,11 +80,11 @@ test('prefs v2: list ids kept, v1 path keys and stale ids dropped, settings vali
   assert.equal(r.app, 'tasksdashboard'); assert.equal(r.profile_id, 'u1'); assert.equal(r.prefs.version, 2);
 });
 
-test('deriveQuadrant: stored wins; importance from priority or category; urgency from pin or the window', () => {
-  const t = (o) => Object.assign({ qStored: null, priority: null, category: 'task', pin: undefined, deadline: null }, o);
+test('deriveQuadrant: stored wins; importance from the category (no priority number); urgency from pin or the window', () => {
+  const t = (o) => Object.assign({ qStored: null, category: 'task', pin: undefined, deadline: null }, o);
   assert.equal(C.deriveQuadrant(t({ qStored: 'C' }), null, NOW), 'C');
   assert.equal(C.deriveQuadrant(t({}), null, NOW), 'D');
-  assert.equal(C.deriveQuadrant(t({ priority: 3 }), null, NOW), 'B');
+  assert.equal(C.deriveQuadrant(t({ priority: 5 }), null, NOW), 'D', 'a stray priority is ignored');
   assert.equal(C.deriveQuadrant(t({ category: 'reminder', deadline: new Date(NOW + 2 * 864e5) }), null, NOW), 'A');
   assert.equal(C.deriveQuadrant(t({ category: 'tbd', deadline: new Date(NOW + 20 * 864e5) }), null, NOW), 'B');
   assert.equal(C.deriveQuadrant(t({ deadline: new Date(NOW + 864e5), pin: false }), null, NOW), 'D');

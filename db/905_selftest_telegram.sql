@@ -168,28 +168,28 @@ begin
                                                 where n.nspname = 'public' and p.proname in ('bot_member_guard', 'by_person')),
                          'bot_member_guard:true:true:false,by_person:true:true:false');
 
-  -- T13 review_quadrant (db/016) on the shared cases: n, stored, priority, category, pin, deadline in hours, window, expected
+  -- T13 review_quadrant (db/020, no priority) on the shared cases: n, stored, category, pin, deadline in hours, window, expected
   select coalesce(string_agg(format('%s=%s', n, got), ','), 'none') into v from (
-    select n, ex, public.review_quadrant(st, pr, ca, pin,
+    select n, ex, public.review_quadrant(st, ca, pin,
              case when h is null then null else timestamptz '2026-10-29 10:00+00' + h * interval '1 hour' end,
              timestamptz '2026-10-29 10:00+00', w) as got
       from (values
         -- >>> quadrant cases
-        (1, 'C', 5, 'reminder', true, 1, 7, 'C'),
-        (2, null, null, 'task', null, null, 7, 'D'),
-        (3, null, 3, 'task', null, null, 7, 'B'),
-        (4, null, 2, 'task', null, 24, 7, 'C'),
-        (5, null, null, 'reminder', null, 24, 7, 'A'),
-        (6, null, null, 'tbd', null, 400, 7, 'B'),
-        (7, null, null, 'decision', false, 1, 7, 'B'),
-        (8, null, null, 'task', true, null, 7, 'C'),
-        (9, null, 4, 'task', null, -48, 7, 'A'),
-        (10, null, null, 'task', null, 168, 7, 'C'),
-        (11, null, null, 'task', null, 169, 7, 'D'),
-        (12, null, null, 'task', null, 40, 1, 'D'),
-        (13, 'X', 3, 'task', null, null, 7, 'B')
+        (1, 'C', 'reminder', true, 1, 7, 'C'),
+        (2, null, 'task', null, null, 7, 'D'),
+        (3, null, 'decision', null, null, 7, 'B'),
+        (4, null, 'task', null, 24, 7, 'C'),
+        (5, null, 'reminder', null, 24, 7, 'A'),
+        (6, null, 'tbd', null, 400, 7, 'B'),
+        (7, null, 'decision', false, 1, 7, 'B'),
+        (8, null, 'task', true, null, 7, 'C'),
+        (9, null, 'tbd', null, -48, 7, 'A'),
+        (10, null, 'task', null, 168, 7, 'C'),
+        (11, null, 'task', null, 169, 7, 'D'),
+        (12, null, 'task', null, 40, 1, 'D'),
+        (13, 'X', 'reminder', null, null, 7, 'B')
         -- <<< quadrant cases
-      ) c(n, st, pr, ca, pin, h, w, ex)
+      ) c(n, st, ca, pin, h, w, ex)
   ) r where got is distinct from ex;
   perform public._tg_chk('T13 review_quadrant', v, 'none');
 

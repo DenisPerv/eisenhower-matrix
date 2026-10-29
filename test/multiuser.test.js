@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 let C;
 test.before(async () => { C = (await import('../cli/lib.mjs')).loadCore(); });
 const row = (o = {}) => Object.assign({ id: 'i1', list_id: 'L1', num: 3, quadrant: 'B', title: 'T', body_md: '', tags: ['a'], due_at: null, start_at: null, status: 'open',
-  completed_at: null, urgent_pin: null, sort_key: 1024, category: 'task', priority: null, review_state: 'none', ai_confidence: null, created_by: 'u1', version: 2,
+  completed_at: null, urgent_pin: null, sort_key: 1024, category: 'task', review_state: 'none', ai_confidence: null, created_by: 'u1', version: 2,
   deleted_at: null, updated_at: '2026-10-27T09:00:00Z' }, o);
 
 test('restError: 22023 tells the sensitive screen from a bad value; 54000 is a limit; sharing texts in plain words', () => {

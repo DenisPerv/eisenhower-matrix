@@ -640,7 +640,7 @@ async function gUi() {
     check(G, `${who}: Urgency settings hold only window, due soon % and Do limit`, await T.ev('!!document.getElementById("s-win")&&!!document.getElementById("s-th")&&!document.getElementById("s-wd")&&!document.getElementById("s-hpd")&&!document.getElementById("s-name")'));
     await T.ev('document.querySelector("dialog[open]")?.close(),true');
     // round 3, adjustment 7: rail tabs Matrix, Archive, Review; task links: Timeline is the fourth tab
-    check(G, `${who}: rail tabs are Matrix, Archive, Review, Timeline`, await T.ev(`[...document.querySelectorAll('.views [role=tab]')].map(b=>b.dataset.view).join()==='matrix,archive,review,timeline'`));
+    check(G, `${who}: rail tabs are Matrix, Archive, Review (Timeline is in the account menu since 2026-10-29)`, await T.ev(`[...document.querySelectorAll('.views [role=tab]')].map(b=>b.dataset.view).join()==='matrix,archive,review'`));
     await T.click('[data-view=review]');
     // round 3, adjustment 8: the Weekly review view. Ten ISO weeks, this one picked and marked; Ctrl and Shift pick several
     check(G, `${who}: Review shows the week strip (10 weeks, this week picked and marked "now") and the hint`, await T.wait('document.querySelectorAll(".rvw .wk").length===10', 5000) &&
@@ -737,10 +737,9 @@ async function gUi() {
       }
     }
     await T.click('#profile');
-    check(G, `${who}: the account menu has General settings and Urgency settings, no Weekly review and no Timeline (a rail tab since task links)`, await T.ev(`(()=>{const t=document.getElementById('pop').textContent;return /General settings/.test(t)&&/Urgency settings/.test(t)&&!/Timeline/.test(t)&&!/Weekly review/.test(t)})()`));
-    await T.click('#profile');
-    await T.click('[data-view=timeline]');
-    check(G, `${who}: the Timeline tab opens the Timeline view`, await T.wait('!!document.querySelector(".tl")', 5000));
+    check(G, `${who}: the account menu has General settings and Urgency settings, and Timeline, no Weekly review`, await T.ev(`(()=>{const t=document.getElementById('pop').textContent;return /General settings/.test(t)&&/Urgency settings/.test(t)&&/Timeline/.test(t)&&!/Weekly review/.test(t)})()`));
+    await T.click('[data-menu=timeline]');
+    check(G, `${who}: the account menu's Timeline opens the Timeline view; the Matrix tab stays reachable`, await T.wait('!!document.querySelector(".tl")', 5000) && await T.ev(`document.querySelector('.views [data-view=matrix]').tabIndex===0`));
     await T.click('#profile'); await T.click('[data-menu=general]');
     check(G, `${who}: General settings hold display name and time zone`, await T.wait('!!document.getElementById("s-name")&&!!document.getElementById("s-tz")&&!document.getElementById("s-lim")', 5000));
     await T.ev('document.querySelector("dialog[open]")?.close(),true');
@@ -866,7 +865,7 @@ async function gLinks() {
   const ready = await MK.rest('POST', 'rpc/unlink_items', { p_from: ST.id, p_to: ST.id, p_kind: 'parent' });
   if (!ready.ok && ready.status === 404) { skip(G, 'task links', 'rpc/unlink_items is missing: db/018 is not applied'); await T.close(); return; }
   const day = n => { const d = new Date(Date.now() + n * 864e5); d.setHours(12, 0, 0, 0); return d.toISOString(); };
-  const par = await mkItem('links parent', { quadrant: 'A', start_at: day(0), due_at: day(9), priority: 4 });
+  const par = await mkItem('links parent', { quadrant: 'A', start_at: day(0), due_at: day(9) });
   const k1 = await mkItem('links child one', { quadrant: 'A', start_at: day(0), due_at: day(3) });
   const k2 = await mkItem('links child two', { quadrant: 'B', start_at: day(2), due_at: day(6) });
   const k3 = await mkItem('links child three', { quadrant: 'A', start_at: day(4), due_at: day(8) });
@@ -879,8 +878,9 @@ async function gLinks() {
   await T.wait(`!!document.querySelector('[data-card="${par.id}"]')`, 10000);
   // the task window: + Subtask by search, + Subtask by Create, a loop left out, Start and Priority
   await T.click(`[data-card="${par.id}"]`);
-  check(G, 'the task window has Start, Priority and the Links block', await T.wait('!!document.querySelector("dialog[open] #fsd")&&!!document.querySelector("dialog[open] #fp")&&!!document.querySelector("dialog[open] #lk")', 5000));
-  check(G, 'the window lists the stored subtasks (two) and Priority P4', await T.ev(`document.querySelectorAll('#lk [data-role=child] [data-lk-del]').length===2&&document.getElementById('fp').value==='4'`));
+  check(G, 'the task window has Start and the Links block, no Priority (priority by position)', await T.wait('!!document.querySelector("dialog[open] #fsd")&&!document.querySelector("dialog[open] #fp")&&!!document.querySelector("dialog[open] #lk")', 5000));
+  check(G, 'the window lists the stored subtasks (two), each with the subtask colour and glyph, and one row of add buttons: + Predecessor, + Next, + Subtask, + Parent', await T.ev(`(()=>{const c=[...document.querySelectorAll('#lk .lk-chip.lk-child[data-role=child]')];const b=[...document.querySelectorAll('#lk .lk-adds [data-lk-add]')];return c.length===2&&c.every(x=>x.querySelector('.lk-g').textContent==='↓')&&b.map(x=>x.dataset.lkAdd).join()==='pred,next,child,parent'&&new Set(b.map(x=>Math.round(x.getBoundingClientRect().top))).size===1&&getComputedStyle(c[0]).borderTopColor!==getComputedStyle(document.querySelector('#lk .lk-adds')).borderTopColor})()`));
+  await T.shot('ui-links-window-1440x900-light');
   await T.click('#lk [data-lk-add=child]');
   await T.insert('#lk-q', 'links child one');
   check(G, 'the search finds the task by title words', await T.wait(`(document.querySelector('#lk-opts li[data-i="0"]')||{}).textContent?.includes('links child one')`, 4000));
@@ -908,13 +908,56 @@ async function gLinks() {
   check(G, 'Start is saved (start_at)', !!ps.start_at && new Date(ps.start_at).getDate() === new Date(day(1)).getDate(), ps.start_at);
   // the board: badges, then Group by parent
   await T.wait(`!!document.querySelector('[data-card="${par.id}"] .tb.pg')`, 8000);
-  check(G, 'badges: P4 and the progress 0/4 on the parent, "Waiting for 1" on a task with an open predecessor', await T.ev(`(()=>{const p=document.querySelector('[data-card="${par.id}"]');const w=document.querySelector('[data-card="${k2.id}"] .tb.wt');return /P4/.test(p.querySelector('.tb.pr').textContent)&&p.querySelector('.tb.pg').textContent==='0/4'&&!!w&&w.querySelector('.wl').textContent.trim()==='Waiting for'&&w.textContent.endsWith('1')})()`));
+  check(G, 'badges: no P badge and the progress 0/4 on the parent, "Waiting for 1" on a task with an open predecessor', await T.ev(`(()=>{const p=document.querySelector('[data-card="${par.id}"]');const w=document.querySelector('[data-card="${k2.id}"] .tb.wt');return !p.querySelector('.tb.pr')&&p.querySelector('.tb.pg').textContent==='0/4'&&!!w&&w.querySelector('.wl').textContent.trim()==='Waiting for'&&w.textContent.endsWith('1')})()`));
   await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.querySelector("[data-cl=group]")', 4000);
-  check(G, 'Card layout lists the four switches, grouping off by default', await T.ev(`['group','priority','waiting','progress'].every(k=>!!document.querySelector('[data-cl='+k+']'))&&!document.querySelector('[data-cl=group]').checked&&document.querySelector('[data-cl=priority]').checked`));
+  check(G, 'Card layout lists the three link switches (no Priority), grouping off by default', await T.ev(`['group','waiting','progress'].every(k=>!!document.querySelector('[data-cl='+k+']'))&&!document.querySelector('[data-cl=priority]')`) && core.CARD_LAYOUT_DEFAULTS.group === false); // the default, not the account's stored choice
   await T.ev(`(document.querySelector('[data-cl=group]').checked=true,true)`); await T.click('#cl-save');
   await T.wait(`!!document.querySelector('[data-card="${k1.id}"].lk-kid')`, 5000);
   check(G, 'Group by parent: the parent first, its subtasks indented after it in Do', await T.ev(`(()=>{const ids=[...document.querySelectorAll('[data-body=A] [data-card]')].map(c=>c.dataset.card);const i=ids.indexOf('${par.id}');return i>=0&&ids.indexOf('${k1.id}')>i&&ids.indexOf('${k3.id}')>i&&document.querySelector('[data-card="${k3.id}"]').classList.contains('lk-kid')})()`));
   check(G, 'a subtask in another quadrant sits under a faded copy of its parent (not a card)', await T.ev(`(()=>{const g=document.querySelector('[data-body=B] .lk-ghost[data-open="${par.id}"]');const c=document.querySelector('[data-body=B] [data-card="${k2.id}"]');return !!g&&!!c&&c.classList.contains('lk-kid')&&!g.hasAttribute('data-card')&&(g.compareDocumentPosition(c)&4)>0})()`));
+  // priority by position (2026-10-29): with grouping on, a drop lands where the board shows it and a parent takes its subtasks
+  const gx = await mkItem('links drag x', { quadrant: 'A' });
+  await T.ev('dispatchEvent(new Event("focus")),true'); await T.wait(`!!document.querySelector('[data-body=A] [data-card="${gx.id}"]')`, 8000);
+  const drop = (src, dst, low) => T.ev(`(()=>{const a=document.querySelector('[data-card="'+${JSON.stringify(src)}+'"]'),b=document.querySelector('[data-card="'+${JSON.stringify(dst)}+'"]');const dt=new DataTransfer();const r=b.getBoundingClientRect();const y=${low ? 'r.bottom-3' : 'r.top+3'};
+    const fire=(el,type)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+20,clientY:y}));fire(a,'dragstart');fire(b,'dragover');fire(b,'drop');fire(a,'dragend');return true})()`);
+  const keysOf = async ids => Object.fromEntries((await MK.rest('GET', 'items?select=id,sort_key&id=in.(' + ids.join(',') + ')')).json.map(r => [r.id, r.sort_key]));
+  await drop(par.id, gx.id, true);
+  const kp = await until(async () => { const k = await keysOf([par.id, k1.id, k3.id, gx.id]); return k[par.id] > k[gx.id] && k; });
+  check(G, 'grouped drag: the parent dropped below a task moves there and its subtasks follow it (keys after it)', !!kp && kp[k1.id] > kp[par.id] && kp[k3.id] > kp[par.id], JSON.stringify(kp));
+  await drop(gx.id, par.id, true);
+  const kx = await until(async () => { const k = await keysOf([par.id, k1.id, k3.id, gx.id]); return k[gx.id] > k[par.id] && k; });
+  check(G, 'grouped drag: a task dropped on a parent\'s lower half lands after its whole subtree, where the board shows it', !!kx && kx[gx.id] > kx[k1.id] && kx[gx.id] > kx[k3.id] &&
+    await T.wait(`(()=>{const ids=[...document.querySelectorAll('[data-body=A] [data-card]')].map(c=>c.dataset.card);return ids.indexOf('${gx.id}')>ids.indexOf('${k1.id}')&&ids.indexOf('${gx.id}')>ids.indexOf('${k3.id}')})()`, 4000), JSON.stringify(kx));
+  // the task window: previous / next by the side areas, ghosts at 1440, ‹ › everywhere, unsaved changes ask first, a new task closes
+  const shown = async () => T.ev(`[...document.querySelectorAll('[data-body=A] [data-card]')].map(c=>c.dataset.card)`);
+  const titleOf = id => T.ev(`document.querySelector('[data-card="${id}"]').getAttribute('aria-label')`);
+  const side = right => T.ev(`(()=>{const d=document.querySelector('dialog[open]');const r=d.getBoundingClientRect();d.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:${right ? 'r.right+40' : 'r.left-40'},clientY:r.top+60}));return true})()`);
+  const openTitle = () => T.ev(`(document.querySelector('dialog[open] #ft')||{}).textContent||''`);
+  let ids = await shown();
+  await T.click(`[data-card="${ids[0]}"]`); await T.wait('!!document.querySelector("dialog[open] #ft")', 5000);
+  check(G, 'window at 1440: a ghost of the next card beside it, none before the first; ‹ disabled, › enabled', await T.wait('!!document.querySelector("dialog[open] .tk-ghost.next:popover-open")', 3000) &&
+    await T.ev('!document.querySelector("dialog[open] .tk-ghost.prev")&&document.querySelector("dialog[open] [data-nav=prev]").disabled&&!document.querySelector("dialog[open] [data-nav=next]").disabled'));
+  await sleep(300); await T.shot('ui-nav-1440x900-light');
+  await side(true);
+  check(G, 'a click right of the window opens the next card of the quadrant (shown order)', await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[1]))}`, 4000), await openTitle());
+  await side(false);
+  check(G, 'a click left of it goes back', await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[0]))}`, 4000), await openTitle());
+  await T.ev("(()=>{const f=document.querySelector('dialog[open] #fn');f.textContent=f.textContent+' unsaved';return true})()");
+  await side(true);
+  check(G, 'unsaved changes: the move asks first (Save and go, Discard and go, Stay)', await T.wait('!!document.querySelector("dialog[open] .tk-ask [data-ask=discard]")', 3000) &&
+    await T.ev('[...document.querySelectorAll("dialog[open] .tk-ask [data-ask]")].map(b=>b.dataset.ask).join()==="save,discard,stay"'));
+  await T.click('dialog[open] .tk-ask [data-ask=discard]');
+  check(G, 'Discard and go opens the next card and saves nothing', await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[1]))}`, 4000) &&
+    !/unsaved/.test((await MK.rest('GET', 'items?select=body_md&id=eq.' + ids[0])).json[0].body_md || ''));
+  await T.size(390, 844); await sleep(500);
+  check(G, 'window at 390: no ghosts, the ‹ › buttons move between cards', await T.ev('!document.querySelector("dialog[open] .tk-ghost:popover-open")') &&
+    (await T.click('dialog[open] [data-nav=prev]'), await T.wait(`(document.querySelector('dialog[open] #ft')||{}).textContent===${JSON.stringify(await titleOf(ids[0]))}`, 4000)));
+  await T.shot('ui-nav-390x844-light');
+  for (const theme of ['dark']) { await T.theme(theme); await T.ev(`(document.documentElement.dataset.theme='${theme}',true)`); await sleep(300); await T.shot(`ui-nav-390x844-${theme}`); await T.size(1440, 900); await sleep(500); await T.shot(`ui-nav-1440x900-${theme}`); await T.theme('light'); await T.ev("(document.documentElement.dataset.theme='light',true)"); }
+  await T.size(1440, 900); await closeDialogs(T);
+  await T.click('[data-add="A"]'); await T.wait('!!document.querySelector("dialog[open] #ft")', 4000);
+  await side(false);
+  check(G, 'a new task: a click beside the window closes it', await T.wait('!document.querySelector("dialog[open]")', 3000));
   for (const theme of ['light', 'dark']) {
     await T.theme(theme);
     await T.ev(`(document.documentElement.dataset.theme='${theme}',true)`);
@@ -924,7 +967,7 @@ async function gLinks() {
   check(G, 'no card is wider than itself at 390 px (grouped)', await T.ev(`[...document.querySelectorAll('[data-card],.lk-ghost')].every(c=>c.scrollWidth<=c.clientWidth+1)`));
   await T.size(1440, 900); await T.theme('light');
   // the Timeline
-  await T.click('[data-view=timeline]');
+  await T.click('#profile'); await T.click('[data-menu=timeline]');
   check(G, 'Timeline: one row per task, the subtasks after their parent and indented', await T.wait(`!!document.querySelector('.tl-row[data-tl="${par.id}"]')`, 5000) &&
     await T.ev(`(()=>{const ids=[...document.querySelectorAll('.tl-row')].map(r=>r.dataset.tl);const i=ids.indexOf('${par.id}');const ind=id=>+getComputedStyle(document.querySelector('.tl-row[data-tl="'+id+'"] .tl-name')).getPropertyValue('--ind');return i>=0&&ids.indexOf('${k1.id}')>i&&ids.indexOf('${k2.id}')>i&&ind('${k1.id}')===ind('${par.id}')+1&&new Set(ids).size===ids.length})()`));
   check(G, 'Timeline: an arrow per predecessor link in view, the one that starts too early dashed red', await T.ev(`(()=>{const p=[...document.querySelectorAll('.tl-links > path')];return p.length>=2&&p.filter(x=>x.classList.contains('late')).length>=1})()`));
@@ -947,7 +990,7 @@ async function gLinks() {
     const ids = bulk.json.map(r => r.id);
     for (let p = 0; p < 20; p++) for (let c = 1; c < 10; c++) await L(ids[p * 10 + c], ids[p * 10], 'parent');
     for (let p = 0; p < 20; p++) await L(ids[p * 10 + 2], ids[p * 10 + 1], 'depends_on');
-    await T.reload(); await T.ready(); await pick(T, ST.id); await T.click('[data-view=timeline]');
+    await T.reload(); await T.ready(); await pick(T, ST.id); await T.click('#profile'); await T.click('[data-menu=timeline]');
     await T.wait(`document.querySelectorAll('.tl-row').length>=200`, 10000);
     await T.click('#tl-today'); await sleep(300);
     const ms = await T.ev('window.tdTimelineMs||0'), n = await T.ev(`document.querySelectorAll('.tl-row').length`);

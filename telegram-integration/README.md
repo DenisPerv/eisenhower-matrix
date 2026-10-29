@@ -81,7 +81,7 @@ and a note here.
 | `render` | `render(card, scope, *, prefix, token, lang, today, label=..., problem=None) -> (html, rows)`, `keyboard_json(rows)`, `button_count(rows)` |
 | `codec` | `new_token()`, `encode(prefix, token, op)`, `decode(prefix, data) -> (token, op) | None`; ops `l<i> L q<auto|A-D> o<i> d<0-4> t g<i> p<n> b e` handled by `card.apply`, `s` (Save), `x` (Cancel) and `n` (no-op header) handled by the bot |
 | `payload` | `Provenance`, `create_body(card, scope, prov, to_utc)`, `change_patch(card, scope, to_utc)`, `tag_changes(card) -> (add, remove)`, `due_at(day, time, to_utc)` |
-| `quadrant` | `derive_quadrant(*, stored, priority, category, pin, deadline, now, window_days=7)`, `QN`, `QS` |
+| `quadrant` | `derive_quadrant(*, stored, category, pin, deadline, now, window_days=7)` (no priority since 2026-10-29), `QN`, `QS` |
 | `texts` | `t(key, lang, **kw)`, `weekday(n, lang)` |
 | `ports` | `ScopeSource`, `ItemWriter`, `CardMessenger` |
 
