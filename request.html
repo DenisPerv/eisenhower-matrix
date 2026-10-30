@@ -231,7 +231,7 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
         (o.message ? `<p class="msg" role="alert">${esc(o.message)}</p>` : '') +
         `<button type="button" class="google" data-act="google"${HOSTED && CFG ? '' : ' disabled'}>${GOOGLE_G}<span>Continue with Google</span></button>` +
         (HOSTED ? '' : '<p class="fine">Open this page on its https address to sign in.</p>') +
-        '<p class="fine">We keep your email, your name and the time of the request.</p>';
+        '<p class="fine">We keep your email, your name and the time of the request. We also use your email address to send you one email with the decision (approved or not), from Maksym\'s Gmail.</p>';
     } else if (state === 'sending') {
       h = '<h1>Sending your request</h1><div class="scan" aria-hidden="true"></div><p>One moment.</p>';
     } else if (state === 'sent') {
