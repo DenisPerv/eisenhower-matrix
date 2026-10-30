@@ -14,14 +14,24 @@ export const REQUEST_PATHS = ['/request', '/config/tasksdashboard.config.js'];
 // the phone app (app/, published at /app/) is public at the edge and gates itself (docs/hosting.md "The phone app")
 export const PHONE_APP = 'TasksDashboard phone app';
 export const PHONE_PATHS = ['/app', '/app/*'];
+// the two-host layout (docs/hosting.md): on the app host Access gates only the board and the phone app; everything else
+// (/signin, /privacy, the config, version.json) is public. One previews app per host covers every preview deployment.
+export const GATE_APP = 'Eisenhower gate';
+export const GATED_PATHS = ['/board', '/board/*', '/app', '/app/*'];
+export const PREVIEWS_APP = { app: 'Eisenhower previews (app)', landing: 'Eisenhower previews (landing)' };
 // a reusable policy needs one include rule; this address can never sign in (.invalid), and list/add/remove hide it
 export const PLACEHOLDER = 'no-guests-yet@example.invalid';
 export const SEATS = { warn: 45, max: 50 };   // Zero Trust free plan: 50 users (G5)
 const CF_NAMES = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_ACCESS_TOKEN', 'CF_ACCESS_GUEST_POLICY_ID', 'CF_ACCESS_PROD_APP_ID'];
 const COMMANDS = ['list', 'add', 'remove', 'setup', 'process'];
-const FLAGS = new Set(['apply', 'force', 'json', 'help']);
+const FLAGS = new Set(['apply', 'force', 'json', 'help', 'gate']);
 const USAGE = `usage: node cli/access.mjs <command> [options]     (dry run unless --apply)
-  list                         the guests policy's emails and seats, the production app's policies
+  list    [--app ID]           the guests policy's emails and seats, the production app's (or app ID's) paths and policies
+  setup --gate --host H [--landing-host L]
+                               two-host layout: the app "${GATE_APP}" on H (${GATED_PATHS.join(', ')}) and
+                               "${PREVIEWS_APP.app}" on *.H (with L also "${PREVIEWS_APP.landing}" on *.L),
+                               each with the production app's policies and the guests policy; apps found by name are
+                               reported present, and only missing paths or policies are added
   add     --email A [--force]  add A to the guests policy (warn at ${SEATS.warn} emails, refuse at ${SEATS.max} unless --force)
   remove  --email A            take A off the guests policy; its approved request becomes removed
   setup                        create the guests policy, the bypass policy, the request app (${REQUEST_PATHS.join(', ')})
@@ -81,6 +91,31 @@ export function attachPlan(appPolicies, policyId) {
   const top = before.reduce((m, p) => Math.max(m, p.precedence), 0);
   return { before, after: [...before, { id: policyId, name: GUEST_POLICY, precedence: top + 1 }], changed: true };
 }
+// the policies an app should carry after adding `want` (the production app's, then the guests policy): every policy it has
+// stays where it is, the missing ones follow after the last, in `want` order; ids only
+export function mergePolicies(have, want) {
+  const before = (have || []).map((p, i) => ({ id: p.id, name: p.name || p.id, precedence: p.precedence || i + 1 }));
+  let top = before.reduce((m, p) => Math.max(m, p.precedence), 0);
+  const add = [];
+  for (const w of want || []) if (w && w.id && !before.some(p => p.id === w.id) && !add.some(p => p.id === w.id)) add.push({ id: w.id, name: w.name || w.id, precedence: ++top });
+  return { before, after: [...before, ...add], added: add };
+}
+// the apps of the two-host layout for app host `host` (and optionally the landing host): name, domain, destinations
+export function gateApps(host, landingHost) {
+  const h = String(host || '').trim().toLowerCase(), l = String(landingHost || '').trim().toLowerCase();
+  const okHost = x => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(x);
+  if (!okHost(h)) throw new TdError(EXIT.error, '--host needs a host name such as app.example.pages.dev (no scheme, no path)');
+  if (l && !okHost(l)) throw new TdError(EXIT.error, '--landing-host needs a host name (no scheme, no path)');
+  const apps = [
+    { name: GATE_APP, domain: h + GATED_PATHS[0], destinations: GATED_PATHS.map(p => h + p) },
+    { name: PREVIEWS_APP.app, domain: '*.' + h, destinations: ['*.' + h] },
+  ];
+  if (l) apps.push({ name: PREVIEWS_APP.landing, domain: '*.' + l, destinations: ['*.' + l] });
+  return apps;
+}
+// the destinations an app has, as host/path strings
+export const appUris = app => ((app && app.destinations) || []).map(d => String(d.uri || '')).filter(Boolean).concat(
+  app && !(app.destinations || []).length && app.domain ? [String(app.domain)] : []);
 // ids that were on the app before and are gone now (any → stop)
 export const lostPolicies = (before, after) => before.map(p => p.id).filter(id => !(after || []).some(p => p.id === id));
 // the app's own fields for a PUT: everything the GET gave except what the API sets itself
@@ -180,7 +215,8 @@ export async function run(argv, out = console.log, deps = {}) {
     remove: ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_ACCESS_TOKEN', 'CF_ACCESS_GUEST_POLICY_ID'],
     setup: ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_ACCESS_TOKEN', 'CF_ACCESS_PROD_APP_ID'],
     process: ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_ACCESS_TOKEN', 'CF_ACCESS_GUEST_POLICY_ID'] }[cmd];
-  const miss = cfMissing(env, need).concat(cmd === 'process' ? missingEnv(env, 'homeos-agent') : []);
+  const miss = cfMissing(env, cmd === 'list' && a.app ? need.filter(k => k !== 'CF_ACCESS_PROD_APP_ID') : need)
+    .concat(cmd === 'process' ? missingEnv(env, 'homeos-agent') : []);
   if (miss.length) throw new TdError(EXIT.env, `missing: ${miss.join(', ')}`);
   const cf = deps.cf || cfClient(env, { fetch: deps.fetch });
   if (!a.apply) out('dry run: nothing is changed (add --apply)');
@@ -188,12 +224,15 @@ export async function run(argv, out = console.log, deps = {}) {
   if (cmd === 'list') {
     const p = await cf.policy(env.CF_ACCESS_GUEST_POLICY_ID);
     const emails = policyEmails(p).sort();
-    const app = await cf.app(env.CF_ACCESS_PROD_APP_ID);
+    // the production app, or --app <id> (in the two-host layout CF_ACCESS_PROD_APP_ID is the Eisenhower gate's id)
+    const app = await cf.app(a.app || env.CF_ACCESS_PROD_APP_ID);
     const pol = attachPlan(app.policies, env.CF_ACCESS_GUEST_POLICY_ID);
-    if (a.json) { out(JSON.stringify({ emails, seats: emails.length, max: SEATS.max, app: app.name, policies: pol.before.map(x => x.name), guestsAttached: !pol.changed })); return EXIT.ok; }
+    const paths = appUris(app);
+    if (a.json) { out(JSON.stringify({ emails, seats: emails.length, max: SEATS.max, app: app.name, paths, policies: pol.before.map(x => x.name), guestsAttached: !pol.changed })); return EXIT.ok; }
     out(`${GUEST_POLICY}: ${seatCheck(emails.length).note}`);
     emails.forEach(e => out('  ' + e));
     out(`${app.name} (${appHost(app)}): ${pol.before.map(x => x.name).join(', ') || '(no policies)'}${pol.changed ? `; ${GUEST_POLICY} NOT attached: run setup` : ''}`);
+    out(`  paths: ${paths.join(', ') || '(none)'}`);
     return EXIT.ok;
   }
 
@@ -215,6 +254,58 @@ export async function run(argv, out = console.log, deps = {}) {
         }
       } finally { await c.close(); }
     }
+    return EXIT.ok;
+  }
+
+  if (cmd === 'setup' && a.gate) {
+    const want = gateApps(a.host, a['landing-host']);
+    const prod = await cf.app(env.CF_ACCESS_PROD_APP_ID);
+    // the policies every gate app carries: the production app's, then the guests policy when it is known
+    const pols = (prod.policies || []).map((p, i) => ({ id: p.id, name: p.name || p.id, precedence: p.precedence || i + 1 }))
+      .sort((x, y) => x.precedence - y.precedence);
+    if (env.CF_ACCESS_GUEST_POLICY_ID && !pols.some(p => p.id === env.CF_ACCESS_GUEST_POLICY_ID)) pols.push({ id: env.CF_ACCESS_GUEST_POLICY_ID, name: GUEST_POLICY });
+    if (!pols.length) throw new TdError(EXIT.error, 'the production app has no policies to copy');
+    out(`policies from ${prod.name}: ${pols.map(p => p.name).join(', ')}`);
+    const apps = await cf.apps();
+    let missing = 0;
+    for (const w of want) {
+      const found = apps.filter(x => x.name === w.name);
+      if (found.length > 1) throw new TdError(EXIT.error, `several apps are called "${w.name}": keep one in Zero Trust → Access → Applications`);
+      let have = found[0];
+      if (!have) {
+        missing++;
+        out(`${a.apply ? 'create' : 'would create'} app "${w.name}" for ${w.destinations.join(', ')}, policies ${pols.map(p => p.name).join(', ')}`);
+        if (a.apply) {
+          have = await cf.createApp({ name: w.name, type: 'self_hosted', domain: w.domain, destinations: w.destinations.map(uri => ({ type: 'public', uri })),
+            session_duration: prod.session_duration || '24h', app_launcher_visible: false, policies: pols.map((p, i) => ({ id: p.id, precedence: i + 1 })) });
+          const now = await cf.app(have.id);
+          const lack = pols.filter(p => !(now.policies || []).some(q => q.id === p.id)).map(p => p.name);
+          if (lack.length) throw new TdError(EXIT.error, `app "${w.name}" was created without ${lack.join(', ')}; check it in Zero Trust`);
+          out(`created app "${w.name}": ${have.id}`);
+        }
+        continue;
+      }
+      // present: report it, add only what is missing (paths, policies); nothing it has is removed
+      const uris = appUris(have);
+      const lackPaths = w.destinations.filter(u => !uris.includes(u));
+      const plan = mergePolicies(have.policies, pols);
+      out(`app "${w.name}": present (${have.id})`);
+      if (!lackPaths.length && !plan.added.length) continue;
+      missing++;
+      if (lackPaths.length) out(`  ${a.apply ? 'add' : 'would add'} paths: ${lackPaths.join(', ')}`);
+      if (plan.added.length) out(`  ${a.apply ? 'add' : 'would add'} policies: ${plan.added.map(p => p.name).join(', ')}`);
+      if (a.apply) {
+        const full = await cf.app(have.id);
+        const body = appBody(full, plan.after);
+        if (lackPaths.length) body.destinations = [...uris, ...lackPaths].map(uri => ({ type: 'public', uri }));
+        await cf.updateApp(have.id, body);
+        const now = await cf.app(have.id);
+        const lost = lostPolicies(plan.before, now.policies);
+        if (lost.length) throw new TdError(EXIT.conflict, `STOP: app "${w.name}" lost ${lost.join(', ')}; restore them in Zero Trust → Access → Applications`);
+        out(`  verified: "${w.name}" kept every earlier policy`);
+      }
+    }
+    out(missing ? `${missing} app(s) ${a.apply ? 'set up' : 'to set up: run again with --apply'}` : 'nothing missing');
     return EXIT.ok;
   }
 

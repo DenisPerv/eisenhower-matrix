@@ -271,3 +271,121 @@ test('process: an approval over the seat limit changes nothing', async () => {
   assert.ok(!db.calls.some(c => /^(PATCH|POST rpc\/access_request_decided)/.test(c)));
   assert.equal(db.closed, true);
 });
+
+// ---------- two-host layout: setup --gate, list --app ----------
+
+test('gateApps: the gate on the app host paths, one previews app per host; host names only', () => {
+  const apps = A.gateApps('App.Example.pages.dev', 'land.example.pages.dev');
+  assert.deepEqual(A.GATED_PATHS, ['/board', '/board/*', '/app', '/app/*']);
+  assert.deepEqual(apps.map(x => x.name), [A.GATE_APP, A.PREVIEWS_APP.app, A.PREVIEWS_APP.landing]);
+  assert.deepEqual(apps[0].destinations, ['app.example.pages.dev/board', 'app.example.pages.dev/board/*', 'app.example.pages.dev/app', 'app.example.pages.dev/app/*']);
+  assert.equal(apps[0].domain, 'app.example.pages.dev/board');
+  assert.deepEqual(apps[1].destinations, ['*.app.example.pages.dev']);
+  assert.deepEqual(apps[2].destinations, ['*.land.example.pages.dev']);
+  assert.equal(A.gateApps('app.example.pages.dev').length, 2);
+  for (const bad of ['', 'https://app.example.pages.dev', 'app.example.pages.dev/board', 'localhost', 'a b.example.com'])
+    assert.throws(() => A.gateApps(bad), /--host needs a host name/, bad);
+  assert.throws(() => A.gateApps('app.example.pages.dev', 'https://x.example'), /--landing-host/);
+});
+
+test('mergePolicies keeps every policy where it is and adds the missing ones after the last, once', () => {
+  const m = A.mergePolicies([{ id: 'a', name: 'A', precedence: 2 }], [{ id: 'b', name: 'B' }, { id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }]);
+  assert.deepEqual(m.after.map(x => [x.id, x.precedence]), [['a', 2], ['b', 3], ['c', 4]]);
+  assert.deepEqual(m.added.map(x => x.id), ['b', 'c']);
+  assert.equal(A.mergePolicies(m.after, [{ id: 'c' }]).added.length, 0);
+});
+
+const gateState = () => {
+  const st = cfState(['a@x.com']);
+  st.policies.pf = { id: 'pf', name: 'Family', decision: 'allow', include: [{ email: { email: 'f@x.com' } }] };
+  st.policies.ps = { id: 'ps', name: 'Service Auth', decision: 'non_identity', include: [{ service_token: { token_id: 't1' } }] };
+  st.apps.app1.policies = [{ id: 'ph', name: 'Household', precedence: 1 }, { id: 'pf', name: 'Family', precedence: 2 },
+    { id: 'pg', name: A.GUEST_POLICY, precedence: 3 }, { id: 'ps', name: 'Service Auth', precedence: 4 }];
+  st.apps.app1.session_duration = '730h';
+  return st;
+};
+const GATE_ARGS = ['setup', '--gate', '--host', 'app.example.pages.dev', '--landing-host', 'land.example.pages.dev'];
+
+test('setup --gate: dry run writes nothing; --apply creates the gate and both previews apps with the production policies; a re-run reports present', async () => {
+  const st = gateState(), cf = fakeCf(st);
+  let r = await runCmd(GATE_ARGS, { env: ENV, fetch: cf.fetch });
+  assert.equal(r.code, 0, r.err && r.err.message);
+  assert.match(r.out, /dry run/);
+  assert.match(r.out, /policies from TasksDashboard: Household, Family, TasksDashboard guests, Service Auth/);
+  assert.match(r.out, /would create app "Eisenhower gate" for app\.example\.pages\.dev\/board, app\.example\.pages\.dev\/board\/\*, app\.example\.pages\.dev\/app, app\.example\.pages\.dev\/app\/\*/);
+  assert.match(r.out, /would create app "Eisenhower previews \(app\)" for \*\.app\.example\.pages\.dev/);
+  assert.match(r.out, /would create app "Eisenhower previews \(landing\)" for \*\.land\.example\.pages\.dev/);
+  assert.match(r.out, /3 app\(s\) to set up: run again with --apply/);
+  assert.ok(cf.calls.every(c => c.startsWith('GET ')));
+  assert.ok(!r.out.includes(TOKEN));
+
+  r = await runCmd(GATE_ARGS.concat('--apply'), { env: ENV, fetch: cf.fetch });
+  assert.equal(r.code, 0, r.err && r.err.message);
+  const gate = Object.values(st.apps).find(x => x.name === A.GATE_APP);
+  assert.deepEqual(gate.destinations.map(d => d.uri), A.GATED_PATHS.map(p => 'app.example.pages.dev' + p));
+  assert.deepEqual(gate.policies.map(p => p.id), ['ph', 'pf', 'pg', 'ps']);
+  assert.equal(gate.session_duration, '730h');
+  assert.equal(gate.type, 'self_hosted');
+  const prevApp = Object.values(st.apps).find(x => x.name === A.PREVIEWS_APP.app);
+  const prevLand = Object.values(st.apps).find(x => x.name === A.PREVIEWS_APP.landing);
+  assert.equal(prevApp.domain, '*.app.example.pages.dev');
+  assert.equal(prevLand.domain, '*.land.example.pages.dev');
+  assert.deepEqual(prevLand.policies.map(p => p.id), ['ph', 'pf', 'pg', 'ps']);
+  assert.deepEqual(st.apps.app1.policies.map(p => p.id), ['ph', 'pf', 'pg', 'ps']);   // the production app is untouched
+
+  const n = cf.calls.length;
+  r = await runCmd(GATE_ARGS.concat('--apply'), { env: ENV, fetch: cf.fetch });
+  assert.equal(r.code, 0);
+  assert.match(r.out, /app "Eisenhower gate": present/);
+  assert.match(r.out, /app "Eisenhower previews \(landing\)": present/);
+  assert.match(r.out, /nothing missing/);
+  assert.ok(cf.calls.slice(n).every(c => c.startsWith('GET ')));
+});
+
+test('setup --gate: apps made elsewhere (phase 0) are found by name; only a missing policy or path is added, nothing removed', async () => {
+  const st = gateState(), cf = fakeCf(st);
+  st.apps.g1 = { id: 'g1', name: A.GATE_APP, type: 'self_hosted', domain: 'app.example.pages.dev/board',
+    destinations: ['/board', '/board/*', '/app'].map(p => ({ type: 'public', uri: 'app.example.pages.dev' + p })),
+    policies: [{ id: 'ph', precedence: 1 }, { id: 'pf', precedence: 2 }, { id: 'ps', precedence: 3 }] };
+  st.apps.p1 = { id: 'p1', name: A.PREVIEWS_APP.app, type: 'self_hosted', domain: '*.app.example.pages.dev', destinations: [{ type: 'public', uri: '*.app.example.pages.dev' }],
+    policies: [{ id: 'ph', precedence: 1 }, { id: 'pf', precedence: 2 }, { id: 'pg', precedence: 3 }, { id: 'ps', precedence: 4 }] };
+  const args = ['setup', '--gate', '--host', 'app.example.pages.dev'];
+  let r = await runCmd(args, { env: ENV, fetch: cf.fetch });
+  assert.equal(r.code, 0, r.err && r.err.message);
+  assert.match(r.out, /app "Eisenhower gate": present \(g1\)\n {2}would add paths: app\.example\.pages\.dev\/app\/\*\n {2}would add policies: TasksDashboard guests/);
+  assert.match(r.out, /app "Eisenhower previews \(app\)": present \(p1\)\n1 app\(s\) to set up/);
+  assert.ok(!/previews \(landing\)/.test(r.out));
+  assert.ok(cf.calls.every(c => c.startsWith('GET ')));
+  r = await runCmd(args.concat('--apply'), { env: ENV, fetch: cf.fetch });
+  assert.equal(r.code, 0, r.err && r.err.message);
+  assert.deepEqual(st.apps.g1.policies.map(p => [p.id, p.precedence]), [['ph', 1], ['pf', 2], ['ps', 3], ['pg', 4]]);
+  assert.deepEqual(st.apps.g1.destinations.map(d => d.uri), A.GATED_PATHS.map(p => 'app.example.pages.dev' + p));
+  assert.equal(cf.calls.filter(c => c.startsWith('PUT')).length, 1);
+  assert.match(r.out, /verified: "Eisenhower gate" kept every earlier policy/);
+});
+
+test('setup --gate: a bad host or two apps with one name stop before any write', async () => {
+  const st = gateState(), cf = fakeCf(st);
+  let r = await runCmd(['setup', '--gate', '--host', 'https://app.example.pages.dev/'], { env: ENV, fetch: cf.fetch });
+  assert.equal(r.err.exit, 1);
+  st.apps.g1 = { id: 'g1', name: A.GATE_APP, domain: 'app.example.pages.dev/board', policies: [] };
+  st.apps.g2 = { id: 'g2', name: A.GATE_APP, domain: 'app.example.pages.dev/board', policies: [] };
+  r = await runCmd(['setup', '--gate', '--host', 'app.example.pages.dev', '--apply'], { env: ENV, fetch: cf.fetch });
+  assert.equal(r.err.exit, 1);
+  assert.match(r.err.message, /several apps are called "Eisenhower gate"/);
+  assert.ok(cf.calls.every(c => c.startsWith('GET ')));
+});
+
+test('list --app: the gate app\'s paths and policies; CF_ACCESS_PROD_APP_ID is then not needed', async () => {
+  const st = gateState(), cf = fakeCf(st);
+  st.apps.g1 = { id: 'g1', name: A.GATE_APP, domain: 'app.example.pages.dev/board',
+    destinations: A.GATED_PATHS.map(p => ({ type: 'public', uri: 'app.example.pages.dev' + p })),
+    policies: [{ id: 'ph', name: 'Household', precedence: 1 }, { id: 'pg', name: A.GUEST_POLICY, precedence: 2 }] };
+  const env = Object.assign({}, ENV, { CF_ACCESS_PROD_APP_ID: '' });
+  const r = await runCmd(['list', '--app', 'g1'], { env, fetch: cf.fetch });
+  assert.equal(r.code, 0, r.err && r.err.message);
+  assert.match(r.out, /Eisenhower gate \(app\.example\.pages\.dev\): Household, TasksDashboard guests\n {2}paths: app\.example\.pages\.dev\/board, app\.example\.pages\.dev\/board\/\*, app\.example\.pages\.dev\/app, app\.example\.pages\.dev\/app\/\*/);
+  const j = await runCmd(['list', '--app', 'g1', '--json'], { env, fetch: cf.fetch });
+  assert.equal(JSON.parse(j.out.split('\n').pop()).paths.length, 4);
+  assert.equal((await runCmd(['list'], { env, fetch: cf.fetch })).err.exit, 2);
+});

@@ -1,20 +1,20 @@
 # Access requests
 
-How a person who is not let into a hosted copy asks for access, and how an owner lets them in. Details of each piece are in `README.md` (Set up `db/015`, Open and sign in "Access request page", Access CLI, Hosting, Limits); this page is the overview.
+How a person who is not let into a hosted copy asks for access, and how an owner lets them in. Details of each piece are in `README.md` (Set up `db/015`, Open and sign in "Sign-in page", Access CLI, Hosting, Limits); this page is the overview.
 
 ## Flow
 
 | # | Who | What happens |
 |---|---|---|
-| 1 | stranger | opens `<host>/request` (`request.html`), which the host serves without its access gate |
-| 2 | stranger | Continue with Google (the app's PKCE flow, `redirect_to` = `<origin>/request`); the sign-up hook decides whether a new login may exist, as for the board |
+| 1 | stranger | opens `<app host>/signin` (`signin.html`; the landing page's Sign in link, or `/board/` and `/app/` for a signed-out visitor), which is public; the older `/request` is a 301 to it |
+| 2 | stranger | Continue with Google (the app's PKCE flow, `redirect_to` = exactly `<origin>/signin`); the sign-up hook decides whether a new login may exist, as for the board. A household login or an approved request goes on to `/board/` (or `/app/` when it came with `?next=/app/`) |
 | 3 | page | `rpc/my_access_request`; when there is no request (or the last one is `removed`) `rpc/request_access`, then `my_access_request` again. It shows "Your request is sent" with the request time |
 | 4 | database | `request_access()` adds a row to `users_pending_for_decision` and a task `Access request: <email>` in the household list `access-requests` ("Access requests"), created as the agent login, due at the next 09:00 in the owners' time zone, `details.notify` = the owners, so a daily digest that lists tasks due today shows it |
 | 5 | owner | writes `Approved` or `Declined` as the **first word** of the task's description (any case; anything else = not decided yet) |
 | 6 | owner or a job | `node cli/access.mjs process --apply`: approved emails go into the access policy, then `access_request_decided` and the task is set done with a closing line |
-| 7 | stranger | reloads `/request`: "You're in" with a link to `/`, or "Request declined" |
+| 7 | stranger | opens `/signin` again: an approved request goes on to the board; a declined one sees "Request declined". Access lets an approved login through `/board/` and `/app/` once step 6 has run |
 
-The decision email is sent by the host, not by this repository: HomeOS mails each requester once, from Maksym's Gmail, after it applies the decision; `request.html`, the phone app's gate and `privacy.html` say so.
+The decision email is sent by the host, not by this repository: HomeOS mails each requester once, from Maksym's Gmail, after it applies the decision; `signin.html`, the phone app's gate and `privacy.html` say so.
 
 The page loads no board data. A signed-in stranger already has a login and their own "My tasks" (as any guest), so the gate in front of the board is the host's access policy, not the database.
 
@@ -35,8 +35,9 @@ Dry run unless `--apply`. Env names only (values never printed): `CLOUDFLARE_ACC
 
 | Command | Use |
 |---|---|
-| `setup` | once: creates the guests policy, the bypass policy, the request app and the phone app, attaches the guests policy to the production app (every existing policy kept; exit 3 if one would be lost), prints `CF_ACCESS_GUEST_POLICY_ID` |
-| `list` | emails on the guests policy, seats, the production app's policies |
+| `setup` | single-host layout, once: creates the guests policy, the bypass policy, the request app and the phone app, attaches the guests policy to the production app (every existing policy kept; exit 3 if one would be lost), prints `CF_ACCESS_GUEST_POLICY_ID` |
+| `setup --gate --host <app host> [--landing-host <landing host>]` | two-host layout: the Access app **Eisenhower gate** on `/board`, `/board/*`, `/app`, `/app/*` and a previews app per host, with the production app's policies and the guests policy; apps found by name are reported `present`, only missing paths or policies are added |
+| `list [--app <id>]` | emails on the guests policy, seats, the production app's (or that app's) paths and policies |
 | `add --email A` / `remove --email A` | by hand; `remove` also marks an approved request `removed`, so the person may ask again |
 | `process` | applies the decisions written in the tasks |
 
@@ -46,6 +47,10 @@ Dry run unless `--apply`. Env names only (values never printed): `CLOUDFLARE_ACC
 2. `node cli/access.mjs setup --env <file>`: read the before/after policy list.
 3. `node cli/access.mjs setup --env <file> --apply`; add the printed `CF_ACCESS_GUEST_POLICY_ID` to the env file.
 4. Check without a token: `<host>/request` and `<host>/config/tasksdashboard.config.js` answer `200`; `<host>/` still redirects to `*.cloudflareaccess.com`.
+
+**Two-host layout** (since 2026-10-30, [hosting.md](hosting.md)): no bypass apps are needed, because the gate covers only `/board` and `/app` on the app host. Run `node cli/access.mjs setup --gate --host <app host> --landing-host <landing host> --env <file>`, then with `--apply`; set `CF_ACCESS_PROD_APP_ID` to the gate's id; run `process --apply` so every approved guest is on the guests policy the gate uses. Check without a token: `/signin`, `/privacy` and the config answer `200`, `/request` a 301 to `/signin`, `/board/` and `/app/` a redirect to `*.cloudflareaccess.com`.
+
+**The lag:** a login approved in the database passes Access only after the next `process --apply`, which a daily job runs in the household; run it by hand to let someone in at once.
 
 What `setup` creates: the reusable policy **TasksDashboard guests** (allow, emails, session 730 h; it holds the placeholder `no-guests-yet@example.invalid` until the first guest, because a reusable policy needs one rule), the policy **TasksDashboard request (bypass)** (bypass, everyone) the self-hosted app **TasksDashboard request** on `/request` and `/config/tasksdashboard.config.js`, and the self-hosted app **TasksDashboard phone app** on `/app` and `/app/*` (the phone app, which gates itself; [hosting.md](hosting.md) "The phone app on the same project"), both on the bypass policy. The more specific path wins over the production app, so only those paths are public. Run `setup` again on an older installation to add the phone app: it creates only what is missing. The config holds only public values (project URL, publishable key, poll interval). `privacy.html` is not on the bypass app; add its path there if a Google consent screen must link to it publicly.
 
@@ -63,7 +68,8 @@ Zero Trust's free plan counts 50 users, the owners included. `add` and `process`
 
 | Symptom | Cause and fix |
 |---|---|
-| `/request` shows the Access login | `setup --apply` not run, or the request app was deleted |
+| `/request` shows the Access login | single host: `setup --apply` not run, or the request app was deleted |
+| `/signin` shows the Access login | two hosts: an Access app covers more than `/board` and `/app`; check the gate's paths with `list --app <id>` |
 | `/app/` shows the Access login | `setup --apply` not run since the phone app was added, or the phone app was deleted |
 | "Try again later" | a cap (`54000`) or the sign-up hook's limit; raise the caps in `ops.settings` or decide open requests |
 | an approved person still sees the Access login | `process --apply` not run yet, or their Google email differs from the one Access receives (they must use the same account) |

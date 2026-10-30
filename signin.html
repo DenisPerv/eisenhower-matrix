@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>TasksDashboard: request access</title>
+<title>TasksDashboard: sign in</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath d=%22M1.6 1.6V30.4H30.4%22 fill=%22none%22 stroke=%22%2317181B%22 stroke-width=%221.4%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M15.6 27.17L29.99 26.87A25.4 25.4 0 0 0 26.86 15.16L14.24 22.1A11 11 0 0 1 15.6 27.17Z%22 fill=%22%23C2922A%22/%3E%3Cpath d=%22M14.01 21.7L26.33 14.24A25.4 25.4 0 0 0 17.76 5.67L10.3 17.99A11 11 0 0 1 14.01 21.7Z%22 fill=%22%23B5392C%22/%3E%3Cpath d=%22M9.9 17.76L16.84 5.14A25.4 25.4 0 0 0 5.13 2.01L4.83 16.4A11 11 0 0 1 9.9 17.76Z%22 fill=%22%231F6B4F%22/%3E%3C/svg%3E">
-<!-- The public access-request page (access-backup-plan.md A1): no board data, Google sign-in (PKCE, no library), then
-     rpc/my_access_request and, when there is no request yet, rpc/request_access. One inline script: its sha256 is in the
-     deploy's _headers (docs/deployment/2-deploy.md). The look is the app's "Aurora instrument" (TasksDashboard.html UI 4-5). -->
+<!-- The public sign-in page (/signin; /request is a 301 alias): no board data, Google sign-in (PKCE, no library), then
+     rpc/my_access_request and, when there is no request yet, rpc/request_access. A household login or an approved request
+     goes on to `next` (/board/ or /app/ only, default /board/) with location.replace; everyone else stays on the request
+     screens. One inline script: its sha256 is in the deploy's _headers (docs/deployment/2-deploy.md). The look is the app's
+     "Aurora instrument" (TasksDashboard.html UI 4-5). -->
 <style>
 :root{
   --ui:"Bahnschrift","DIN Alternate","DIN 2014","Segoe UI",system-ui,sans-serif;
@@ -69,6 +71,7 @@ body::before{content:"";position:fixed;inset:-20vmax;z-index:-1;pointer-events:n
 h1{margin:0;font:500 30px/1.1 var(--serif);letter-spacing:-.005em}
 p{margin:0;color:var(--ink2);max-width:60ch}
 .fine{font-size:13px;color:var(--ink3)}
+.fine a{color:var(--accent-ink);text-underline-offset:3px}
 .msg{padding:8px 10px;border-left:3px solid var(--danger);background:var(--danger-bg);color:var(--danger-ink);font:600 13px/1.4 var(--font)}
 button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:0 16px;border-radius:var(--r);font:600 15px var(--ui);letter-spacing:.01em;text-decoration:none;cursor:pointer}
 button:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -113,7 +116,7 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
   try { const t = localStorage.getItem('td.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
 
   // this tab only: the PKCE verifier while Google is open, then the session (never the board's td.auth)
-  const PKCE_KEY = 'td.request.pkce', AUTH_KEY = 'td.request.auth';
+  const PKCE_KEY = 'td.request.pkce', AUTH_KEY = 'td.request.auth', NEXT_KEY = 'td.signin.next';
   const ss = {
     get: k => { try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch (e) { return null; } },
     set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -142,8 +145,29 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
   async function pkceChallenge(verifier) {
     return b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
   }
-  // back to /request (Pages serves request.html there); the address loses the code at once
-  const backUrl = () => location.origin + location.pathname.replace(/\.html$/, '');
+  // back to exactly <origin>/signin, no query, so it matches the exact Redirect URL in Supabase; the address loses the code at once
+  const backUrl = () => location.origin + '/signin';
+  // where a let-in login goes: only these two pages of this host; anything else (another host, //host, another path) is /board/
+  const NEXT_PAGES = ['/board/', '/app/'];
+  const safeNext = v => (typeof v === 'string' && NEXT_PAGES.includes(v) ? v : '/board/');
+  // ?next= is read on arrival and kept in this tab, because the way back from Google carries no query
+  function keepNext(href) {
+    let u;
+    try { u = new URL(href); } catch (e) { return; }
+    if (!u.searchParams.has('next')) return;
+    ss.set(NEXT_KEY, safeNext(u.searchParams.get('next')));
+    u.searchParams.delete('next');
+    const qs = u.searchParams.toString();
+    try { history.replaceState(null, '', u.pathname + (qs ? '?' + qs : '') + u.hash); } catch (e) {}
+  }
+  const nextPage = () => safeNext(ss.get(NEXT_KEY));
+  // a household login or an approved request goes on to the page it came for
+  function goOn() {
+    const to = nextPage();
+    ss.del(NEXT_KEY);
+    location.replace(to);
+  }
+  window.TDSignin = { safeNext, backUrl, NEXT_PAGES };
   const CALLBACK_KEYS = ['code', 'error', 'error_code', 'error_description', 'state', 'access_token', 'refresh_token', 'expires_in', 'expires_at', 'token_type', 'provider_token', 'provider_refresh_token', 'type'];
   function readCallback(href) {
     let u;
@@ -227,11 +251,12 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
     m.dataset.state = state;
     let h = '';
     if (state === 'signedout') {
-      h = '<h1>Ask for access</h1><p>TasksDashboard is a private board. Sign in with Google and your request goes to the people who run it.</p>' +
+      h = '<h1>Sign in</h1><p>TasksDashboard is a private board. Sign in with Google: if you have access, the board opens; if not, your request goes to the people who run it.</p>' +
         (o.message ? `<p class="msg" role="alert">${esc(o.message)}</p>` : '') +
         `<button type="button" class="google" data-act="google"${HOSTED && CFG ? '' : ' disabled'}>${GOOGLE_G}<span>Continue with Google</span></button>` +
         (HOSTED ? '' : '<p class="fine">Open this page on its https address to sign in.</p>') +
-        '<p class="fine">We keep your email, your name and the time of the request. We also use your email address to send you one email with the decision (approved or not).</p>';
+        '<p class="fine">We keep your email, your name and the time of the request. We also use your email address to send you one email with the decision (approved or not).</p>' +
+        `<p class="fine" data-privacy>How we handle your data: <a href="${HOSTED ? '/privacy' : 'privacy.html'}">privacy</a>.</p>`;
     } else if (state === 'sending') {
       h = '<h1>Sending your request</h1><div class="scan" aria-hidden="true"></div><p>One moment.</p>';
     } else if (state === 'sent') {
@@ -239,9 +264,9 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
         `<dl><div><dt>Requested</dt><dd>${when(o.row.requested_at) || 'just now'}</dd></div>${account()}<div><dt>Status</dt><dd><span class="dot" aria-hidden="true"></span>Waiting for a decision</dd></div></dl>` +
         '<p class="fine">Come back to this page later to see the answer.</p>' + signOutBtn;
     } else if (state === 'approved') {
-      h = '<h1>You\'re in</h1><p>Your request was approved. Open the board and sign in with the same Google account.</p>' +
+      h = '<h1>You\'re in</h1><p>You have access. Opening the board; sign in there with the same Google account if asked.</p>' +
         `<dl>${account()}${o.row.decided_at ? `<div><dt>Approved</dt><dd>${when(o.row.decided_at)}</dd></div>` : ''}</dl>` +
-        `<a class="btn primary" href="${HOSTED ? '/' : 'TasksDashboard.html'}" data-act="open">Open TasksDashboard</a>` + signOutBtn;
+        `<a class="btn primary" href="${HOSTED ? esc(nextPage()) : 'TasksDashboard.html'}" data-act="open">Open TasksDashboard</a>` + signOutBtn;
     } else if (state === 'declined') {
       h = '<h1>Request declined</h1><p>The people who run this board declined the request. If you think that\'s a mistake, ask the person who sent you the link.</p>' +
         `<dl>${account()}${o.row.decided_at ? `<div><dt>Declined</dt><dd>${when(o.row.decided_at)}</dd></div>` : ''}</dl>` + signOutBtn;
@@ -258,15 +283,20 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
   function failed(r) {
     if (r.code === '54000') return view('cap');
     // db/015: a household member has the board already
-    if (r.code === '22023' && /already have access/i.test(r.message)) return view('approved', { row: {} });
+    if (r.code === '22023' && /already have access/i.test(r.message)) return letIn({});
     if (r.status === 401 || r.code === 'session' || r.code === 'PGRST301' || r.code === 'PGRST303') { forget(); return view('signedout', { message: 'Session ended. Sign in again.' }); }
     if (!r.status) return view('error', { message: 'Can\'t reach the server. Check the connection and try again.' });
     if (r.status === 429) return view('error', { message: 'Too many attempts. Wait a minute, then try again.' });
     return view('error', { message: 'The request did not go through' + (r.message ? ': ' + r.message.slice(0, 160).replace(/[.!?]*$/, '.') : '.') });
   }
+  function letIn(row) {
+    view('approved', { row });
+    if (HOSTED) goOn();
+  }
   function show(row) {
     const st = String(row.status || 'pending');
-    view(st === 'approved' || st === 'declined' ? st : 'sent', { row });
+    if (st === 'approved') return letIn(row);
+    view(st === 'declined' ? st : 'sent', { row });
   }
   // the state first; a request is made only when this account has none (or only a removed one)
   async function check() {
@@ -325,6 +355,7 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
       else if (act === 'signout') signOut();
       else if (act === 'retry') session ? check() : view('signedout');
     });
+    keepNext(location.href);
     if (!CFG) return view('error', { message: 'This page has no valid config (config/tasksdashboard.config.js).' });
     const cb = readCallback(location.href);
     if (cb) return finishGoogle(cb);
@@ -339,7 +370,7 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
 <body>
 <div class="wrap">
   <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M1.6 1.6V30.4H30.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M15.6 27.17L29.99 26.87A25.4 25.4 0 0 0 26.86 15.16L14.24 22.1A11 11 0 0 1 15.6 27.17Z" fill="var(--qc)"/><path d="M14.01 21.7L26.33 14.24A25.4 25.4 0 0 0 17.76 5.67L10.3 17.99A11 11 0 0 1 14.01 21.7Z" fill="var(--qa)"/><path d="M9.9 17.76L16.84 5.14A25.4 25.4 0 0 0 5.13 2.01L4.83 16.4A11 11 0 0 1 9.9 17.76Z" fill="var(--qb)"/></svg>TasksDashboard</div>
-  <main id="app" class="panel" data-state="loading" aria-live="polite"><h1>Request access</h1><p>Loading.</p><noscript><p class="msg">This page needs JavaScript to sign in.</p></noscript></main>
+  <main id="app" class="panel" data-state="loading" aria-live="polite"><h1>Sign in</h1><p>Loading.</p><noscript><p class="msg">This page needs JavaScript to sign in.</p></noscript></main>
 </div>
 </body>
 </html>
