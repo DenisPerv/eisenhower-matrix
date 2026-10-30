@@ -1672,7 +1672,7 @@ async function afterSignIn() {
   closeDlg('dlg-signin');
   const g = await D.gate();
   if (g === 'board') { closeDlg('dlg-access'); return load(); }
-  openAccess(g === 'none' ? 'ask' : g === 'pending' ? 'sent' : g);
+  openAccess(TDData.accessScreen(g));
 }
 async function load() {
   $('#map').classList.add('loading'); $('#main').setAttribute('aria-busy', 'true');
@@ -1825,7 +1825,7 @@ document.addEventListener('click', async e => {
     case 'ac-ask': case 'ac-retry': {
       openAccess('sending');
       const r = await D.requestAccess();
-      if (r.state === 'board') { closeDlg('dlg-access'); load(); } else openAccess(r.state, r.message);
+      if (r.state === 'board') { closeDlg('dlg-access'); load(); } else openAccess(TDData.accessScreen(r.state), r.message);
       break;
     }
     case 'ac-check': afterSignIn(); break;

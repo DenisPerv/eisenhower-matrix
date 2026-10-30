@@ -106,6 +106,8 @@
     if (!row || row.status === 'removed') return 'none';
     return row.status === 'declined' ? 'declined' : 'pending';
   }
+  // the access screen for a gate() or requestAccess() state: none -> ask, pending -> sent (request.html show()); the rest as they are
+  const accessScreen = st => st === 'none' ? 'ask' : st === 'pending' ? 'sent' : st;
 
   // ---- sync pill (pure): saved, saving, offline(n), conflict, ended ----
   function syncStateOf(s) {
@@ -1099,5 +1101,5 @@
 
   function safe(fn) { try { return fn(); } catch (e) { return null; } }
 
-  return { create, queueRecord, queueRestore, idbQueueStore, gateFrom, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS, USER_KEYS };
+  return { create, queueRecord, queueRestore, idbQueueStore, gateFrom, accessScreen, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS, USER_KEYS };
 });

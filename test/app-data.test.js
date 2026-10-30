@@ -325,6 +325,38 @@ test('gate: household, an approved request or a list shared by someone else -> b
   assert.equal(asked, 1);
 });
 
+// 2026-10-30: the first tap saved the request but showed "Something went wrong" (twice with Try again): requestAccess()
+// answers 'pending' and the app's screen table only has 'sent'. accessScreen() maps every gate and request state to a screen.
+test('access request: the first tap and Try again both land on the "Request sent" screen with the request time', async () => {
+  const fs = require('node:fs');
+  const ROW = { id: 'r1', status: 'pending', email: 'g@example.com', first_name: 'G', last_name: null,
+    requested_at: '2026-10-30T09:12:00+00:00', decided_at: null, applied_at: null, item_id: 'i1' };
+  let saved = null, made = 0;
+  // like db/015: my_access_request() is jsonb (null until a request exists); request_access() returns the row and, with a
+  // request already open, returns that same row without making a second one
+  const f = fakeSupabase([
+    ['POST', /rpc\/my_access_request/, () => [200, saved]],
+    ['POST', /rpc\/request_access/, () => { if (!saved) { saved = ROW; made++; } return [200, saved]; }],
+  ]);
+  const d = make(f);
+  await d.signIn('g@example.com', 'pw', true);
+  const first = await d.requestAccess();
+  assert.equal(D.accessScreen(first.state), 'sent', 'first tap');
+  assert.equal(d.accessRequest().requested_at, ROW.requested_at, 'the screen shows the request time');
+  const again = await d.requestAccess();
+  assert.equal(D.accessScreen(again.state), 'sent', 'Try again after a saved request');
+  assert.equal(made, 1, 'one request only');
+  assert.equal(D.accessScreen('none'), 'ask');
+  for (const s of ['board', 'declined', 'cap', 'error']) assert.equal(D.accessScreen(s), s);
+
+  // the app page: every screen accessScreen() can return exists, and both paths (after sign-in, after a tap) go through it
+  const page = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+  const table = page.slice(page.indexOf('function openAccess('), page.indexOf('$(\'#ac-body\')'));
+  for (const s of ['none', 'pending', 'board', 'declined', 'cap', 'error']) assert.match(table, new RegExp('\\n\\s+' + D.accessScreen(s) + ': `'), 'screen ' + s);
+  assert.match(page, /openAccess\(TDData\.accessScreen\(g\)\)/, 'afterSignIn');
+  assert.match(page, /openAccess\(TDData\.accessScreen\(r\.state\), r\.message\)/, 'Ask for access / Try again');
+});
+
 test('Google PKCE: back to /app/, verifier in localStorage for 10 minutes and used once', async () => {
   let exchanged = null, went = null;
   const f = fakeSupabase([['POST', /grant_type=pkce/, (m, body) => { exchanged = body; return [200, grant('G')]; }]]);
