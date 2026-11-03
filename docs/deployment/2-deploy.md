@@ -11,11 +11,15 @@ node scripts/tasksdb/deploy-pages.js --project <name> --ref <sha>   # build and 
 node scripts/tasksdb/deploy-pages.js --project <name> --status [--timeout <ms>]   # step 1 and 3: hosted version.json vs release_maxden
 node scripts/tasksdb/deploy-pages.js --project <old> --redirect-to <origin> [--permanent]   # a redirect-only upload for a retired host
 node scripts/tasksdb/deploy-pages.js --project <old> --layout legacy --ref <sha>            # rebuild the single-host layout (board at /)
+node scripts/tasksdb/deploy-pages.js --project <name> --set landing|app --dry-run           # force a file set (dry runs of any project)
+node scripts/tasksdb/deploy-pages.js --project <name> --src <dir> --dry-run                 # build from a working tree instead of a release commit (dry run only)
 ```
 
 Run from the HomeOS root on the machine with the tokens. `--project` picks the file set: the project named in `TASKSDB_SITE_PROJECT` gets the landing set, any other the app set. Look at the dry-run output first: the file list, `_headers` and `_redirects`.
 
 - **`--ref`** takes a 7-40 character sha that must be an ancestor of `origin/release_maxden` (otherwise exit 3).
+- **`--set landing|app`** forces the file set when the env names do not pick it yet. **`--src <dir>`** builds from a working tree and works only with `--dry-run` (it refuses `--ref`).
+- **Guard:** a real deploy of the landing or app set goes only to the two host projects (`TASKSDB_SITE_PROJECT`, `TASKSDB_PAGES_PROJECT` or the two host names). The retired host `homeos-tasksboard` takes only `--layout legacy` or `--redirect-to` (exit 2 otherwise). Dry runs work for any project.
 - **Before deploying** the script reads the project's production branch through the Cloudflare API (`GET /accounts/<id>/pages/projects/<project>`) and refuses with exit 4 when it differs from `TASKSDB_PAGES_BRANCH` (default `main`): the upload would land as a preview.
 - **After deploying** it reads the latest production deployment through the API (`…/deployments?env=production&per_page=1`) and fails with exit 7 unless it carries the deployed sha. It then prints `deployed <short sha> to <url>` and the CSP hashes.
 
