@@ -358,10 +358,28 @@
   }
 
   // ---- sign-in with Google (multi-user T8): PKCE against Supabase Auth, no library ----
-  // Google needs an origin to come back to: https, or http on localhost. A file:// page signs in with a password only.
+  // Google needs an origin to come back to: https, or http on localhost. Sign-in is Google only (2026-10-30): a file:// page
+  // shows the button but cannot sign in.
   function isHostedOrigin(origin) {
     const o = String(origin || '');
     return /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o);
+  }
+  // Google only: on a hosted origin (https, not localhost) a signed-out page goes to the public sign-in page with its own path as
+  // next (signin.html accepts /board/ and /app/ only); file:// and localhost keep the Google button in place (null).
+  const SIGNIN_NEXT = ['/board/', '/app/'];
+  function signinRedirect(origin, next) {
+    const o = String(origin || '');
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o) || /^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o)) return null;
+    return '/signin?next=' + (SIGNIN_NEXT.includes(next) ? next : '/board/');
+  }
+  // signin.html keeps its session in this tab's sessionStorage (td.request.auth) and goes on to next with location.replace, in
+  // the same tab: the page takes its refresh token once and deletes the key. td.signin.stay: the "Stay signed in" box of the
+  // page that sent the visitor to /signin ('0' unticked; missing means ticked).
+  const SIGNIN_AUTH_KEY = 'td.request.auth', SIGNIN_STAY_KEY = 'td.signin.stay';
+  function signinHandover(raw) {
+    let v = null;
+    try { v = JSON.parse(raw || 'null'); } catch (e) { return null; }
+    return isObj(v) && typeof v.refresh_token === 'string' && v.refresh_token.length > 0 ? v.refresh_token : null;
   }
   function b64url(bytes) {
     let s = '';
@@ -1118,7 +1136,7 @@
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,

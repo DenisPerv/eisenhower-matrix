@@ -5,9 +5,10 @@
 // Without --url the page is the local file (file://). With --url it is <origin>/ or the page path given (https://host/board/, a
 // directory path ending in /), and sessions are seeded on <origin>/version.json
 // (same origin, same storage); --access-env adds the Cloudflare Access service-token headers to requests for that origin only.
-// No dependencies. Real sessions come from a REST sign-in in Node, seeded into the page's td.auth; the form itself is only fed
-// dummy credentials while Fetch interception answers it, so no real password is ever typed into the page. Writes stay in the
-// _selftest list (and test lists it creates and archives; guests: see gGuests). The transport never logs CDP parameters.
+// No dependencies. Real sessions come from a REST sign-in in Node, seeded into the page's td.auth (or, for the hand-over from
+// /signin, into sessionStorage td.request.auth); the page has no password form (Google only since 2026-10-30), so nothing is
+// ever typed into it. Writes stay in the _selftest list (and test lists it creates and archives; guests: see gGuests). The
+// transport never logs CDP parameters.
 import fs from 'node:fs';
 import http from 'node:http';
 import crypto from 'node:crypto';
@@ -31,7 +32,6 @@ const RUN = 'e2e-' + new Date().toISOString().replace(/\D/g, '').slice(2, 12);
 // a Cyrillic name new on every run (no ASCII letters or digits, so the slug is list-xxxxxx): since db/012 a same name as an
 // archived list of an earlier run is refused with Restore, so a fixed name would fail from the second run on
 const CYR_LIST = 'Тестовий список ' + RUN.slice(4).replace(/\d/g, (d) => 'абвгдежзик'[d]);
-const DUMMY = { email: 'nobody@example.invalid', password: 'not-a-password' };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // real key presses (CDP Input): implicit form submission and the dialog's Escape only follow trusted keys. Modifiers: Alt 1
 const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 },
@@ -151,6 +151,16 @@ async function seed(T, session, kind = 'local') {
   await T.go(seedUrl());
   await T.ev(`(()=>{localStorage.removeItem('td.auth');sessionStorage.removeItem('td.auth');${kind === 'local' ? 'localStorage' : 'sessionStorage'}.setItem('td.auth',${JSON.stringify(JSON.stringify({ refresh_token: session.refresh_token }))});return true})()`);
 }
+// signin.html's hand-over: its session in this tab's sessionStorage (td.request.auth) and the Stay box of the page that sent
+// the visitor there (td.signin.stay), as signin.html leaves them before location.replace to /board/
+async function seedSignin(T, session, stay) {
+  await T.go(seedUrl());
+  const s = { access_token: session.access_token, refresh_token: session.refresh_token, expires_at: session.expires_at, email: (session.user && session.user.email) || '' };
+  await T.ev(`(()=>{localStorage.removeItem('td.auth');sessionStorage.removeItem('td.auth');sessionStorage.setItem('td.request.auth',${JSON.stringify(JSON.stringify(s))});sessionStorage.setItem('td.signin.stay',${JSON.stringify(stay ? '1' : '0')});return true})()`);
+}
+// signed out: the board's sign-in card (file://, localhost) or, on a hosted origin, the public /signin page (Google only)
+const SIGNED_OUT = '(!!document.getElementById("signin") || location.pathname === "/signin")';
+const signedOut = (T, ms) => T.wait(SIGNED_OUT, ms);
 async function open(T, session, kind) { if (session) await seed(T, session, kind); await T.go(pageUrl()); return T.ready(); }
 // Fetch patterns of a tab: the page origin while --access-env is on (headers added), plus a test's own pattern
 function fetchPatterns(pattern) {
@@ -279,43 +289,34 @@ async function cleanup() {
 async function gAuth() {
   const G = 'auth';
   const c1 = await ctx(B), T = await tab(B, c1);
-  // the form's own submit path: dummy credentials, Fetch answers (a real grant made in Node, then a 400, then a 429)
+  // signed out: Google only, no password field anywhere; hosted pages go to /signin?next=/board/
   await T.go(seedUrl()); await T.ev('localStorage.clear();sessionStorage.clear();true');
   await T.go(pageUrl());
-  check(G, 'signed out: the form shows', await T.wait('!!document.getElementById("signin")'));
+  check(G, 'signed out: the sign-in shows (the card here, /signin on a hosted origin)', await signedOut(T));
+  check(G, 'no password field', await T.ev('!document.querySelector("input[type=password]")'));
+  if (await T.ev('location.pathname === "/signin"')) {
+    check(G, 'hosted: signed out goes to /signin, next=/board/ kept in this tab', await T.ev('JSON.parse(sessionStorage.getItem("td.signin.next") || "null") === "/board/"'));
+  } else {
+    check(G, 'the card: Continue with Google, Stay signed in ticked, the privacy line with the contact and a privacy link',
+      await T.ev('!!document.getElementById("si-google") && document.getElementById("si-stay").checked && document.querySelector(".si-privacy").textContent.includes("md.solutions.homeos@gmail.com") && ["privacy.html", "/privacy"].includes(document.querySelector(".si-privacy a").getAttribute("href"))'));
+    if (!ORIGIN) {
+      await T.click('#si-google');
+      check(G, 'file://: Continue with Google explains that it needs an https or localhost page; nothing is sent', await T.wait('document.getElementById("si-msg").textContent.includes("https or localhost")', 5000));
+    }
+  }
+  // back from /signin: its session becomes td.auth (Stay signed in), the hand-over key is deleted
   const real = await grantFor('maksym');
-  let seen = 0, sentDummy = false, next = 'grant';
-  await intercept(T, '*auth/v1/token?grant_type=password*', p => {
-    seen++;
-    try { const b = JSON.parse(p.request.postData || '{}'); sentDummy = b.email === DUMMY.email && b.password === DUMMY.password; } catch (e) {}
-    if (next === '400') return { status: 400, body: { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' } };
-    if (next === '429') return { status: 429, body: { code: 429, error_code: 'over_request_rate_limit', msg: 'rate limit' } };
-    return { status: 200, body: { access_token: real.access_token, refresh_token: real.refresh_token, expires_in: 3600, token_type: 'bearer', user: { id: real.user.id, email: real.user.email } } };
-  });
-  next = '400';
-  await T.insert('#si-email', DUMMY.email); await T.insert('#si-pass', DUMMY.password);
-  await T.ev('document.getElementById("signin").requestSubmit()');
-  await T.wait('document.getElementById("si-msg").textContent.length > 0');
-  const n400 = seen;
-  await sleep(2500);
-  check(G, 'a 400 shows "Email or password is wrong" and focuses the message; nothing more is sent', /wrong/.test(await T.text('#si-msg')) && await T.ev('document.activeElement.id==="si-msg"') && seen === n400 && n400 === 1, `requests ${seen}`);
-  check(G, 'the form sent the typed dummy credentials (intercepted, nothing left the machine)', sentDummy);
-  check(G, 'form attributes: email autocomplete=username, password current-password, Stay signed in ticked', await T.ev('document.getElementById("si-email").autocomplete==="username" && document.getElementById("si-pass").autocomplete==="current-password" && document.getElementById("si-stay").checked'));
-  next = '429';
-  await T.ev('document.getElementById("signin").requestSubmit()');
-  check(G, 'a 429 shows the wait message', await T.wait('/Too many attempts/.test(document.getElementById("si-msg").textContent)'));
-  next = 'grant';
-  await T.ev('document.getElementById("signin").requestSubmit()');
-  check(G, `a granted submit (Stay signed in) loads the board from ${where()}`, await T.ready());
-  await unintercept(T);
-  check(G, 'td.auth is kept in localStorage', await T.ev('!!localStorage.getItem("td.auth") && !sessionStorage.getItem("td.auth")'));
+  await seedSignin(T, real, true);
+  await T.go(pageUrl());
+  check(G, `the hand-over from /signin (Stay signed in) loads the board from ${where()}`, await T.ready());
+  check(G, 'td.auth is kept in localStorage; td.request.auth and td.signin.stay are gone', await T.ev('!!localStorage.getItem("td.auth") && !sessionStorage.getItem("td.auth") && !sessionStorage.getItem("td.request.auth") && !sessionStorage.getItem("td.signin.stay")'));
   await T.reload();
   check(G, 'a reload stays signed in', await T.ready());
   // a 401 on a REST call: one silent refresh and a retry
   let hit = 0;
   await intercept(T, '*rest/v1/preferences*', () => (hit++ === 0 ? { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } } : null));
   await T.reload();
-  check(G, 'a 401 refreshes silently (board loads, no form)', await T.ready() && hit >= 2 && !(await T.has('#signin')), `prefs requests ${hit}`);
+  check(G, 'a 401 refreshes silently (board loads, no form)', await T.ready() && hit >= 2 && !(await T.ev(SIGNED_OUT)), `prefs requests ${hit}`);
   await unintercept(T);
   // two tabs in one context share the refresh (Web Lock + BroadcastChannel), both modes
   const T2 = await tab(B, c1);
@@ -327,28 +328,26 @@ async function gAuth() {
   await Promise.all([T.ev('dispatchEvent(new Event("focus")),true'), T2.ev('dispatchEvent(new Event("focus")),true')]);
   await sleep(4000);
   await unintercept(T); await unintercept(T2);
-  check(G, 'both tabs refresh at the same time and stay signed in', !(await T.has('#signin')) && !(await T2.has('#signin')), `${h1}/${h2}`);
+  check(G, 'both tabs refresh at the same time and stay signed in', !(await T.ev(SIGNED_OUT)) && !(await T2.ev(SIGNED_OUT)), `${h1}/${h2}`);
   await T2.close();
-  // unticked: sessionStorage only; a new tab shows the form; a duplicated tab (same sessionStorage) keeps working
+  // unticked (the Stay box of the page that went to /signin): sessionStorage only; a new tab is signed out; a duplicated tab
+  // (same sessionStorage) keeps working
   const c2 = await ctx(B), U = await tab(B, c2);
-  await U.go(seedUrl()); await U.ev('localStorage.clear();sessionStorage.clear();true'); await U.go(pageUrl());
+  await U.go(seedUrl()); await U.ev('localStorage.clear();sessionStorage.clear();true');
   const real2 = await grantFor('maksym');
-  await intercept(U, '*auth/v1/token?grant_type=password*', () => ({ status: 200, body: { access_token: real2.access_token, refresh_token: real2.refresh_token, expires_in: 3600, user: { id: real2.user.id, email: real2.user.email } } }));
-  await U.wait('!!document.getElementById("signin")');
-  await U.insert('#si-email', DUMMY.email); await U.insert('#si-pass', DUMMY.password);
-  await U.ev('document.getElementById("si-stay").checked=false;document.getElementById("signin").requestSubmit();true');
+  await seedSignin(U, real2, false);
+  await U.go(pageUrl());
   check(G, 'unticked: signs in, td.auth only in sessionStorage', await U.ready() && await U.ev('!localStorage.getItem("td.auth") && !!sessionStorage.getItem("td.auth")'));
-  await unintercept(U);
   const U2 = await tab(B, c2);
   await U2.go(pageUrl());
-  check(G, 'unticked: a new tab shows the form', await U2.wait('!!document.getElementById("signin")'));
+  check(G, 'unticked: a new tab is signed out', await signedOut(U2));
   const copied = await U.ev('sessionStorage.getItem("td.auth")');
   await U2.go(seedUrl()); await U2.ev(`sessionStorage.setItem('td.auth', ${JSON.stringify(copied)});true`); await U2.go(pageUrl());
   const dupOk = await U2.ready();
   let hd = 0;
   await intercept(U, '*rest/v1/items*', () => (hd++ === 0 ? { status: 401, body: { code: 'PGRST301' } } : null));
   await U.ev('dispatchEvent(new Event("focus")),true'); await sleep(3000); await unintercept(U);
-  check(G, 'a duplicated tab (copied sessionStorage) opens, and the first tab still refreshes after it', dupOk && !(await U.has('#signin')));
+  check(G, 'a duplicated tab (copied sessionStorage) opens, and the first tab still refreshes after it', dupOk && !(await U.ev(SIGNED_OUT)));
   await U2.close(); await U.close();
   // round 4, item 1: Anastasiia signed in once on this browser, then Maksym: the account menu has no other accounts and no
   // Add account (only Sign out), and Sign out shows the sign-in form
@@ -356,22 +355,22 @@ async function gAuth() {
   await open(S, await grantFor('anastasiia'));
   await S.wait('!!document.getElementById("profile")');
   await S.click('#profile'); await S.click('[data-signout]');
-  await S.wait('!!document.getElementById("signin")');
+  await signedOut(S);
   await open(S, await grantFor('maksym'));
   await S.click('#profile');
   await S.wait('!!document.querySelector("[data-signout]")');
   check(G, 'account menu: no Accounts on this browser, no Add account, Sign out only (round 4)', await S.ev('!document.querySelector("[data-switch],[data-forget],[data-addaccount]") && !/Accounts on this browser|Add account/.test(document.getElementById("pop")?.textContent||"")'));
   await S.click('[data-signout]');
-  check(G, 'Sign out shows the sign-in form', await S.wait('!!document.getElementById("signin")'));
+  check(G, 'Sign out shows the sign-in (the card here, /signin on a hosted origin)', await signedOut(S));
   check(G, 'sign-out removes td.auth', await S.ev('!localStorage.getItem("td.auth") && !sessionStorage.getItem("td.auth")'));
   // a second context stays signed in after the first signs out
   await T.click('#profile'); await T.click('[data-signout]');
-  await T.wait('!!document.getElementById("signin")');
+  await signedOut(T);
   const c4 = await ctx(B), V = await tab(B, c4);
   const okBefore = await open(V, await grantFor('maksym'));
   const W = await tab(B, c3);
   await open(W, await grantFor('maksym'));
-  await W.click('#profile'); await W.click('[data-signout]'); await W.wait('!!document.getElementById("signin")');
+  await W.click('#profile'); await W.click('[data-signout]'); await signedOut(W);
   await V.reload();
   check(G, 'a second context stays signed in after the first signs out', okBefore && await V.ready());
   for (const x of [T, S, V, W]) await x.close().catch(() => {});

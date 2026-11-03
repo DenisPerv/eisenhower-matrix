@@ -39,6 +39,61 @@ test('isHostedOrigin: https and localhost only; never file://', () => {
   for (const o of ['null', 'file://', '', 'http://example.com', 'https://x.dev/path', undefined]) assert.equal(C.isHostedOrigin(o), false, String(o));
 });
 
+// Google only (2026-10-30, eisenhower-run W5): the hosted redirect to /signin and the hand-over of its session
+test('signinRedirect: hosted https -> /signin?next= its own page (/board/ or /app/ only); localhost, 127.0.0.1 and file:// stay', () => {
+  assert.equal(C.signinRedirect('https://eisenhower-agentic-planner-app.pages.dev', '/board/'), '/signin?next=/board/');
+  assert.equal(C.signinRedirect('https://eisenhower-agentic-planner-app.pages.dev', '/app/'), '/signin?next=/app/');
+  assert.equal(C.signinRedirect('https://abc.eisenhower-agentic-planner-app.pages.dev', '//evil.example'), '/signin?next=/board/');
+  for (const o of ['http://localhost:8788', 'http://127.0.0.1:8788', 'https://localhost', 'https://127.0.0.1:8443', 'file://', 'null', '', 'http://example.com'])
+    assert.equal(C.signinRedirect(o, '/board/'), null, o);
+});
+
+test('signinHandover: the refresh token of signin.html\'s session (td.request.auth), nothing else', () => {
+  assert.equal(C.SIGNIN_AUTH_KEY, 'td.request.auth');
+  assert.equal(C.SIGNIN_STAY_KEY, 'td.signin.stay');
+  assert.equal(C.signinHandover(JSON.stringify({ access_token: 'a', refresh_token: 'r1', expires_at: 1, email: 'x@example.com' })), 'r1');
+  for (const raw of [null, '', 'null', '{bad', '[]', '"r1"', JSON.stringify({ refresh_token: '' }), JSON.stringify({ refresh_token: 5 }), JSON.stringify({ access_token: 'a' })])
+    assert.equal(C.signinHandover(raw), null, String(raw));
+});
+
+test('the board and the phone app have no password form; the privacy line names the contact, links /privacy, and is the same in both', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+  const data = fs.readFileSync(path.join(__dirname, '..', 'app', 'td-data.js'), 'utf8');
+  for (const [name, src] of [['TasksDashboard.html', web], ['app/index.html', app], ['app/td-data.js', data]]) {
+    assert.ok(!/type\s*=\s*["']?password/i.test(src), name + ': a password field');
+    assert.ok(!/grant_type=password/.test(src), name + ': a password grant');
+    assert.ok(!/Ask Maksym to delete/.test(src), name + ': the old contact');
+  }
+  // every inline script of both pages still parses
+  for (const [name, src] of [['TasksDashboard.html', web], ['app/index.html', app]])
+    [...src.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)].filter(m => !/\ssrc\s*=/i.test(m[1] || '')).forEach((m, i) => assert.doesNotThrow(() => new Function(m[2]), name + ' inline script ' + i));
+  const priv = src => (src.match(/const PRIVACY = '([^']*)'/) || [])[1];
+  assert.ok(priv(web) && priv(web) === priv(app), 'the same privacy words (twin rule)');
+  assert.match(priv(web), /md\.solutions\.homeos@gmail\.com/);
+  assert.match(web, /const PRIVACY_HREF = HOSTED \? '\/privacy' : 'privacy\.html';/);
+  assert.match(app, /<a href="\.\.\/privacy\.html">Privacy<\/a>/);
+  assert.match(web, /Continue with Google/); assert.match(web, /id="si-stay"/);
+  assert.match(app, /Continue with Google/); assert.match(app, /id="si-stay"/);
+});
+
+test('S12: the board\'s esc() escapes \' like the phone app\'s', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const pick = f => {
+    const src = fs.readFileSync(path.join(__dirname, '..', ...f), 'utf8');
+    const line = src.split(/\r?\n/).find(l => /^const esc = s => /.test(l));
+    assert.ok(line, f.join('/') + ': esc not found');
+    return new Function(line + '; return esc;')();
+  };
+  const web = pick(['TasksDashboard.html']), app = pick(['app', 'index.html']);
+  const evil = `<a href='x' onclick="y">&'</a>`;
+  assert.equal(web(evil), '&lt;a href=&#39;x&#39; onclick=&quot;y&quot;&gt;&amp;&#39;&lt;/a&gt;');
+  assert.equal(web(evil), app(evil));
+  assert.equal(web("O'Brien"), 'O&#39;Brien');
+  assert.equal(web(null), ''); assert.equal(web(undefined), ''); assert.equal(web(0), '0');
+});
+
 test('PKCE: verifier from random bytes, S256 challenge equals sha256 base64url (RFC 7636 appendix B)', async () => {
   const crypto = await import('node:crypto');
   // RFC 7636 appendix B: these 32 octets give this verifier and this challenge

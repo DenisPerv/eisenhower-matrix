@@ -750,7 +750,6 @@ main{padding-bottom:calc(var(--tab-h) + 88px + var(--sab) + var(--dockh,0px))}
 @keyframes steam{0%{opacity:0;transform:translateY(6px)}40%{opacity:.9}100%{opacity:0;transform:translateY(-8px)}}
 .signin .fine{margin:14px 0 0;color:var(--ink2);font:500 14px/1.4 var(--ui)}
 .signin .priv a{display:inline-flex;align-items:center;min-height:44px;padding:0 6px;margin:0 -6px;color:var(--accent-ink);font-weight:600}
-.si-hint{margin:0 0 12px;color:var(--ink2);font:500 13px/1.4 var(--ui)}
 /* welcome, two steps */
 dialog.alert.wl{max-width:440px;max-height:calc(var(--vvh,100dvh) - 32px);overflow:auto}
 dialog.alert.wl p.wl-step{margin:0 0 4px;font:600 13px/1.2 var(--ui);color:var(--ink2)}
@@ -936,7 +935,7 @@ h2[tabindex="-1"]:focus{outline:none}
     <div id="si-body"></div>
   </div>
 </dialog>
-<!-- after sign-in: an account that is neither household nor approved (request.html states, in the app) -->
+<!-- after sign-in: an account that is neither household nor approved (signin.html states, in the app) -->
 <dialog class="screen" id="dlg-access" aria-labelledby="ac-h">
   <div class="aura2" aria-hidden="true"></div>
   <div class="signin"><div class="big"><svg aria-hidden="true" style="color:var(--ink)"><use href="#i-mark"/></svg></div><div id="ac-body"></div></div>
@@ -963,7 +962,7 @@ const GEO = ['B', 'A', 'D', 'C']; /* the web board's geometry, also the focus or
 const QN = { A: 'Do', B: 'Plan', C: 'Delegate', D: 'Eliminate' };
 const QH = { A: 'Important and urgent', B: 'Important, not urgent', C: 'Urgent, not important', D: 'Neither' };
 const DAY = 864e5;
-const PRIVACY = 'We store your email, name and the items you create. Only people you share a list with see them. Ask Maksym to delete your account.'; /* the web's PRIVACY, word for word */
+const PRIVACY = 'We store your email, name and the items you create. Only people you share a list with see them. To delete your account, write to md.solutions.homeos@gmail.com.'; /* the web's PRIVACY, word for word */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ic = (id, cls = 'i') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
@@ -1641,29 +1640,20 @@ function listMenu(id) {
 /* ---------- S1 sign-in, the access screens ---------- */
 let SI = {};
 const google = () => C.isHostedOrigin(location.origin);
+/* Google only (2026-10-30): Continue with Google and Stay signed in, no password form. Hosted (https, not localhost): a signed-out
+   visitor goes to /signin?next=/app/ (D.goSignin), and the button goes there too (this screen shows only with a message);
+   localhost signs in here; file:// cannot (Google needs an origin). */
 function openSignin(o = {}) {
-  SI = o; const form = o.other || o.k === 'wrong' || !google();
+  SI = o;
+  if (!o.k && !o.msg && D.signinPage()) { D.goSignin(true); return; }
   const msg = o.k === 'unreachable' ? `<div class="note" role="alert">${esc(o.msg || 'Can\'t reach the database. Check your connection.')}<div style="margin-top:10px"><button class="btn" data-act="si-retry">Retry</button></div></div>`
     : o.k === 'noprofile' ? `<div class="note" role="alert">This login can't open the board.<div style="margin-top:10px"><button class="btn" data-act="si-out">Sign out</button></div></div>`
     : o.msg ? `<div class="note" role="alert">${esc(o.msg)}</div>` : '';
-  $('#si-body').innerHTML = msg + `<div class="acts">${google() ? '<button class="btn gbtn block" data-act="si-google"><span class="gmark" aria-hidden="true">G</span>Continue with Google</button>' : ''}
+  $('#si-body').innerHTML = msg + `<div class="acts"><button class="btn gbtn block" data-act="si-google"><span class="gmark" aria-hidden="true">G</span>Continue with Google</button>
     <label class="switch" style="padding:0 4px">Stay signed in on this phone<input type="checkbox" checked id="si-stay"></label>
-    ${form ? `<form id="si-form" novalidate><label class="field"><span>Email</span><input class="inp" type="email" id="si-email" autocomplete="username" aria-describedby="si-err si-hint"></label><label class="field"><span>Password</span><input class="inp" type="password" id="si-pw" autocomplete="current-password" aria-describedby="si-err si-hint"></label><p class="err" id="si-err" role="alert" hidden>Enter your email and password.</p><p class="si-hint" id="si-hint">Password logins are for the household and its assistants. There is no password reset here.</p><button class="btn primary block" type="submit" id="si-go">Sign in</button></form>` : `<button class="btn quiet block" data-act="si-other" aria-expanded="false">Other ways to sign in</button>`}</div>
-    <p class="priv">${PRIVACY} <a href="../privacy.html">Privacy</a></p>`;
+    ${google() ? '' : '<p class="fine">This page is a local file. Google sign-in works on the hosted app or on http://localhost.</p>'}</div>
+    <p class="priv">${esc(PRIVACY)} <a href="../privacy.html">Privacy</a></p>`;
   openDlg('dlg-signin');
-  const f = $('#si-form');
-  if (f) {
-    if (o.other) $('#si-email').focus();
-    f.onsubmit = async e => {
-      e.preventDefault(); const em = $('#si-email').value.trim(), pw = $('#si-pw').value, er = $('#si-err');
-      if (!em || !pw) { er.textContent = 'Enter your email and password.'; er.hidden = false; return; }
-      $('#si-go').disabled = true;
-      const err = await D.signIn(em, pw, $('#si-stay').checked);
-      $('#si-go').disabled = false;
-      if (err) { er.textContent = err.kind === 'network' || err.kind === 'server' ? 'Can\'t reach the database. Check your connection.' : err.message; er.hidden = false; $('#si-pw').focus(); return; }
-      afterSignIn();
-    };
-  }
 }
 $('#dlg-signin').addEventListener('cancel', e => e.preventDefault());
 $('#dlg-access').addEventListener('cancel', e => e.preventDefault());
@@ -1691,7 +1681,7 @@ async function load() {
   animateCards = true; renderAll(); setPill(); afterLoad();
 }
 function applyTheme() { const t = D.prefs.theme; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; store.set('td.app.theme', t || 'auto'); }
-/* request.html's states, inside the app */
+/* signin.html's states, inside the app */
 const COFFEE = `<svg class="coffee" viewBox="0 0 240 132" role="img" aria-label="A cup of coffee, steaming"><path class="ax" d="M20 4V120H232"/><path class="st" d="M106 68c-9-9 9-15 0-24s9-15 0-24"/><path class="st s2" d="M122 66c-9-9 9-15 0-24s9-15 0-24"/><path class="st s3" d="M138 68c-9-9 9-15 0-24s9-15 0-24"/><path class="ln" d="M154 84h7a9 9 0 0 1 9 9v1a9 9 0 0 1-9 9h-9"/><path class="cup" d="M90 76h64v22a16 16 0 0 1-16 16h-32a16 16 0 0 1-16-16z"/><path class="brew" d="M95 82h54"/><path class="ln" d="M70 118h104"/></svg>`;
 const at = s => { if (!s) return ''; const d = new Date(s); return isNaN(d) ? '' : `${ymd(d)} ${hm(d)}`; };
 function openAccess(st, msg) {
@@ -1818,8 +1808,12 @@ document.addEventListener('click', async e => {
     }
     case 'ver-later': unnote('n-ver'); break;
     case 'ver-reload': unnote('n-ver'); if (swReg && swReg.waiting) { swReload = true; swReg.waiting.postMessage({ type: 'SKIP_WAITING' }); } else { try { await D.flushAll(); } catch (er) {} location.reload(); } break;
-    case 'si-google': D.startGoogle({ stay: !$('#si-stay') || $('#si-stay').checked }); break;
-    case 'si-other': openSignin(Object.assign({}, SI, { other: true })); break;
+    case 'si-google': {
+      const stay = !$('#si-stay') || $('#si-stay').checked;
+      if (D.signinPage()) { D.goSignin(stay); break; }
+      if (!google()) { openSignin({ msg: 'Google sign-in needs an https or localhost page.' }); break; }
+      D.startGoogle({ stay }); break;
+    }
     case 'si-retry': closeDlg('dlg-signin'); boot(); break;
     case 'si-out': await D.signOut(true); openSignin({}); break;
     case 'ac-ask': case 'ac-retry': {
@@ -1830,7 +1824,7 @@ document.addEventListener('click', async e => {
     }
     case 'ac-check': afterSignIn(); break;
     case 'ac-open': closeDlg('dlg-access'); load(); break;
-    case 'ac-other': closeDlg('dlg-access'); await D.signOut(true); openSignin({ other: true }); break;
+    case 'ac-other': closeDlg('dlg-access'); await D.signOut(true); openSignin({}); break;
     default: await part2Click(a, b, e); break;
   }
 });
