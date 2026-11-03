@@ -63,3 +63,26 @@ test('sw: one VERSION line for the deploy; the cache name and precache follow it
   for (const k of ['install', 'activate', 'message', 'fetch']) assert.equal(typeof listeners[k], 'function', k);
   assert.doesNotMatch(SRC, /importScripts/);
 });
+
+// 2026-11-03: on the local version (VERSION 'dev', no ?v= stamp) cache-first paired a new index.html with an older cached
+// td-core.js ("C.versionSwitchUrl is not a function", the Me page stayed empty). An unstamped worker is network-first for them.
+test('sw: dev (unstamped) worker: scripts, manifest and icons network-first ("fresh"), takes over at once; a stamped one stays cache-first', () => {
+  assert.equal(W.DEV, true);
+  for (const p of ['/app/td-core.js', '/app/td-data.js', '/app/manifest.webmanifest', '/app/icons/icon-192.png'])
+    assert.equal(W.cacheRule(ORIGIN + p, ORIGIN, 'no-cors', true), 'fresh', p);
+  assert.equal(W.cacheRule(ORIGIN + '/config/tasksdashboard.config.js', ORIGIN, 'no-cors', true), 'revalidate');
+  assert.equal(W.cacheRule(ORIGIN + '/app/', ORIGIN, 'navigate', true), 'navigate');
+  assert.equal(W.cacheRule('https://abc.supabase.co/rest/v1/items', ORIGIN, 'cors', true), 'skip');
+  assert.match(SRC, /cacheRule\(req\.url, self\.location\.origin, req\.mode, DEV\)/, 'the fetch handler passes DEV');
+  assert.match(SRC, /if \(rule === 'fresh'\)/);
+  const v = load(SRC.replace("const VERSION = 'dev';", "const VERSION = '0123456789abcdef0123456789abcdef01234567';")).W;
+  assert.equal(v.DEV, false);
+  // the install handler skips waiting only in dev
+  for (const [src, want] of [[SRC, 1], [SRC.replace("const VERSION = 'dev';", "const VERSION = 'abc';"), 0]]) {
+    let skipped = 0; const listeners2 = {};
+    const self = { location: { origin: ORIGIN }, addEventListener: (k, fn) => { listeners2[k] = fn; }, skipWaiting: () => { skipped++; } };
+    vm.runInNewContext(src, { self, URL, caches: { open: () => Promise.resolve({ put: () => {} }) }, fetch: () => Promise.reject(new Error('offline')), Response: {} });
+    listeners2.install({ waitUntil: () => {} });
+    assert.equal(skipped, want);
+  }
+});

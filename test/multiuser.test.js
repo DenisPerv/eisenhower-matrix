@@ -73,7 +73,13 @@ test('the switch buttons: the board\'s account menu has "Switch to mobile versio
   assert.ok(sv.includes('flushAll()') && sv.includes('await writePrefs()') && sv.indexOf('writePrefs') < sv.indexOf('location.assign(url)'));
   assert.ok(web.includes(`addEventListener('beforeunload', e => { if (Q.size)`), 'the beforeunload prompt still guards unsaved changes');
   // app: a row in Me → Account, shown only when versionSwitchUrl allows it; pending changes ask for a second tap
-  assert.ok(app.includes("${C.versionSwitchUrl(location.origin, 'board') ? row('switch-board', 'Switch to desktop version') : ''}"));
+  assert.ok(app.includes("${switchUrl('board') ? row('switch-board', 'Switch to desktop version') : ''}"));
+  // an older cached td-core.js without versionSwitchUrl leaves the row out instead of breaking the Me page (2026-11-03 bug)
+  const line = app.split(/\r?\n/).find(l => l.startsWith('const switchUrl = '));
+  assert.ok(line, 'switchUrl helper');
+  const mk = core => new Function('C', 'location', line + '; return switchUrl;')(core, { origin: 'http://localhost:8788' });
+  assert.equal(mk({})('board'), null, 'a core without versionSwitchUrl');
+  assert.equal(mk(C)('board'), '/board/');
   const cs = app.slice(app.indexOf("case 'switch-board':"), app.indexOf("case 'signout':"));
   assert.ok(cs.includes('await D.flushAll()') && cs.includes('D.pending && !S.swAsk') && cs.includes('Tap again to switch') && cs.includes('location.assign(url)'));
 });
