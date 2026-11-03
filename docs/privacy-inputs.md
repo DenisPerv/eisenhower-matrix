@@ -10,9 +10,9 @@ Facts for whoever writes the privacy policy, the cookie list, the terms and the 
 
 | Page | Host | Data collected | Sent to |
 |---|---|---|---|
-| Landing page `/` (`site/index.html`) | landing | nothing; the demo's cards stay in the browser | nothing (`connect-src 'none'`; no request beyond the page's own host); the consulting button opens an email (`mailto:`) to the contact |
+| Landing page `/` (`site/index.html`) | landing | nothing; the demo's cards stay in the browser | nothing (`connect-src 'none'`; no request beyond the page's own host); the consulting buttons go to `/signin?intent=consult` on the app host |
 | Legal placeholders, `/privacy` | landing, app | nothing | nothing (no script) |
-| Sign-in `/signin` (`signin.html`) | app | Google sign-in returns email, name and profile picture (scopes `openid`, `email`, `profile`); an access request keeps email, first and last name and the request time (`users_pending_for_decision`) | Supabase (Auth and two RPCs); Google (the sign-in screen) |
+| Sign-in `/signin` (`signin.html`) | app | Google sign-in returns email, name and profile picture (scopes `openid`, `email`, `profile`); an access request keeps email, first and last name and the request time (`users_pending_for_decision`); a consulting-call request (`?intent=consult`, `db/025`) keeps the email, the Telegram username and WhatsApp number if given, a note if given and the time, as a task in the household list "Consultancy Request" (read by Maksym, `homeos-agent` and the household Telegram bot) | Supabase (Auth and four RPCs); Google (the sign-in screen); the task appears in Maksym's Telegram digest |
 | Board `/board/` (`TasksDashboard.html`) | app | the account (email, display name), the lists, items, tags, sharing and preferences a person creates | Supabase only |
 | Phone app `/app/` | app | the same as the board; changes made offline wait on the device until they are sent | Supabase only |
 | Cloudflare Access login (before `/board/` and `/app/`) | app | the email Google returns to Access | Cloudflare (Access), Google |

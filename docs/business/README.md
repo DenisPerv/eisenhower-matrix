@@ -34,7 +34,7 @@ All prices and numbers are examples, not decided. Since 2026-10-30 the site show
 | Demo | free, on the page, sample lists, one browser |
 | Personal | €4 a month (example): sync on every device, unlimited lists and tasks, reminders, cards shaped your way, timeline and area views, export |
 | Team | €7 per member a month (example): local or cloud, weekly team reports, shared and private lists, delegate to a teammate or an agent |
-| Consulting | a call with Maksym Denysiuk on agentic AI workflows inside a business and how Eisenhower plugs in; no booking calendar yet, the buttons open an email to `md.solutions.homeos@gmail.com` |
+| Consulting | a call with Maksym Denysiuk on agentic AI workflows inside a business and how Eisenhower plugs in; no booking calendar yet; the buttons open the app host's `/signin?intent=consult`: Google sign-in, then an optional Telegram, WhatsApp and note, and the request lands as a task in the household list "Consultancy Request" (`db/025`), due 09:00 so it is in Maksym's Telegram digest |
 | Coming next (on the site) | skills and MCP for creating tasks from your AI ecosystem; task groups (by project, client or goal); favourites with progress |
 
 ## What exists
@@ -59,7 +59,7 @@ The sample data is invented:
 
 Not wired yet:
 - **Payments:** the Subscribe buttons show a dialog and emit `ec:subscribe`.
-- **Consulting booking:** the buttons emit `ec:consult` and open `BOOKING_URL`, which is a `mailto:` link to `md.solutions.homeos@gmail.com` until a booking calendar exists.
+- **Consulting booking:** the buttons emit `ec:consult` and open `BOOKING_URL` in the same tab: `https://eisenhower-agentic-planner-app.pages.dev/signin?intent=consult` (on `localhost` the same origin's `/signin`). The request becomes a task in "Consultancy Request"; Maksym replies by email, Telegram or WhatsApp.
 - **Storage:** the demo keeps its state in the browser (`localStorage` key `ec.demo.v5`) through a thin `ECStore` adapter, the only part a database adapter would replace.
 
 ![The demo](images/demo.jpg)
@@ -82,7 +82,7 @@ On 2026-10-30 the page moved into this repository and got the copy changes for p
 
 ## Next
 
-- Set `BOOKING_URL` to a real booking calendar so the consulting buttons go to one.
+- A booking calendar later: link it from the reply, or show it on `signin.html`'s `consultsent` screen.
 - Decide the palette: the brand-book logo uses red, green, yellow and grey, while the site's panes use amber, blue, ember and dusk blue.
 - Decide the plan prices and replace "Pricing soon"; replace the example counts in Focus at every scale.
 - Wire payments, and connect the demo to the real task store (the database of this repository, `db/`).

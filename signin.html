@@ -9,8 +9,10 @@
 <!-- The public sign-in page (/signin; /request is a 301 alias): no board data, Google sign-in (PKCE, no library), then
      rpc/my_access_request and, when there is no request yet, rpc/request_access. A household login or an approved request
      goes on to `next` (/board/ or /app/ only, default /board/) with location.replace; everyone else stays on the request
-     screens. One inline script: its sha256 is in the deploy's _headers (docs/deployment/2-deploy.md). The look is the app's
-     "Aurora instrument" (TasksDashboard.html UI 4-5). -->
+     screens. With ?intent=consult (the landing's consulting-call buttons, db/025) it is a consulting-call request instead:
+     Google sign-in, then rpc/my_consultation_request and a form (Telegram, WhatsApp, note) that calls
+     rpc/request_consultation; no access request, no board. One inline script: its sha256 is in the deploy's _headers
+     (docs/deployment/2-deploy.md). The look is the app's "Aurora instrument" (TasksDashboard.html UI 4-5). -->
 <style>
 :root{
   --ui:"Bahnschrift","DIN Alternate","DIN 2014","Segoe UI",system-ui,sans-serif;
@@ -107,6 +109,15 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
 .coffee .st.s3{animation-delay:-1.7s;opacity:.55}
 @keyframes steam{to{stroke-dashoffset:68}}
 @media (prefers-reduced-motion:reduce){.coffee .st,.scan::after{animation:none}}
+/* the consulting-call form */
+form{display:grid;gap:12px;margin-top:6px}
+label{display:grid;gap:5px;font:500 13px/1.4 var(--ui);letter-spacing:.01em;color:var(--ink3)}
+label .opt{font-weight:400}
+input,textarea{width:100%;padding:10px 12px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--solid);color:var(--ink);font:400 15px/1.4 var(--font)}
+input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent-line)}
+input[readonly]{background:var(--well);color:var(--ink2)}
+textarea{min-height:88px;resize:vertical}
+form .primary{margin-top:2px}
 @media (max-width:480px){.panel{padding:26px 20px 22px}h1{font-size:27px}.google,.primary{min-height:48px}}
 </style>
 <script src="config/tasksdashboard.config.js"></script>
@@ -116,7 +127,7 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
   try { const t = localStorage.getItem('td.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
 
   // this tab only: the PKCE verifier while Google is open, then the session (never the board's td.auth)
-  const PKCE_KEY = 'td.request.pkce', AUTH_KEY = 'td.request.auth', NEXT_KEY = 'td.signin.next';
+  const PKCE_KEY = 'td.request.pkce', AUTH_KEY = 'td.request.auth', NEXT_KEY = 'td.signin.next', INTENT_KEY = 'td.signin.intent';
   const ss = {
     get: k => { try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch (e) { return null; } },
     set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -161,13 +172,24 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
     try { history.replaceState(null, '', u.pathname + (qs ? '?' + qs : '') + u.hash); } catch (e) {}
   }
   const nextPage = () => safeNext(ss.get(NEXT_KEY));
+  // ?intent=consult (the landing's consulting-call buttons) is kept in this tab the same way; any other value is ignored
+  function keepIntent(href) {
+    let u;
+    try { u = new URL(href); } catch (e) { return; }
+    if (!u.searchParams.has('intent')) return;
+    if (u.searchParams.get('intent') === 'consult') ss.set(INTENT_KEY, 'consult'); else ss.del(INTENT_KEY);
+    u.searchParams.delete('intent');
+    const qs = u.searchParams.toString();
+    try { history.replaceState(null, '', u.pathname + (qs ? '?' + qs : '') + u.hash); } catch (e) {}
+  }
+  const consultMode = () => ss.get(INTENT_KEY) === 'consult';
   // a household login or an approved request goes on to the page it came for
   function goOn() {
     const to = nextPage();
     ss.del(NEXT_KEY);
     location.replace(to);
   }
-  window.TDSignin = { safeNext, backUrl, NEXT_PAGES };
+  window.TDSignin = { safeNext, backUrl, NEXT_PAGES, keepIntent, consultMode };
   const CALLBACK_KEYS = ['code', 'error', 'error_code', 'error_description', 'state', 'access_token', 'refresh_token', 'expires_in', 'expires_at', 'token_type', 'provider_token', 'provider_refresh_token', 'type'];
   function readCallback(href) {
     let u;
@@ -215,10 +237,10 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
     return true;
   }
   // POST rpc/<name>; a stale token is refreshed once. Returns { ok, data } or { ok: false, status, code, message }
-  async function rpc(name) {
+  async function rpc(name, args) {
     if (session.expires_at - 60000 <= Date.now() && !(await refresh())) return { ok: false, status: 401, code: 'session' };
-    let r = await call('/rest/v1/rpc/' + name, {}, session.access_token);
-    if (r.status === 401 && (await refresh())) r = await call('/rest/v1/rpc/' + name, {}, session.access_token);
+    let r = await call('/rest/v1/rpc/' + name, args || {}, session.access_token);
+    if (r.status === 401 && (await refresh())) r = await call('/rest/v1/rpc/' + name, args || {}, session.access_token);
     if (r.status >= 200 && r.status < 300) return { ok: true, data: r.json };
     const b = isObj(r.json) ? r.json : {};
     return { ok: false, status: r.status, code: String(b.code || ''), message: String(b.message || '') };
@@ -250,7 +272,31 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
     const m = main();
     m.dataset.state = state;
     let h = '';
-    if (state === 'signedout') {
+    if (state === 'signedout' && consultMode()) {
+      h = '<h1>Book a consulting call</h1><p>Sign in with Google so we reply to an address that is really yours. Then add Telegram or WhatsApp if you prefer to talk there.</p>' +
+        (o.message ? `<p class="msg" role="alert">${esc(o.message)}</p>` : '') +
+        `<button type="button" class="google" data-act="google"${HOSTED && CFG ? '' : ' disabled'}>${GOOGLE_G}<span>Continue with Google</span></button>` +
+        (HOSTED ? '' : '<p class="fine">Open this page on its https address to sign in.</p>') +
+        '<p class="fine">We keep your email, the contacts and note you add, and the time of the request, to arrange the call. Signing in does not give access to any board.</p>' +
+        `<p class="fine" data-privacy>How we handle your data: <a href="${HOSTED ? '/privacy' : 'privacy.html'}">privacy</a>.</p>`;
+    } else if (state === 'consult') {
+      const v = o.values || {};
+      h = '<h1>Book a consulting call</h1><p>We reply by email within two working days. Telegram and WhatsApp are optional: add one if you would rather talk there.</p>' +
+        (o.message ? `<p class="msg" role="alert">${esc(o.message)}</p>` : '') +
+        '<form data-form="consult" novalidate>' +
+        `<label><span>Email</span><input type="email" name="email" value="${esc(session && session.email)}" readonly></label>` +
+        `<label><span>Telegram <span class="opt">(optional)</span></span><input type="text" name="telegram" maxlength="64" autocomplete="off" placeholder="@username" value="${esc(v.telegram)}"></label>` +
+        `<label><span>WhatsApp <span class="opt">(optional)</span></span><input type="tel" name="whatsapp" maxlength="24" autocomplete="tel" placeholder="+351 912 345 678" value="${esc(v.whatsapp)}"></label>` +
+        `<label><span>What would you like to discuss? <span class="opt">(optional)</span></span><textarea name="note" maxlength="500">${esc(v.note)}</textarea></label>` +
+        '<button type="submit" class="primary">Send request</button></form>' + signOutBtn;
+    } else if (state === 'consultsent') {
+      const r = o.row || {};
+      h = COFFEE + '<h1>Request sent</h1>' + `<p>${o.again ? 'Your request is already with us.' : 'Thank you.'} We\'ll get back to you within two working days.</p>` +
+        `<dl><div><dt>Requested</dt><dd>${when(r.requested_at) || 'just now'}</dd></div>${account()}` +
+        (r.telegram ? `<div><dt>Telegram</dt><dd>${esc(String(r.telegram).replace('https://t.me/', '@'))}</dd></div>` : '') +
+        (r.whatsapp ? `<div><dt>WhatsApp</dt><dd>${esc(String(r.whatsapp).replace('https://wa.me/', '+'))}</dd></div>` : '') +
+        '<div><dt>Status</dt><dd><span class="dot" aria-hidden="true"></span>We\'ll be in touch</dd></div></dl>' + signOutBtn;
+    } else if (state === 'signedout') {
       h = '<h1>Sign in</h1><p>TasksDashboard is a private board. Sign in with Google: if you have access, the board opens; if not, your request goes to the people who run it.</p>' +
         (o.message ? `<p class="msg" role="alert">${esc(o.message)}</p>` : '') +
         `<button type="button" class="google" data-act="google"${HOSTED && CFG ? '' : ' disabled'}>${GOOGLE_G}<span>Continue with Google</span></button>` +
@@ -258,7 +304,7 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
         '<p class="fine">We keep your email, your name and the time of the request. We also use your email address to send you one email with the decision (approved or not).</p>' +
         `<p class="fine" data-privacy>How we handle your data: <a href="${HOSTED ? '/privacy' : 'privacy.html'}">privacy</a>.</p>`;
     } else if (state === 'sending') {
-      h = '<h1>Sending your request</h1><div class="scan" aria-hidden="true"></div><p>One moment.</p>';
+      h = `<h1>${consultMode() ? 'One moment' : 'Sending your request'}</h1><div class="scan" aria-hidden="true"></div><p>One moment.</p>`;
     } else if (state === 'sent') {
       h = COFFEE + '<h1>Request sent</h1><p>Your request is sent. We\'ll let you in soon.</p>' +
         `<dl><div><dt>Requested</dt><dd>${when(o.row.requested_at) || 'just now'}</dd></div>${account()}<div><dt>Status</dt><dd><span class="dot" aria-hidden="true"></span>Waiting for a decision</dd></div></dl>` +
@@ -298,8 +344,28 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
     if (st === 'approved') return letIn(row);
     view(st === 'declined' ? st : 'sent', { row });
   }
+  // consult mode (db/025): an open request is shown as sent; otherwise the form
+  async function consultCheck() {
+    view('sending');
+    const r = await rpc('my_consultation_request');
+    if (!r.ok) return failed(r);
+    const row = rowOf(r.data);
+    if (isObj(row) && row.status === 'open') return view('consultsent', { row, again: true });
+    view('consult');
+  }
+  async function consultSend(form) {
+    const values = { telegram: form.telegram.value.trim(), whatsapp: form.whatsapp.value.trim(), note: form.note.value.trim() };
+    view('sending');
+    const r = await rpc('request_consultation', { p_telegram: values.telegram || null, p_whatsapp: values.whatsapp || null, p_note: values.note || null });
+    // a refused value (db/025 22023) goes back to the form with what was typed
+    if (!r.ok && r.code === '22023') return view('consult', { values, message: r.message || 'Check the fields and try again.' });
+    if (!r.ok) return failed(r);
+    const row = rowOf(r.data) || {};
+    view('consultsent', { row, again: row.created === false });
+  }
   // the state first; a request is made only when this account has none (or only a removed one)
   async function check() {
+    if (consultMode()) return consultCheck();
     view('sending');
     let r = await rpc('my_access_request');
     if (!r.ok) return failed(r);
@@ -355,7 +421,14 @@ dd .dot{display:inline-block;width:8px;height:8px;margin-right:8px;vertical-alig
       else if (act === 'signout') signOut();
       else if (act === 'retry') session ? check() : view('signedout');
     });
+    main().addEventListener('submit', e => {
+      const f = e.target.closest('form[data-form="consult"]');
+      if (!f) return;
+      e.preventDefault();
+      consultSend(f);
+    });
     keepNext(location.href);
+    keepIntent(location.href);
     if (!CFG) return view('error', { message: 'This page has no valid config (config/tasksdashboard.config.js).' });
     const cb = readCallback(location.href);
     if (cb) return finishGoogle(cb);

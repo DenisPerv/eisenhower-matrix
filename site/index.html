@@ -971,7 +971,7 @@ dialog p { margin: 0 0 1rem; line-height: 1.5; }
       </article>
     </div>
     <p class="plans-note">Pricing soon.</p>
-    <!-- consulting: no calendar is wired yet. A click opens BOOKING_URL when it is set, otherwise a dialog, and emits `ec:consult` -->
+    <!-- consulting: a click goes to BOOKING_URL (/signin?intent=consult on the app host: a request in the Consultancy Request list), and emits `ec:consult` -->
     <article class="consult" aria-labelledby="consultH">
       <div class="consult-copy">
         <p class="consult-k"><span class="lamp" aria-hidden="true"></span>Consulting</p>
@@ -1781,12 +1781,15 @@ document.querySelectorAll('[data-plan]').forEach((b) => b.addEventListener('clic
 }));
 sub.addEventListener('close', () => subFrom?.focus());
 
-/* ---------- consulting call: BOOKING_URL is an email link until a calendar exists; set it to the calendar link then. Empty: a click says booking opens soon ---------- */
-const BOOKING_URL = 'mailto:md.solutions.homeos@gmail.com?subject=Consulting%20call';
+/* ---------- consulting call: the app host's sign-in page in consult mode (db/025): Google sign-in, then email, Telegram,
+   WhatsApp and a note become a task in the "Consultancy Request" list. Same tab (the page keeps its state per tab). Local
+   (serve-local.js) serves /signin on this origin. Empty: a click says booking opens soon ---------- */
+const APP_HOST = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? location.origin : 'https://eisenhower-agentic-planner-app.pages.dev';
+const BOOKING_URL = APP_HOST + '/signin?intent=consult';
 const consult = $('#consult'); let consultFrom = null;
 document.querySelectorAll('[data-consult]').forEach((b) => b.addEventListener('click', () => {
   document.dispatchEvent(new CustomEvent('ec:consult', { detail: { topic: 'Agentic AI workflows and Eisenhower integration', from: b.id } }));
-  if (BOOKING_URL) { if (BOOKING_URL.startsWith('mailto:')) location.href = BOOKING_URL; else window.open(BOOKING_URL, '_blank', 'noopener'); return; }
+  if (BOOKING_URL) { location.href = BOOKING_URL; return; }
   consultFrom = b; consult.showModal();
 }));
 consult.addEventListener('close', () => consultFrom?.focus());
