@@ -191,6 +191,25 @@ test('rest: a 401 refreshes once and retries with the new token; a dead refresh 
   assert.equal(e.syncState().state, 'ended');
 });
 
+test('Session ended: the message says the waiting change is sent after sign-in only when IndexedDB keeps it; otherwise that it is lost', async () => {
+  const ended = async idb => {
+    const g = fakeSupabase([
+      ['POST', /grant_type=refresh_token/, () => [400, { error_code: 'refresh_token_already_used' }]],
+      ['PATCH', /^\/rest\/v1\/items/, () => [401, { code: 'PGRST301' }]],
+    ]);
+    const e = make(g, { idb });
+    const msgs = [];
+    e.on('session', x => { if (x.state === 'ended') msgs.push(x.msg); });
+    await signIn(e, true);
+    await e.loadAll();
+    e.edit(ITEM, t => { t.title = 'Buy oat milk'; });
+    await until(() => msgs.length > 0);
+    return msgs[0];
+  };
+  assert.equal(await ended(memQueue()), 'Session ended. Sign in again. 1 change waits and is sent after you sign in.');
+  assert.equal(await ended(null), 'Session ended. Sign in again. 1 change is not saved: signing in again reloads the page and drops it.');
+});
+
 test('versioned PATCH that matches no row: no clash -> sent again on the new version; a clash -> conflict event, their version kept', async () => {
   let remote = row({ version: 1 });
   const f = fakeSupabase([

@@ -1657,6 +1657,14 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     try { v = JSON.parse(raw || 'null'); } catch (e) { return null; }
     return isObj(v) && typeof v.refresh_token === 'string' && v.refresh_token.length > 0 ? v.refresh_token : null;
   }
+  // "Session ended" with n changes waiting. kept: they survive the trip to Google or /signin (the phone app's IndexedDB queue);
+  // the board's queue lives in memory only, and every sign-in now leaves the page, so it says they are lost (honest, not "sent")
+  function sessionEndedText(n, kept) {
+    const c = Math.max(0, Math.floor(Number(n) || 0));
+    if (!c) return 'Session ended. Sign in again.';
+    return 'Session ended. Sign in again. ' + c + (kept ? (c === 1 ? ' change waits and is' : ' changes wait and are') + ' sent after you sign in.'
+      : (c === 1 ? ' change is' : ' changes are') + ' not saved: signing in again reloads the page and drops ' + (c === 1 ? 'it.' : 'them.'));
+  }
   function b64url(bytes) {
     let s = '';
     for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
@@ -2412,7 +2420,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
@@ -2662,7 +2670,8 @@ const noteMax = rows => rows.forEach(r => { const u = Date.parse(r.updated_at); 
 function sessionEnded() {
   if (!session && boot.gate === 'signin') return;
   session = null;
-  showSignIn('Session ended. Sign in again.' + (Q.size ? ' ' + Q.size + (Q.size === 1 ? ' change waits' : ' changes wait') + ' and are sent after you sign in.' : ''), emailOf(me && me.handle));
+  // the queue is in memory only and every sign-in leaves the page (Google, or /signin on a hosted origin): say the changes are lost
+  showSignIn(C.sessionEndedText(Q.size, false), emailOf(me && me.handle));
 }
 function showSignIn(msg, prefill) {
   boot.gate = 'signin'; boot.msg = msg || ''; boot.prefill = prefill || '';
@@ -3046,7 +3055,7 @@ async function flush(id) {
   e.inflight = false;
   if (!res.ok) {
     if (res.err.retry || res.status === 401) {
-      // offline or the session ended: the change waits (the form keeps the queue)
+      // offline or the session ended: the change waits in memory (a sign-in leaves the page and drops it; sessionEndedText says so)
       if (sending) sending.fields.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
       if (res.err.retry && !offline) { offline = true; }
       if (res.err.retry) toast((res.err.kind === 'rate' ? 'The database is busy: ' : 'Offline: ') + Q.size + (Q.size === 1 ? ' change waiting' : ' changes waiting'));

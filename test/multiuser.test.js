@@ -78,6 +78,18 @@ test('the board and the phone app have no password form; the privacy line names 
   assert.match(app, /Continue with Google/); assert.match(app, /id="si-stay"/);
 });
 
+test('sessionEndedText: "sent after you sign in" only when the changes are kept; the board (memory queue) always says they are lost', () => {
+  assert.equal(C.sessionEndedText(0, false), 'Session ended. Sign in again.');
+  assert.equal(C.sessionEndedText(0, true), 'Session ended. Sign in again.');
+  assert.equal(C.sessionEndedText(1, true), 'Session ended. Sign in again. 1 change waits and is sent after you sign in.');
+  assert.equal(C.sessionEndedText(3, true), 'Session ended. Sign in again. 3 changes wait and are sent after you sign in.');
+  assert.equal(C.sessionEndedText(1, false), 'Session ended. Sign in again. 1 change is not saved: signing in again reloads the page and drops it.');
+  assert.equal(C.sessionEndedText(2, false), 'Session ended. Sign in again. 2 changes are not saved: signing in again reloads the page and drops them.');
+  const web = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  assert.match(web, /showSignIn\(C\.sessionEndedText\(Q\.size, false\)/, 'the board never promises to send its in-memory queue');
+  assert.ok(!/are sent after you sign in\.' : ''/.test(web));
+});
+
 test('S12: the board\'s esc() escapes \' like the phone app\'s', () => {
   const fs = require('node:fs'), path = require('node:path');
   const pick = f => {

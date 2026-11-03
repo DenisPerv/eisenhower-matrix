@@ -261,7 +261,8 @@
     function sessionEnded() {
       if (!session) return;
       session = null; ended = true; stopPolling();
-      emit('session', { state: 'ended', msg: 'Session ended. Sign in again.' + (Q.size ? ' ' + Q.size + (Q.size === 1 ? ' change waits' : ' changes wait') + ' and are sent after you sign in.' : '') });
+      // kept in IndexedDB they survive the trip to /signin or Google; without it (durable off) they are lost, and it says so
+      emit('session', { state: 'ended', msg: C.sessionEndedText(Q.size, durable) });
       syncChanged();
     }
     // web: adopt. Another person's queue and items never carry over

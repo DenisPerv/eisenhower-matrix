@@ -381,6 +381,14 @@
     try { v = JSON.parse(raw || 'null'); } catch (e) { return null; }
     return isObj(v) && typeof v.refresh_token === 'string' && v.refresh_token.length > 0 ? v.refresh_token : null;
   }
+  // "Session ended" with n changes waiting. kept: they survive the trip to Google or /signin (the phone app's IndexedDB queue);
+  // the board's queue lives in memory only, and every sign-in now leaves the page, so it says they are lost (honest, not "sent")
+  function sessionEndedText(n, kept) {
+    const c = Math.max(0, Math.floor(Number(n) || 0));
+    if (!c) return 'Session ended. Sign in again.';
+    return 'Session ended. Sign in again. ' + c + (kept ? (c === 1 ? ' change waits and is' : ' changes wait and are') + ' sent after you sign in.'
+      : (c === 1 ? ' change is' : ' changes are') + ' not saved: signing in again reloads the page and drops ' + (c === 1 ? 'it.' : 'them.'));
+  }
   function b64url(bytes) {
     let s = '';
     for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
@@ -1136,7 +1144,7 @@
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
