@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// TasksDashboard CLI: add-task, add-reminder, overdue, do, restore-list, link, unlink against TasksDashboardDB.
+// TasksDashboard CLI: add-task, add-reminder, overdue, do, restore-list, link, unlink, find, show, update, done, reopen, cancel
+// against TasksDashboardDB.
 // node cli/tasks.mjs <command> [options]; README "CLI" lists the options and exit codes. Never prints an env value.
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { EXIT, TdError, readEnv, missingEnv, connect, loadCore, errorExit, parseWhen, localStamp } from './lib.mjs';
 
 const TZ = 'Europe/Lisbon';
-const COMMANDS = ['add-task', 'add-reminder', 'overdue', 'do', 'restore-list', 'link', 'unlink'];
-const FLAGS = new Set(['json', 'dry-run', 'needs-review', 'help']);
+const COMMANDS = ['add-task', 'add-reminder', 'overdue', 'do', 'restore-list', 'link', 'unlink', 'find', 'show', 'update', 'done', 'reopen', 'cancel'];
+const FLAGS = new Set(['json', 'dry-run', 'needs-review', 'help', 'all', 'top']);
 const USAGE = `usage: node cli/tasks.mjs <command> [options]
   add-task      --title T [--list LIST] [--q A|B|C|D] [--due WHEN] [--tags a,b] [--owner HANDLE|none] [--notify a,b] [--body MD] [--confidence 0-1] [--needs-review]
                 [--start WHEN] [--parent REF] [--after REF]
@@ -17,12 +18,20 @@ const USAGE = `usage: node cli/tasks.mjs <command> [options]
   restore-list  --list slug                      (people only: --as maksym or anastasiia)
   link          REF --parent REF | --after REF   (task links, db/018: REF becomes a child of, or comes after, the other)
   unlink        REF --parent REF | --after REF   (removes that link)
+  find          WORDS | REF | --key KEY  [--in LIST] [--all]   (every match is listed; never writes)
+  show          TARGET
+  update        TARGET [--title T] [--body MD] [--due WHEN|none] [--start WHEN|none] [--q A|B|C|D] [--top] [--owner HANDLE|none]
+                [--tags a,b] [--add-tag t] [--remove-tag t] [--list LIST]   (tasks and reminders; a versioned write)
+  done | reopen | cancel  TARGET                 (tasks and reminders; cancel is also delete: nothing is deleted)
 common: --env FILE  --as HANDLE (default homeos-agent)  --for HANDLE  --via CHANNEL (default script:tasks-cli)  --run-id ID  --json  --dry-run
 WHEN: YYYY-MM-DD (09:00) or YYYY-MM-DD HH:mm in ${TZ}, or ISO with an offset
 LIST: a slug, or OWNER/slug when two owners use the same slug (slugs are unique per owner)
 REF: LIST#num, a task by its list and number (backlog#12, maksym/backlog#12)
+TARGET: REF, --key KEY, or title words with exactly one match (open items; closed ones for reopen; --in LIST narrows;
+        test lists _… only with --in); several matches are listed with exit 10 and nothing is written
 who: --owner and --notify take people's handles; maksym, anastasiia or shared in --tags set the owner instead (shared = none)
-exit: 0 ok, 1 error, 2 env missing, 3 conflict, 4 duplicate, 5 sensitive, 6 unreachable, 7 auth failed, 8 list archived or not restorable, 9 limit reached`;
+exit: 0 ok, 1 error, 2 env missing, 3 conflict, 4 duplicate, 5 sensitive, 6 unreachable, 7 auth failed, 8 list archived or not restorable, 9 limit reached,
+      10 several matches (listed, nothing written)`;
 
 export function parseArgs(argv) {
   const out = { _: [] };
@@ -134,10 +143,201 @@ async function insert(c, body, opts, ls) {
   return { item: c.core.rowToTask(r.json[0]) };
 }
 
+// ---- find, show, update, done, reopen, cancel (the rules of HomeOS /workitem-board-update after the tags round) ----
+const ITEM_SELECT = 'id,list_id,num,category,title,body_md,status,quadrant,urgent_pin,sort_key,due_at,start_at,owner_id,details,review_state,dedup_key,version,updated_at';
+const WRITABLE = ['task', 'reminder'];
+const CLOSED_ST = ['done', 'cancelled'];
+const REF_RE = /^.+#\d+$/;
+const NIL = '00000000-0000-0000-0000-000000000000';
+
+// the same screen as the database's assert_no_sensitive (db/002): card numbers (Luhn), IBANs, ID numbers. null = clean
+function luhnOk(d) {
+  let s = 0;
+  for (let i = 0; i < d.length; i++) { let n = +d[d.length - 1 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } s += n; }
+  return d.length >= 12 && s % 10 === 0;
+}
+export function sensitiveCheck(text) {
+  if (text === null || text === undefined) return null;
+  const t = String(text).replace(/https?:\/\/\S+/gi, ' ');
+  const card = /(?<![0-9])([2-6][0-9]{12,18}|[2-6][0-9]{3}(?:[ -][0-9]{4}){3}|3[47][0-9]{2}[ -][0-9]{6}[ -][0-9]{5})(?![0-9])/g;
+  for (const m of t.matchAll(card)) if (luhnOk(m[1].replace(/\D/g, ''))) return 'looks like a card number';
+  if (/\b[A-Z]{2}[0-9]{2}( ?[A-Z0-9]{4}){3,7}( ?[A-Z0-9]{1,4})?\b/.test(t)) return 'looks like an IBAN';
+  if (/\b(nif|niss|nipc|passport|passaporte|cart[aã]o de cidad[aã]o|citizen card|id card|id number)\s*(no\.?|n\.?º|number|#|:)?\s*[a-z]{0,2}[0-9]{6,}/i.test(t))
+    return 'looks like an ID number';
+  return null;
+}
+// title words for a search: lower case, letters, digits and hyphens, two letters or more, at most 6
+export function searchWords(q) {
+  const w = String(q || '').toLowerCase().split(/\s+/).map(x => x.replace(/[^\p{L}\p{N}-]/gu, '')).filter(x => x.length > 1).slice(0, 6);
+  if (!w.length) throw new TdError(EXIT.error, 'give at least one title word of two letters or more');
+  return w;
+}
+// --due: none clears; a bare date keeps the item's time of day (none yet: 09:00 for a reminder, 18:00 otherwise)
+export function dueValue(raw, row) {
+  if (/^none$/i.test(String(raw))) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) {
+    const time = row.due_at ? localStamp(new Date(row.due_at), TZ).wall.slice(11) : row.category === 'reminder' ? '09:00' : '18:00';
+    return parseWhen(`${raw} ${time}`, TZ);
+  }
+  return parseWhen(raw, TZ);
+}
+// --start: none clears; a bare date is 09:00
+export const startValue = raw => /^none$/i.test(String(raw)) ? null : parseWhen(raw, TZ);
+// the sort_key that puts the item first in quadrant q of the list (a task's priority is its position in its quadrant):
+// SPACING above the first open card with a key (stored or derived quadrant), 0 when none has one; null = it is first already
+export function topSortKey(core, row, peers, q, now, settings = null) {
+  const keys = peers.filter(x => x.id !== row.id && !CLOSED_ST.includes(x.status) && typeof x.sort_key === 'number'
+    && core.deriveQuadrant(core.rowToTask(x), settings, now) === q).map(x => x.sort_key);
+  const first = keys.length ? Math.min(...keys) : null;
+  if (typeof row.sort_key === 'number' && (first === null || row.sort_key < first)) return null;
+  return core.sortBetween(null, first);
+}
+// a list's reference: its slug, or owner/slug when another list this login reads has the same slug
+function listRef(l, ls, ppl) {
+  if (!l) return '?';
+  const twins = Object.values(ls).filter(x => x.slug === l.slug).length > 1;
+  return twins ? `${(ppl[l.owner_id] || {}).handle || '?'}/${l.slug}` : l.slug;
+}
+const itemRef = (row, ls, ppl) => `${listRef(ls[row.list_id], ls, ppl)}#${row.num}`;
+export function itemLine(row, ls, ppl) {
+  const due = row.due_at ? ' · due ' + localStamp(new Date(row.due_at), TZ).wall : '';
+  return `${itemRef(row, ls, ppl)} · ${row.category} · ${row.status} · ${row.title}${due}${row.quadrant ? ' · ' + row.quadrant : ''}`;
+}
+const rowJson = (row, ls, ppl) => ({ ref: itemRef(row, ls, ppl), id: row.id, list: (ls[row.list_id] || {}).slug || null, num: row.num, category: row.category,
+  status: row.status, title: row.title, due_at: row.due_at || null, quadrant: row.quadrant || null, dedup_key: row.dedup_key || null, version: row.version });
+
+async function get(c, p, what) {
+  const r = await c.rest('GET', p);
+  if (!r.ok) throw new TdError(errorExit(r.err), `${what}: ${r.err.message}`);
+  return r.json;
+}
+// items whose title holds every word: open ones (closed for reopen, all with --all); test lists only when --in names one
+async function search(c, ls, ppl, words, { closed = false, all = false, inList = null } = {}) {
+  let scope = Object.values(ls).filter(l => !c.core.isTestList(l));
+  if (inList) { const l = findList(ls, inList, ppl); if (!l) throw new TdError(EXIT.error, 'list not found: ' + inList); scope = [l]; }
+  let p = `items?select=${ITEM_SELECT}&deleted_at=is.null&list_id=in.(${scope.map(l => l.id).join(',') || NIL})`;
+  p += `&and=(${searchWords(words).map(w => `title.ilike.*${encodeURIComponent(w)}*`).join(',')})`;
+  if (!all) p += closed ? `&status=in.(${CLOSED_ST.join(',')})` : `&status=not.in.(${CLOSED_ST.join(',')})`;
+  return get(c, p + '&order=updated_at.desc&limit=10', 'find');
+}
+// the items REF, --key or title words name: { rows, what, exact } (exact = REF or key, not a title search)
+async function lookup(c, a, ls, ppl, { closed = false, all = false } = {}) {
+  const words = a._.slice(1).join(' ').trim();
+  if ((a.key !== undefined) === !!words) throw new TdError(EXIT.error, 'name the item: LIST#num, --key KEY or title words');
+  let rows, what;
+  if (a.key !== undefined) {
+    what = 'key ' + a.key;
+    rows = await get(c, `items?select=${ITEM_SELECT}&dedup_key=eq.${encodeURIComponent(a.key)}&deleted_at=is.null`, 'read item');
+  } else if (REF_RE.test(words)) {
+    what = words;
+    const p = parseRef(words), l = findList(ls, p.list, ppl);
+    if (!l) throw new TdError(EXIT.error, 'list not found: ' + p.list);
+    rows = await get(c, `items?select=${ITEM_SELECT}&list_id=eq.${l.id}&num=eq.${p.num}&deleted_at=is.null`, 'read item');
+  } else {
+    what = `"${words}"`;
+    rows = await search(c, ls, ppl, words, { closed, all, inList: a.in });
+  }
+  return { rows: rows.filter(x => ls[x.list_id]), what, exact: a.key !== undefined || REF_RE.test(words) };
+}
+// the one item a command is about (TARGET): no match exit 1, several matches listed with exit 10; nothing written either way
+async function resolveTarget(c, a, ls, ppl, out, { closed = false } = {}) {
+  const { rows, what, exact } = await lookup(c, a, ls, ppl, { closed });
+  if (!rows.length) throw new TdError(EXIT.error, `no ${exact ? '' : closed ? 'closed ' : 'open '}item matches ${what}; nothing written`);
+  if (rows.length > 1) {
+    if (a.json) out(JSON.stringify({ candidates: rows.map(x => rowJson(x, ls, ppl)) }, null, 2));
+    else { out(`${rows.length} items match; nothing written. Name one with LIST#num:`); rows.forEach(x => out('  ' + itemLine(x, ls, ppl))); }
+    throw new TdError(EXIT.ambiguous, `several items match ${what}`);
+  }
+  return rows[0];
+}
+// a change needs an open list and a task or reminder
+function changeable(row, ls, ppl) {
+  const l = writable(ls[row.list_id], itemRef(row, ls, ppl));
+  if (!WRITABLE.includes(row.category)) throw new TdError(EXIT.error, `${itemRef(row, ls, ppl)} is a ${row.category}: only tasks and reminders are changed here; nothing written`);
+  return l;
+}
+// topic tags on an item (item_tags, live rows): [{ tag_id, name }]
+async function itemTags(c, id) {
+  const r = await get(c, `item_tags?select=tag_id,tags(name,tag_list_id)&item_id=eq.${id}&removed_at=is.null`, 'read tags');
+  return r.filter(x => x.tags).map(x => ({ tag_id: x.tag_id, name: x.tags.name }));
+}
+// the item's live links per role, "<ref> title" each, and how many predecessors are still open
+async function linksOf(c, row, ls, ppl) {
+  const res = { parent: [], subtasks: [], after: [], next: [], waiting: 0 };
+  const r = await c.rest('GET', `item_links?select=from_item,to_item,kind&removed_at=is.null&kind=in.(depends_on,parent)&or=(from_item.eq.${row.id},to_item.eq.${row.id})`);
+  if (!r.ok || !r.json.length) return res;
+  const ids = [...new Set(r.json.map(l => (l.from_item === row.id ? l.to_item : l.from_item)))];
+  const other = Object.fromEntries((await get(c, `items?select=id,list_id,num,title,status&deleted_at=is.null&id=in.(${ids.join(',')})`, 'read links')).map(x => [x.id, x]));
+  for (const l of r.json) {
+    const mine = l.from_item === row.id, x = other[mine ? l.to_item : l.from_item];
+    if (!x || !ls[x.list_id]) continue;
+    const role = l.kind === 'parent' ? (mine ? 'parent' : 'subtasks') : (mine ? 'after' : 'next');
+    res[role].push(`${itemRef(x, ls, ppl)} ${x.title}${CLOSED_ST.includes(x.status) ? ` (${x.status})` : ''}`);
+    if (role === 'after' && !CLOSED_ST.includes(x.status)) res.waiting++;
+  }
+  return res;
+}
+// the versioned write: 0 rows back = changed meanwhile (or not editable), exit 3
+async function versioned(c, row, patch, ref) {
+  const r = await c.rest('PATCH', `items?id=eq.${row.id}&version=eq.${row.version}`, patch, { Prefer: 'return=representation' });
+  if (!r.ok) throw new TdError(errorExit(r.err), `${ref}: ${r.err.message}; nothing written`);
+  if (!Array.isArray(r.json) || r.json.length !== 1) throw new TdError(EXIT.conflict, `conflict: ${ref} changed meanwhile or is not editable by this login; nothing written (show it and try again)`);
+  return r.json[0];
+}
+// update: the item patch, plus tag names to soft-remove (item_tags.removed_at) and notes for the report
+async function buildPatch(c, a, row, ls, ppl, now) {
+  const p = {}, notes = [];
+  let removeTags = [];
+  if (a.title !== undefined) {
+    p.title = String(a.title).replace(/\s+/g, ' ').trim().replace(/\.+$/, '');
+    if (!p.title) throw new TdError(EXIT.error, '--title cannot be empty');
+  }
+  if (a.body !== undefined) p.body_md = String(a.body);
+  if (a.due !== undefined) { const d = dueValue(a.due, row); p.due_at = d ? d.toISOString() : null; }
+  if (a.start !== undefined) { const d = startValue(a.start); p.start_at = d ? d.toISOString() : null; }
+  const q = a.q !== undefined ? a.q : a.quadrant;
+  if (q !== undefined) {
+    p.quadrant = String(q).toUpperCase();
+    if (!c.core.QS.includes(p.quadrant)) throw new TdError(EXIT.error, '--q is one of A, B, C, D');
+  }
+  if (a.owner !== undefined) p.owner_id = /^none$/i.test(a.owner) ? null : await profileId(c, a.owner, '--owner');
+  let listId = row.list_id;
+  if (a.list !== undefined) {
+    const to = writable(findList(ls, a.list, ppl), a.list);
+    if (to.id !== row.list_id) { p.list_id = to.id; listId = to.id; }
+  }
+  if (a.tags !== undefined || a['add-tag'] !== undefined || a['remove-tag'] !== undefined) {
+    const norm = s => String(s).trim().toLowerCase().replace(/\s+/g, '-');
+    const current = [...new Set((await itemTags(c, row.id)).map(t => t.name.toLowerCase()))];
+    const given = [...(a.tags !== undefined ? String(a.tags).split(',') : []), ...(a['add-tag'] !== undefined ? [a['add-tag']] : [])].map(norm).filter(Boolean);
+    // who an item is for is never a tag: person names are dropped (the owner changes only with --owner)
+    const people = given.filter(t => OWNER_TAGS.includes(t));
+    if (people.length) notes.push(`not tags: ${[...new Set(people)].join(', ')} (use --owner)`);
+    const topic = given.filter(t => !OWNER_TAGS.includes(t));
+    let wanted = a.tags !== undefined ? topic : [...current, ...topic];
+    const rm = a['remove-tag'] !== undefined ? norm(a['remove-tag']) : null;
+    if (rm) wanted = wanted.filter(t => t !== rm);
+    wanted = [...new Set(wanted)];
+    const add = wanted.filter(t => !current.includes(t));
+    removeTags = current.filter(t => !wanted.includes(t));
+    if (add.length) p.tags = add;   // filed by the database's compatibility trigger (additive) into the writer's tag list
+  }
+  if (a.top) {
+    const t = c.core.rowToTask(Object.assign({}, row, p));
+    const qq = c.core.deriveQuadrant(t, null, now);
+    const peers = await get(c, `items?select=id,list_id,status,category,quadrant,urgent_pin,due_at,sort_key&list_id=eq.${listId}&deleted_at=is.null&status=not.in.(${CLOSED_ST.join(',')})`, 'read the quadrant order');
+    const key = topSortKey(c.core, listId === row.list_id ? row : Object.assign({}, row, { sort_key: null }), peers, qq, now);
+    if (key === null) notes.push('already first in ' + qq); else p.sort_key = key;
+  }
+  return { patch: p, removeTags, notes };
+}
+
 export async function run(argv, out = console.log) {
   const a = parseArgs(argv);
   const cmd = a._[0];
   if (a.help || !COMMANDS.includes(cmd)) { out(USAGE); return cmd || a.help ? (a.help ? EXIT.ok : EXIT.error) : EXIT.error; }
+  // refused before sign-in: priority was removed (a task's priority is its position in its quadrant; --top puts it first)
+  if (cmd === 'update' && a.priority !== undefined) throw new TdError(EXIT.error, "--priority was removed: a task's priority is its position in its quadrant; use --top");
   const env = readEnv(a.env);
   const as = a.as || 'homeos-agent';
   const miss = missingEnv(env, as);
@@ -245,6 +445,80 @@ async function command(a, cmd, c, out) {
     if (!r.ok) throw new TdError(errorExit(r.err), r.err.message);
     if (r.json.length !== 1) throw new TdError(EXIT.error, 'not allowed: only a person who owns the list restores it');
     out(a.json ? JSON.stringify({ restored: l.slug }) : 'restored ' + l.name);
+    return EXIT.ok;
+  }
+  if (cmd === 'find') {
+    // every match is listed; nothing is ever written. REF and --key name one item, words search titles
+    const { rows, what, exact } = await lookup(c, a, ls, ppl, { all: !!a.all });
+    if (a.json) out(JSON.stringify(rows.map(x => rowJson(x, ls, ppl)), null, 2));
+    else if (!rows.length) out(`none: no ${a.all || exact ? '' : 'open '}item matches ${what}`);
+    else rows.forEach(x => out(itemLine(x, ls, ppl) + (ls[x.list_id].archived_at ? ' · list archived' : '')));
+    return EXIT.ok;
+  }
+  if (cmd === 'show') {
+    const row = await resolveTarget(c, a, ls, ppl, out);
+    const l = ls[row.list_id];
+    const tags = (await itemTags(c, row.id)).map(t => t.name);
+    const lk = await linksOf(c, row, ls, ppl);
+    const q = row.quadrant || core.deriveQuadrant(core.rowToTask(row), null, now);
+    const owner = row.owner_id ? ((ppl[row.owner_id] || {}).handle || row.owner_id) : null;
+    const notify = (row.details && row.details.notify) || [];
+    if (a.json) {
+      out(JSON.stringify(Object.assign(rowJson(row, ls, ppl), { body_md: row.body_md || '', start_at: row.start_at || null, quadrant_shown: q, quadrant_stored: !!row.quadrant,
+        sort_key: row.sort_key, owner, notify, tags, links: lk, review_state: row.review_state || 'none', list_name: l.name, archived: !!l.archived_at }), null, 2));
+      return EXIT.ok;
+    }
+    out(itemLine(row, ls, ppl) + (l.archived_at ? ' · list archived' : ''));
+    out(`list: ${l.name} · quadrant: ${q}${row.quadrant ? '' : ' (derived)'} · owner: ${owner || 'none'}`);
+    if (row.start_at) out('start: ' + localStamp(new Date(row.start_at), TZ).wall);
+    if (tags.length) out('tags: ' + tags.join(', '));
+    if (notify.length) out('notify: ' + notify.join(', '));
+    if (lk.parent.length) out('parent: ' + lk.parent.join(', '));
+    if (lk.subtasks.length) out('subtasks: ' + lk.subtasks.join(', '));
+    if (lk.after.length) out('comes after: ' + lk.after.join(', ') + (lk.waiting ? ` (waiting for ${lk.waiting})` : ''));
+    if (lk.next.length) out('next: ' + lk.next.join(', '));
+    if (row.review_state && row.review_state !== 'none') out('review: ' + row.review_state);
+    out(`key: ${row.dedup_key || '-'} · version ${row.version}`);
+    if (row.body_md) out('\n' + row.body_md);
+    return EXIT.ok;
+  }
+  if (cmd === 'update') {
+    const named = ['title', 'body', 'due', 'start', 'q', 'quadrant', 'owner', 'tags', 'add-tag', 'remove-tag', 'list', 'top'].filter(k => a[k] !== undefined);
+    if (!named.length) throw new TdError(EXIT.error, 'update needs at least one of --title, --body, --due, --start, --q, --top, --owner, --tags, --add-tag, --remove-tag, --list');
+    const row = await resolveTarget(c, a, ls, ppl, out);
+    changeable(row, ls, ppl);
+    const ref = itemRef(row, ls, ppl);
+    const { patch, removeTags, notes } = await buildPatch(c, a, row, ls, ppl, now);
+    const why = sensitiveCheck([patch.title, patch.body_md, (patch.tags || []).join(' ')].filter(Boolean).join(' '));
+    if (why) throw new TdError(EXIT.sensitive, `sensitive data refused (${why}); nothing written`);
+    const fields = [...Object.keys(patch), ...(removeTags.length ? ['removed tags ' + removeTags.join(', ')] : [])];
+    if (!fields.length) { out(a.json ? JSON.stringify({ unchanged: true, ref, notes }) : `nothing to change: ${itemLine(row, ls, ppl)}${notes.length ? ' · ' + notes.join('; ') : ''}`); return EXIT.ok; }
+    if (a['dry-run']) { out(a.json ? JSON.stringify({ dry: true, ref, patch, removeTags }, null, 2) : `dry run, nothing sent: update ${ref} · ${fields.join(', ')}`); return EXIT.ok; }
+    const next = Object.keys(patch).length ? await versioned(c, row, patch, ref) : row;
+    if (removeTags.length) {
+      const ids = (await itemTags(c, row.id)).filter(t => removeTags.includes(t.name.toLowerCase())).map(t => t.tag_id);
+      if (ids.length) {
+        const w = await c.rest('PATCH', `item_tags?item_id=eq.${row.id}&tag_id=in.(${ids.join(',')})`, { removed_at: new Date(now).toISOString() });
+        if (!w.ok) throw new TdError(errorExit(w.err), `${ref}: tags not removed: ${w.err.message}`);
+      }
+    }
+    const after = Object.assign({}, row, next);
+    out(a.json ? JSON.stringify(Object.assign({ action: 'updated', fields, notes }, rowJson(after, ls, ppl))) : `updated ${itemLine(after, ls, ppl)} · ${fields.join(', ')}${notes.length ? ' · ' + notes.join('; ') : ''}`);
+    return EXIT.ok;
+  }
+  if (cmd === 'done' || cmd === 'reopen' || cmd === 'cancel') {
+    const status = { done: 'done', reopen: 'open', cancel: 'cancelled' }[cmd];
+    const row = await resolveTarget(c, a, ls, ppl, out, { closed: cmd === 'reopen' });
+    changeable(row, ls, ppl);
+    const ref = itemRef(row, ls, ppl);
+    if (cmd === 'reopen' ? !CLOSED_ST.includes(row.status) : row.status === status) {
+      out(a.json ? JSON.stringify({ unchanged: true, ref, status: row.status }) : `already ${row.status}: ${itemLine(row, ls, ppl)}; nothing written`);
+      return EXIT.ok;
+    }
+    if (a['dry-run']) { out(`dry run, nothing sent: ${cmd} ${ref}`); return EXIT.ok; }
+    const after = Object.assign({}, row, await versioned(c, row, { status }, ref));
+    const verb = { done: 'done', reopen: 'reopened', cancel: 'cancelled' }[cmd];
+    out(a.json ? JSON.stringify(Object.assign({ action: verb }, rowJson(after, ls, ppl))) : `${verb} ${itemLine(after, ls, ppl)}`);
     return EXIT.ok;
   }
   return EXIT.error;
