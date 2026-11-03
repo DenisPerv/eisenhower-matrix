@@ -90,7 +90,7 @@ Run from the HomeOS root on the machine with the tokens. `--project` picks the f
 
    ```
    /*
-     Content-Security-Policy: default-src 'none'; script-src 'sha256-<each inline script of site/index.html>'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
+     Content-Security-Policy: default-src 'none'; script-src 'sha256-<each inline script of site/index.html>'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src <supabaseUrl, when the page names it and its url and key equal the config; else 'none'>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
      COMMON
    /terms  (and /refund, /cookies, /legal-notice, /accessibility, /data-deletion, /privacy)
      ! Content-Security-Policy

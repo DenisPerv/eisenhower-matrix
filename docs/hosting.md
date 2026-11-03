@@ -10,7 +10,7 @@ The public landing page and the signed-in pages live on two origins, so the land
 
 | Host (Pages project) | Paths | Access |
 |---|---|---|
-| landing, `<landing>.pages.dev` (household: `eisenhower-agentic-planner.pages.dev`) | `/` site, `/assets/*`, `/terms`, `/refund`, `/cookies`, `/legal-notice`, `/accessibility`, `/data-deletion`, `/privacy`, `/version.json` | public; noindex; CSP from hashes only, `connect-src 'none'` |
+| landing, `<landing>.pages.dev` (household: `eisenhower-agentic-planner.pages.dev`) | `/` site, `/assets/*`, `/terms`, `/refund`, `/cookies`, `/legal-notice`, `/accessibility`, `/data-deletion`, `/privacy`, `/version.json` | public; noindex; CSP from hashes only; `connect-src` the Supabase origin on `/`, `'none'` on the other pages |
 | app, `<app>.pages.dev` (household: `eisenhower-agentic-planner-app.pages.dev`) | `/board/`, `/app/`, `/signin`, `/request` (301 → `/signin`), `/privacy`, `/config/tasksdashboard.config.js`, `/version.json`; later first-party `/<name>/` | `/board`, `/board/*`, `/app`, `/app/*` behind the Access app **Eisenhower gate**; everything else public |
 
 Every path on both hosts is noindex (`X-Robots-Tag: noindex`).
@@ -85,7 +85,7 @@ The app host gates only the signed-in pages; the landing host has no gate except
 
 | Host | Path | `script-src` | `connect-src` |
 |---|---|---|---|
-| landing | `/` | `'sha256-…'` of each inline script of `site/index.html` (no `'self'`: the site loads no script file) | `'none'` |
+| landing | `/` | `'sha256-…'` of each inline script of `site/index.html` (no `'self'`: the site loads no script file) | the Supabase URL, for `rpc/request_plan_interest` only (`db/026`); `'none'` for a release whose page does not name it |
 | landing | legal pages, `/privacy` | `'none'` | `'none'` |
 | app | `/board`, `/board/`, `/board/*` | `'self'` (the config) plus the board's inline scripts | the Supabase URL |
 | app | `/app/`, `/app/*` | `'self'` plus the app's inline scripts; also `manifest-src 'self'`, `worker-src 'self'` | `'self'` and the Supabase URL |
@@ -94,7 +94,7 @@ The app host gates only the signed-in pages; the landing host has no gate except
 
 - `Access-Control-Allow-Origin` is removed (`! Access-Control-Allow-Origin`) on `/board*` and `/app/*`.
 - `Cache-Control: no-cache` for `/`, `/board/`, `/board/index.html`, `/signin`, the config, `version.json` and the phone app's paths.
-- `script-src` lists the sha256 of the body of each inline `<script>` (line endings LF), so a new inline script, an external script or a new network host needs the template changed in the same commit ([deployment/2-deploy.md](deployment/2-deploy.md) holds it). `connect-src` is only the Supabase origin on the app host, so a stolen token cannot be sent anywhere else from the page.
+- `script-src` lists the sha256 of the body of each inline `<script>` (line endings LF), so a new inline script, an external script or a new network host needs the template changed in the same commit ([deployment/2-deploy.md](deployment/2-deploy.md) holds it). `connect-src` is only the Supabase origin on the app host and the landing `/`, so a stolen token cannot be sent anywhere else from the page.
 - Turn off any Cloudflare feature that injects scripts (Web Analytics auto-inject, Rocket Loader, email obfuscation): the CSP blocks them and the pages break.
 
 ## Storage per origin
