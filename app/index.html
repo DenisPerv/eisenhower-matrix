@@ -1826,6 +1826,15 @@ document.addEventListener('click', async e => {
         : [{ label: 'Sync now', icon: 'cloud', run: () => pullSync() }, { label: `Everything is saved. Tasks syncs every ${Math.round(((D.config && D.config.pollMs) || 30000) / 1000)} seconds while open.`, run: () => {} }]);
       break;
     }
+    case 'switch-board': { /* web: the account menu's "Switch to mobile version" (switchVersion); same origin, so td.auth carries the session */
+      const url = switchUrl('board');
+      if (!url) break;
+      try { await D.flushAll(); } catch (er) {}
+      if (D.pending && !S.swAsk) { S.swAsk = true; setTimeout(() => { S.swAsk = false; }, 8000); toast(`${D.pending} ${D.pending === 1 ? 'change' : 'changes'} not sent yet. ${D.durable ? 'They stay on this phone and are sent when you open Tasks again.' : 'Switching drops them.'} Tap again to switch.`); break; }
+      S.swAsk = false;
+      try { await D.writePrefs(); } catch (er) {}
+      location.assign(url); break;
+    }
     case 'signout': {
       const r = await D.signOut(!!S.outAsk);
       if (r && !r.ok) { S.outAsk = true; setTimeout(() => { S.outAsk = false; }, 8000); toast(`${r.pending} ${r.pending === 1 ? 'change' : 'changes'} not sent yet. Tap again to sign out anyway.`); break; }
@@ -2248,6 +2257,9 @@ const standalone = () => matchMedia('(display-mode: standalone)').matches || nav
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const themeName = () => ({ auto: 'System', light: 'Light', dark: 'Dark' })[D.prefs.theme] || 'System';
 const closedAll = () => D.all().filter(t => isClosed(t));
+/* the version switch's address (core versionSwitchUrl); null when the loaded core is older than this page (a cached td-core.js),
+   so the row is left out instead of the whole Me page failing */
+const switchUrl = to => typeof C.versionSwitchUrl === 'function' ? C.versionSwitchUrl(location.origin, to) : null;
 function renderMe() {
   const v = $('#v-me'), a = document.activeElement;
   if (mePage && a && v.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'radio') return; /* a poll never wipes what is typed */
@@ -2256,7 +2268,7 @@ function renderMe() {
   const row = (act, label, val = '') => `<li><button class="rowb" data-act="${act}">${label}<span class="v">${val}${ic('next')}</span></button></li>`;
   const inv = D.invites.length, live = C.tagGroups(D.tagLists, D.tags, me().id, D.names, { order: D.prefs.tagListOrder }).length;
   v.innerHTML = `<div class="me-id"><span class="avatar" aria-hidden="true">${esc((me().display_name || '?')[0])}</span><div><h2 id="me-h" tabindex="-1">${esc(me().display_name || '')}</h2><p>${esc((D.session && D.session.email) || '')}</p></div></div>
-   <div class="group"><h3>Account</h3><ul class="rows">${row('pg-theme', 'Theme', themeName())}${row('pg-sharing', 'Sharing', inv ? `<span class="cntb inv" aria-label="${inv} ${inv === 1 ? 'invitation' : 'invitations'}">${inv}</span>` : '')}${row('pg-install', 'Install the app', standalone() ? 'Installed' : '')}</ul></div>
+   <div class="group"><h3>Account</h3><ul class="rows">${row('pg-theme', 'Theme', themeName())}${row('pg-sharing', 'Sharing', inv ? `<span class="cntb inv" aria-label="${inv} ${inv === 1 ? 'invitation' : 'invitations'}">${inv}</span>` : '')}${row('pg-install', 'Install the app', standalone() ? 'Installed' : '')}${switchUrl('board') ? row('switch-board', 'Switch to desktop version') : ''}</ul></div>
    <div class="group"><h3>Board</h3><ul class="rows">${human() ? row('pg-general', 'General settings') : ''}${row('pg-urgency', 'Urgency settings', `${D.settings.windowDays} ${D.settings.windowDays === 1 ? 'day' : 'days'}`)}${row('pg-cards', 'Card layout')}${row('pg-tags', 'Tags', `${live} ${live === 1 ? 'list' : 'lists'}`)}</ul></div>
    <div class="group"><h3>History</h3><ul class="rows">${row('pg-archive', 'Archive', String(closedAll().length))}${row('pg-alists', 'Archived lists')}${row('pg-hlists', 'Hidden lists', String(D.hiddenLists.length))}${row('pg-timeline', 'Timeline')}</ul></div>
    <div class="group"><h3>Coming later</h3><ul class="rows"><li><div class="rowb" aria-disabled="true" style="cursor:default"><span>Reminders<span class="rowsub">Deadline reminders by your settings. Coming later.</span></span><span class="v"><span class="later">Later</span></span></div></li></ul></div>
