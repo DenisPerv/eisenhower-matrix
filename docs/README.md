@@ -7,11 +7,13 @@ TasksDashboard is an Eisenhower matrix task app: one HTML file (`TasksDashboard.
 | [architecture.md](architecture.md) | the pieces (page, core, UI, phone app, CLI, database, host) and how data flows between them; the phone app's structure, durable queue, service worker and gate |
 | [database.md](database.md) | the SQL files and their apply order, the RLS model, the functions (RPCs), limits, how to change the schema |
 | [auth.md](auth.md) | password and Google sign-in (also in the phone app), sessions and storage, the sign-up hook and allowlist, closing registrations |
-| [hosting.md](hosting.md) | serving the page on Cloudflare Pages behind Cloudflare Access: setup steps, the phone app at `/app/` with its Access bypass, headers and CSP, Supabase redirect URLs, verified free-plan facts |
+| [hosting.md](hosting.md) | the two hosts on Cloudflare Pages (a public landing host, an app host whose `/board/` and `/app/` sit behind Cloudflare Access): what each serves, the path-gated Access model, the first-party rule, setup steps, headers and CSP per path, Supabase and Google settings, switching the site off, a custom domain later, verified free-plan facts |
 | [testing-and-release.md](testing-and-release.md) | unit tests, the end-to-end runner, the selftests, branches and the release flow |
 | [api/README.md](api/README.md) and [api/openapi.yaml](api/openapi.yaml) | the read API: the weekly review report (`rpc/review_report`), tokens, curl examples, errors |
 | [deployment/](deployment/README.md) | the step-by-step runbook for a deploy or a rollback (version check, deploy, post-deploy check) |
-| [access-requests.md](access-requests.md) | (access track) how a stranger asks for access on `/request` and how an owner lets them in |
+| [access-requests.md](access-requests.md) | (access track) how a stranger signs in and asks for access on `/signin` and how an owner lets them in |
+| [privacy-inputs.md](privacy-inputs.md) | facts for the legal texts: per page the data collected, storage keys, cookies and caches, processors and regions, the contact; no legal wording |
+| [business/README.md](business/README.md) | the business notes behind the landing page: idea, who it is for, offer, sections, status |
 
 Conventions in these pages:
 

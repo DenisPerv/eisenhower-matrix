@@ -55,6 +55,11 @@ begin
     (gen_random_uuid(), a, 'st-mu-sub-a', 'google', json_build_object('sub', 'st-mu-sub-a', 'email', ae, 'email_verified', true)),
     (gen_random_uuid(), b, 'st-mu-sub-b', 'google', json_build_object('sub', 'st-mu-sub-b', 'email', be, 'email_verified', true)),
     (gen_random_uuid(), c, 'st-mu-sub-c', 'google', json_build_object('sub', 'st-mu-sub-c', 'email', ce, 'email_verified', true));
+  -- db/024: the guest fixtures are let in (an approved access request), so they may write as before
+  insert into public.users_pending_for_decision (user_id, email, status, decided_at, applied_at)
+  select p.id, lower(p.email), 'approved', now(), now() from public.profiles p
+   where not p.is_household and p.kind = 'human' and lower(p.email) like 'st-%@example.invalid'
+     and not exists (select 1 from public.users_pending_for_decision r where r.user_id = p.id);
   select l.id into am from public.lists l where l.owner_id = a;
   select t.id into adef from public.tag_lists t where t.owner_id = a and t.is_default;
   select t.id into bdef from public.tag_lists t where t.owner_id = b and t.is_default;

@@ -28,10 +28,13 @@ TasksDashboard has no server of its own. A static page talks straight to a Supab
 | UI script | the rest of the page | the session, a serial write queue per item, polling every `pollMs`, rendering, dialogs |
 | Config | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`: public values only (a `.js` file because a `file://` page can load a script but not read JSON) |
 | Phone app | `app/` | a second page for phones, installable, published at `/app/`; same database, config and core rules (section Phone app) |
-| Request page | `request.html` | the public access-request page of a hosted copy (`/request`); no board data ([access-requests.md](access-requests.md)) |
-| Privacy page | `privacy.html` | static, no script; the Google consent screen's privacy link |
+| Sign-in page | `signin.html` | the public sign-in page of the app host (`/signin`; `/request` is a 301 alias): Google, then the access request; a household login or an approved request goes on to `/board/` or `/app/`; no board data ([access-requests.md](access-requests.md)) |
+| Landing page | `site/index.html`, `site/assets/` | the public landing page with a demo that keeps its state in the browser; its own host, no database access (`connect-src 'none'`); business notes in `docs/business/` |
+| Legal pages | `legal/*.html` | static placeholders on the landing host (terms, refund, cookies, legal notice, accessibility, data deletion) |
+| Privacy page | `privacy.html` | static, no script; the Google consent screen's privacy link; public at `/privacy` on both hosts |
 | CLI | `cli/tasks.mjs`, `cli/lib.mjs` | add tasks and reminders, list overdue items and the Do quadrant, restore a list; signs in as a login, never with a secret key |
-| Access CLI | `cli/access.mjs` | turns approved access requests into the host's Access policy (Cloudflare API); dry run unless `--apply` |
+| Access CLI | `cli/access.mjs` | turns approved access requests into the host's Access policy (Cloudflare API); sets up the gate of the two-host layout (`setup --gate`); dry run unless `--apply` |
+| Hosts | two Cloudflare Pages projects | landing (site, legal pages, privacy) and app (board, phone app, sign-in), [hosting.md](hosting.md) |
 | Database | `db/001` … `db/018`, selftests `db/900` … `db/906` | schema, triggers, RLS, RPCs; applied in file order ([database.md](database.md)) |
 | Docs | `README.md` (technical reference), `docs/` | this folder |
 
@@ -58,7 +61,7 @@ TasksDashboard has no server of its own. A static page talks straight to a Supab
 
 **Data flow.** Same as above, through `TDData`: sign in (password, or Google PKCE returning to `/app/`, [auth.md](auth.md)), then `gate()`, then `loadAll()` (the same REST reads), a poll every `pollMs` while visible, versioned PATCHes with the same field-level conflict merge. Requests carry `x-homeos-via: app`, so the audit trail tells the clients apart. Tokens stay in memory; the refresh token is the page's `td.auth` key, so the web page and the app on one origin share the sign-in, the refresh lock and the channel.
 
-**Gate.** After sign-in `gate()` decides what the app shows: the board for a household member, for a login whose access request was approved (`rpc/my_access_request`), or for a member of a list someone else owns; otherwise the request flow (`pending`, `declined`, `none`, `error`), which calls the same `rpc/request_access` as `request.html` ([access-requests.md](access-requests.md)). It is a courtesy screen, not a lock: RLS still decides what a login reads and writes.
+**Gate.** After sign-in `gate()` decides what the app shows: the board for a household member, for a login whose access request was approved (`rpc/my_access_request`), or for a member of a list someone else owns; otherwise the request flow (`pending`, `declined`, `none`, `error`), which calls the same `rpc/request_access` as `signin.html` ([access-requests.md](access-requests.md)). It is a courtesy screen, not a lock: RLS still decides what a login reads and writes.
 
 **Durable queue.** A change shows at once and joins the item's write queue, as on the web. Each queued write (and each link operation) is also mirrored to IndexedDB `td-app`, store `queue`, key `<uid>:<item id>` (links: `<uid>:links`), with the fields, their base and new values and the version at edit time. The queue survives a closed or killed app: on the next start `loadAll` reads the records back under the Web Lock `td.queue`, keeping the stored version, so a save made by someone else in between meets the normal conflict merge instead of being overwritten. The queue is sent on start, when the phone comes online, when the page becomes visible and on every poll; sign-out clears it. Where IndexedDB is missing or throws, the queue stays in memory and the page warns on close.
 

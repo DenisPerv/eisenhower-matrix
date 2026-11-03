@@ -1,5 +1,6 @@
 // node --test test/  — the phone app's data layer (app/td-data.js) against a fake Supabase (fetch), fake storage, a fake
-// IndexedDB queue store and fake timers: password sign-in, refresh and retry on 401, a versioned PATCH that misses (conflict
+// IndexedDB queue store and fake timers: Google sign-in (no password path), the hand-over from /signin, sign-out to other tabs,
+// refresh and retry on 401, a versioned PATCH that misses (conflict
 // merge), the durable queue (record/restore, offline edit -> new page -> sent with the persisted version), the access gate,
 // and the Google PKCE verifier (10-minute expiry, one use). No network.
 const test = require('node:test');
@@ -38,7 +39,7 @@ function fakeSupabase(routes) {
 }
 // what loadAll reads, for a household member with one list and one item
 const BASE = [
-  ['POST', /^\/auth\/v1\/token\?grant_type=password/, () => [200, grant('A')]],
+  ['POST', /^\/auth\/v1\/token\?grant_type=pkce/, () => [200, grant('A')]],
   ['POST', /^\/auth\/v1\/token\?grant_type=refresh_token/, () => [200, grant('R')]],
   ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [row()]]],
   ['GET', /^\/rest\/v1\/lists\?select=id,slug/, () => [200, [{ id: LIST, slug: 'home', name: 'Home', default_category: 'task', sort: 1, owner_id: UID }]]],
@@ -66,21 +67,100 @@ function make(fetch, more) {
   d.opts = o;
   return d;
 }
+// a signed-in data layer the way the app signs in: back from Google with a stored verifier (token?grant_type=pkce -> grant A)
+async function signIn(d, stay = true) {
+  d.opts.storage.local.setItem(D.PKCE_KEY, JSON.stringify({ verifier: 'v'.repeat(43), stay, at: d.opts.now() }));
+  const r = await d.finishGoogle({ code: 'code-1', cleanUrl: '/app/' });
+  assert.equal(r, null, 'signed in');
+}
 const until = async (fn, n = 200) => { for (let i = 0; i < n && !fn(); i++) await new Promise(r => setTimeout(r, 2)); assert.ok(fn(), 'condition not reached'); };
 
-test('password sign-in: Stay signed in keeps td.auth in localStorage, unticked in sessionStorage; a wrong password is an error', async () => {
+test('no password path: the data layer has no signIn; Google keeps td.auth in localStorage (Stay signed in), unticked in sessionStorage', async () => {
   const f = fakeSupabase([]);
   const d = make(f);
-  assert.equal(await d.signIn('me@example.com', 'pw', true), null);
+  assert.equal(typeof d.signIn, 'undefined');
+  await signIn(d, true);
   assert.deepEqual(JSON.parse(d.opts.storage.local.getItem('td.auth')), { refresh_token: 'r-A', uid: UID });
   assert.equal(d.opts.storage.session.getItem('td.auth'), null);
   assert.equal(d.session.uid, UID);
   const d2 = make(f);
-  await d2.signIn('me@example.com', 'pw', false);
+  await signIn(d2, false);
   assert.equal(d2.opts.storage.local.getItem('td.auth'), null);
   assert.ok(d2.opts.storage.session.getItem('td.auth'));
-  const bad = make(fakeSupabase([['POST', /grant_type=password/, () => [400, { error_code: 'invalid_credentials', msg: 'Invalid login credentials' }]]]));
-  assert.equal((await bad.signIn('me@example.com', 'x', true)).kind, 'credentials');
+  assert.ok(!f.calls.some(c => /grant_type=password/.test(c.u)), 'no password grant is ever sent');
+});
+
+test('signed out on a hosted origin: goSignin goes to /signin?next=/app/ with the Stay box; localhost and file:// stay', () => {
+  const went = [];
+  const d = make(fakeSupabase([]), { location: { origin: 'https://eisenhower-agentic-planner-app.pages.dev', href: 'https://eisenhower-agentic-planner-app.pages.dev/app/', pathname: '/app/', replace: u => went.push(u) } });
+  assert.equal(d.signinPage(), '/signin?next=/app/');
+  assert.equal(d.goSignin(false), '/signin?next=/app/');
+  assert.deepEqual(went, ['/signin?next=/app/']);
+  assert.equal(d.opts.storage.session.getItem('td.signin.stay'), '0');
+  for (const origin of ['http://localhost:8788', 'http://127.0.0.1:8788', 'https://localhost', 'null', '']) {
+    const e = make(fakeSupabase([]), { location: { origin, href: origin + '/app/', pathname: '/app/', replace: u => went.push(u) } });
+    assert.equal(e.signinPage(), null, origin);
+    assert.equal(e.goSignin(true), null, origin);
+  }
+  assert.equal(went.length, 1);
+});
+
+test('back from /signin: its session (sessionStorage td.request.auth) becomes td.auth once, as its Stay box said; a bad one is dropped', async () => {
+  let used = null;
+  const f = fakeSupabase([['POST', /grant_type=refresh_token/, (m, body) => { used = body.refresh_token; return [200, grant('H')]; }]]);
+  const d = make(f);
+  d.opts.storage.session.setItem('td.request.auth', JSON.stringify({ access_token: 'x', refresh_token: 'from-signin', expires_at: T0 + 3600e3, email: 'me@example.com' }));
+  d.opts.storage.session.setItem('td.signin.stay', '1');
+  assert.equal((await d.start()).state, 'signedin');
+  assert.equal(used, 'from-signin');
+  assert.equal(d.opts.storage.session.getItem('td.request.auth'), null, 'the hand-over key is deleted');
+  assert.equal(d.opts.storage.session.getItem('td.signin.stay'), null);
+  assert.deepEqual(JSON.parse(d.opts.storage.local.getItem('td.auth')), { refresh_token: 'r-H', uid: UID });
+
+  const e = make(fakeSupabase([]));
+  e.opts.storage.session.setItem('td.request.auth', JSON.stringify({ refresh_token: 'from-signin' }));
+  e.opts.storage.session.setItem('td.signin.stay', '0');
+  assert.equal((await e.start()).state, 'signedin');
+  assert.equal(e.opts.storage.local.getItem('td.auth'), null, 'unticked: this tab only');
+  assert.ok(e.opts.storage.session.getItem('td.auth'));
+
+  const g = make(fakeSupabase([]));
+  g.opts.storage.session.setItem('td.request.auth', '{not json');
+  assert.equal((await g.start()).state, 'signin');
+  assert.equal(g.opts.storage.session.getItem('td.request.auth'), null);
+  // a dead hand-over token: signed out, and nothing is left to hand over again (no loop back to the board)
+  const h = make(fakeSupabase([['POST', /grant_type=refresh_token/, () => [400, { error_code: 'refresh_token_not_found' }]]]));
+  h.opts.storage.session.setItem('td.request.auth', JSON.stringify({ refresh_token: 'dead' }));
+  const r = await h.start();
+  assert.equal(r.state, 'signin');
+  assert.equal(h.opts.storage.session.getItem('td.request.auth'), null);
+  assert.equal(h.opts.storage.local.getItem('td.auth'), null);
+});
+
+test('S14: sign-out reaches the other tabs of the same person (BroadcastChannel td.auth), and a tab signs out on that message', async () => {
+  const posted = [];
+  let onA = null;
+  const chan = () => { const c = { postMessage: m => posted.push(m) }; Object.defineProperty(c, 'onmessage', { set: fn => { onA = fn; }, get: () => onA }); return c; };
+  const d = make(fakeSupabase([['POST', /^\/auth\/v1\/logout/, () => [204, undefined]]]), { broadcast: chan });
+  await signIn(d, true);
+  assert.equal((await d.signOut(true)).ok, true);
+  assert.deepEqual(posted.filter(m => m.type === 'signout'), [{ type: 'signout', uid: UID }]);
+  // the receiving side: another tab of the same person shows sign-in with a message
+  let onB = null;
+  const chanB = () => { const c = { postMessage: () => {} }; Object.defineProperty(c, 'onmessage', { set: fn => { onB = fn; }, get: () => onB }); return c; };
+  const e = make(fakeSupabase([]), { broadcast: chanB });
+  await signIn(e, true);
+  const events = [];
+  e.on('session', x => events.push(x));
+  onB({ data: { type: 'signout', uid: OTHER } });
+  assert.ok(e.session, 'another person signing out changes nothing');
+  onB({ data: { type: 'signout', uid: UID } });
+  assert.equal(e.session, null);
+  assert.ok(events.some(x => x.state === 'signin' && /another tab/.test(x.msg)));
+  // signed out already (no live session): nothing is broadcast
+  posted.length = 0;
+  await d.signOut(true);
+  assert.equal(posted.length, 0);
 });
 
 test('rest: a 401 refreshes once and retries with the new token; a dead refresh token ends the session and keeps the queue', async () => {
@@ -90,7 +170,7 @@ test('rest: a 401 refreshes once and retries with the new token; a dead refresh 
     ['GET', /^\/rest\/v1\/probe/, (m, b, h) => h.Authorization === 'Bearer B' ? [200, [{ ok: 1 }]] : [401, { code: 'PGRST301', message: 'JWT expired' }]],
   ]);
   const d = make(f);
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   const r = await d.rest('GET', 'probe');
   assert.equal(r.ok, true);
   assert.equal(refreshed, 1);
@@ -103,12 +183,31 @@ test('rest: a 401 refreshes once and retries with the new token; a dead refresh 
   const e = make(g);
   const events = [];
   e.on('session', x => events.push(x.state));
-  await e.signIn('me@example.com', 'pw', true);
+  await signIn(e, true);
   await e.loadAll();
   e.edit(ITEM, t => { t.title = 'Buy oat milk'; });
   await until(() => events.includes('ended'));
   assert.equal(e.pending, 1, 'the change waits for the next sign-in');
   assert.equal(e.syncState().state, 'ended');
+});
+
+test('Session ended: the message says the waiting change is sent after sign-in only when IndexedDB keeps it; otherwise that it is lost', async () => {
+  const ended = async idb => {
+    const g = fakeSupabase([
+      ['POST', /grant_type=refresh_token/, () => [400, { error_code: 'refresh_token_already_used' }]],
+      ['PATCH', /^\/rest\/v1\/items/, () => [401, { code: 'PGRST301' }]],
+    ]);
+    const e = make(g, { idb });
+    const msgs = [];
+    e.on('session', x => { if (x.state === 'ended') msgs.push(x.msg); });
+    await signIn(e, true);
+    await e.loadAll();
+    e.edit(ITEM, t => { t.title = 'Buy oat milk'; });
+    await until(() => msgs.length > 0);
+    return msgs[0];
+  };
+  assert.equal(await ended(memQueue()), 'Session ended. Sign in again. 1 change waits and is sent after you sign in.');
+  assert.equal(await ended(null), 'Session ended. Sign in again. 1 change is not saved: signing in again reloads the page and drops it.');
 });
 
 test('versioned PATCH that matches no row: no clash -> sent again on the new version; a clash -> conflict event, their version kept', async () => {
@@ -123,7 +222,7 @@ test('versioned PATCH that matches no row: no clash -> sent again on the new ver
     }],
   ]);
   const d = make(f);
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   await d.loadAll();
   // someone else changed the description meanwhile (version 2)
   remote = row({ version: 2, body_md: 'from the shop' });
@@ -185,7 +284,7 @@ test('durable queue: an offline edit is stored, a new page sends it after loadAl
   ]);
   const local = memStore();
   const d = make(f, { idb: q, storage: { local, session: memStore() } });
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   await d.loadAll();
   f.offline = true;
   d.edit(ITEM, t => { t.title = 'Call the plumber'; });
@@ -210,7 +309,7 @@ test('durable queue: an edit made after "Session ended" is stored too; sign-out 
     ['PATCH', /^\/rest\/v1\/items/, () => [401, { code: 'PGRST301' }]],
   ]);
   const d = make(f, { idb: q, storage: { local, session: memStore() } });
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   await d.loadAll();
   local.setItem('td.app.list', LIST); local.setItem('td.app.lastList', LIST);
   d.edit(ITEM, t => { t.title = 'first'; });
@@ -234,7 +333,7 @@ test('a queued change sent twice (a second tab, a restored record) is not a conf
   const d = make(f);
   const conflicts = [];
   d.on('conflict', c => conflicts.push(c));
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   await d.loadAll();
   d.edit(ITEM, t => { t.title = 'Call the plumber'; });
   await until(() => d.pending === 0);
@@ -251,7 +350,7 @@ test('durable queue fails open: a throwing store turns durability off, the edit 
     ['PATCH', /^\/rest\/v1\/items/, (m, body) => [200, [row(Object.assign({}, body, { version: 2 }))]]],
   ]);
   const d = make(f, { idb: bad });
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   await d.loadAll();
   assert.equal(d.durable, false);
   d.edit(ITEM, t => { t.title = 'x'; });
@@ -266,7 +365,7 @@ test('create: a new task goes on top of its quadrant with a client id; done and 
     ['PATCH', /^\/rest\/v1\/items/, (m, body) => [200, [row(Object.assign({ id: posted[0] ? posted[0].id : ITEM }, body, { version: 2 }))]]],
   ]);
   const d = make(f, { uuid: () => 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' });
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   await d.loadAll();
   const c = d.create({ list: LIST, q: 'A', title: 'New one' });
   assert.equal(c.task.id, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
@@ -299,7 +398,7 @@ test('gate: household, an approved request or a list shared by someone else -> b
     ['POST', /^\/rest\/v1\/rpc\/my_access_request/, () => o.reqFail ? [500, { message: 'boom' }] : [200, o.req === undefined ? null : o.req]],
     ['POST', /^\/rest\/v1\/rpc\/request_access/, () => o.cap ? [400, { code: '54000', message: 'too many open requests' }] : [200, null]],
   ]);
-  const gateOf = async o => { const d = make(guest(o)); await d.signIn('g@example.com', 'pw', true); return d.gate(); };
+  const gateOf = async o => { const d = make(guest(o)); await signIn(d, true); return d.gate(); };
   assert.equal(await gateOf({}), 'none', 'a guest with only their own My tasks');
   assert.equal(await gateOf({ owner: OTHER }), 'board');
   assert.equal(await gateOf({ req: { status: 'approved' } }), 'board');
@@ -308,21 +407,53 @@ test('gate: household, an approved request or a list shared by someone else -> b
   assert.equal(await gateOf({ reqFail: true }), 'error');
   const hh = make(fakeSupabase([['GET', /^\/rest\/v1\/profiles\?select=id,is_household/, () => [200, [{ id: UID, is_household: true }]]],
     ['GET', /^\/rest\/v1\/list_members\?select=list_id&/, () => [200, []]], ['POST', /rpc\/my_access_request/, () => [404, { message: 'no function' }]]]));
-  await hh.signIn('me@example.com', 'pw', true);
+  await signIn(hh, true);
   assert.equal(await hh.gate(), 'board', 'household even on a database without db/015');
 
   const d = make(guest({ cap: true }));
-  await d.signIn('g@example.com', 'pw', true);
+  await signIn(d, true);
   assert.equal((await d.requestAccess()).state, 'cap');
   let asked = 0;
   const e = make(fakeSupabase([
     ['POST', /rpc\/my_access_request/, () => [200, asked ? { status: 'pending', requested_at: '2026-10-29T10:00:00Z' } : null]],
     ['POST', /rpc\/request_access/, () => { asked++; return [200, null]; }],
   ]));
-  await e.signIn('g@example.com', 'pw', true);
+  await signIn(e, true);
   const r = await e.requestAccess();
   assert.equal(r.state, 'pending');
   assert.equal(asked, 1);
+});
+
+// 2026-10-30: the first tap saved the request but showed "Something went wrong" (twice with Try again): requestAccess()
+// answers 'pending' and the app's screen table only has 'sent'. accessScreen() maps every gate and request state to a screen.
+test('access request: the first tap and Try again both land on the "Request sent" screen with the request time', async () => {
+  const fs = require('node:fs');
+  const ROW = { id: 'r1', status: 'pending', email: 'g@example.com', first_name: 'G', last_name: null,
+    requested_at: '2026-10-30T09:12:00+00:00', decided_at: null, applied_at: null, item_id: 'i1' };
+  let saved = null, made = 0;
+  // like db/015: my_access_request() is jsonb (null until a request exists); request_access() returns the row and, with a
+  // request already open, returns that same row without making a second one
+  const f = fakeSupabase([
+    ['POST', /rpc\/my_access_request/, () => [200, saved]],
+    ['POST', /rpc\/request_access/, () => { if (!saved) { saved = ROW; made++; } return [200, saved]; }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  const first = await d.requestAccess();
+  assert.equal(D.accessScreen(first.state), 'sent', 'first tap');
+  assert.equal(d.accessRequest().requested_at, ROW.requested_at, 'the screen shows the request time');
+  const again = await d.requestAccess();
+  assert.equal(D.accessScreen(again.state), 'sent', 'Try again after a saved request');
+  assert.equal(made, 1, 'one request only');
+  assert.equal(D.accessScreen('none'), 'ask');
+  for (const s of ['board', 'declined', 'cap', 'error']) assert.equal(D.accessScreen(s), s);
+
+  // the app page: every screen accessScreen() can return exists, and both paths (after sign-in, after a tap) go through it
+  const page = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+  const table = page.slice(page.indexOf('function openAccess('), page.indexOf('$(\'#ac-body\')'));
+  for (const s of ['none', 'pending', 'board', 'declined', 'cap', 'error']) assert.match(table, new RegExp('\\n\\s+' + D.accessScreen(s) + ': `'), 'screen ' + s);
+  assert.match(page, /openAccess\(TDData\.accessScreen\(g\)\)/, 'afterSignIn');
+  assert.match(page, /openAccess\(TDData\.accessScreen\(r\.state\), r\.message\)/, 'Ask for access / Try again');
 });
 
 test('Google PKCE: back to /app/, verifier in localStorage for 10 minutes and used once', async () => {
@@ -369,7 +500,7 @@ test('saveProfile: PATCH profiles with display_name and timezone, names follow; 
   let refuse = false;
   const f = fakeSupabase([['PATCH', /^\/rest\/v1\/profiles\?id=eq\./, (m, body) => [200, refuse ? [] : [Object.assign({ id: UID }, body)]]]]);
   const d = make(f);
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   assert.equal((await d.loadAll()).ok, true);
   const r = await d.saveProfile({ display_name: ' Maks\u0007 ', timezone: 'Europe/Lisbon' });
   assert.equal(r.ok, true);
@@ -396,7 +527,7 @@ test('tag lists (tags round): an old prefs row is migrated to the full order wit
     ['PATCH', /^\/rest\/v1\/tag_lists\?id=eq\.([^&]+)/, (m, body) => { if (refuse) return [200, []]; patched.push([m[1], body.sort]); sorts[m[1]] = body.sort; return [200, [{ id: m[1], sort: body.sort }]]; }],
   ]);
   const d = make(f);
-  await d.signIn('me@example.com', 'pw', true);
+  await signIn(d, true);
   assert.equal((await d.loadAll()).ok, true);
   // web: load + C.tagListPrefsMigrate: own lists first (landing list first, then by sort), then the shared ones; favourite = landing list
   assert.deepEqual(d.prefs.tagListOrder, [A, B, S]);
@@ -433,7 +564,7 @@ test('tag lists (tags round): an old prefs row is migrated to the full order wit
   const d2 = make(fakeSupabase([
     ['GET', /^\/rest\/v1\/preferences/, () => [200, [{ prefs: { version: 2, tagListOrder: [], tagListOrderV: 2, tagListFavs: [] } }]]],
   ]));
-  await d2.signIn('me@example.com', 'pw', true);
+  await signIn(d2, true);
   await d2.loadAll();
   assert.equal(d2.prefs.tagListOrderV, 2);
   assert.deepEqual(d2.prefs.tagListFavs, []);

@@ -936,29 +936,16 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .si-logo .td-adv{display:block;width:96.6px;height:37.6px;overflow:visible}
 .signin h1{margin:0 0 6px;font:500 30px/1.1 var(--serif);letter-spacing:-.005em}
 .signin label{margin-top:10px;color:var(--ink2);font:500 13px var(--ui);letter-spacing:.01em}
-.signin input[type=email],.signin input[type=password]{width:100%;min-height:40px;padding:0 12px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--glass2);font:400 15px var(--font);color:var(--ink)}
-.signin input[type=email]:focus,.signin input[type=password]:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
 .signin label.cb{display:flex;gap:8px;align-items:center;margin-top:14px;color:var(--ink);font:400 14px var(--font);letter-spacing:0}
 .signin label.cb input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
 .signin .si-msg{margin:4px 0 0;padding:8px 10px;border-left:3px solid var(--danger);background:var(--danger-bg);color:var(--danger-ink);font:600 13px/1.4 var(--font);max-width:none}
 .signin .si-msg:empty{display:none}
-#si-go{margin-top:18px;min-height:42px;border:0;border-radius:var(--r);background:var(--accent);color:#FFFFFF;font:600 15px var(--ui)}
-#si-go:hover{background:var(--accent);filter:brightness(1.08)}
-#si-go:disabled{opacity:.6;filter:none}
-/* the dark accent is light: dark ink on it keeps the label above 4.5:1 */
-:root[data-theme="dark"] #si-go{color:#14152B}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #si-go{color:#14152B}}
 .signin .si-hint{margin:14px 0 0;color:var(--ink3);font:400 12.5px/1.45 var(--font);max-width:none}
-@media (max-width:700px){.signin{padding:24px 20px 20px}.signin input[type=email],.signin input[type=password]{font-size:16px;min-height:44px}#si-go{min-height:46px}}
-/* multi-user (T8): Continue with Google first, the password form behind "Other ways to sign in", the privacy line last */
-.si-form{display:grid;gap:6px}
+@media (max-width:700px){.signin{padding:24px 20px 20px}}
+/* Google only (2026-10-30): Continue with Google, Stay signed in, the privacy line last; no password form */
 .si-google{min-height:44px;margin-top:10px;gap:10px;border-radius:var(--r);background:var(--solid);border:1px solid var(--hair2);color:var(--ink);font:600 15px var(--ui)}
 .si-google:hover{border-color:var(--accent-line);background:var(--hover)}
 .si-google .g-mark{width:18px;height:18px;flex:none}
-.si-other{margin-top:12px;border-top:1px solid var(--hair);padding-top:10px}
-.si-other summary{cursor:pointer;color:var(--ink2);font:500 13px var(--ui);padding:4px 0;border-radius:var(--r-sm)}
-.si-other summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.si-other[open] summary{margin-bottom:4px}
 .signin .si-privacy{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--hair);color:var(--ink3);font:400 12.5px/1.45 var(--font);max-width:none}
 @media (max-width:700px){.si-google{min-height:48px}}
 /* multi-user (T9): the account menu, the sharing and tags dialogs */
@@ -1647,10 +1634,36 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   }
 
   // ---- sign-in with Google (multi-user T8): PKCE against Supabase Auth, no library ----
-  // Google needs an origin to come back to: https, or http on localhost. A file:// page signs in with a password only.
+  // Google needs an origin to come back to: https, or http on localhost. Sign-in is Google only (2026-10-30): a file:// page
+  // shows the button but cannot sign in.
   function isHostedOrigin(origin) {
     const o = String(origin || '');
     return /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o);
+  }
+  // Google only: on a hosted origin (https, not localhost) a signed-out page goes to the public sign-in page with its own path as
+  // next (signin.html accepts /board/ and /app/ only); file:// and localhost keep the Google button in place (null).
+  const SIGNIN_NEXT = ['/board/', '/app/'];
+  function signinRedirect(origin, next) {
+    const o = String(origin || '');
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o) || /^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o)) return null;
+    return '/signin?next=' + (SIGNIN_NEXT.includes(next) ? next : '/board/');
+  }
+  // signin.html keeps its session in this tab's sessionStorage (td.request.auth) and goes on to next with location.replace, in
+  // the same tab: the page takes its refresh token once and deletes the key. td.signin.stay: the "Stay signed in" box of the
+  // page that sent the visitor to /signin ('0' unticked; missing means ticked).
+  const SIGNIN_AUTH_KEY = 'td.request.auth', SIGNIN_STAY_KEY = 'td.signin.stay';
+  function signinHandover(raw) {
+    let v = null;
+    try { v = JSON.parse(raw || 'null'); } catch (e) { return null; }
+    return isObj(v) && typeof v.refresh_token === 'string' && v.refresh_token.length > 0 ? v.refresh_token : null;
+  }
+  // "Session ended" with n changes waiting. kept: they survive the trip to Google or /signin (the phone app's IndexedDB queue);
+  // the board's queue lives in memory only, and every sign-in now leaves the page, so it says they are lost (honest, not "sent")
+  function sessionEndedText(n, kept) {
+    const c = Math.max(0, Math.floor(Number(n) || 0));
+    if (!c) return 'Session ended. Sign in again.';
+    return 'Session ended. Sign in again. ' + c + (kept ? (c === 1 ? ' change waits and is' : ' changes wait and are') + ' sent after you sign in.'
+      : (c === 1 ? ' change is' : ' changes are') + ' not saved: signing in again reloads the page and drops ' + (c === 1 ? 'it.' : 'them.'));
   }
   function b64url(bytes) {
     let s = '';
@@ -2407,7 +2420,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
@@ -2457,9 +2470,13 @@ const store = s => ({ get: k => { try { return s().getItem(k); } catch (e) { ret
 const ls = store(() => localStorage), ss = store(() => sessionStorage);
 ['td.profile', 'td.axes', 'td.lists'].forEach(ls.del); // keys of the file-based app, removed once
 const AUTH_KEY = 'td.auth', ACCOUNTS_KEY = 'td.accounts', EMAILS_KEY = 'td.emails', PKCE_KEY = 'td.pkce';
-// Google sign-in needs an origin to come back to (https or localhost); file:// signs in with a password only
+// Google sign-in needs an origin to come back to (https or localhost); file:// shows the button but cannot sign in.
+// Google only (2026-10-30): on a hosted origin (https, not localhost) a signed-out page goes to /signin?next=/board/.
 const HOSTED = C.isHostedOrigin(location.origin);
-const PRIVACY = 'We store your email, name and the items you create. Only people you share a list with see them. Ask Maksym to delete your account.';
+const SIGNIN_PAGE = C.signinRedirect(location.origin, '/board/');
+// the privacy line under sign-in; the phone app (app/index.html) has the same words (twin rule)
+const PRIVACY = 'We store your email, name and the items you create. Only people you share a list with see them. To delete your account, write to md.solutions.homeos@gmail.com.';
+const PRIVACY_HREF = HOSTED ? '/privacy' : 'privacy.html';
 const boot = { gate: 'loading', errors: cfgRead.errors, msg: '', prefill: '' };
 let TODAY = new Date();
 let session = null, storeKind = null, me = null, sessionProvider = null;
@@ -2487,7 +2504,7 @@ const inList = t => st.list === 'all' || t.list === st.list;
 const refText = t => initial(t.list) + t.num;
 const ref = t => esc(refText(t)); // escaped: the initial comes from a list name
 const rel = t => { if (!t.deadline) return 'no date'; const n = Math.round((t.deadline - TODAY) / DAY); return n < 0 ? (-n) + ' d overdue' : n === 0 ? 'due today' : 'due in ' + n + ' d'; };
-const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // the role on a list (list_members) decides which controls a card shows; the database enforces the same rules
 const canDo = (action, t, list) => C.can(ROLE[t ? t.list : list], action, t, me && me.id);
 const canAddSomewhere = () => st.list === 'all' ? LISTS.some(l => canDo('add', null, l)) : canDo('add', null, st.list);
@@ -2554,7 +2571,7 @@ const passFilters = t => {
 const hl = (title, q) => { q = q.trim(); if (!q || /^#?\p{L}?\d+$/iu.test(q)) return esc(title); const i = title.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(title) : esc(title.slice(0, i)) + '<mark>' + esc(title.slice(i, i + q.length)) + '</mark>' + esc(title.slice(i + q.length)); };
 const VISIBLE = 5;
 
-// ---- session: a sign-in form; the access token lives in memory, the refresh token in td.auth ----
+// ---- session: Google sign-in (here, or on /signin when hosted); the access token lives in memory, the refresh token in td.auth ----
 // "Stay signed in" keeps td.auth in localStorage, unticked in sessionStorage (this tab only). Tabs share a refresh through a
 // Web Lock (td.refresh) and a BroadcastChannel (td.auth): refresh tokens rotate, and a reused one ends the session.
 // td.auth = { refresh_token, uid }. This tab's sessionStorage is read before localStorage, the storage in use before the other,
@@ -2653,25 +2670,34 @@ const noteMax = rows => rows.forEach(r => { const u = Date.parse(r.updated_at); 
 function sessionEnded() {
   if (!session && boot.gate === 'signin') return;
   session = null;
-  showSignIn('Session ended. Sign in again.' + (Q.size ? ' ' + Q.size + (Q.size === 1 ? ' change waits' : ' changes wait') + ' and are sent after you sign in.' : ''), emailOf(me && me.handle));
+  // the queue is in memory only and every sign-in leaves the page (Google, or /signin on a hosted origin): say the changes are lost
+  showSignIn(C.sessionEndedText(Q.size, false), emailOf(me && me.handle));
 }
 function showSignIn(msg, prefill) {
   boot.gate = 'signin'; boot.msg = msg || ''; boot.prefill = prefill || '';
   document.querySelectorAll('dialog').forEach(d => d.remove());
+  // hosted: a signed-out visitor goes to /signin; a message (session ended, signed out in another tab) is shown here first
+  if (SIGNIN_PAGE && !boot.msg) { boot.gate = 'loading'; render(); return goSignin(true); }
   render();
 }
-// a new session (password or Google): stored as "Stay signed in" says; another person's queue and items never carry over
+// to the public sign-in page; it comes back to /board/ with its session in sessionStorage (takeSignin)
+function goSignin(stay) {
+  ss.set(C.SIGNIN_STAY_KEY, stay === false ? '0' : '1');
+  location.replace(SIGNIN_PAGE);
+}
+// back from /signin (same tab): its refresh token becomes td.auth, as "Stay signed in" said there; the key is deleted at once,
+// so a token that no longer works sends the visitor to an empty /signin, never round in a loop
+function takeSignin() {
+  const token = C.signinHandover(ss.get(C.SIGNIN_AUTH_KEY));
+  const stay = ss.get(C.SIGNIN_STAY_KEY) !== '0';
+  ss.del(C.SIGNIN_AUTH_KEY); ss.del(C.SIGNIN_STAY_KEY);
+  if (!token) return;
+  clearAuth(); storeKind = stay ? 'local' : 'session'; saveRefresh(token, null); sessionProvider = 'google';
+}
+// a new session (Google): stored as "Stay signed in" says; another person's queue and items never carry over
 function adopt(s, stay, provider) {
   if (me && me.id !== s.user.id) { Q.clear(); tasks = []; }
   session = s; clearAuth(); storeKind = stay ? 'local' : 'session'; saveRefresh(s.refresh_token, s.user.id); sessionProvider = provider;
-}
-async function signIn(email, password, stay) {
-  const r = await authCall('token?grant_type=password', { email, password });
-  const s = r.status === 200 && C.sessionFromGrant(r.json, Date.now());
-  if (!s) return C.restError(r.status, r.json);
-  adopt(s, stay, 'email');
-  await loadAll();
-  return null;
 }
 // Continue with Google: a PKCE verifier in sessionStorage td.pkce (this tab only), then Supabase's authorize page.
 // pick: Google's account chooser, when an account already signed in on this browser (td.accounts).
@@ -2680,7 +2706,7 @@ async function startGoogle(pick) {
   const verifier = C.pkceVerifier(crypto.getRandomValues(new Uint8Array(48)));
   const challenge = await C.pkceChallenge(verifier, crypto.subtle);
   ss.set(PKCE_KEY, JSON.stringify({ verifier, stay: box ? box.checked : true }));
-  location.assign(C.authorizeUrl(CFG.supabaseUrl, { redirectTo: location.origin + location.pathname, challenge, selectAccount: !!pick }));
+  location.assign(C.authorizeUrl(CFG.supabaseUrl, { redirectTo: location.origin + location.pathname, challenge, selectAccount: !!pick, loginHint: boot.prefill || undefined }));
 }
 // back from Google: the code is swapped at once (token?grant_type=pkce), the address loses it, the verifier is deleted
 async function finishGoogle(cb) {
@@ -2724,9 +2750,10 @@ async function start() {
   if (!CFG) return showGate('config');
   const cb = HOSTED ? C.readCallback(location.href) : null;
   if (cb) return finishGoogle(cb);
+  takeSignin();
   const stored = readRefresh(null);
   if (!stored) {
-    const want = new URLSearchParams(location.search).get('profile'); // ?profile=<handle> only prefills the email
+    const want = new URLSearchParams(location.search).get('profile'); // ?profile=<handle>: Google's login hint (its email)
     return showSignIn('', emailOf(want));
   }
   storeKind = stored.kind;
@@ -3028,7 +3055,7 @@ async function flush(id) {
   e.inflight = false;
   if (!res.ok) {
     if (res.err.retry || res.status === 401) {
-      // offline or the session ended: the change waits (the form keeps the queue)
+      // offline or the session ended: the change waits in memory (a sign-in leaves the page and drops it; sessionEndedText says so)
       if (sending) sending.fields.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
       if (res.err.retry && !offline) { offline = true; }
       if (res.err.retry) toast((res.err.kind === 'rate' ? 'The database is busy: ' : 'Offline: ') + Q.size + (Q.size === 1 ? ' change waiting' : ' changes waiting'));
@@ -3188,40 +3215,23 @@ async function writePrefs() {
 function gate(kind) {
   const app = document.getElementById('app');
   if (kind === 'signin') {
-    // hosted (https or localhost): Continue with Google first; the password form (household, assistants, tests) sits behind
-    // "Other ways to sign in", open when an email is prefilled or the last account here used a password. file:// is password only.
-    const last = accounts()[0];
-    const otherOpen = !HOSTED || !!boot.prefill || !!(last && last.provider === 'email');
+    // Google only (2026-10-30): Continue with Google and Stay signed in, no password form. Hosted (https, not localhost): the
+    // button goes to /signin (this card shows only with a message); localhost signs in here; file:// cannot (Google needs an origin).
     const stay = '<label class="cb"><input id="si-stay" type="checkbox" checked> Stay signed in on this computer</label>';
-    const form = '<form class="si-form" id="signin" novalidate aria-label="Sign in with email and password">' +
-      '<label for="si-email">Email</label><input id="si-email" name="username" type="email" autocomplete="username" spellcheck="false" required value="' + esc(boot.prefill) + '">' +
-      '<label for="si-pass">Password</label><input id="si-pass" name="password" type="password" autocomplete="current-password" required>' +
-      (HOSTED ? '' : stay) + '<button id="si-go" type="submit">Sign in</button>' +
-      '<p class="si-hint">' + (HOSTED ? 'Password logins are for the household and its assistants, made in the Supabase dashboard.' : 'This page is a local file: it signs in with a password. Google sign-in works on the hosted page (https).') + ' There is no password reset here.</p></form>';
-    app.innerHTML = '<main class="gate"><section class="signin" aria-labelledby="si-h">' +
+    app.innerHTML = '<main class="gate"><section class="signin" id="signin" aria-labelledby="si-h">' +
       '<div class="si-logo">' + ADV_LOGO + '</div><h1 id="si-h">Sign in</h1>' +
       '<p class="si-msg" id="si-msg" role="alert" tabindex="-1">' + esc(boot.msg) + '</p>' +
-      (HOSTED ? '<button id="si-google" type="button" class="si-google">' + GOOGLE_G + '<span>Continue with Google</span></button>' + stay +
-        '<details class="si-other" id="si-other"' + (otherOpen ? ' open' : '') + '><summary>Other ways to sign in</summary>' + form + '</details>' : form) +
-      '<p class="si-privacy">' + esc(PRIVACY) + '</p></section></main>';
-    const f = document.getElementById('signin'), go = document.getElementById('si-go'), msg = document.getElementById('si-msg');
-    const g = document.getElementById('si-google');
-    if (g) g.onclick = async () => {
+      '<button id="si-google" type="button" class="si-google">' + GOOGLE_G + '<span>Continue with Google</span></button>' + stay +
+      (HOSTED ? '' : '<p class="si-hint">This page is a local file. Google sign-in works on the hosted page or on http://localhost.</p>') +
+      '<p class="si-privacy">' + esc(PRIVACY) + ' <a href="' + PRIVACY_HREF + '">Privacy</a></p></section></main>';
+    const msg = document.getElementById('si-msg'), g = document.getElementById('si-google');
+    g.onclick = async () => {
+      if (SIGNIN_PAGE) return goSignin(document.getElementById('si-stay').checked);
       g.disabled = true; msg.textContent = '';
       try { await startGoogle(accounts().length > 0); }
       catch (err) { g.disabled = false; msg.textContent = 'Google sign-in could not start: ' + err.message; msg.focus(); }
     };
-    (boot.msg ? msg : boot.prefill && otherOpen ? document.getElementById('si-pass') : g && !boot.prefill ? g : document.getElementById('si-email')).focus();
-    f.onsubmit = async e => {
-      e.preventDefault();
-      const email = document.getElementById('si-email').value.trim(), pass = document.getElementById('si-pass').value;
-      if (!email || !pass) { msg.textContent = !email ? 'Enter your email.' : 'Enter your password.'; msg.focus(); return; }
-      go.disabled = true; go.textContent = 'Signing in…'; msg.textContent = '';
-      const err = await signIn(email, pass, document.getElementById('si-stay').checked);
-      if (!err) return;
-      go.disabled = false; go.textContent = 'Sign in';
-      msg.textContent = err.message; msg.focus();
-    };
+    (boot.msg ? msg : g).focus();
     return;
   }
   const html = {

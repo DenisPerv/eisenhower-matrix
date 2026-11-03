@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const APP_HTML = path.join(HERE, '..', 'TasksDashboard.html');
-export const EXIT = { ok: 0, error: 1, env: 2, conflict: 3, duplicate: 4, sensitive: 5, unreachable: 6, auth: 7, archived: 8, limit: 9 };
+export const EXIT = { ok: 0, error: 1, env: 2, conflict: 3, duplicate: 4, sensitive: 5, unreachable: 6, auth: 7, archived: 8, limit: 9, ambiguous: 10 };
 
 // <script id="core"> from TasksDashboard.html, run in a sandbox: the CLI and the tests use the page's own rules
 export function loadCore(htmlPath = APP_HTML) {

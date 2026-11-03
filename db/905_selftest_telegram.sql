@@ -57,6 +57,11 @@ begin
     (g, 'st-tg-g@example.invalid', 'authenticated', 'authenticated', '{"provider":"google","providers":["google"]}', '{"full_name":"Guest TG"}');
   insert into auth.identities (id, user_id, provider_id, provider, identity_data) values
     (gen_random_uuid(), g, 'st-tg-sub-g', 'google', json_build_object('sub', 'st-tg-sub-g', 'email', 'st-tg-g@example.invalid', 'email_verified', true));
+  -- db/024: the guest fixtures are let in (an approved access request), so they may write as before
+  insert into public.users_pending_for_decision (user_id, email, status, decided_at, applied_at)
+  select p.id, lower(p.email), 'approved', now(), now() from public.profiles p
+   where not p.is_household and p.kind = 'human' and lower(p.email) like 'st-%@example.invalid'
+     and not exists (select 1 from public.users_pending_for_decision r where r.user_id = p.id);
   insert into ops.bot_links (bot_id, person_id) values (b, h1), (b, h2);
 
   perform public._tg_as(h1);

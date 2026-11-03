@@ -106,6 +106,8 @@
     if (!row || row.status === 'removed') return 'none';
     return row.status === 'declined' ? 'declined' : 'pending';
   }
+  // the access screen for a gate() or requestAccess() state: none -> ask, pending -> sent (signin.html show()); the rest as they are
+  const accessScreen = st => st === 'none' ? 'ask' : st === 'pending' ? 'sent' : st;
 
   // ---- sync pill (pure): saved, saving, offline(n), conflict, ended ----
   function syncStateOf(s) {
@@ -259,7 +261,8 @@
     function sessionEnded() {
       if (!session) return;
       session = null; ended = true; stopPolling();
-      emit('session', { state: 'ended', msg: 'Session ended. Sign in again.' + (Q.size ? ' ' + Q.size + (Q.size === 1 ? ' change waits' : ' changes wait') + ' and are sent after you sign in.' : '') });
+      // kept in IndexedDB they survive the trip to /signin or Google; without it (durable off) they are lost, and it says so
+      emit('session', { state: 'ended', msg: C.sessionEndedText(Q.size, durable) });
       syncChanged();
     }
     // web: adopt. Another person's queue and items never carry over
@@ -267,15 +270,25 @@
       if (me && me.id !== s.user.id) { Q.clear(); LQ.length = 0; tasks = []; me = null; }
       session = s; ended = false; clearAuth(); storeKind = stay ? 'local' : 'session'; saveRefresh(s.refresh_token, s.user.id); sessionProvider = provider;
     }
-    // web: signIn
-    async function signIn(email, password, stay) {
-      if (!CFG) return { kind: 'config', message: cfgRead.errors.join('; ') };
-      const r = await authCall('token?grant_type=password', { email, password });
-      const s = r.status === 200 && C.sessionFromGrant(r.json, now());
-      if (!s) return C.restError(r.status, r.json);
-      adopt(s, stay !== false, 'email');
-      emit('session', { state: 'signedin' });
-      return null;
+    // web: takeSignin. Back from /signin (same tab): its refresh token (sessionStorage td.request.auth) becomes td.auth, as
+    // "Stay signed in" said on the page that went there (td.signin.stay); both keys are deleted at once, so a dead token ends on
+    // an empty /signin, never in a loop. Sign-in is Google only (2026-10-30): there is no password path.
+    function takeSignin() {
+      const token = C.signinHandover(ss.get(C.SIGNIN_AUTH_KEY));
+      const stay = ss.get(C.SIGNIN_STAY_KEY) !== '0';
+      ss.del(C.SIGNIN_AUTH_KEY); ss.del(C.SIGNIN_STAY_KEY);
+      if (!token) return false;
+      clearAuth(); storeKind = stay ? 'local' : 'session'; saveRefresh(token, null); sessionProvider = 'google';
+      return true;
+    }
+    // web: goSignin. Hosted (https, not localhost): to /signin?next=/app/, with this page's Stay signed in; null elsewhere
+    const signinPage = () => C.signinRedirect(loc.origin, '/app/');
+    function goSignin(stay) {
+      const to = signinPage();
+      if (!to) return null;
+      ss.set(C.SIGNIN_STAY_KEY, stay === false ? '0' : '1');
+      if (typeof loc.replace === 'function') loc.replace(to); else navigate(to);
+      return to;
     }
     // web: startGoogle. The verifier goes to localStorage with its time (not sessionStorage): an installed iOS app may come back
     // from Google in a new page. Back to the app's own /app/ address
@@ -317,6 +330,7 @@
       if (!CFG) return report({ state: 'config', msg: cfgRead.errors.join('; ') });
       const cb = C.isHostedOrigin(loc.origin) ? C.readCallback(loc.href) : null;
       if (cb) { const f = await finishGoogle(cb); return report(f || { state: 'signedin' }); }
+      takeSignin();
       const stored = readRefresh(null);
       if (!stored) return report({ state: 'signin', msg: '' });
       storeKind = stored.kind;
@@ -337,10 +351,11 @@
       }
       await writePrefs();
       if (session && C.needsRefresh(session, now())) await refreshSession(false);
-      const token = session && session.access_token, uid = queueUid();
+      const token = session && session.access_token, uid = queueUid(), live = session && session.user.id;
       if (token) await authCall('logout?scope=local', null, token);
       clearAuth(); storeKind = null; session = null; ended = false;
-      if (bc && uid && session) bc.postMessage({ type: 'signout', uid });
+      // the other tabs of this person sign out too (S14: the check used to read session after it was cleared, so nothing was sent)
+      if (bc && live) bc.postMessage({ type: 'signout', uid: live });
       Q.clear(); LQ.length = 0; tasks = []; stopPolling(); NOTICES = []; loaded = false;
       if (qstore && uid) { try { await qstore.clear(uid); } catch (e) { durable = false; } }
       USER_KEYS.forEach(k => ls.del(k));
@@ -371,7 +386,7 @@
       return gateFrom({ household, shared, request: accessRow, failed });
     }
     const accessRequest = () => accessRow;
-    // web twin: request.html check(). { state: pending | declined | board | cap | error, row, message }
+    // web twin: signin.html check(). { state: pending | declined | board | cap | error, row, message }
     async function requestAccess() {
       const fail = r => {
         const code = String((r.json && r.json.code) || ''), msg = String((r.json && r.json.message) || '');
@@ -1077,7 +1092,7 @@
     const api = {
       on, attach, syncState, config: CFG, configErrors: cfgRead.errors, core: C,
       // session
-      start, signIn, startGoogle, finishGoogle, signOut, gate, requestAccess, accessRequest,
+      start, startGoogle, finishGoogle, goSignin, signinPage, signOut, gate, requestAccess, accessRequest,
       // data
       loadAll, refreshMeta, poll, startPolling, stopPolling, rest, rpc, getAll,
       get session() { return session ? { uid: session.user.id, email: session.user.email } : null; },
@@ -1099,5 +1114,5 @@
 
   function safe(fn) { try { return fn(); } catch (e) { return null; } }
 
-  return { create, queueRecord, queueRestore, idbQueueStore, gateFrom, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS, USER_KEYS };
+  return { create, queueRecord, queueRestore, idbQueueStore, gateFrom, accessScreen, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS, USER_KEYS };
 });

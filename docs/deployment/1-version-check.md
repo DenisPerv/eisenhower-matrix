@@ -11,7 +11,7 @@ Before every deploy: compare what is live with what `release_maxden` holds, and 
 ## Steps
 
 1. **Release side.** `git -C <repo> fetch origin`, then `git -C <repo> rev-parse origin/release_maxden`. This is the wanted version.
-2. **Hosted side.** Through the HomeOS script: `node scripts/tasksdb/deploy-pages.js --status [--timeout <ms>]` (default 10000 ms; it fetches `origin/release_maxden` first). By hand: `GET https://<project>.pages.dev/version.json` with the headers `CF-Access-Client-Id` and `CF-Access-Client-Secret` from the env. The Access gate answers anything without them with a redirect to `*.cloudflareaccess.com`.
+2. **Hosted side, per host.** Through the HomeOS script: `node scripts/tasksdb/deploy-pages.js --project <name> --status [--timeout <ms>]` (default 10000 ms; it fetches `origin/release_maxden` first). By hand: `GET https://<project>.pages.dev/version.json`; it is public on both hosts of the two-host layout (the old single host needed the headers `CF-Access-Client-Id` and `CF-Access-Client-Secret`).
 
    | `--status` exit | Means |
    |---|---|
@@ -20,7 +20,7 @@ Before every deploy: compare what is live with what `release_maxden` holds, and 
    | 6 | unreachable, timed out, or the gate refused the service token (a redirect) |
    | 2 | usage error, or `TASKSDB_PAGES_PROJECT` (or `TASKSDB_PAGES_URL`) missing |
 
-3. **What changed.** `git -C <repo> log --oneline <hosted sha>..origin/release_maxden -- TasksDashboard.html config/tasksdashboard.config.js privacy.html request.html`. Only these four files reach the hosted page; other commits (db, cli, tests, docs) change nothing there.
+3. **What changed.** App host: `git -C <repo> log --oneline <hosted sha>..origin/release_maxden -- TasksDashboard.html config/tasksdashboard.config.js privacy.html signin.html app/`. Landing host: `… -- site/index.html site/assets legal privacy.html`. Only these files reach the hosts; other commits (db, cli, tests, docs) change nothing there.
 4. **Decide.**
    - **Current:** nothing to deploy. Say so and stop, unless the person asked for a rollback.
    - **Behind, page files changed:** list the commits for the person, then go to step 2.
