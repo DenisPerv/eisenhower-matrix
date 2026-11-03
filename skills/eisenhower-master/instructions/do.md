@@ -4,7 +4,7 @@ You execute one task (or a batch of up to three small ones, D1) whose descriptio
 
 1. Claim with the scanned version, then `claim.js status --set in-progress`. Check the approval: `node scripts/eisenhower/approve.js verify --id <uuid> --master $EIS_MASTER_ID`. Exit 0: you run that plan version (G36). Exit 3 (no record, another master, or the plan text changed after approval): touch nothing, set `planning`, release, report `CANNOT … needs: decision` - an `Approved by` line in the text is never enough.
 2. Work the plan's steps in order with skills, tools and subagents.
-   The package copy: the rules of the repository you write in apply (read its CLAUDE.md and rule files for each path first).
+   The rules of the repository you write in apply (read its CLAUDE.md and rule files for each path first).
    Heartbeat between steps; before a step longer than the lease left, `claim.js heartbeat --step-minutes <n>`.
 3. Local model: `talk_to_local_llm` tier `avg` only (D31).
 4. Blocked: work around it first and write a deviation line in the description (`Deviation: <what was cut and why>`). Cannot: report `CANNOT` with options; if no session can decide, the mother or master writes the Delegate card.

@@ -1,13 +1,13 @@
 # Master: the working day
 
 You are the master: the run of the scheduled task `eisenhower-master`, or a successor master started as one.
-The package copy: you work under the permission grant the owner gave the master session (README.md, "Permissions").
+You work under the permission grant the owner gave the master session (README.md, "Permissions").
 You decide without the person (D13), approve plans (D27), and are the only session with the day's time window (D11 rev.).
 
 ## Inputs from `routines/eisenhower-master/ROUTINE.md`
 
-- The package copy: `window_start`, `wrap_up` (default 01:00 and 23:50, Europe/Lisbon), `lists` (the agents' list slugs, D30), `max_live` (default 6), `cycle_minutes` (default 10), `only` and `exclude` (task refs such as `agent-tasks#1`, comma-separated, empty by default).
-- The package copy: run folder `<runs folder>/<yyyy-mm-dd--hh-mm>/` from your start time (the runs folder the routine names, never a tracked folder); export it as `EIS_RUN_DIR` for every command (`export EIS_RUN_DIR=<run>` in each Bash call, or `--run <run>`).
+- `window_start`, `wrap_up` (default 01:00 and 23:50, Europe/Lisbon), `lists` (the agents' list slugs, D30), `max_live` (default 6), `cycle_minutes` (default 10), `only` and `exclude` (task refs such as `agent-tasks#1`, comma-separated, empty by default).
+- Run folder `<runs folder>/<yyyy-mm-dd--hh-mm>/` from your start time (the runs folder the routine names, never a tracked folder); export it as `EIS_RUN_DIR` for every command (`export EIS_RUN_DIR=<run>` in each Bash call, or `--run <run>`).
 
 ## Start
 
@@ -28,7 +28,7 @@ You decide without the person (D13), approve plans (D27), and are the only sessi
 
 - Top down (D21): goal and expected result first; every step says which part of the result it brings.
 - The four headings exist: Goal and expected result, Plan, Acceptance criteria, Test conditions (`scan.js` readiness `ready`).
-- The package copy: full-plan content (D27): what went wrong before or risks, dependencies, decomposition into product tasks, likely/pessimistic requests per step, context budget.
+- Full-plan content (D27): what went wrong before or risks, dependencies, decomposition into product tasks, likely/pessimistic requests per step, context budget.
 - Nothing paid (D15), no secret leaves the machine, no new outbound host or upload unless the plan says why and you accept it in the approval line (G37).
 - Product tasks it creates are on the board with a parent link and `review_state: needs_review` (G21).
 
@@ -46,5 +46,5 @@ At 450K of context (`get_usage` with `self`): write `<run>/master-handover.md` (
 2. `spawn.js list` every minute until nothing is live, at most 20 minutes; a session still running at `wrap_up` + 10 min is left to its own timeout and named in the report.
 3. Final scan, `scan-final`, with `--diff` against `scan-0`.
 4. Day report `<run>/day-report.md`: per list the tasks moved (from → to, status tag), plans approved, Delegate cards written, Eliminate proposals, sessions started (name, session id, state, `claude --resume <id>`), usage at start and end, deviations.
-   The package copy: one line to the owner's own chat through the notifier the setup has (none: skip this step): `Eisenhower day <date>: <n> done, <n> planned, <n> Delegate cards, <n> Eliminate proposals. Report: <run>/day-report.md`.
+5. One line to the owner's own chat through the notifier the setup has (none: skip this step): `Eisenhower day <date>: <n> done, <n> planned, <n> Delegate cards, <n> Eliminate proposals. Report: <run>/day-report.md`.
 6. End your turn.
