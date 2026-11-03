@@ -48,6 +48,36 @@ test('signinRedirect: hosted https -> /signin?next= its own page (/board/ or /ap
     assert.equal(C.signinRedirect(o, '/board/'), null, o);
 });
 
+// the version switch (2026-11-03): board account menu "Switch to mobile version" -> /app/, phone Me "Switch to desktop version" -> /board/
+test('versionSwitchUrl: /app/ or /board/ on a hosted or localhost origin; file://, plain http and unknown targets get null', () => {
+  for (const o of ['https://eisenhower-agentic-planner-app.pages.dev', 'http://localhost:8788', 'http://127.0.0.1:8788']) {
+    assert.equal(C.versionSwitchUrl(o, 'app'), '/app/', o);
+    assert.equal(C.versionSwitchUrl(o, 'board'), '/board/', o);
+  }
+  for (const o of ['null', 'file://', '', 'http://example.com', undefined]) {
+    assert.equal(C.versionSwitchUrl(o, 'app'), null, String(o));
+    assert.equal(C.versionSwitchUrl(o, 'board'), null, String(o));
+  }
+  for (const t of ['', 'site', 'constructor', '__proto__', '//evil.example', undefined])
+    assert.equal(C.versionSwitchUrl('http://localhost:8788', t), null, String(t));
+});
+
+test('the switch buttons: the board\'s account menu has "Switch to mobile version", the app\'s Me page "Switch to desktop version"', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+  // board: shown only when versionSwitchUrl allows it, just above Sign out; the handler flushes the queue and writes prefs first
+  assert.ok(web.includes(`(C.versionSwitchUrl(location.origin, 'app') ? '<button data-switch="app">Switch to mobile version</button>' : '') + '<button data-signout>Sign out</button>'`));
+  assert.ok(web.includes(`app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); switchVersion(b.dataset.switch); });`));
+  const sv = web.slice(web.indexOf('async function switchVersion('), web.indexOf('let signOutArmed'));
+  assert.ok(sv.includes('flushAll()') && sv.includes('await writePrefs()') && sv.indexOf('writePrefs') < sv.indexOf('location.assign(url)'));
+  assert.ok(web.includes(`addEventListener('beforeunload', e => { if (Q.size)`), 'the beforeunload prompt still guards unsaved changes');
+  // app: a row in Me → Account, shown only when versionSwitchUrl allows it; pending changes ask for a second tap
+  assert.ok(app.includes("${C.versionSwitchUrl(location.origin, 'board') ? row('switch-board', 'Switch to desktop version') : ''}"));
+  const cs = app.slice(app.indexOf("case 'switch-board':"), app.indexOf("case 'signout':"));
+  assert.ok(cs.includes('await D.flushAll()') && cs.includes('D.pending && !S.swAsk') && cs.includes('Tap again to switch') && cs.includes('location.assign(url)'));
+});
+
 test('signinHandover: the refresh token of signin.html\'s session (td.request.auth), nothing else', () => {
   assert.equal(C.SIGNIN_AUTH_KEY, 'td.request.auth');
   assert.equal(C.SIGNIN_STAY_KEY, 'td.signin.stay');

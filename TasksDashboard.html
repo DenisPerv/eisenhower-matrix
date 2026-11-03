@@ -1697,6 +1697,13 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o) || /^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o)) return null;
     return '/signin?next=' + (SIGNIN_NEXT.includes(next) ? next : '/board/');
   }
+  // the version switch: the board's account menu opens the phone app (/app/), the app's Me page opens the board (/board/), on the
+  // same origin, so td.auth carries the session over. Hosted or localhost origins only; file:// (origin 'null') gets null and the
+  // button is hidden, because the phone app cannot sign in there.
+  const VERSION_PATHS = { app: '/app/', board: '/board/' };
+  function versionSwitchUrl(origin, to) {
+    return isHostedOrigin(origin) && Object.prototype.hasOwnProperty.call(VERSION_PATHS, to) ? VERSION_PATHS[to] : null;
+  }
   // signin.html keeps its session in this tab's sessionStorage (td.request.auth) and goes on to next with location.replace, in
   // the same tab: the page takes its refresh token once and deletes the key. td.signin.stay: the "Stay signed in" box of the
   // page that sent the visitor to /signin ('0' unticked; missing means ticked).
@@ -2469,7 +2476,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
@@ -2774,6 +2781,15 @@ async function finishGoogle(cb) {
   }
   adopt(s, saved.stay !== false, 'google');
   await loadAll();
+}
+// the account menu's "Switch to mobile version": same origin, so the session (td.auth) carries over. Unsaved changes get the same
+// short flush as Sign out; if some are still waiting, the beforeunload prompt asks before the page is left.
+async function switchVersion(to) {
+  const url = C.versionSwitchUrl(location.origin, to);
+  if (!url) return;
+  if (Q.size) { flushAll(); for (let i = 0; i < 30 && Q.size; i++) await new Promise(r => setTimeout(r, 100)); }
+  await writePrefs();
+  location.assign(url);
 }
 let signOutArmed = false;
 async function signOut() {
@@ -3594,7 +3610,7 @@ function render() {
       (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
       '<hr><button data-menu="timeline">Timeline</button><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
       (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : '') +
-      '<hr><button data-signout>Sign out</button>',
+      '<hr>' + (C.versionSwitchUrl(location.origin, 'app') ? '<button data-switch="app">Switch to mobile version</button>' : '') + '<button data-signout>Sign out</button>',
     more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
     listmenu: () => (human && listActs.includes('share') ? '<button data-share-list="' + esc(st.list) + '">Share ' + esc(label(st.list)) + '…</button>' : '') +
       (listActs.includes('people') ? '<button data-people-list="' + esc(st.list) + '">People</button>' : '') +
@@ -5515,6 +5531,7 @@ function bind() {
   // accounts on this browser: sign out here (local scope), then Google with that email, or the form with it filled in
   app.querySelectorAll('[data-more]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.more; st.more.has(id) ? st.more.delete(id) : st.more.add(id); render(); document.querySelector('[data-more="' + id + '"]')?.focus(); });
   app.querySelectorAll('[data-signout]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; signOut(); });
+  app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); switchVersion(b.dataset.switch); });
   document.getElementById('mine').onclick = () => { st.mine = !st.mine; render(); };
   const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', mine: false, lowc: false, sel: -1 }); st.tags.clear(); st.cats.clear(); st.quads.clear(); render(); };
   app.querySelectorAll('.grp').forEach(b => b.onclick = () => { const q = b.dataset.q; st.collapsed.has(q) ? st.collapsed.delete(q) : st.collapsed.add(q); render(); });

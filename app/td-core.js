@@ -414,6 +414,13 @@
     if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o) || /^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(o)) return null;
     return '/signin?next=' + (SIGNIN_NEXT.includes(next) ? next : '/board/');
   }
+  // the version switch: the board's account menu opens the phone app (/app/), the app's Me page opens the board (/board/), on the
+  // same origin, so td.auth carries the session over. Hosted or localhost origins only; file:// (origin 'null') gets null and the
+  // button is hidden, because the phone app cannot sign in there.
+  const VERSION_PATHS = { app: '/app/', board: '/board/' };
+  function versionSwitchUrl(origin, to) {
+    return isHostedOrigin(origin) && Object.prototype.hasOwnProperty.call(VERSION_PATHS, to) ? VERSION_PATHS[to] : null;
+  }
   // signin.html keeps its session in this tab's sessionStorage (td.request.auth) and goes on to next with location.replace, in
   // the same tab: the page takes its refresh token once and deletes the key. td.signin.stay: the "Stay signed in" box of the
   // page that sent the visitor to /signin ('0' unticked; missing means ticked).
@@ -1186,7 +1193,7 @@
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
