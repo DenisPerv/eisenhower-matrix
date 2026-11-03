@@ -980,6 +980,79 @@ async function gUi() {
   await N.wait(`!!document.querySelector('[data-card="${tz.id}"]')`); await N.click(`[data-card="${tz.id}"]`);
   check(G, 'time zone override: the end shows in the browser zone (10:00 in New York for 15:00 UTC)', await N.wait('document.querySelector("dialog[open] #fd")?.value==="2026-11-20T10:00"'));
   await N.close();
+  await gDecision(G, T);
+}
+
+// self-improvement cards (HomeOS routine homeos-self-improvement): a card with details.decision in _selftest (made as Maksym: homeos-agent
+// is not a member of _selftest; the routine writes as homeos-agent into its own list, and the client reads details the same way).
+// Web: the decision block sits above the description; Yes saves the window's other change with it, marks the task done, keeps
+// every other details key and closes the window; Undo puts both back; an applied answer turns the buttons off. Phone (app/ from
+// file://): the same block in the task sheet, No answers. Screenshots of both at 1440x900 and 390x844
+async function gDecision(G, T) {
+  const AG = MK;
+  const DEC = { v: 1, label_1: 'Yes', label_0: 'No', answer: null, module: 'm2', problem_key: 'm2:e2e-' + RUN, action: { kind: 'none' }, run_id: RUN,
+    answered_by: null, answered_at: null, applied_at: null, applied_result: null };
+  const mkDec = async title => {
+    const r = await AG.rest('POST', 'items', { list_id: ST.id, category: 'task', title: `${RUN} ${title}`, body_md: 'What will be done and why.', quadrant: 'C', sort_key: Date.now() % 100000,
+      details: { decision: DEC, notify: ['maksym'], e2e: RUN } }, { Prefer: 'return=representation' });
+    return r.ok ? r.json[0] : null;
+  };
+  const a = await mkDec('Add evals.md to skill x?'), b = await mkDec('Move x to y?');
+  check(G, 'decision: two cards with details.decision made in _selftest', !!a && !!b);
+  if (!a || !b) return;
+  const W = 'dialog[open]';
+  await T.reload(); await T.ready();
+  const opened = await openCard(T, a.id, W + ' .fdec');
+  const blk = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('.fdec'),bs=[...f.querySelectorAll('[data-dec]')],desc=d.querySelector('#fn');
+    return {labels:bs.map(x=>x.textContent),on:bs.every(x=>!x.disabled),above:!!(f.compareDocumentPosition(desc)&Node.DOCUMENT_POSITION_FOLLOWING),yesLikeSave:getComputedStyle(bs[0]).backgroundImage===getComputedStyle(d.querySelector('#fs')).backgroundImage&&getComputedStyle(bs[0]).backgroundColor===getComputedStyle(d.querySelector('#fs')).backgroundColor}})()`) : null;
+  check(G, 'decision (web): the block shows Yes and No above the description, both on, Yes styled like Save', !!blk && JSON.stringify(blk.labels) === '["Yes","No"]' && blk.on && blk.above && blk.yesLikeSave, JSON.stringify(blk));
+  await sleep(900); // the window's open animation ends first
+  await T.shot('decision-web-1440x900');
+  await T.size(390, 844); await sleep(500);
+  check(G, 'decision (web): at 390 px the block fits, no horizontal scroll', await T.ev(`(()=>{const f=document.querySelector('${W} .fdec');const r=f&&f.getBoundingClientRect();return !!r&&r.left>=0&&r.right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth})()`));
+  await T.shot('decision-web-390x844');
+  await T.size(1440, 900); await sleep(300);
+  // Yes with an unsaved description change: one save, then the window closes
+  await T.ev(`(()=>{document.querySelector('${W} #fn').textContent='Checked by e2e';document.querySelector('${W} [data-dec="1"]').click();return true})()`);
+  check(G, 'decision (web): Yes closes the window and says "Answered “Yes”" with Undo', await T.wait(`!document.querySelector('${W}')`, 5000) && /Answered “Yes”/.test(await toastText(T)) && await T.has('.toast button'));
+  const yes = await until(async () => { const x = await item(a.id); return x && x.status === 'done' && x.details && x.details.decision && x.details.decision.answer === 1 ? x : null; });
+  check(G, 'decision (web): the row has status done, answer 1, answered_by maksym, answered_at, the description saved with it, notify and the other keys kept',
+    !!yes && yes.details.decision.answered_by === 'maksym' && !!Date.parse(yes.details.decision.answered_at) && yes.body_md === 'Checked by e2e' && JSON.stringify(yes.details.notify) === '["maksym"]' && yes.details.e2e === RUN && yes.details.decision.problem_key === DEC.problem_key,
+    yes ? JSON.stringify({ status: yes.status, details: yes.details, body: yes.body_md }) : 'not answered');
+  await undo(T);
+  const back = await until(async () => { const x = await item(a.id); return x && x.status === 'open' && x.details.decision.answer === null ? x : null; });
+  check(G, 'decision (web): Undo puts status open and answer null back, the other keys still there', !!back && back.details.e2e === RUN && JSON.stringify(back.details.notify) === '["maksym"]');
+  // applied by the routine: the buttons are off and the line says Applied
+  await AG.rest('PATCH', 'items?id=eq.' + a.id, { details: Object.assign({}, back.details, { decision: Object.assign({}, DEC, { answer: 1, answered_by: 'maksym', answered_at: new Date().toISOString(), applied_at: new Date().toISOString(), applied_result: 'e2e applied' }) }) });
+  await T.reload(); await T.ready();
+  const ap = (await openCard(T, a.id, W + ' .fdec')) && await T.ev(`(()=>{const f=document.querySelector('${W} .fdec');return {off:[...f.querySelectorAll('[data-dec]')].every(x=>x.disabled),pressed:f.querySelector('[data-dec="1"]').getAttribute('aria-pressed'),line:(f.querySelector('#fdec-s')||{}).textContent||''}})()`);
+  check(G, 'decision (web): an applied answer shows Yes chosen, both buttons off, "Applied … · e2e applied"', !!ap && ap.off && ap.pressed === 'true' && /^Applied .+ · e2e applied$/.test(ap.line), JSON.stringify(ap));
+  await sleep(900);
+  await T.shot('decision-web-applied-1440x900');
+  await closeDialogs(T);
+  // phone app: the task sheet from file:// with the same session, list _selftest chosen
+  const P = await tab(B, await ctx(B), { width: 390, height: 844 });
+  await seed(P, await grantFor('maksym'));
+  await P.ev(`localStorage.setItem('td.app.list',${JSON.stringify(ST.id)}),true`);
+  await P.go(pathToFileURL(path.join(path.dirname(PAGE), 'app', 'index.html')).href);
+  const card = `.card[data-tid="${b.id}"] .cmain`;
+  let sheet = await P.wait(`!!document.querySelector('${card}')`, 20000);
+  if (sheet) { await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.id!=="dlg-task"&&d.close()),true'); await P.click(card); sheet = await P.wait('!!document.querySelector("#dlg-task[open] #t-dec-l")', 8000); }
+  const pb = sheet ? await P.ev(`(()=>{const d=document.querySelector('#dlg-task'),bs=[...d.querySelectorAll('[data-act="t-decide"]')],desc=d.querySelector('#t-desc');
+    return {labels:bs.map(x=>x.textContent),on:bs.every(x=>!x.disabled),above:!!(d.querySelector('.fdec').compareDocumentPosition(desc)&Node.DOCUMENT_POSITION_FOLLOWING),primary:bs[0].classList.contains('primary'),wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
+  check(G, 'decision (phone): the sheet shows Yes (primary) and No above the description, both on, no horizontal scroll', !!pb && JSON.stringify(pb.labels) === '["Yes","No"]' && pb.on && pb.above && pb.primary && !pb.wide, JSON.stringify(pb) + ' ' + P.errors.slice(-2).join(' / '));
+  await sleep(900); // the sheet's open animation ends first
+  await P.shot('decision-app-390x844');
+  await P.size(1440, 900); await sleep(500);
+  await P.shot('decision-app-1440x900');
+  await P.size(390, 844); await sleep(300);
+  if (sheet) await P.click('[data-act="t-decide"][data-v="0"]');
+  const no = await until(async () => { const x = await item(b.id); return x && x.status === 'done' && x.details.decision.answer === 0 ? x : null; });
+  check(G, 'decision (phone): No saves answer 0, answered_by maksym, status done, the other keys kept, and closes the sheet',
+    !!no && no.details.decision.answered_by === 'maksym' && no.details.e2e === RUN && JSON.stringify(no.details.notify) === '["maksym"]' && await P.wait('!document.querySelector("#dlg-task[open]")', 3000),
+    no ? JSON.stringify(no.details.decision) : 'not answered');
+  check(G, 'decision (phone): no page errors', !P.errors.length, P.errors.slice(-3).join(' / '));
+  await P.close();
 }
 
 // ---- links (task links, db/018), Maksym's page, all in _selftest: a parent with subtasks made in the task window (one found by

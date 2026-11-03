@@ -373,6 +373,11 @@ dialog.alert form .field{margin:0 0 6px}
 .switch input:checked{background:var(--accent)}
 .switch input:checked::after{transform:translateX(20px)}
 .dangerrow{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+/* the decision block of a self-improvement card (details.decision): two answers above the description; the chosen one is ringed */
+.fdec-b{display:flex;gap:10px;flex-wrap:wrap}
+.fdec-b .btn{flex:1 1 0;min-width:120px}
+.fdec-b .btn[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+.fdec-s{margin:8px 0 0;font-size:13px;color:var(--ink2)}
 .src{margin:0 0 16px;font:400 14px/1.45 var(--font);color:var(--ink2)}
 
 /* page heads (Review, Search, Me) */
@@ -1408,6 +1413,15 @@ function openTask(id, swap, draft) {
   const dis = ro ? ' readonly' : '';
   const sT = t.start && hm(t.start) !== START_T ? hm(t.start) : '', eT = t.deadline && hm(t.deadline) !== END_T ? hm(t.deadline) : '';
   const lists = D.lists.filter(l => canAdd(l) || l === t.list);
+  /* self-improvement cards (web: openTask decHtml): two answers above the description; a tap answers, saves the sheet's other
+     changes with it (TDData.saveTask decision), marks the task done and closes the sheet with Undo. Applied, or read only: off */
+  const dec = C.decisionOf(t), decOn = !!dec && !ro && !dec.applied_at;
+  const decWho = h => !h ? '' : me() && h === me().handle ? 'you' : D.handleNames[h] || h;
+  const decDay = s => { const ms = Date.parse(s || ''); return isNaN(ms) ? '' : ymd(new Date(ms)); };
+  const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
+    : dec.answer !== null ? ['Answered “' + (dec.answer ? dec.label_1 : dec.label_0) + '”', decWho(dec.answered_by), decDay(dec.answered_at)].filter(Boolean).join(' · ')
+    : ro ? 'Only an editor of this list can answer' : '';
+  const decHtml = !dec ? '' : `<div class="field fdec" role="group" aria-labelledby="t-dec-l"><span class="flabel" id="t-dec-l">Decision</span><div class="fdec-b">${[1, 0].map(v => `<button type="button" class="btn${v ? ' primary' : ''}" data-act="t-decide" data-v="${v}" aria-pressed="${dec.answer === v}"${decOn ? '' : ' disabled'}>${dec.answer === v ? '✓ ' : ''}${esc(v ? dec.label_1 : dec.label_0)}</button>`).join('')}</div>${decState ? `<p class="fdec-s" id="t-dec-s">${esc(decState)}</p>` : ''}</div>`;
   $('#task-body').innerHTML = `
     ${lowConf(t) ? `<p class="note info">Added by an assistant with low confidence${t.aiConfidence !== null ? ` (${t.aiConfidence.toFixed(2)})` : ''}. Check the list and the text.</p>` : ''}
     ${closed ? `<div class="banner">${ic('lock')}<span>${t.status === 'done' ? 'Done' : 'Cancelled'}${t.doneAt ? ' ' + ymd(t.doneAt) : ''}. Restore it from Me, Archive, to change it.</span></div>` : ''}
@@ -1415,6 +1429,7 @@ function openTask(id, swap, draft) {
     <label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label>
     <p class="err" id="t-title-err" hidden></p>
     <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>
+    ${decHtml}
     <div class="field"><span class="flabel" id="t-desc-l">Description</span>
       ${tb || info ? `<div class="fbar">${tb}${info ? `<p class="info">${info}</p>` : ''}</div>` : ''}
       <div class="inp rich" id="t-desc" role="textbox" aria-multiline="true" aria-labelledby="t-desc-l" contenteditable="${ro ? 'false' : 'true'}"${ro ? ' aria-readonly="true"' : ''}>${md(draft ? draft.notes : t.notes)}</div></div>
@@ -1507,7 +1522,7 @@ function afterLink(k) { closeDlg('dlg-link'); renderLinks(); onTaskInput(); cons
 /* Save: fields through TDData.saveTask (a list change puts it on top of its quadrant), links through linkOp, new subtasks / next
    tasks through create (on top of the quadrant). Returns true when written */
 let saving = false;
-async function saveTask() {
+async function saveTask(decision) {
   const t = task(TS.id); if (!t || saving) return false;
   if (!validTask()) { const f = $('#t-title[aria-invalid]') || $('#t-sdate[aria-invalid]'); if (f) f.focus(); return false; }
   saving = true;
@@ -1516,7 +1531,9 @@ async function saveTask() {
     if ($('#t-list').value !== t.list) f.list = $('#t-list').value;
     if (dateInputs() !== st.dates) { f.start = fromInputs($('#t-sdate').value, $('#t-stime').value, START_T); f.deadline = fromInputs($('#t-date').value, $('#t-time').value, END_T); }
     f.tags = await commitTags('t', st.tags);
-    D.saveTask(t.id, f);
+    if (decision === 1 || decision === 0) f.decision = decision;
+    const res = D.saveTask(t.id, f);
+    if (res && res.decided) st.decided = res;
     /* links: what differs between the sheet's map and the stored one, for links that touch this task (parent removals first) */
     const touches = l => l.from === t.id || l.to === t.id, cur = D.links;
     const removed = [...cur.values()].filter(l => touches(l) && !st.map.has(lkKey(l))), added = [...st.map.values()].filter(l => touches(l) && !cur.has(lkKey(l)));
@@ -1782,6 +1799,14 @@ document.addEventListener('click', async e => {
       document.execCommand(b.dataset.f === 'b' ? 'bold' : b.dataset.f === 'i' ? 'italic' : 'insertUnorderedList'); onTaskInput(); break;
     }
     case 't-theirs': { const x = TS.theirs; $('#t-title').value = x.title; $('#t-desc').innerHTML = md(x.notes); TS.conflict = false; $('#t-conflict').hidden = true; TS.snap = snapTask(); $('#task-save').textContent = 'Save'; onTaskInput(); toast('Kept their version.'); break; }
+    case 't-decide': {
+      /* the answer with every other change of the sheet in one versioned write, then close with Undo (web: the [data-dec] click) */
+      if (!TS || TS.ro) break; const st = TS;
+      if (!(await saveTask(Number(b.dataset.v)))) break;
+      resetPicker('t'); TS = null; closeDlg('dlg-task'); renderAll();
+      if (st.decided) said(st.decided); else toast('Saved.');
+      break;
+    }
     case 't-cancel': { const tid = TS.id; resetPicker('t'); TS = null; closeDlg('dlg-task'); said(D.cancelTask(tid), 'Cancelled.'); break; }
     case 't-delete': { const tid = TS.id; resetPicker('t'); TS = null; closeDlg('dlg-task'); said(D.removeTask(tid), 'Deleted.'); break; }
     case 'lk-add': openLink(b.dataset.k); break;

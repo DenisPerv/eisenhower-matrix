@@ -570,3 +570,115 @@ test('tag lists (tags round): an old prefs row is migrated to the full order wit
   assert.deepEqual(d2.prefs.tagListFavs, []);
   assert.equal(typeof d2.setDefaultTagList, 'undefined');
 });
+
+// self-improvement cards: the decision block's answer (C.answerDecision through saveTask) and items.details on the write path
+const DEC = { v: 1, label_1: 'Yes', label_0: 'No', answer: null, module: 'm3', problem_key: 'm3:move-x', action: { kind: 'move', from: 'a', to: 'b' }, run_id: 'r1',
+  answered_by: null, answered_at: null, applied_at: null, applied_result: null };
+const decRow = o => row(Object.assign({ quadrant: 'C', title: 'Move x to y?', details: { decision: DEC, notify: ['me'] } }, o));
+
+test('decision: saveTask answers with the other changes in one versioned PATCH (details whole, status done); Undo sends both back', async () => {
+  let remote = decRow({ version: 1 }); const patches = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [remote]]],
+    ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => {
+      patches.push(body);
+      if (Number(m[1]) !== remote.version) return [200, []];
+      remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]];
+    }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  await d.loadAll();
+  assert.deepEqual(C.decisionOf(d.find(ITEM)).label_1, 'Yes');
+  const r = d.saveTask(ITEM, { title: 'Move x to y?', notes: 'checked', decision: 1 });
+  assert.equal(r.decided, true);
+  assert.equal(r.msg, 'Answered “Yes”: Move x to y?');
+  await until(() => d.pending === 0);
+  assert.equal(patches.length, 1, 'one write');
+  assert.equal(patches[0].status, 'done');
+  assert.equal(patches[0].body_md, 'checked');
+  assert.deepEqual(patches[0].details.notify, ['me'], 'other keys kept');
+  assert.equal(patches[0].details.decision.answer, 1);
+  assert.equal(patches[0].details.decision.answered_by, 'me');
+  assert.equal(patches[0].details.decision.answered_at, new Date(T0).toISOString());
+  assert.equal(patches[0].details.decision.problem_key, 'm3:move-x');
+  assert.equal(d.find(ITEM).status, 'done');
+  r.undo();
+  await until(() => d.pending === 0 && patches.length === 2);
+  assert.equal(patches[1].status, 'open');
+  assert.equal(patches[1].details.decision.answer, null);
+  // applied by the routine: no answer any more
+  remote = decRow({ version: remote.version + 1, details: { decision: Object.assign({}, DEC, { answer: 1, applied_at: '2026-11-04T10:00:00Z', applied_result: 'moved' }) } });
+  await d.loadAll();
+  const r2 = d.saveTask(ITEM, { decision: 0 });
+  assert.equal(r2, null, 'nothing changed, nothing sent');
+  assert.equal(patches.length, 2);
+});
+
+test('decision: the routine changed details meanwhile -> merged per key and sent again; both answered differently -> a conflict', async () => {
+  let remote = decRow({ version: 1 }); const patches = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [decRow({ version: 1 })]]],
+    ['GET', /^\/rest\/v1\/items\?select=\*&id=eq\./, () => [200, [remote]]],
+    ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => {
+      patches.push(body);
+      if (Number(m[1]) !== remote.version) return [200, []];
+      remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]];
+    }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  await d.loadAll();
+  remote = decRow({ version: 2, details: { decision: DEC, notify: ['me'], seen: 'run2' } });
+  d.saveTask(ITEM, { decision: 0 });
+  await until(() => d.pending === 0);
+  assert.equal(remote.version, 3);
+  assert.equal(remote.details.seen, 'run2', 'their key kept');
+  assert.equal(remote.details.decision.answer, 0, 'my answer sent on the new version');
+  // a clash: someone answered Yes meanwhile, I answer No again from a stale copy
+  const conflicts = [];
+  d.on('conflict', c => conflicts.push(c));
+  const t = d.find(ITEM);
+  d.edit(t, x => { x.details = { decision: Object.assign({}, DEC, { answer: 1, answered_by: 'me', answered_at: 'x' }), notify: ['me'], seen: 'run2' }; });
+  await until(() => d.pending === 0);
+  remote = Object.assign({}, remote, { version: 9, details: { decision: Object.assign({}, DEC, { answer: 0, answered_by: 'other', answered_at: 'y' }), notify: ['me'], seen: 'run2' } });
+  d.edit(t, x => { x.details = { decision: Object.assign({}, DEC, { answer: 1, answered_by: 'me', answered_at: 'z' }), notify: ['me'], seen: 'run2' }; }, { origin: 'dialog' });
+  await until(() => conflicts.length === 1 && d.pending === 0);
+  assert.deepEqual(conflicts[0].fields, ['details']);
+  assert.match(conflicts[0].what, /decision/);
+  assert.equal(d.find(ITEM).details.decision.answered_by, 'other', 'theirs kept');
+});
+
+test('decision offline: the answer waits in IndexedDB with details intact, a new page sends it after loadAll', async () => {
+  const q = memQueue();
+  const patches = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [decRow({ version: 1 })]]],
+    ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => { patches.push([Number(m[1]), body]); return [200, [decRow(Object.assign({}, body, { version: 2 }))]]; }],
+  ]);
+  const local = memStore();
+  const d = make(f, { idb: q, storage: { local, session: memStore() } });
+  await signIn(d, true);
+  await d.loadAll();
+  f.offline = true;
+  d.saveTask(ITEM, { decision: 1 });
+  await until(() => d.syncState().state === 'offline');
+  const rec = [...q.m.values()][0];
+  assert.ok(rec.fields.includes('details') && rec.fields.includes('status'));
+  // a details key named like the encoder's markers ("d", "u") survives the record
+  const back = D.queueRestore(JSON.parse(JSON.stringify(D.queueRecord(UID, Object.assign(C.rowToTask(decRow()), { details: { d: 1, u: 2, decision: DEC } }), { fields: new Set(['details']), base: { details: {} } }))), C.rowToTask(decRow()));
+  assert.deepEqual(back.task.details, { d: 1, u: 2, decision: DEC });
+  assert.deepEqual(back.entry.base.details, {});
+  f.offline = false;
+  const d2 = make(f, { idb: q, storage: { local, session: memStore() } });
+  assert.equal((await d2.start()).state, 'signedin');
+  await d2.loadAll();
+  await until(() => d2.pending === 0 && q.m.size === 0);
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0][0], 1);
+  assert.equal(patches[0][1].status, 'done');
+  assert.equal(patches[0][1].details.decision.answer, 1);
+  assert.equal(patches[0][1].details.decision.module, 'm3');
+  assert.deepEqual(patches[0][1].details.notify, ['me']);
+  assert.equal(d2.find(ITEM).details.decision.answer, 1);
+});
