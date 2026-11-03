@@ -114,6 +114,9 @@
 
   // tags live in item_tags (db/009): a row read with the item_tags embed carries its tag ids; without it, none (the caller keeps its own)
   const tagIdsOf = r => Array.isArray(r.item_tags) ? r.item_tags.filter(x => x && !x.removed_at && x.tag_id).map(x => x.tag_id) : [];
+  // items.details (jsonb, not null): kept as a plain object, a deep copy so a change never touches the row it came from
+  const isPlain = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  const plainDetails = v => isPlain(v) ? JSON.parse(JSON.stringify(v)) : {};
   // a DB row -> the app's task. q is the stored quadrant; the display quadrant is derived when it is null.
   function rowToTask(r) {
     const closed = CLOSED.includes(r.status);
@@ -127,11 +130,11 @@
       reviewState: r.review_state || 'none',
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
-      createdAt: date(r.created_at),
+      createdAt: date(r.created_at), details: plainDetails(r.details),
     };
   }
   // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
-  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at' };
+  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at', details: 'details' };
   function taskToPatch(t, fields, nowIso) {
     const p = {};
     (fields || Object.keys(FIELD_COLUMNS)).forEach(f => {
@@ -146,8 +149,47 @@
       else if (f === 'sortKey') p.sort_key = typeof t.sortKey === 'number' ? t.sortKey : null;
       else if (f === 'list') p.list_id = t.list;
       else if (f === 'deleted') p.deleted_at = t.deleted ? (nowIso || iso(Date.now())) : null;
+      else if (f === 'details') p.details = plainDetails(t.details); // the whole object: the task holds every key it read, so none is lost
     });
     return p;
+  }
+  // details changed here and remotely at once (a versioned PATCH met a newer row): a three-way merge per key, one level into nested
+  // objects (details.decision). A key only I changed takes mine, a key only they changed takes theirs; clash lists the keys both
+  // changed to different values (theirs is kept there)
+  function mergeDetails(base, mine, remote) {
+    const b = plainDetails(base), m = plainDetails(mine), r = plainDetails(remote), out = {}, clash = [];
+    const eq = (x, y) => JSON.stringify(x === undefined ? null : x) === JSON.stringify(y === undefined ? null : y);
+    const keys = new Set(Object.keys(b).concat(Object.keys(m), Object.keys(r)));
+    keys.forEach(k => {
+      const mc = !eq(m[k], b[k]), rc = !eq(r[k], b[k]);
+      let v;
+      if (!mc) v = r[k];
+      else if (!rc || eq(m[k], r[k])) v = m[k];
+      else if (isPlain(m[k]) && isPlain(r[k])) {
+        const sub = mergeDetails(isPlain(b[k]) ? b[k] : {}, m[k], r[k]);
+        v = sub.value; sub.clash.forEach(x => clash.push(k + '.' + x));
+      } else { v = r[k]; clash.push(k); }
+      if (v !== undefined) out[k] = v;
+    });
+    return { value: out, clash };
+  }
+  // self-improvement cards (HomeOS): details.decision = { v, label_1, label_0, answer 1|0|null, module, problem_key, action, run_id,
+  // answered_by, answered_at, applied_at, applied_result }. decisionOf: null unless both labels are set; the window shows the block then
+  function decisionOf(t) {
+    const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null;
+    const lab = x => typeof x === 'string' ? x.trim() : '';
+    if (!d || !lab(d.label_1) || !lab(d.label_0)) return null;
+    return { label_1: lab(d.label_1), label_0: lab(d.label_0), answer: d.answer === 1 || d.answer === 0 ? d.answer : null,
+      answered_by: d.answered_by || null, answered_at: d.answered_at || null, applied_at: d.applied_at || null, applied_result: d.applied_result || null };
+  }
+  // the answer of a click: the task fields to change (details with every other key kept, status done), or null when the task has no
+  // decision, the value is not 1 or 0, or the routine already applied the answer (applied_at set: too late to change it)
+  function answerDecision(t, value, who, nowIso) {
+    const d = decisionOf(t);
+    if (!d || d.applied_at || (value !== 1 && value !== 0)) return null;
+    const details = plainDetails(t.details);
+    details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
+    return { details, status: 'done' };
   }
   // the inverse of an action, sent as a new versioned PATCH
   function inverseOf(action, before, fields, nowIso) {
@@ -1141,7 +1183,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,

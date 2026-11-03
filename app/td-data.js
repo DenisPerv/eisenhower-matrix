@@ -19,27 +19,29 @@
   const LINK_RETRY_MS = 3000;          // web: runLinks retry pause
   const VIA = { 'x-homeos-via': 'app' };
   // the fields a queued write may carry (web: FIELDS); qStored is the stored quadrant, written as "q"
-  const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'status', 'sortKey', 'list', 'deleted'];
+  const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'status', 'sortKey', 'list', 'deleted', 'details'];
   const NOTICES_PATH = 'shared_notices?select=*&seen_at=is.null&order=created_at';
   const LINK_COLS = 'item_links?select=from_item,to_item,kind,removed_at,changed_at&kind=in.(depends_on,parent)';
   const LINK_LIVE = 'item_links?select=from_item,to_item,kind,removed_at,changed_at,f:items!item_links_from_item_fkey!inner(id),t:items!item_links_to_item_fkey!inner(id)' +
     '&kind=in.(depends_on,parent)&removed_at=is.null&f.deleted_at=is.null&t.deleted_at=is.null';
   const QN = { A: 'Do', B: 'Plan', C: 'Delegate', D: 'Eliminate' };
-  const CLASH_NAMES = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start' };
+  const CLASH_NAMES = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start', details: 'decision' };
 
   const dbField = f => f === 'qStored' ? 'q' : f;
-  const val = (t, f) => f === 'tags' ? (t.tags || []).slice() : t[f];
+  // details (web: val): the jsonb object as one field, a copy so "before" stays as it was when a mutate changes the object
+  const val = (t, f) => f === 'tags' ? (t.tags || []).slice() : f === 'details' ? JSON.parse(JSON.stringify(t.details || {})) : t[f];
   const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
   const plain = s => String(s || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(?!\s)(.+?)\*/g, '$1').replace(/^\s*(?:[-*]|\d+[.)])\s+/gm, '');
   const rowOf = d => (Array.isArray(d) ? d[0] : d) || null;
 
   // ---- durable queue: pure parts (tested in test/app-data.test.js) ----
-  // values are stored as JSON: a Date as { d: ms }, undefined as { u: 1 } (pin undefined = "no hand-set urgency")
-  const enc = v => v instanceof Date ? { d: v.getTime() } : v === undefined ? { u: 1 } : Array.isArray(v) ? v.slice() : v;
-  const dec = v => v && typeof v === 'object' && !Array.isArray(v) ? ('d' in v ? new Date(v.d) : 'u' in v ? undefined : v) : Array.isArray(v) ? v.slice() : v;
-  const TASK_KEYS = ['id', 'list', 'num', 'qStored', 'q', 'title', 'notes', 'tags', 'ownerId', 'deadline', 'start', 'status', 'doneAt', 'pin', 'sortKey', 'category', 'reviewState', 'aiConfidence', 'createdBy', 'version', 'deleted', 'updatedAt', 'createdAt'];
+  // values are stored as JSON: a Date as { d: ms }, undefined as { u: 1 } (pin undefined = "no hand-set urgency"), a plain object
+  // (details) as { o: copy }, so its own keys never read as a date or undefined
+  const enc = v => v instanceof Date ? { d: v.getTime() } : v === undefined ? { u: 1 } : Array.isArray(v) ? v.slice() : v && typeof v === 'object' ? { o: JSON.parse(JSON.stringify(v)) } : v;
+  const dec = v => v && typeof v === 'object' && !Array.isArray(v) ? ('d' in v ? new Date(v.d) : 'u' in v ? undefined : 'o' in v ? JSON.parse(JSON.stringify(v.o)) : v) : Array.isArray(v) ? v.slice() : v;
+  const TASK_KEYS = ['id', 'list', 'num', 'qStored', 'q', 'title', 'notes', 'tags', 'ownerId', 'deadline', 'start', 'status', 'doneAt', 'pin', 'sortKey', 'category', 'reviewState', 'aiConfidence', 'createdBy', 'version', 'deleted', 'updatedAt', 'createdAt', 'details'];
   function encTask(t) { const o = {}; TASK_KEYS.forEach(k => { o[k] = enc(t[k]); }); return o; }
-  function decTask(o) { const t = {}; TASK_KEYS.forEach(k => { t[k] = dec(o[k]); }); t.tags = Array.isArray(t.tags) ? t.tags : []; return t; }
+  function decTask(o) { const t = {}; TASK_KEYS.forEach(k => { t[k] = dec(o[k]); }); t.tags = Array.isArray(t.tags) ? t.tags : []; if (!t.details || typeof t.details !== 'object') t.details = {}; return t; }
   // one queue entry -> its IndexedDB record. e.sending holds fields of a write in flight: they stay in the record until it lands.
   function queueRecord(uid, t, e) {
     const fields = new Set(e.fields || []), base = Object.assign({}, e.sending ? e.sending.base : {}, e.base || {});
@@ -155,7 +157,7 @@
 
     // ---- state (web: the main IIFE's globals) ----
     let session = null, storeKind = null, me = null, sessionProvider = null, ended = false;
-    let LISTS = [], LIST = {}, ROLE = {}, CATS = {}, HIDDEN_LISTS = [], NAMES = {}, TAG_LISTS = {}, TAG = {}, LABEL = {}, TAG_NAME = {}, INVITES = [], NOTICES = [];
+    let LISTS = [], LIST = {}, ROLE = {}, CATS = {}, HIDDEN_LISTS = [], NAMES = {}, HANDLE_NAMES = {}, TAG_LISTS = {}, TAG = {}, LABEL = {}, TAG_NAME = {}, INVITES = [], NOTICES = [];
     let tasks = [], maxSeen = 0, maxTagSeen = 0, maxTagDefSeen = 0, TAGS_UPDATED = false;
     let LINKS = new Map(), LINKS_READY = false, maxLinkSeen = 0;
     let prefs = C.prefsFromRow(null), settings = C.readSettings(null), cardLayout = C.readCardLayout(null), prefsExists = false, lastWritten = null, prefsTimer = 0;
@@ -435,7 +437,7 @@
       if (order.length) LISTS.sort((a, b) => (order.indexOf(a) + 1 || 1e6) - (order.indexOf(b) + 1 || 1e6));
       CATS = {}; cats.json.forEach(c => { CATS[c.slug] = c; });
       me = profs.json.find(p => p.id === uid) || null;
-      NAMES = {}; profs.json.concat(vis.json || []).forEach(p => { NAMES[p.id] = p.display_name; });
+      NAMES = {}; HANDLE_NAMES = {}; profs.json.concat(vis.json || []).forEach(p => { NAMES[p.id] = p.display_name; if (p.handle) HANDLE_NAMES[p.handle] = p.display_name; });
       const tlRole = {}, tlHidden = new Set();
       tlm.json.forEach(m => { tlRole[m.tag_list_id] = m.role; if (m.hidden_at) tlHidden.add(m.tag_list_id); });
       TAG_LISTS = {}; tls.json.forEach(l => { TAG_LISTS[l.id] = Object.assign({}, l, { role: tlRole[l.id] || null, hidden: tlHidden.has(l.id) }); });
@@ -720,12 +722,14 @@
       // app only (not in the web's conflict): a field the row already holds with my value has landed (the same queued change sent
       // by a second tab, or restored from IndexedDB after it went out): it is neither a clash nor sent again
       const open = [...sending.fields].filter(f => !same(val(remote, f), val(t, f)));
-      const clash = open.filter(f => !same(val(remote, f), sending.base[f]));
+      // details merges per key (web: conflict, C.mergeDetails): only a key both sides changed to different values is a clash
+      const dm = open.includes('details') ? C.mergeDetails(sending.base.details, val(t, 'details'), remote.details) : null;
+      const clash = open.filter(f => f === 'details' ? dm.clash.length > 0 : !same(val(remote, f), sending.base[f]));
       if (!clash.length) {
-        const mine = {}; open.forEach(f => { mine[f] = val(t, f); });
+        const mine = {}; open.forEach(f => { mine[f] = f === 'details' ? dm.value : val(t, f); });
         applyRow(t, row, e.fields);
         Object.assign(t, mine);
-        open.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
+        open.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = f === 'details' ? remote.details : sending.base[f]; });
         return { ok: true };
       }
       const draft = { title: t.title, notes: t.notes };
@@ -763,16 +767,21 @@
       const u = edit(t, x => { x.status = prev; });
       return u && { msg: 'Restored: ' + plain(t.title), undo: undoEdit(t, u) };
     }
-    // fields from a form or a sheet: { title, notes, tags, deadline, start, list }. A list change puts the task on top of its quadrant
+    // fields from a form or a sheet: { title, notes, tags, deadline, start, list, decision }. A list change puts the task on top of its
+    // quadrant. decision (1 or 0): the answer of a self-improvement card (C.answerDecision: details.decision, status done), sent in the
+    // same versioned write as the other fields (web: openTask save with decide)
     function saveTask(id, f, eo) {
       const t = find(id); if (!t) return null;
       const moved = f.list !== undefined && f.list !== t.list;
       const key = moved ? topKey(f.list, derive(t).q) : t.sortKey;
+      const dch = f.decision !== undefined ? C.answerDecision(t, f.decision, me && me.handle, nowDate().toISOString()) : null;
       const r = edit(t, x => {
+        if (dch) Object.assign(x, dch);
         ['title', 'notes', 'tags', 'deadline', 'start'].forEach(k => { if (f[k] !== undefined) x[k] = Array.isArray(f[k]) ? f[k].slice() : f[k]; });
         if (moved) x.list = f.list;
         x.sortKey = key;
       }, eo || { origin: 'dialog' });
+      if (r && dch) { const d = C.decisionOf(t); return { msg: 'Answered “' + (f.decision ? d.label_1 : d.label_0) + '”: ' + plain(t.title), undo: undoEdit(t, r), decided: true }; }
       return r && { msg: moved ? 'Moved to ' + label(f.list) : 'Saved', undo: undoEdit(t, r) };
     }
     function moveToList(id, list) { return saveTask(id, { list }, { origin: null }); }
@@ -1097,7 +1106,7 @@
       loadAll, refreshMeta, poll, startPolling, stopPolling, rest, rpc, getAll,
       get session() { return session ? { uid: session.user.id, email: session.user.email } : null; },
       get me() { return me; }, get tasks() { return tasks; }, get lists() { return LISTS.slice(); }, get listById() { return LIST; }, get roles() { return ROLE; },
-      get categories() { return CATS; }, get hiddenLists() { return HIDDEN_LISTS; }, get names() { return NAMES; }, get tagLists() { return TAG_LISTS; },
+      get categories() { return CATS; }, get hiddenLists() { return HIDDEN_LISTS; }, get names() { return NAMES; }, get handleNames() { return HANDLE_NAMES; }, get tagLists() { return TAG_LISTS; },
       get tags() { return TAG; }, get labels() { return LABEL; }, get tagNames() { return TAG_NAME; }, get invites() { return INVITES; }, get notices() { return NOTICES; },
       get links() { return LINKS; }, get linksReady() { return LINKS_READY; }, get prefs() { return prefs; }, get settings() { return settings; }, get cardLayout() { return cardLayout; },
       get durable() { return durable; }, get pending() { return Q.size + LQ.length; },

@@ -393,8 +393,9 @@ dialog input.tag-new{width:4ch;min-width:4ch;max-width:100%;min-height:28px;bord
 .err{color:var(--danger-ink);font-weight:600;font-size:12px;min-height:16px;margin-top:2px}
 .actions{display:flex;gap:var(--s3);justify-content:flex-end;margin-top:var(--s6)}
 .actions button{min-height:38px;padding:0 18px;border-radius:12px;font:600 14px var(--ui)}
-#fs,#s-save,#g{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#FFFFFF;box-shadow:0 10px 26px -10px var(--glow)}
-#fs:hover,#s-save:hover,#g:hover{filter:brightness(1.08);box-shadow:0 12px 30px -8px var(--glow)}
+.fdec-b button{min-height:38px;padding:0 18px;border-radius:12px;font:600 14px var(--ui)}
+#fs,#s-save,#g,.fdec-yes{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#FFFFFF;box-shadow:0 10px 26px -10px var(--glow)}
+#fs:hover,#s-save:hover,#g:hover,.fdec-yes:not(:disabled):hover{filter:brightness(1.08);box-shadow:0 12px 30px -8px var(--glow)}
 #cf-ok{background:var(--danger);border-color:transparent;color:#FFFFFF;box-shadow:0 10px 26px -10px var(--danger)}
 :root[data-theme="dark"] #cf-ok{color:#1B0507}
 #cf-ok:hover{filter:brightness(1.05)}
@@ -744,11 +745,11 @@ dialog input,dialog select,.rt,.welcome input{border-radius:var(--r)}
 .tagchip[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
 .tag-add{border-radius:var(--r-sm)}
 dialog input.tag-new{border-radius:var(--r-sm)}
-.actions button{border-radius:var(--r);font:500 15px var(--ui)}
-#fs,#s-save,#g{background:var(--accent);box-shadow:0 10px 24px -14px var(--glow)}
+.actions button,.fdec-b button{border-radius:var(--r);font:500 15px var(--ui)}
+#fs,#s-save,#g,.fdec-yes{background:var(--accent);box-shadow:0 10px 24px -14px var(--glow)}
 /* the dark accent is light: dark ink on every label set on it keeps it above 4.5:1, as on #si-go */
-:root[data-theme="dark"] :is(#fs,#s-save,#g,.toast button,.tagchip[aria-pressed="true"],.fmt [aria-pressed="true"]:not(:hover),.tl-d.td){color:var(--solid)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(#fs,#s-save,#g,.toast button,.tagchip[aria-pressed="true"],.fmt [aria-pressed="true"]:not(:hover),.tl-d.td){color:var(--solid)}}
+:root[data-theme="dark"] :is(#fs,#s-save,#g,.fdec-yes,.toast button,.tagchip[aria-pressed="true"],.fmt [aria-pressed="true"]:not(:hover),.tl-d.td){color:var(--solid)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(#fs,#s-save,#g,.fdec-yes,.toast button,.tagchip[aria-pressed="true"],.fmt [aria-pressed="true"]:not(:hover),.tl-d.td){color:var(--solid)}}
 /* a pressed format button loses the accent fill on hover (.fmt button:hover): its label takes the ink */
 .fmt [aria-pressed="true"]:hover{color:var(--ink)}
 #cf-ok{box-shadow:none}
@@ -1011,6 +1012,12 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .actions .sp{flex:1}
 .actions .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
 .actions .danger{color:var(--danger-ink)}
+/* the decision block of a self-improvement card (details.decision): two answers above the description; the chosen one is ringed */
+.fdec-b{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:6px}
+.fdec-b .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
+.fdec-b [aria-pressed="true"]{box-shadow:0 0 0 2px var(--solid),0 0 0 4px var(--accent)}
+.fdec-b .quiet[aria-pressed="true"]{color:var(--ink)}
+.fdec-s{margin:6px 0 0;font-size:13px}
 .actions .danger:hover{background:var(--danger-bg);border-color:var(--danger)}
 .al{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--hair)}
 @media (max-width:700px){.actions{flex-wrap:wrap}.actions .sp{flex-basis:100%;height:0}}
@@ -1390,6 +1397,9 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 
   // tags live in item_tags (db/009): a row read with the item_tags embed carries its tag ids; without it, none (the caller keeps its own)
   const tagIdsOf = r => Array.isArray(r.item_tags) ? r.item_tags.filter(x => x && !x.removed_at && x.tag_id).map(x => x.tag_id) : [];
+  // items.details (jsonb, not null): kept as a plain object, a deep copy so a change never touches the row it came from
+  const isPlain = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  const plainDetails = v => isPlain(v) ? JSON.parse(JSON.stringify(v)) : {};
   // a DB row -> the app's task. q is the stored quadrant; the display quadrant is derived when it is null.
   function rowToTask(r) {
     const closed = CLOSED.includes(r.status);
@@ -1403,11 +1413,11 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
       reviewState: r.review_state || 'none',
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
-      createdAt: date(r.created_at),
+      createdAt: date(r.created_at), details: plainDetails(r.details),
     };
   }
   // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
-  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at' };
+  const FIELD_COLUMNS = { title: 'title', notes: 'body_md', tags: 'tags', q: 'quadrant', pin: 'urgent_pin', deadline: 'due_at', start: 'start_at', status: 'status', sortKey: 'sort_key', list: 'list_id', deleted: 'deleted_at', details: 'details' };
   function taskToPatch(t, fields, nowIso) {
     const p = {};
     (fields || Object.keys(FIELD_COLUMNS)).forEach(f => {
@@ -1422,8 +1432,47 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
       else if (f === 'sortKey') p.sort_key = typeof t.sortKey === 'number' ? t.sortKey : null;
       else if (f === 'list') p.list_id = t.list;
       else if (f === 'deleted') p.deleted_at = t.deleted ? (nowIso || iso(Date.now())) : null;
+      else if (f === 'details') p.details = plainDetails(t.details); // the whole object: the task holds every key it read, so none is lost
     });
     return p;
+  }
+  // details changed here and remotely at once (a versioned PATCH met a newer row): a three-way merge per key, one level into nested
+  // objects (details.decision). A key only I changed takes mine, a key only they changed takes theirs; clash lists the keys both
+  // changed to different values (theirs is kept there)
+  function mergeDetails(base, mine, remote) {
+    const b = plainDetails(base), m = plainDetails(mine), r = plainDetails(remote), out = {}, clash = [];
+    const eq = (x, y) => JSON.stringify(x === undefined ? null : x) === JSON.stringify(y === undefined ? null : y);
+    const keys = new Set(Object.keys(b).concat(Object.keys(m), Object.keys(r)));
+    keys.forEach(k => {
+      const mc = !eq(m[k], b[k]), rc = !eq(r[k], b[k]);
+      let v;
+      if (!mc) v = r[k];
+      else if (!rc || eq(m[k], r[k])) v = m[k];
+      else if (isPlain(m[k]) && isPlain(r[k])) {
+        const sub = mergeDetails(isPlain(b[k]) ? b[k] : {}, m[k], r[k]);
+        v = sub.value; sub.clash.forEach(x => clash.push(k + '.' + x));
+      } else { v = r[k]; clash.push(k); }
+      if (v !== undefined) out[k] = v;
+    });
+    return { value: out, clash };
+  }
+  // self-improvement cards (HomeOS): details.decision = { v, label_1, label_0, answer 1|0|null, module, problem_key, action, run_id,
+  // answered_by, answered_at, applied_at, applied_result }. decisionOf: null unless both labels are set; the window shows the block then
+  function decisionOf(t) {
+    const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null;
+    const lab = x => typeof x === 'string' ? x.trim() : '';
+    if (!d || !lab(d.label_1) || !lab(d.label_0)) return null;
+    return { label_1: lab(d.label_1), label_0: lab(d.label_0), answer: d.answer === 1 || d.answer === 0 ? d.answer : null,
+      answered_by: d.answered_by || null, answered_at: d.answered_at || null, applied_at: d.applied_at || null, applied_result: d.applied_result || null };
+  }
+  // the answer of a click: the task fields to change (details with every other key kept, status done), or null when the task has no
+  // decision, the value is not 1 or 0, or the routine already applied the answer (applied_at set: too late to change it)
+  function answerDecision(t, value, who, nowIso) {
+    const d = decisionOf(t);
+    if (!d || d.applied_at || (value !== 1 && value !== 0)) return null;
+    const details = plainDetails(t.details);
+    details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
+    return { details, status: 'done' };
   }
   // the inverse of an action, sent as a new versioned PATCH
   function inverseOf(action, before, fields, nowIso) {
@@ -2417,7 +2466,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, SIGNIN_NEXT, signinRedirect, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
@@ -2482,7 +2531,7 @@ let TODAY = new Date();
 let session = null, storeKind = null, me = null, sessionProvider = null;
 let LISTS = [], LIST = {}, ROLE = {}, CATS = {};
 // multi-user: lists hidden for me, names of people I share something with, tag lists, tags and their chip labels, my invitations
-let HIDDEN_LISTS = [], NAMES = {}, TAG_LISTS = {}, TAG = {}, LABEL = {}, TAG_NAME = {}, INVITES = [], maxTagSeen = 0;
+let HIDDEN_LISTS = [], NAMES = {}, HANDLE_NAMES = {}, TAG_LISTS = {}, TAG = {}, LABEL = {}, TAG_NAME = {}, INVITES = [], maxTagSeen = 0;
 let NOTICES = []; // round 3: open notes of a first share (shared_notices, seen_at null)
 const NOTICE_TRIED = new Set(); // notes whose unknown target made the poll reload the lists once
 const noticeKnown = (n) => n.list_id ? !!LIST[n.list_id] || HIDDEN_LISTS.some(l => l.id === n.list_id) : !!TAG_LISTS[n.tag_list_id];
@@ -2796,7 +2845,7 @@ async function loadMeta() {
   if (order.length) LISTS.sort((a, b) => (order.indexOf(a) + 1 || 1e6) - (order.indexOf(b) + 1 || 1e6));
   CATS = {}; cats.json.forEach(c => { CATS[c.slug] = c; });
   me = profs.json.find(p => p.id === uid) || null;
-  NAMES = {}; profs.json.concat(vis.json || []).forEach(p => { NAMES[p.id] = p.display_name; });
+  NAMES = {}; HANDLE_NAMES = {}; profs.json.concat(vis.json || []).forEach(p => { NAMES[p.id] = p.display_name; if (p.handle) HANDLE_NAMES[p.handle] = p.display_name; });
   const tlRole = {}, tlHidden = new Set();
   tlm.json.forEach(m => { tlRole[m.tag_list_id] = m.role; if (m.hidden_at) tlHidden.add(m.tag_list_id); });
   TAG_LISTS = {}; tls.json.forEach(l => { TAG_LISTS[l.id] = Object.assign({}, l, { role: tlRole[l.id] || null, hidden: tlHidden.has(l.id) }); });
@@ -2973,9 +3022,10 @@ async function refreshMeta() {
 // ---- writes: one serial queue per item, merged per item; every PATCH carries the version the last response returned ----
 // Q: item id -> { fields: Set of task fields waiting, base: their values before the first waiting change, create, inflight, origin }
 const Q = new Map();
-const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'status', 'sortKey', 'list', 'deleted'];
+const FIELDS = ['title', 'notes', 'tags', 'qStored', 'pin', 'deadline', 'start', 'status', 'sortKey', 'list', 'deleted', 'details'];
 const dbField = f => f === 'qStored' ? 'q' : f; // taskToPatch names the stored quadrant "q"
-const val = (t, f) => f === 'tags' ? t.tags.slice() : t[f];
+// details is one field (the jsonb object, every key sent); a copy, so "before" stays as it was when a mutate changes the object
+const val = (t, f) => f === 'tags' ? t.tags.slice() : f === 'details' ? JSON.parse(JSON.stringify(t.details || {})) : t[f];
 const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
 let offline = false;
 // change a task locally and queue the write; returns the values before, for undo
@@ -3078,18 +3128,21 @@ async function conflict(t, e, sending) {
     return { ok: true };
   }
   const remote = C.rowToTask(row);
-  const clash = [...sending.fields].filter(f => !same(val(remote, f), sending.base[f]));
+  // details merges per key (C.mergeDetails): only a key both sides changed to different values is a clash
+  const dm = sending.fields.has('details') ? C.mergeDetails(sending.base.details, val(t, 'details'), remote.details) : null;
+  const clash = [...sending.fields].filter(f => f === 'details' ? dm.clash.length > 0 : !same(val(remote, f), sending.base[f]));
   if (!clash.length) {
     // nothing I changed was changed remotely: take their row, then send mine again on the new version
-    const mine = {}; sending.fields.forEach(f => { mine[f] = val(t, f); });
+    const mine = {}; sending.fields.forEach(f => { mine[f] = f === 'details' ? dm.value : val(t, f); });
     applyRow(t, row, e.fields);
     Object.assign(t, mine);
-    sending.fields.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = sending.base[f]; });
+    // details: the next merge starts from their row (the keys they changed are no longer mine)
+    sending.fields.forEach(f => { e.fields.add(f); if (!(f in e.base)) e.base[f] = f === 'details' ? remote.details : sending.base[f]; });
     return { ok: true };
   }
   const draft = { title: t.title, notes: t.notes };
   applyRow(t, row, e.fields);
-  const names = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start' };
+  const names = { title: 'title', notes: 'description', tags: 'tags', qStored: 'quadrant', pin: 'urgency', deadline: 'end', status: 'status', sortKey: 'order', list: 'list', deleted: 'deleted', start: 'start', details: 'decision' };
   const what = clash.map(f => names[f] || f).join(', ');
   if (e.origin === 'dialog') openTask(t.id, null, { draft, notice: 'Changed by someone else while you edited: ' + what + '. Their version is saved; your text is below. Save again to replace it.' });
   else toast('Changed by someone else: ' + what);
@@ -3941,12 +3994,26 @@ function openTask(id, quad, opts) {
   const pos = t ? C.deckPos(order, t.id, t.q, QN[t.q]) : null;
   const ROLE_GLYPH = { parent: '↑', child: '↓', pred: '←', next: '→' }, ROLE_KIND = { parent: 'Parent', child: 'Subtask', pred: 'Comes after', next: 'Next' };
   const LK_WAIT_TITLE = 'Not done yet: this task waits for it'; // the title of an open predecessor's chip (.waiting)
+  // self-improvement cards (HomeOS routine): the decision block, two answers above the description (C.decisionOf). A click answers,
+  // saves the window's other changes with it, marks the task done and closes the window (Undo in the toast). Once the routine has
+  // applied the answer (applied_at) the buttons are off; a reader of the list sees them off too
+  const dec = t ? C.decisionOf(t) : null;
+  const decOn = !!dec && editable && !dec.applied_at && !o.preview;
+  const decWho = h => !h ? '' : me && h === me.handle ? 'you' : HANDLE_NAMES[h] || h;
+  const decDay = s => { const ms = Date.parse(s || ''); return isNaN(ms) ? '' : longDay(ms); };
+  const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
+    : dec.answer !== null ? ['Answered “' + (dec.answer ? dec.label_1 : dec.label_0) + '”', decWho(dec.answered_by), decDay(dec.answered_at)].filter(Boolean).join(' · ')
+    : editable ? '' : 'Only an editor of this list can answer';
+  const decHtml = !dec ? '' : '<div class="fdec" role="group" aria-labelledby="fdec-l"><div class="flabel" id="fdec-l">Decision</div><div class="fdec-b">' +
+    [1, 0].map(v => '<button type="button" class="' + (v ? 'fdec-yes' : 'quiet') + '" data-dec="' + v + '" aria-pressed="' + (dec.answer === v) + '"' + (decOn ? '' : ' disabled') + '>' +
+      (dec.answer === v ? '✓ ' : '') + esc(v ? dec.label_1 : dec.label_0) + '</button>').join('') + '</div>' +
+    (decState ? '<p class="n fdec-s" id="fdec-s">' + esc(decState) + '</p>' : '') + '</div>';
   const formHtml = '<form method="dialog"><div class="tk-head"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
-    (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
+    decHtml + (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
     '<div class="flabel" id="fn-l">Description</div><div class="rt" id="fn" contenteditable="' + editable + '" role="textbox" aria-multiline="true" aria-labelledby="fn-l">' + mdToHtml(dr.notes !== undefined ? dr.notes : t ? t.notes : '') + '</div>' +
     // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
     // position in its quadrant (2026-10-29)
@@ -4266,6 +4333,8 @@ function openTask(id, quad, opts) {
   if (fdel) fdel.onclick = () => { deck.dlg.close(); removeTask(t); };
   const fs = dlg.querySelector('#fs');
   let after = null, afterTo = null, saveBad = false; // after: where "Save and go / close" goes once the save is through
+  let decide = null; // the decision button clicked (1 or 0): Save sends the answer with the other changes, then the window closes
+  dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = null; fs.click(); if (saveBad) decide = null; }; });
   if (fs) fs.onclick = e => {
     saveBad = false;
     const title = htmlToMd(dlg.querySelector('#ft')).replace(/\n+/g, ' ').trim(), notes = htmlToMd(dlg.querySelector('#fn')).trim(), list = dlg.querySelector('#fl').value;
@@ -4296,7 +4365,9 @@ function openTask(id, quad, opts) {
         }
         const moved = mine.includes('list');
         const key = moved ? topKey(list, fq) : t.sortKey;
+        const dch = decide !== null ? C.answerDecision(t, decide, me && me.handle, new Date().toISOString()) : null;
         const r = edit(t, x => {
+          if (dch) Object.assign(x, dch);
           if (mine.includes('title')) x.title = title;
           if (mine.includes('notes')) x.notes = notes;
           if (mine.includes('tags')) x.tags = tags;
@@ -4307,7 +4378,8 @@ function openTask(id, quad, opts) {
         }, { origin: 'dialog' });
         st.keep.add(t.id);
         const nl = applyLinks(list, fq);
-        if (r) toast(moved ? 'Moved to ' + label(list) : 'Saved', undoEdit(t, r));
+        if (r && dch) toast('Answered “' + (decide ? C.decisionOf(t).label_1 : C.decisionOf(t).label_0) + '”: ' + plain(t.title), undoEdit(t, r));
+        else if (r) toast(moved ? 'Moved to ' + label(list) : 'Saved', undoEdit(t, r));
         else if (nl) toast(nl === 1 ? 'Link saved' : nl + ' links saved');
       } else {
         const cat = LIST[list].default_category || 'task';

@@ -77,6 +77,28 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 - **Rights** (`link_items`, `unlink_items`): edit rights on at least one end (`can_edit_item`: editor and up, or the contributor who made that item) and read on both; removing is also allowed to the one who made the link. A parent link replaces the old parent in the same call. `links_read` (`011`, read on both ends) is unchanged, so a link to an item someone cannot read never reaches them, not even as a count.
 - **Direct REST** (`003`: select, insert, delete for `authenticated`): an insert still needs `links_add` and passes the trigger; agents should use the RPCs so removals are soft and polled.
 
+## Item details and the decision contract
+
+`items.details` (`jsonb not null default '{}'`, `db/001`) holds per-category extras: `notify` (people's handles, CLI `--notify`), `renew_by` (`007`), `access_request_id` and `email` (`015`). Editors write it like any column (`003`); an agent's write of `details` sets `validation` to `unverified` (`010`). No schema object checks its shape. Both clients read it whole and send it whole (`details` field, merged per key on a conflict: README "Data and sync").
+
+**`details.decision`** (2026-11-03, no schema change): a yes/no card of the HomeOS routine `homeos-self-improvement` (list `homeos-self-improvements`, quadrant C, made by `homeos-agent`). The web task window and the phone sheet show a Decision block for it.
+
+| Key | Type | Written by | Meaning |
+|---|---|---|---|
+| `v` | 1 | routine | contract version |
+| `label_1`, `label_0` | text | routine | the button texts (Yes / No, Accept / Decline, …); the block shows only when both are set |
+| `answer` | `1`, `0` or `null` | client | the button clicked; `null` until then |
+| `module` | `m1` … `m8` | routine | the routine module that made the card |
+| `problem_key` | text | routine | `<module>:<stable slug>`; the routine creates no second open card with the same key |
+| `action` | object | routine | what a Yes does, machine-readable; the clients never read it |
+| `run_id` | text | routine | the run that made the card |
+| `answered_by`, `answered_at` | handle, ISO time | client | who answered and when |
+| `applied_at`, `applied_result` | ISO time, text | routine | set when the next run applied the answer (No: "declined, no change"); from then on the clients refuse a new answer |
+
+- **A click** (`answerDecision`): `answer`, `answered_by`, `answered_at` and `status` `done` in one versioned PATCH with the window's other changes; every other key of `details` (and of `decision`) is kept. Undo sends the earlier `details` and status back.
+- **Without the buttons** (Telegram, the CLI): the routine also takes the first word of the description when it equals `label_1` or `label_0` (case ignored), the same idea as `cli/access.mjs` `decisionOf`.
+- **Closed without an answer:** nothing is applied; the card stays as it is.
+
 ## Limits
 
 The caps live in `ops.settings` (`db/009`, `012`, `015`; admin SQL tunes them) and answer 54000 when crossed; the root README's **Limits** table lists them (guests: 20 live lists, 1,000 live items, 120 item writes a minute …; household: 50 lists each, 5,000 items per list …; invitations; access requests; the sign-up hook's 200 profiles or 400 MB). Reads have no rate limit of their own; `review_report` bounds itself (1-26 weeks, at most 50 lists).
