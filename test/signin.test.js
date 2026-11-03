@@ -1,5 +1,6 @@
 // node --test test/  — signin.html (/signin) without network: its one inline script runs in a vm with a fake location,
-// sessionStorage, document and fetch. Checks the exact PKCE return URL, the `next` rules and the forward for let-in logins.
+// sessionStorage, document and fetch. Checks the exact PKCE return URL, the `next` rules, the forward for let-in logins and
+// the consulting-call mode (?intent=consult, db/025).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -9,23 +10,25 @@ const vm = require('node:vm');
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'signin.html'), 'utf8');
 const INLINE = [...HTML.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script\s*>/gi)].filter(m => !/\ssrc\s*=/i.test(m[1] || '')).map(m => m[2]);
 const ORIGIN = 'https://app.example.pages.dev';
-const NEXT_KEY = 'td.signin.next', AUTH_KEY = 'td.request.auth';
+const NEXT_KEY = 'td.signin.next', AUTH_KEY = 'td.request.auth', INTENT_KEY = 'td.signin.intent';
 const SESSION = () => ({ access_token: 'acc', refresh_token: 'ref', expires_at: Date.now() + 3600e3, email: 'p@example.invalid' });
 
-// answers: { mine: [status, body], request: [status, body] }
+// answers: { mine, request, consultMine, consult: [status, body] }; bodies: the JSON body of each rpc call by path
 function load(href, { stored = {}, answers = {} } = {}) {
   const store = new Map(Object.entries(stored).map(([k, v]) => [k, JSON.stringify(v)]));
   const u = new URL(href);
   const loc = { href, origin: u.origin, pathname: u.pathname, search: u.search, hash: u.hash, assigned: null, replaced: null,
     assign(x) { this.assigned = x; }, replace(x) { this.replaced = x; } };
   const history = { replaceState(_s, _t, url) { const n = new URL(url, href); Object.assign(loc, { href: n.href, pathname: n.pathname, search: n.search, hash: n.hash }); } };
-  const app = { dataset: {}, innerHTML: '', addEventListener(t, f) { this.onclick = f; } };
+  const app = { dataset: {}, innerHTML: '', addEventListener(t, f) { this['on' + t] = f; } };
   const listeners = {};
-  const calls = [];
+  const calls = [], bodies = {};
   const fetch = async (url, init) => {
     const p = new URL(url).pathname;
     calls.push(p);
-    const [status, body] = (p.endsWith('/my_access_request') ? answers.mine : p.endsWith('/request_access') ? answers.request : null) || [204];
+    try { bodies[p] = JSON.parse((init && init.body) || 'null'); } catch (e) {}
+    const [status, body] = (p.endsWith('/my_access_request') ? answers.mine : p.endsWith('/request_access') ? answers.request
+      : p.endsWith('/my_consultation_request') ? answers.consultMine : p.endsWith('/request_consultation') ? answers.consult : null) || [204];
     return { status, text: async () => (body === undefined ? '' : JSON.stringify(body)) };
   };
   const ctx = {
@@ -38,7 +41,7 @@ function load(href, { stored = {}, answers = {} } = {}) {
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(INLINE[0], ctx);
-  return { ctx, loc, app, store, calls, start: () => listeners.DOMContentLoaded() };
+  return { ctx, loc, app, store, calls, bodies, start: () => listeners.DOMContentLoaded() };
 }
 const settle = async (s, ms = 2000) => { const t = Date.now(); while (s.app.dataset.state === 'sending' || !s.app.dataset.state) { if (Date.now() - t > ms) break; await new Promise(r => setTimeout(r, 5)); } };
 const stored = (s, k) => (s.store.has(k) ? JSON.parse(s.store.get(k)) : null);
@@ -143,4 +146,82 @@ test('not on a hosted origin (file://): an approved login is shown the link, not
   s.start(); await settle(s);
   assert.equal(s.app.dataset.state, 'approved');
   assert.equal(s.loc.replaced, null);
+});
+
+// ---- consulting-call mode (?intent=consult, db/025) ----
+function submit(s, v) {
+  const f = { telegram: { value: v.telegram || '' }, whatsapp: { value: v.whatsapp || '' }, note: { value: v.note || '' } };
+  f.closest = () => f;
+  s.app.onsubmit({ target: f, preventDefault() {} });
+}
+
+test('consult: ?intent=consult is kept in this tab and taken off the address; another value clears it', () => {
+  const s = load(ORIGIN + '/signin?intent=consult&next=/app/'); s.start();
+  assert.equal(stored(s, INTENT_KEY), 'consult');
+  assert.equal(s.loc.search, '');
+  const t = load(ORIGIN + '/signin?intent=other', { stored: { [INTENT_KEY]: 'consult' } }); t.start();
+  assert.equal(stored(t, INTENT_KEY), null);
+  assert.equal(t.loc.search, '');
+});
+
+test('consult: signed out it asks for Google sign-in to book a call, with no access-request wording', () => {
+  const s = load(ORIGIN + '/signin?intent=consult'); s.start();
+  assert.equal(s.app.dataset.state, 'signedout');
+  assert.match(s.app.innerHTML, /<h1>Book a consulting call<\/h1>/);
+  assert.match(s.app.innerHTML, /data-act="google"/);
+  assert.match(s.app.innerHTML, /does not give access to any board/);
+  assert.ok(!/decision \(approved or not\)/.test(s.app.innerHTML));
+  assert.match(s.app.innerHTML, /<a href="\/privacy">privacy<\/a>/);
+});
+
+test('consult: signed in with no open request, the form shows the email read-only; no access request is made', async () => {
+  const s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION(), [INTENT_KEY]: 'consult' }, answers: { consultMine: [200, null] } });
+  s.start(); await settle(s);
+  assert.equal(s.app.dataset.state, 'consult');
+  assert.match(s.app.innerHTML, /name="email" value="p@example.invalid" readonly/);
+  for (const n of ['telegram', 'whatsapp', 'note']) assert.match(s.app.innerHTML, new RegExp(`name="${n}"`));
+  assert.deepEqual(s.calls, ['/rest/v1/rpc/my_consultation_request']);
+  assert.equal(s.loc.replaced, null);
+});
+
+test('consult: an open request is shown as sent (already with us), not the form', async () => {
+  const s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION(), [INTENT_KEY]: 'consult' },
+    answers: { consultMine: [200, { status: 'open', requested_at: '2026-11-03T10:00:00Z', telegram: 'https://t.me/ada_l' }] } });
+  s.start(); await settle(s);
+  assert.equal(s.app.dataset.state, 'consultsent');
+  assert.match(s.app.innerHTML, /already with us/);
+  assert.match(s.app.innerHTML, /@ada_l/);
+});
+
+test('consult: sending calls request_consultation with the typed values, then shows the request', async () => {
+  const s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION(), [INTENT_KEY]: 'consult' },
+    answers: { consultMine: [200, null], consult: [200, { created: true, status: 'open', whatsapp: 'https://wa.me/351912345678' }] } });
+  s.start(); await settle(s);
+  submit(s, { telegram: ' @ada_l ', whatsapp: '+351 912 345 678', note: '' });
+  await settle(s);
+  assert.equal(s.app.dataset.state, 'consultsent');
+  assert.deepEqual(s.bodies['/rest/v1/rpc/request_consultation'], { p_telegram: '@ada_l', p_whatsapp: '+351 912 345 678', p_note: null });
+  assert.match(s.app.innerHTML, /\+351912345678/);
+  assert.ok(!/already with us/.test(s.app.innerHTML));
+});
+
+test('consult: a refused value (22023) goes back to the form with the message and what was typed', async () => {
+  const s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION(), [INTENT_KEY]: 'consult' },
+    answers: { consultMine: [200, null], consult: [400, { code: '22023', message: 'Telegram: a username of 5 to 32 letters, digits or _' }] } });
+  s.start(); await settle(s);
+  submit(s, { telegram: 'ab', note: 'hello <b>' });
+  await settle(s);
+  assert.equal(s.app.dataset.state, 'consult');
+  assert.match(s.app.innerHTML, /role="alert">Telegram: a username/);
+  assert.match(s.app.innerHTML, /name="telegram"[^>]*value="ab"/);
+  assert.match(s.app.innerHTML, /hello &lt;b&gt;<\/textarea>/);
+});
+
+test('consult: the cap (54000) says try later', async () => {
+  const s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION(), [INTENT_KEY]: 'consult' },
+    answers: { consultMine: [200, null], consult: [400, { code: '54000', message: 'too many' }] } });
+  s.start(); await settle(s);
+  submit(s, {});
+  await settle(s);
+  assert.equal(s.app.dataset.state, 'cap');
 });
