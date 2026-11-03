@@ -10,7 +10,7 @@ Facts for whoever writes the privacy policy, the cookie list, the terms and the 
 
 | Page | Host | Data collected | Sent to |
 |---|---|---|---|
-| Landing page `/` (`site/index.html`) | landing | nothing; the demo's cards stay in the browser | nothing (`connect-src 'none'`; no request beyond the page's own host); the consulting buttons go to `/signin?intent=consult` on the app host |
+| Landing page `/` (`site/index.html`) | landing | the demo's cards stay in the browser. A press of Try the demo, Subscribe to Personal or Subscribe to Team keeps the plan and the time, and the email and Telegram username if the person gives them (both optional, unverified), as a task in the household list "Consultancy Request" (read by Maksym, `homeos-agent` and the household Telegram bot); no IP address or other detail is stored by the function | Supabase (`rpc/request_plan_interest`, `db/026`; Supabase's own request logs apply) on a press, nothing else; the consulting buttons go to `/signin?intent=consult` on the app host |
 | Legal placeholders, `/privacy` | landing, app | nothing | nothing (no script) |
 | Sign-in `/signin` (`signin.html`) | app | Google sign-in returns email, name and profile picture (scopes `openid`, `email`, `profile`); an access request keeps email, first and last name and the request time (`users_pending_for_decision`); a consulting-call request (`?intent=consult`, `db/025`) keeps the email, the Telegram username and WhatsApp number if given, a note if given and the time, as a task in the household list "Consultancy Request" (read by Maksym, `homeos-agent` and the household Telegram bot) | Supabase (Auth and four RPCs); Google (the sign-in screen); the task appears in Maksym's Telegram digest |
 | Board `/board/` (`TasksDashboard.html`) | app | the account (email, display name), the lists, items, tags, sharing and preferences a person creates | Supabase only |
@@ -35,6 +35,7 @@ Facts for whoever writes the privacy policy, the cookie list, the terms and the 
 | `td.request.pkce`, `td.request.auth` | `sessionStorage` | sign-in | the PKCE verifier; the sign-in page's own session | this tab only |
 | `td.signin.next` | `sessionStorage` | sign-in | `/board/` or `/app/`, where a let-in login goes next | removed when it goes |
 | `ec.demo.v5` | `localStorage` | landing page demo | the demo's cards | until the browser's site data is cleared |
+| `ec.interest.v1` | `localStorage` | landing page plan buttons | the plans already filed from this browser, never a contact | until the browser's site data is cleared |
 | `CF_Authorization`, `CF_AppSession` | cookies (set by Cloudflare Access) | app host `/board/`, `/app/` | the Access login | the session length of the Access policy |
 
 Before any click on `/signin` and `/app/` (checked 2026-10-30 on the older host): no cookies, no storage keys, no request to another host. No analytics, no advertising, no tracker in the code.
@@ -53,6 +54,6 @@ The board and the phone app tell people to ask for deletion at the contact above
 
 ## Open points for the legal texts
 
-- Whether the preference keys (`td.theme`, `td.rail`, `td.app.theme`, `td.app.list`, `td.app.installHint`, `td.app.hint`, `ec.demo.v5`) count as strictly necessary.
+- Whether the preference keys (`td.theme`, `td.rail`, `td.app.theme`, `td.app.list`, `td.app.installHint`, `td.app.hint`, `ec.demo.v5`, `ec.interest.v1`) count as strictly necessary.
 - Legal basis, retention periods, transfers, rights and the supervisory authority: not in the code, to be decided.
 - Business details for a legal notice (entity, address, tax number): not in this repository.

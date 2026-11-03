@@ -287,7 +287,7 @@ html.js .logo-app:not(.go) svg { opacity: 0; }
 .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .tools-meta { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; }
 .field-inline { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--muted); font-size: 0.9375rem; }
-select, input[type="text"], input[type="datetime-local"], input:not([type]), textarea { min-height: 44px; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid var(--rule); background: var(--ground-3); color: var(--ink); }
+select, input[type="text"], input[type="email"], input[type="datetime-local"], input:not([type]), textarea { min-height: 44px; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid var(--rule); background: var(--ground-3); color: var(--ink); }
 select { padding-right: 2rem; cursor: pointer; }
 .feats { list-style: none; display: flex; flex-wrap: wrap; gap: 0.35rem 2rem; margin: 0.25rem 0 1rem; padding: 0; color: var(--muted); font-size: 0.9375rem; }
 .feats li::before { content: ''; display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.5rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); vertical-align: 0.05em; }
@@ -607,7 +607,7 @@ dialog { width: min(30rem, calc(100vw - 32px)); padding: 1.25rem 1.25rem 1rem; b
 dialog::backdrop { background: rgb(14 9 6 / 0.72); }
 dialog h3 { margin: 0 0 0.9rem; font: 700 1.6rem/1 var(--font-display); font-stretch: 75%; }
 dialog form { display: grid; gap: 0.7rem; }
-#edit :is(input, textarea, select) { background: #fff; color: var(--paper-ink); border-color: #b7a58f; }
+:is(#edit, #sub) :is(input, textarea, select) { background: #fff; color: var(--paper-ink); border-color: #b7a58f; }
 dialog .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
 dialog .btn:not(.btn-primary) { background: #fffaf1; color: var(--paper-ink); border-color: #b7a58f; }
 dialog .btn.danger { color: var(--hot); border-color: #d9a48f; margin-left: auto; }
@@ -626,6 +626,13 @@ dialog .btn-primary { background: var(--paper-ink); border-color: var(--paper-in
 dialog .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
 dialog .pair label[hidden], dialog .btn[hidden] { display: none; }
 dialog p { margin: 0 0 1rem; line-height: 1.5; }
+#subForm p { margin: 0; }
+#subForm #subH { margin: 0; }
+#subH:focus { outline: none; }
+#subAsk { display: grid; gap: 0.7rem; }
+#subAsk[hidden] { display: none; }
+#sub .fine { font-size: 0.875rem; color: var(--paper-muted); }
+#sub .fine a { color: var(--paper-ink); }
 
 /* phone: one column, a sticky bar of the four lamps */
 .jump { display: none; }
@@ -948,7 +955,7 @@ dialog p { margin: 0 0 1rem; line-height: 1.5; }
     </div>
   </section>
 
-  <!-- plans: the hook to the real tool. No payment system is wired: a click shows a dialog and emits `ec:subscribe` -->
+  <!-- plans: the hook to the real tool. No payment system is wired: a click shows a dialog (optional email and Telegram), files one task through rpc/request_plan_interest (db/026) and, for the paid plans, emits `ec:subscribe` -->
   <section class="plans" id="plans" aria-labelledby="plansH">
     <p class="sec-eyebrow">The full tool</p>
     <h2 class="sec-title" id="plansH">Take it from demo to every day</h2>
@@ -957,7 +964,7 @@ dialog p { margin: 0 0 1rem; line-height: 1.5; }
       <article class="plan" data-q="D" aria-labelledby="planFree">
         <header class="plan-head"><h3 id="planFree"><span class="lamp" aria-hidden="true"></span>Demo</h3><p class="price"><b>Free</b></p><p class="plan-for">This page, sample tasks, one browser.</p></header>
         <div class="glass"><div class="glass-light" aria-hidden="true"></div><ul class="plan-feats"><li>The full matrix to try</li><li>Two sample lists</li><li>Nothing to sign up for</li></ul></div>
-        <a class="btn" href="#app" data-jump="app">Try the demo</a>
+        <a class="btn" href="#app" data-plan="Demo" data-price="Free">Try the demo</a>
       </article>
       <article class="plan pick" data-q="A" aria-labelledby="planPersonal">
         <header class="plan-head"><h3 id="planPersonal"><span class="lamp" aria-hidden="true"></span>Personal <span class="plan-tag">Best for one</span></h3><p class="price"><b>Pricing soon</b></p><p class="plan-for">For one person, on every device.</p></header>
@@ -1083,10 +1090,19 @@ dialog p { margin: 0 0 1rem; line-height: 1.5; }
 </dialog>
 
 <dialog id="sub" aria-labelledby="subH">
-  <h3 id="subH">Almost there</h3>
-  <p id="subMsg"></p>
-  <p>Subscriptions open soon. Payments are not connected yet, so nothing was charged.</p>
-  <form method="dialog"><button class="btn btn-primary">Close</button></form>
+  <form id="subForm" novalidate>
+    <h3 id="subH" tabindex="-1" autofocus>Almost there</h3>
+    <p id="subMsg"></p>
+    <div id="subAsk">
+      <p>Want to hear when the full tool opens? Leave an email or a Telegram username. Both are optional.</p>
+      <label>Email <input name="email" type="email" autocomplete="email" maxlength="254" aria-describedby="subErr"></label>
+      <label>Telegram username <input name="telegram" autocomplete="off" maxlength="60" placeholder="@username" aria-describedby="subErr"></label>
+      <p class="fine">We note the plan you picked and keep your contact only to write to you about it. <a href="/privacy" target="_blank" rel="noopener">Privacy</a></p>
+    </div>
+    <p id="subNext" hidden>Want to talk it through now?</p>
+    <p class="err" id="subErr" role="alert" hidden></p>
+    <div class="row"><button class="btn btn-primary" id="subSend">Send</button><button class="btn btn-primary" type="button" id="subConsult" data-consult hidden>Schedule a consulting call</button><button class="btn" type="button" id="subSkip">No thanks</button></div>
+  </form>
 </dialog>
 
 <dialog id="consult" aria-labelledby="consultDH">
@@ -1771,15 +1787,69 @@ document.querySelectorAll('[data-jump]').forEach((a) => a.addEventListener('clic
 }));
 document.querySelectorAll('.jump').forEach((n) => n.addEventListener('click', (e) => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); const t = document.querySelector(a.getAttribute('href')); jumpTo(t); t.querySelector('.add-btn')?.focus({ preventScroll: true }); }));
 
-/* ---------- plans: no payment system yet. A click says so and emits `ec:subscribe` for whatever is wired later ---------- */
-const sub = $('#sub'); let subFrom = null;
-document.querySelectorAll('[data-plan]').forEach((b) => b.addEventListener('click', () => {
-  const plan = b.dataset.plan, price = b.dataset.price;
-  document.dispatchEvent(new CustomEvent('ec:subscribe', { detail: { plan, price } }));
-  $('#subMsg').textContent = `You picked ${plan}. ${price}.`;
-  subFrom = b; sub.showModal();
+/* ---------- plans: no payment system yet. A press opens a dialog that asks for an optional email and Telegram username, and
+   files one task in the "Consultancy Request" list, quadrant Plan, through rpc/request_plan_interest (db/026): the only
+   call this page makes, with the public key and no login. Closing the dialog any other way files the press with no contact.
+   The demo goes on whatever happens, and asks only once per browser. The two values equal config/tasksdashboard.config.js
+   (test/site-plans.test.js and the deploy check it) ---------- */
+const API = { url: 'https://ierpwgycqgqlmabeaino.supabase.co', key: 'sb_publishable_OLbRdN4Fuaemkf5IstAmVA_Xr8l79wz' };
+const INTEREST_KEY = 'ec.interest.v1', filedHere = new Set();
+const filedPlans = () => { try { const v = JSON.parse(localStorage.getItem(INTEREST_KEY)); return Array.isArray(v) ? v : []; } catch { return []; } };
+const isFiled = (plan) => filedHere.has(plan) || filedPlans().includes(plan);
+const markFiled = (plan) => { filedHere.add(plan); try { localStorage.setItem(INTEREST_KEY, JSON.stringify([...new Set([...filedPlans(), plan])])); } catch { /* the press is filed; only this browser forgets it */ } };
+async function fileInterest(plan, email, telegram) {
+  try {
+    const r = await fetch(API.url + '/rest/v1/rpc/request_plan_interest', { method: 'POST', keepalive: true,
+      headers: { apikey: API.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_plan: plan, p_email: email || null, p_telegram: telegram || null }) });
+    if (r.ok) { markFiled(plan); return { ok: true }; }
+    const j = await r.json().catch(() => ({}));
+    return { ok: false, code: j.code, message: j.message };
+  } catch { return { ok: false }; }
+}
+const sub = $('#sub'), subForm = $('#subForm'), subErr = $('#subErr'), subSend = $('#subSend'), subSkip = $('#subSkip');
+let subRound = null;
+document.querySelectorAll('[data-plan]').forEach((b) => b.addEventListener('click', (e) => {
+  e.preventDefault();
+  const plan = b.dataset.plan, price = b.dataset.price, demo = plan === 'Demo';
+  const after = demo ? () => { const t = $('#app'); jumpTo(t, t.querySelector('h2')); } : null;
+  if (!demo) document.dispatchEvent(new CustomEvent('ec:subscribe', { detail: { plan, price } }));
+  if (demo && isFiled(plan)) return after();
+  subRound = { plan, from: b, after, sent: false, busy: false };
+  subForm.reset(); subErr.hidden = true; subSend.hidden = false; subSend.disabled = false; $('#subAsk').hidden = false; $('#subNext').hidden = true; $('#subConsult').hidden = true;
+  $('#subH').textContent = demo ? 'The demo is ready' : 'Almost there';
+  $('#subMsg').textContent = demo ? 'There is nothing to sign up for.' : `You picked ${plan}. Subscriptions are not open yet, so nothing was charged.`;
+  subSkip.textContent = demo ? 'Go to the demo' : 'No thanks';
+  sub.showModal();
 }));
-sub.addEventListener('close', () => subFrom?.focus());
+subSkip.addEventListener('click', () => sub.close());
+subForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const round = subRound;
+  if (!round || round.busy) return;
+  const email = subForm.elements.email.value.trim(), telegram = subForm.elements.telegram.value.trim();
+  const noContact = !email && !telegram;
+  if (noContact && round.after) return sub.close();
+  round.busy = true; subSend.disabled = true; subErr.hidden = true;
+  const r = noContact && isFiled(round.plan) ? { ok: true } : await fileInterest(round.plan, email, telegram);
+  round.busy = false; subSend.disabled = false;
+  if (!r.ok) {
+    subErr.textContent = r.code === '22023' && r.message ? r.message : 'We could not save that just now. Please try again later.';
+    subErr.hidden = false;
+    return;
+  }
+  round.sent = true;
+  if (round.after) return sub.close();
+  $('#subH').textContent = 'Thanks';
+  $('#subMsg').textContent = noContact ? `We noted your interest in ${round.plan}.` : 'We will let you know as soon as prices are set.';
+  $('#subAsk').hidden = true; subSend.hidden = true; $('#subNext').hidden = false; $('#subConsult').hidden = false; subSkip.textContent = 'Close'; $('#subH').focus();
+});
+sub.addEventListener('close', () => {
+  const round = subRound; subRound = null;
+  if (!round) return;
+  if (!round.sent && !isFiled(round.plan)) fileInterest(round.plan);
+  if (round.after) round.after(); else round.from.focus();
+});
 
 /* ---------- consulting call: the app host's sign-in page in consult mode (db/025): Google sign-in, then email, Telegram,
    WhatsApp and a note become a task in the "Consultancy Request" list. Same tab (the page keeps its state per tab). Local
