@@ -1,6 +1,6 @@
 # Hosting
 
-Nothing here needs a server: any static https host can serve the pages, and `file://` keeps working beside a hosted copy. This page describes the setup this repo was built with, **two Cloudflare Pages projects (Direct Upload), the app host's board and phone app behind Cloudflare Access**, on free plans, so another household can make the same. The deploy itself, step by step, is the runbook in [deployment/](deployment/README.md).
+Nothing here needs a server: any static https host can serve the pages, and `file://` keeps working beside a hosted copy. This page describes the setup this repo was built with, **two Cloudflare Pages projects (Direct Upload)**, on free plans, so another household can make the same. The deploy itself, step by step, is the runbook in [deployment/](deployment/README.md).
 
 Why not Supabase itself: on the free plan Supabase Storage and Edge Functions serve HTML as `text/plain`, and a custom domain is paid. GitHub Pages would publish from the repo and has no free per-email gate; Netlify or Vercel would work but add another account without a free email gate like Access.
 
@@ -11,7 +11,7 @@ The public landing page and the signed-in pages live on two origins, so the land
 | Host (Pages project) | Paths | Access |
 |---|---|---|
 | landing, `<landing>.pages.dev` (household: `eisenhower-agentic-planner.pages.dev`) | `/` site, `/assets/*`, `/terms`, `/refund`, `/cookies`, `/legal-notice`, `/accessibility`, `/data-deletion`, `/privacy`, `/version.json` | public; noindex; CSP from hashes only; `connect-src` the Supabase origin on `/`, `'none'` on the other pages |
-| app, `<app>.pages.dev` (household: `eisenhower-agentic-planner-app.pages.dev`) | `/board/`, `/app/`, `/signin`, `/request` (301 → `/signin`), `/privacy`, `/config/tasksdashboard.config.js`, `/version.json`; later first-party `/<name>/` | `/board`, `/board/*`, `/app`, `/app/*` behind the Access app **Eisenhower gate**; everything else public |
+| app, `<app>.pages.dev` (household: `eisenhower-agentic-planner-app.pages.dev`) | `/board/`, `/app/`, `/signin`, `/request` (301 → `/signin`), `/privacy`, `/config/tasksdashboard.config.js`, `/version.json`; later first-party `/<name>/` | public; the Access app **Eisenhower gate** on `/board`, `/board/*`, `/app`, `/app/*` is bypassed (below) |
 
 Every path on both hosts is noindex (`X-Robots-Tag: noindex`).
 
@@ -39,7 +39,9 @@ The board, the phone app and every later `/<name>/` share the app origin, so the
 
 ## The Access model: a gate on paths
 
-The app host gates only the signed-in pages; the landing host has no gate except on its previews.
+**Household, since 2026-11-04: the gate on the app host is off.** Access answers before a page loads, so a new person on `/board/` or `/app/` saw the Access login and never reached `/signin` to ask for access. The bypass policy `TasksDashboard public paths (bypass)` is attached first to **Eisenhower gate**; take it off to gate these paths again. What guards the board now: RLS with the whitelist (`db/024`), the board's and the app's own refusal of a login that is not let in. The cost: the pages' code is public. The previews apps stay gated.
+
+With the bypass off, the app host gates only the signed-in pages; the landing host has no gate except on its previews.
 
 | Access app | Host and paths | Policies |
 |---|---|---|
@@ -72,7 +74,7 @@ The app host gates only the signed-in pages; the landing host has no gate except
 7. **Secrets** go only into the deploying machine's env file, by name: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCESS_TOKEN`, `TASKSDB_PAGES_PROJECT` (the app project), `TASKSDB_SITE_PROJECT` (the landing project), `TASKSDB_PAGES_BRANCH` (usually `main`), `CF_ACCESS_PROD_APP_ID` (the gate), `CF_ACCESS_GUEST_POLICY_ID`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`.
 8. **Supabase:** Authentication → URL Configuration: Site URL `https://<app>.pages.dev`; Redirect URLs, exact: `https://<app>.pages.dev/signin`, `https://<app>.pages.dev/board/`, `https://<app>.pages.dev/app/` (plus `http://localhost:<port>/**` for local tests). `signin.html` returns to exactly `<origin>/signin`, with no query, so the exact entry matches ([auth.md](auth.md)).
 9. **Google Cloud** (the OAuth client): Authorized JavaScript origins `https://<app>.pages.dev`. On the consent screen, the home page `https://<landing>.pages.dev/` and the privacy policy `https://<landing>.pages.dev/privacy`, both public; authorized domains: both hosts.
-10. **Check** in a private window: `https://<app>.pages.dev/board/` shows the Cloudflare Access page; `/signin` and `/privacy` open; the landing `/` opens.
+10. **Check** in a private window: `https://<app>.pages.dev/board/` shows the Cloudflare Access page (with the bypass policy attached: goes to `/signin`); `/signin` and `/privacy` open; the landing `/` opens.
 
 **Household:** projects `eisenhower-agentic-planner` (landing) and `eisenhower-agentic-planner-app` (app), set up on 2026-10-30 and deployed from Maksym's PC, the only machine with the tokens. The older single host `homeos-tasksboard.pages.dev` (board at `/`, whole host behind Access, bypass apps for `/request` and `/app/*`) redirects to the app host.
 

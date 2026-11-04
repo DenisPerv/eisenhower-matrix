@@ -5,7 +5,7 @@ Right after every deploy or rollback. Any failed check: roll back to the previou
 | # | Check | How | Pass |
 |---|---|---|---|
 | 1 | Version | `deploy-pages.js --status` (or `GET /version.json` with the service token) | exit 0; the sha is the one just deployed |
-| 2 | Gate | **without** the service token: app host `/board`, `/board/`, `/board/index.html`, `/app`, `/app/` and one deployment's `https://<hash>.<project>.pages.dev/` per host | a redirect to `*.cloudflareaccess.com`, never `200` with a page. Public: app host `/signin` 200, `/request` 301 to `/signin`, `/` 302 to `/board/`, `/privacy`, the config and `/version.json` 200; landing `/`, the six legal pages and `/privacy` 200 |
+| 2 | Gate | **without** the service token: one deployment's `https://<hash>.<project>.pages.dev/` per host; app host `/board/`, `/app/` | previews: a redirect to `*.cloudflareaccess.com`, never `200` with a page. `/board/` and `/app/`: `200` while the gate is bypassed ([../hosting.md](../hosting.md)), a redirect to `*.cloudflareaccess.com` if it is on again. Public: app host `/signin` 200, `/request` 301 to `/signin`, `/` 302 to `/board/`, `/privacy`, the config and `/version.json` 200; landing `/`, the six legal pages and `/privacy` 200 |
 | 3 | Headers | `curl -sI` on every published path (the gated ones **with** the service token) | each path has exactly one CSP, its own, hashes equal the dry run's; landing `/` `connect-src` is only the Supabase URL, its legal pages and `/privacy` `'none'`; `X-Robots-Tag: noindex` everywhere; `Cache-Control: no-cache` where listed; no `Access-Control-Allow-Origin` on `/board*` and `/app/*` |
 | 4 | Nothing extra served | with the service token: `/config/profiles.js`, `/config/maksym.prefs.json`, `/db/001_schema.sql`, `/cli/tasks.mjs`, `/test/e2e.mjs`, `/README.md`, `/docs/deployment/README.md` | none returns that file (404 or the index page) |
 | 5 | Pages in a browser | Playwright (headless), the service-token headers added only to requests for the app origin, at 1440×900 and 390×844: landing `/` and a legal page; app host `/board/`, `/app/`, `/signin` | no CSP violation and no error in the console; landing: only its own host until a plan button is used (never press one on the hosted page in a check: it files a real task); app host: only itself and the Supabase URL |
@@ -16,7 +16,7 @@ Right after every deploy or rollback. Any failed check: roll back to the previou
 
 - Never type a real password into the hosted page. Signed-in checks use sessions made over REST and seeded into the page's storage (`test/e2e.mjs`), as for `file://`.
 - Never send the service-token headers to Supabase: they are not in its CORS allow-list and must not leave for another host.
-- Check 2 failing means Access does not cover the address: report it at once. The page is public until a person fixes the Access application.
+- Check 2 failing on a preview means Access does not cover the address: report it at once. The page is public until a person fixes the Access application.
 - Status checks 5-6 now use `e2e.mjs --url`: check 6 as in the table, and for check 5 `--group ui` (screenshots at 1440×900 and 390×844, console errors including CSP violations, the two hosts) next to Playwright. `--access-env` adds the service-token headers to the app origin only.
 
 ## Report
