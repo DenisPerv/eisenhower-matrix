@@ -110,6 +110,6 @@ and a note here.
 
 The card mirrors the app's task window. When that window changes, change this package in the same change
 (TasksDashboard `CLAUDE.md`). The quadrant rule has three copies (the page's `deriveQuadrant`, the SQL
-`review_quadrant` of `db/016`, `quadrant.py`); all three run the cases in `tests/quadrant_cases.json`:
+`review_quadrant` of `db/020`, `quadrant.py`); all three run the cases in `tests/quadrant_cases.json`:
 `tests/test_extract_draft_quadrant.py`, `test/telegram-parity.test.js` (which also checks that `db/905` T13 holds the
 same rows) and `db/905` itself.

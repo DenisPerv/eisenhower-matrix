@@ -92,6 +92,45 @@ test('signinHandover: the refresh token of signin.html\'s session (td.request.au
     assert.equal(C.signinHandover(raw), null, String(raw));
 });
 
+test('loginRefused: only an explicit false from rpc/is_whitelisted_login sends a login away', () => {
+  assert.equal(C.loginRefused({ ok: true, json: false }), true);
+  for (const r of [{ ok: true, json: true }, { ok: false, status: 404, json: null }, { ok: false, status: 0, json: null }, { ok: true, json: null }, null, undefined])
+    assert.equal(C.loginRefused(r), false, JSON.stringify(r));
+});
+
+test('refusedBounce: a refused login goes to /signin, but not again within 5 s of the last trip', () => {
+  const now = 1000000;
+  for (const last of [null, undefined, '', 'x', 0]) assert.equal(C.refusedBounce(last, now), true, String(last));
+  assert.equal(C.refusedBounce(String(now - 1000), now), false);
+  assert.equal(C.refusedBounce(String(now - 4999), now), false);
+  assert.equal(C.refusedBounce(String(now - 5000), now), true);
+  assert.equal(C.refusedBounce(String(now + 1000), now), true);
+});
+
+test('refusedHandover: the session in the shape signin.html reads, and signinHandover can read it back', () => {
+  const raw = C.refusedHandover({ access_token: 'a', refresh_token: 'r', expires_at: 5, user: { id: 'u', email: 'x@example.com' } });
+  assert.deepEqual(JSON.parse(raw), { access_token: 'a', refresh_token: 'r', expires_at: 5, email: 'x@example.com' });
+  assert.equal(C.signinHandover(raw), 'r');
+  assert.equal(JSON.parse(C.refusedHandover({ access_token: 'a', refresh_token: 'r', expires_at: 5 })).email, '');
+});
+
+test('a stale Google callback: oauthMessage calls it expired; the board carries on when it has a session, before any token call', () => {
+  for (const errorCode of ['bad_oauth_state', 'flow_state_not_found', 'flow_state_expired', 'bad_code_verifier'])
+    assert.equal(C.oauthMessage({ errorCode }), 'The Google sign-in expired. Try again.', errorCode);
+  const fs = require('node:fs'), path = require('node:path');
+  const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  const fn = web.slice(web.indexOf('async function finishGoogle(cb)'));
+  const clean = fn.indexOf('history.replaceState(null'), plain = fn.indexOf('return start();'), token = fn.indexOf("token?grant_type=pkce");
+  assert.ok(clean >= 0 && plain > clean && token > plain);
+});
+
+test('the board asks is_whitelisted_login after its profile is known and before it reads any item', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  const asks = web.indexOf("'rpc/is_whitelisted_login'"), noProfile = web.indexOf('This login has no profile'), items = web.indexOf("getAll('items?select=*&deleted_at=is.null')");
+  assert.ok(noProfile > 0 && asks > noProfile && items > asks);
+});
+
 test('the board and the phone app have no password form; the privacy line names the contact, links /privacy, and is the same in both', () => {
   const fs = require('node:fs'), path = require('node:path');
   const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');

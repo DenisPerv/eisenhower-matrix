@@ -1713,6 +1713,20 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     try { v = JSON.parse(raw || 'null'); } catch (e) { return null; }
     return isObj(v) && typeof v.refresh_token === 'string' && v.refresh_token.length > 0 ? v.refresh_token : null;
   }
+  // rpc/is_whitelisted_login (db/024) said no: only an explicit false refuses. A failed call, or a database without db/024, lets the
+  // page load; RLS still refuses the data and the writes.
+  function loginRefused(r) { return !!(r && r.ok && r.json === false); }
+  // a refused login goes to /signin with its session, so the request screens show without a second Google prompt (the shape
+  // signin.html keeps in td.request.auth). A bounce within 5 s of the last one means /signin sent the login straight back: no third
+  // trip, the page shows its card.
+  const REFUSED_AT_KEY = 'td.signin.refusedAt', REFUSED_LOOP_MS = 5000;
+  function refusedBounce(lastAt, now) {
+    const t = Number(lastAt);
+    return !(t > 0 && now - t >= 0 && now - t < REFUSED_LOOP_MS);
+  }
+  function refusedHandover(s) {
+    return JSON.stringify({ access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at, email: (s.user && s.user.email) || '' });
+  }
   // "Session ended" with n changes waiting. kept: they survive the trip to Google or /signin (the phone app's IndexedDB queue);
   // the board's queue lives in memory only, and every sign-in now leaves the page, so it says they are lost (honest, not "sent")
   function sessionEndedText(n, kept) {
@@ -2476,7 +2490,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
@@ -2769,8 +2783,12 @@ async function finishGoogle(cb) {
   history.replaceState(null, '', cb.cleanUrl);
   let saved = null; try { saved = JSON.parse(ss.get(PKCE_KEY) || 'null'); } catch (e) {}
   ss.del(PKCE_KEY);
-  if (!cb.code) return showSignIn(C.oauthMessage(cb), '');
-  if (!saved || typeof saved.verifier !== 'string') return showSignIn('The Google sign-in expired. Try again.', '');
+  // a stale callback (browser Back into a finished sign-in: no verifier here, or Supabase's bad_oauth_state sent to the Site URL) is
+  // no failure while this tab has a session: the address is clean now, so start() is a plain load, the same as a refresh
+  const EXPIRED = 'The Google sign-in expired. Try again.';
+  const message = cb.code ? (saved && typeof saved.verifier === 'string' ? '' : EXPIRED) : C.oauthMessage(cb);
+  if (message === EXPIRED && (C.signinHandover(ss.get(C.SIGNIN_AUTH_KEY)) || readRefresh(null))) return start();
+  if (message) return showSignIn(message, '');
   boot.gate = 'loading'; render();
   const r = await authCall('token?grant_type=pkce', C.pkceBody(cb.code, saved.verifier));
   const s = r.status === 200 && C.sessionFromGrant(r.json, Date.now());
@@ -2977,6 +2995,16 @@ async function loadAll() {
   const meta = await loadMeta();
   if (!meta.ok) return loadFailed(meta);
   if (!me) { boot.msg = 'This login has no profile in the database. Run db/004_seed.sql for it.'; return showGate('error'); }
+  // a login that is not whitelisted has no board: to /signin (hosted and localhost) with its session, where the request screens show;
+  // file://, or /signin sending it straight back, ends on the sign-in card
+  if (C.loginRefused(await rest('POST', 'rpc/is_whitelisted_login', { p_uid: me.id }))) {
+    const go = HOSTED && C.refusedBounce(ss.get(C.REFUSED_AT_KEY), Date.now()), back = C.refusedHandover(session);
+    clearAuth(); storeKind = null; session = null; Q.clear(); tasks = [];
+    if (!go) return showSignIn('This Google account has no access yet.', '');
+    ss.set(C.REFUSED_AT_KEY, String(Date.now())); ss.set(C.SIGNIN_AUTH_KEY, back);
+    return location.replace('/signin?next=/board/');
+  }
+  ss.del(C.REFUSED_AT_KEY);
   // td.accounts: this account on this browser (switching back prefills it, or opens Google with it)
   if (session.user.email) { const known = C.accountFor(accounts(), me.handle); rememberAccount(me.handle, session.user.email, sessionProvider || (known ? known.provider : 'email')); }
   const [items, prefs] = await Promise.all([

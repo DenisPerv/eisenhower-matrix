@@ -304,7 +304,8 @@ form .primary{margin-top:2px}
         '<p class="fine">We keep your email, your name and the time of the request. We also use your email address to send you one email with the decision (approved or not).</p>' +
         `<p class="fine" data-privacy>How we handle your data: <a href="${HOSTED ? '/privacy' : 'privacy.html'}">privacy</a>.</p>`;
     } else if (state === 'sending') {
-      h = `<h1>${consultMode() ? 'One moment' : 'Sending your request'}</h1><div class="scan" aria-hidden="true"></div><p>One moment.</p>`;
+      // also shown while check() asks who this is: most logins here have access and send nothing, so it never says a request is going
+      h = '<h1>One moment</h1><div class="scan" aria-hidden="true"></div><p>Checking your access.</p>';
     } else if (state === 'sent') {
       h = COFFEE + '<h1>Request sent</h1><p>Your request is sent. We\'ll let you in soon.</p>' +
         `<dl><div><dt>Requested</dt><dd>${when(o.row.requested_at) || 'just now'}</dd></div>${account()}<div><dt>Status</dt><dd><span class="dot" aria-hidden="true"></span>Waiting for a decision</dd></div></dl>` +
