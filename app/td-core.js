@@ -430,6 +430,9 @@
     try { v = JSON.parse(raw || 'null'); } catch (e) { return null; }
     return isObj(v) && typeof v.refresh_token === 'string' && v.refresh_token.length > 0 ? v.refresh_token : null;
   }
+  // rpc/is_whitelisted_login (db/024) said no: only an explicit false refuses. A failed call, or a database without db/024, lets the
+  // page load; RLS still refuses the data and the writes.
+  function loginRefused(r) { return !!(r && r.ok && r.json === false); }
   // "Session ended" with n changes waiting. kept: they survive the trip to Google or /signin (the phone app's IndexedDB queue);
   // the board's queue lives in memory only, and every sign-in now leaves the page, so it says they are lost (honest, not "sent")
   function sessionEndedText(n, kept) {
@@ -1193,7 +1196,7 @@
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
-    isHostedOrigin, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
+    isHostedOrigin, loginRefused, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,

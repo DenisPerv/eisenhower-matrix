@@ -92,6 +92,19 @@ test('signinHandover: the refresh token of signin.html\'s session (td.request.au
     assert.equal(C.signinHandover(raw), null, String(raw));
 });
 
+test('loginRefused: only an explicit false from rpc/is_whitelisted_login sends a login away', () => {
+  assert.equal(C.loginRefused({ ok: true, json: false }), true);
+  for (const r of [{ ok: true, json: true }, { ok: false, status: 404, json: null }, { ok: false, status: 0, json: null }, { ok: true, json: null }, null, undefined])
+    assert.equal(C.loginRefused(r), false, JSON.stringify(r));
+});
+
+test('the board asks is_whitelisted_login after its profile is known and before it reads any item', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  const asks = web.indexOf("'rpc/is_whitelisted_login'"), noProfile = web.indexOf('This login has no profile'), items = web.indexOf("getAll('items?select=*&deleted_at=is.null')");
+  assert.ok(noProfile > 0 && asks > noProfile && items > asks);
+});
+
 test('the board and the phone app have no password form; the privacy line names the contact, links /privacy, and is the same in both', () => {
   const fs = require('node:fs'), path = require('node:path');
   const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');

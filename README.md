@@ -131,6 +131,7 @@ Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intende
 | no saved session, `http://localhost` | "Continue with Google", "Stay signed in on this computer" (ticked), the privacy line; Google runs here and comes back to the same page |
 | no saved session, `file://` | the same card with "This page is a local file. Google sign-in works on the hosted page or on http://localhost."; the button says it needs an https or localhost page (Google needs an origin to come back to) |
 | back from `/signin` (same tab) | the refresh token of `signin.html`'s session (`sessionStorage` `td.request.auth`) becomes `td.auth` as `td.signin.stay` says (`'0'` unticked, else ticked); both keys are deleted at once (`signinHandover`), so a dead token ends on an empty `/signin`, never in a loop; then a silent refresh and the board |
+| signed in, not whitelisted (`rpc/is_whitelisted_login`, `db/024`, answers `false`; asked after the profile loads, before any item is read; `loginRefused`) | the saved session is dropped; hosted: `/signin` and its request screens after a new Google sign-in; `http://localhost`: the card with "This Google account has no access yet."; a failed call lets the page load, RLS still refuses the data and the writes |
 | saved session | the board, after a silent token refresh |
 | back from Google (`?code=`) | the code is swapped at once, then removed from the address; the board |
 | back from Google with an error | the sign-in screen with the reason in plain words (`oauthMessage`) |
