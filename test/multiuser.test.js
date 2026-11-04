@@ -114,6 +114,16 @@ test('refusedHandover: the session in the shape signin.html reads, and signinHan
   assert.equal(JSON.parse(C.refusedHandover({ access_token: 'a', refresh_token: 'r', expires_at: 5 })).email, '');
 });
 
+test('a stale Google callback: oauthMessage calls it expired; the board carries on when it has a session, before any token call', () => {
+  for (const errorCode of ['bad_oauth_state', 'flow_state_not_found', 'flow_state_expired', 'bad_code_verifier'])
+    assert.equal(C.oauthMessage({ errorCode }), 'The Google sign-in expired. Try again.', errorCode);
+  const fs = require('node:fs'), path = require('node:path');
+  const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  const fn = web.slice(web.indexOf('async function finishGoogle(cb)'));
+  const clean = fn.indexOf('history.replaceState(null'), plain = fn.indexOf('return start();'), token = fn.indexOf("token?grant_type=pkce");
+  assert.ok(clean >= 0 && plain > clean && token > plain);
+});
+
 test('the board asks is_whitelisted_login after its profile is known and before it reads any item', () => {
   const fs = require('node:fs'), path = require('node:path');
   const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');

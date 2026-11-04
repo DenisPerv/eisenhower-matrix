@@ -2783,8 +2783,12 @@ async function finishGoogle(cb) {
   history.replaceState(null, '', cb.cleanUrl);
   let saved = null; try { saved = JSON.parse(ss.get(PKCE_KEY) || 'null'); } catch (e) {}
   ss.del(PKCE_KEY);
-  if (!cb.code) return showSignIn(C.oauthMessage(cb), '');
-  if (!saved || typeof saved.verifier !== 'string') return showSignIn('The Google sign-in expired. Try again.', '');
+  // a stale callback (browser Back into a finished sign-in: no verifier here, or Supabase's bad_oauth_state sent to the Site URL) is
+  // no failure while this tab has a session: the address is clean now, so start() is a plain load, the same as a refresh
+  const EXPIRED = 'The Google sign-in expired. Try again.';
+  const message = cb.code ? (saved && typeof saved.verifier === 'string' ? '' : EXPIRED) : C.oauthMessage(cb);
+  if (message === EXPIRED && (C.signinHandover(ss.get(C.SIGNIN_AUTH_KEY)) || readRefresh(null))) return start();
+  if (message) return showSignIn(message, '');
   boot.gate = 'loading'; render();
   const r = await authCall('token?grant_type=pkce', C.pkceBody(cb.code, saved.verifier));
   const s = r.status === 200 && C.sessionFromGrant(r.json, Date.now());
