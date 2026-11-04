@@ -14,7 +14,7 @@ How a person who is not let into a hosted copy asks for access, and how an owner
 | 6 | owner or a job | `node cli/access.mjs process --apply`: approved emails go into the access policy, then `access_request_decided`, the task is set done with a closing line and `details.decision` gets `applied_at` |
 | 7 | stranger | opens `/signin` again: once step 6 has run, an approved request goes on to the board; a declined one sees "Request declined" |
 
-The decision email is sent by the host, not by this repository: HomeOS mails each requester once, from Maksym's Gmail, after it applies the decision; `signin.html`, the phone app's gate and `privacy.html` say so.
+The decision email is sent by the host, not by this repository: HomeOS mails each requester once, from md.solutions.homeos@gmail.com, after it applies the decision; `signin.html`, the phone app's gate and `privacy.html` say so.
 
 The page loads no board data. A signed-in stranger already has a login and their own "My tasks" (as any guest), so the gate in front of the board is the host's access policy, not the database.
 
