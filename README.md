@@ -151,7 +151,7 @@ Double-click `TasksDashboard.html` (Chrome or Edge on Windows 11 for the intende
   | `data-state` of `#app` | When | Shows |
   |---|---|---|
   | `signedout` | no session in this tab | "Sign in", Continue with Google (off on `file://`, with "Open this page on its https address to sign in."), what is kept (email, name, time) and that the address gets one email with the decision (approved or not), then "How we handle your data: privacy" (`/privacy`); the phone app's gate says the same |
-  | `sending` | an RPC is on its way | a scan line |
+  | `sending` | an RPC is on its way, also while `check()` asks who this is | "One moment", a scan line, "Checking your access." (never says a request is going: most logins here have access) |
   | `sent` | status `pending` | the coffee break (inline SVG; the steam stops moving with reduced motion), "Your request is sent. We'll let you in soon.", Requested (local `yyyy-mm-dd HH:MM`), Account, Status |
   | `approved` | status `approved`, or `request_access` refuses a household member (`22023` "already have access") | "You're in", the approval time, Open TasksDashboard (`next`); on a hosted origin the page goes on to `next` at once (`location.replace`) |
   | `declined` | status `declined` | "Request declined", the decision time |
