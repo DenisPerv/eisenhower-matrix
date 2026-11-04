@@ -98,6 +98,22 @@ test('loginRefused: only an explicit false from rpc/is_whitelisted_login sends a
     assert.equal(C.loginRefused(r), false, JSON.stringify(r));
 });
 
+test('refusedBounce: a refused login goes to /signin, but not again within 5 s of the last trip', () => {
+  const now = 1000000;
+  for (const last of [null, undefined, '', 'x', 0]) assert.equal(C.refusedBounce(last, now), true, String(last));
+  assert.equal(C.refusedBounce(String(now - 1000), now), false);
+  assert.equal(C.refusedBounce(String(now - 4999), now), false);
+  assert.equal(C.refusedBounce(String(now - 5000), now), true);
+  assert.equal(C.refusedBounce(String(now + 1000), now), true);
+});
+
+test('refusedHandover: the session in the shape signin.html reads, and signinHandover can read it back', () => {
+  const raw = C.refusedHandover({ access_token: 'a', refresh_token: 'r', expires_at: 5, user: { id: 'u', email: 'x@example.com' } });
+  assert.deepEqual(JSON.parse(raw), { access_token: 'a', refresh_token: 'r', expires_at: 5, email: 'x@example.com' });
+  assert.equal(C.signinHandover(raw), 'r');
+  assert.equal(JSON.parse(C.refusedHandover({ access_token: 'a', refresh_token: 'r', expires_at: 5 })).email, '');
+});
+
 test('the board asks is_whitelisted_login after its profile is known and before it reads any item', () => {
   const fs = require('node:fs'), path = require('node:path');
   const web = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
