@@ -51,6 +51,7 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 | Area | Functions | File |
 |---|---|---|
 | lists | `create_list`, `create_list_row`, `set_list_hidden`, `leave_list`, `list_people` | 002/010/012 |
+| lists, one service login | `agent_create_list`, `agent_rename_list`: `homeos-agent` only; the owner is a household person, the slug never changes | 027 |
 | sharing | `share_list`, `share_tag_list`, `shareable_profiles`, `share_list_with`, `share_tag_list_with`, `my_invitations`, `accept_invite`, `decline_invite`, `revoke_invite`, `answer_shared_notice`, `visible_profiles` | 010/012/022 |
 | tag lists | `create_tag_list`, `set_default_tag_list` (no longer called by the page or the app), `set_tag_list_archived`, `set_tag_list_hidden`, `leave_tag_list`, `tag_list_people`, `move_tags`, `merge_tags`, `merge_tag_lists` | 010/012 |
 | settings | `urgency_settings(p_profile)` | 014 |
