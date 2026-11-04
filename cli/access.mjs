@@ -69,6 +69,26 @@ export function decisionOf(body) {
   const w = m ? m[1].toLowerCase() : '';
   return w === 'approved' || w === 'declined' ? w : null;
 }
+// the decision of a task: a clicked button (details.decision.answer, db/028) first, then the first word of the description
+export function taskDecision(item) {
+  const d = item && item.details && item.details.decision;
+  if (d && d.answer === 1) return 'approved';
+  if (d && d.answer === 0) return 'declined';
+  return decisionOf(item && item.body_md);
+}
+// a click closes the task, so process also reads a closed task whose answer it has not applied yet
+export function toProcess(item) {
+  if (item.status !== 'done') return true;
+  const d = item.details && item.details.decision;
+  return !!d && !d.applied_at && (d.answer === 1 || d.answer === 0);
+}
+// details with the applied answer (every other key kept), or null for a task without the buttons
+export function appliedDetails(item, decision, result, nowIso) {
+  const d = item.details && item.details.decision;
+  if (!d) return null;
+  return Object.assign({}, item.details, { decision: Object.assign({}, d, {
+    answer: decision === 'approved' ? 1 : decision === 'declined' ? 0 : d.answer, applied_at: nowIso, applied_result: result }) });
+}
 // the email rules of a policy's include list (other rule kinds are kept as they are), without the placeholder
 export const policyEmails = p => (p && p.include || []).filter(r => r && r.email && r.email.email).map(r => String(r.email.email).toLowerCase())
   .filter(e => e !== PLACEHOLDER);
@@ -129,7 +149,7 @@ export const closingLine = (decision, when) => `\n\n${decision === 'approved' ? 
   + (decision === 'approved' ? 'added to the access policy.' : 'nothing applied.');
 // what process does with one task: { action: 'approve' | 'decline' | 'close' | 'skip', why }
 export function planTask(item, req) {
-  const d = decisionOf(item.body_md);
+  const d = taskDecision(item);
   if (!d) return { action: 'skip', why: 'undecided' };
   if (!req) return { action: 'skip', why: 'no access request for this task' };
   if (d === 'approved') {
@@ -367,9 +387,9 @@ export async function run(argv, out = console.log, deps = {}) {
     const q = await c.rest('POST', 'rpc/access_requests', {});
     if (!q.ok) throw new TdError(errorExit(q.err), q.err.message);
     const reqs = Object.fromEntries((q.json || []).map(x => [x.id, x]));
-    const ir = await c.getAll(`items?select=id,num,title,body_md,details,status&list_id=eq.${listId}&deleted_at=is.null&status=not.in.(done,cancelled)&order=num`);
+    const ir = await c.getAll(`items?select=id,num,title,body_md,details,status&list_id=eq.${listId}&deleted_at=is.null&status=neq.cancelled&order=num`);
     if (!ir.ok) throw new TdError(errorExit(ir.err), ir.err.message);
-    const plans = ir.json.map(it => ({ it, req: reqs[(it.details || {}).access_request_id], p: planTask(it, reqs[(it.details || {}).access_request_id]) }));
+    const plans = ir.json.filter(toProcess).map(it => ({ it, req: reqs[(it.details || {}).access_request_id], p: planTask(it, reqs[(it.details || {}).access_request_id]) }));
     for (const x of plans) out(`A${x.it.num} ${x.req ? x.req.email : x.it.title}: ${x.p.action}${x.p.why ? ' (' + x.p.why + ')' : ''}`);
     const approve = plans.filter(x => x.p.action === 'approve');
     if (approve.length) await changeGuests(cf, env, a, xs => [...xs, ...approve.map(x => x.req.email)], out);
@@ -379,9 +399,16 @@ export async function run(argv, out = console.log, deps = {}) {
         const d = await c.rest('POST', 'rpc/access_request_decided', { p_id: x.req.id, p_status: x.p.decision });
         if (!d.ok) throw new TdError(errorExit(d.err), `A${x.it.num}: ${d.err.message}`);
       }
-      const u = await c.rest('PATCH', 'items?id=eq.' + x.it.id, { status: 'done', body_md: x.it.body_md + closingLine(x.p.decision, now) }, { Prefer: 'return=minimal' });
+      const result = x.p.action === 'approve' ? 'added to the access policy' : x.p.action === 'decline' ? 'nothing applied' : x.p.why;
+      const details = appliedDetails(x.it, x.p.decision, result, new Date(now).toISOString());
+      const u = await c.rest('PATCH', 'items?id=eq.' + x.it.id, Object.assign({ status: 'done', body_md: x.it.body_md + closingLine(x.p.decision, now) }, details ? { details } : {}), { Prefer: 'return=minimal' });
       if (!u.ok) throw new TdError(errorExit(u.err), `A${x.it.num}: ${u.err.message}`);
       out(`A${x.it.num} done`);
+    }
+    // a clicked answer that cannot apply (a removed request, Decline on an approved one): recorded once, so it is not read again
+    for (const x of plans.filter(y => y.p.action === 'skip' && y.it.status === 'done')) {
+      const u = await c.rest('PATCH', 'items?id=eq.' + x.it.id, { details: appliedDetails(x.it, taskDecision(x.it), 'not applied: ' + x.p.why, new Date(now).toISOString()) }, { Prefer: 'return=minimal' });
+      if (!u.ok) throw new TdError(errorExit(u.err), `A${x.it.num}: ${u.err.message}`);
     }
     return EXIT.ok;
   } finally { await c.close(); }

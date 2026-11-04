@@ -13,7 +13,7 @@ Supabase Auth issues every session. **People sign in with Google only** (since 2
 | `file://` | `TasksDashboard.html` | the card, but Google cannot come back to a file: open the page on localhost or the app host |
 
 - **The hand-over from `/signin`:** `signin.html` keeps its session in this tab's `sessionStorage` `td.request.auth` and never writes `td.auth`. The board and the phone app, opened by its `location.replace`, take its refresh token once (`signinHandover`), store it as `td.auth` as their Stay signed in box said before they went to `/signin` (`sessionStorage` `td.signin.stay`; ticked when they went on their own), delete both keys and refresh. A token that no longer works ends on an empty `/signin`, never in a loop.
-- **Two Google prompts on the app host:** one from Cloudflare Access ("Eisenhower gate", in front of `/board/` and `/app/`, remembered for its session length), one from Supabase on `/signin` or in place, remembered while Stay signed in is on.
+- **One Google prompt on the app host:** from Supabase on `/signin` or in place, remembered while Stay signed in is on. Cloudflare Access ("Eisenhower gate") adds a second one only if its bypass policy is taken off ([hosting.md](hosting.md)).
 
 ## Password logins (service logins only)
 

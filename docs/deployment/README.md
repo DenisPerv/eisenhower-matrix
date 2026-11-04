@@ -10,7 +10,7 @@ How the AI deploys TasksDashboard and its landing page to the two hosts on Cloud
 
 ## Status
 
-**Two hosts (household, 2026-10-30):** landing `https://eisenhower-agentic-planner.pages.dev` (public) and app `https://eisenhower-agentic-planner-app.pages.dev` (`/board/` and `/app/` behind the Access app "Eisenhower gate"; `/signin`, `/privacy`, the config and `version.json` public). Both projects exist with placeholder pages until the first release that holds `site/` and `signin.html` is deployed. The older single host `https://homeos-tasksboard.pages.dev` (board at `/`, whole host behind Access) is redirected to the app host once the app host has passed its checks. Deploy script: HomeOS `scripts/tasksdb/deploy-pages.js`.
+**Two hosts (household, 2026-10-30):** landing `https://eisenhower-agentic-planner.pages.dev` (public) and app `https://eisenhower-agentic-planner-app.pages.dev` (all public: `/board/` and `/app/` go to `/signin` when signed out; the Access app "Eisenhower gate" is bypassed since 2026-11-04). Both projects exist with placeholder pages until the first release that holds `site/` and `signin.html` is deployed. The older single host `https://homeos-tasksboard.pages.dev` (board at `/`, whole host behind Access) is redirected to the app host once the app host has passed its checks. Deploy script: HomeOS `scripts/tasksdb/deploy-pages.js`.
 
 ## Rules
 
@@ -27,7 +27,7 @@ How the AI deploys TasksDashboard and its landing page to the two hosts on Cloud
 |---|---|
 | Host | Cloudflare Pages, Direct Upload project (it can never switch to Git integration) |
 | URL | `https://<landing>.pages.dev` and `https://<app>.pages.dev` (household: `eisenhower-agentic-planner.pages.dev`, `eisenhower-agentic-planner-app.pages.dev`) |
-| Gate | Cloudflare Access on the app host's `/board` and `/app` paths ("Eisenhower gate", `cli/access.mjs setup --gate`), Google login, the household's emails and approved guests; a previews app per host; a service token for the AI's checks |
+| Gate | Cloudflare Access: a previews app per host, a service token for the AI's checks; "Eisenhower gate" on the app host's `/board` and `/app` paths is bypassed ([../hosting.md](../hosting.md)) |
 | Tool | Wrangler, pinned: `npx --yes wrangler@4.150.0` (the pin lives in `deploy-pages.js`) |
 | Env names | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (Pages: Edit), `TASKSDB_PAGES_PROJECT` (the app project), `TASKSDB_SITE_PROJECT` (the landing project), `TASKSDB_PAGES_BRANCH` (the project's production branch, default `main`), `TASKSDB_PAGES_URL` (optional, default `https://<project>.pages.dev`), `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` |
 

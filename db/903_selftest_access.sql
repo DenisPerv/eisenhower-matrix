@@ -83,7 +83,7 @@ begin
                                       where user_id = g group by item_id), '1/true');
   perform public._ac_chk('Q3d task', (select concat_ws('|', list_id = acc, created_by = ha, actor_kind, created_via, category, status, title,
                                                        details->'notify', details->>'access_request_id' = rid::text, dedup_key = 'access-request:' || rid,
-                                                       body_md like 'Write Approved or Declined as the first word of this description.%')
+                                                       body_md like 'Use Approve or Decline above.%')
                                         from public.items where id = iid),
                          't|t|agent|rpc:request_access|task|open|Access request: ' || ge || '|["maksym", "anastasiia"]|t|t|t');
   perform public._ac_chk('Q3e due', (select (to_char(due_at at time zone 'Europe/Lisbon', 'HH24:MI') = '09:00' and due_at > now()
