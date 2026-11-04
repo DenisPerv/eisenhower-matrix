@@ -16,7 +16,7 @@ Run the files in the SQL editor (or with an admin tool), each file whole, in thi
 | 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql`, `019_bot_opt_out.sql`, `020_priority_retired.sql`, `022_share_by_person.sql`, `023_agent_tag_home.sql` | KPI history RPC, urgency settings by app, access requests, the review report API, the chat bot's scope, task links, the bot's opt-out, functions without priority (priority by position) |
 | 7 | `003`, `011`, the 012 policy block | again |
 | 7a | `021_drop_priority.sql` | drops `items.priority`, only once every client runs a page without priority (the hosted copy, both household machines, the Telegram bot); then 7 and 8 again |
-| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced); 905 calls the `020` signature, so until 020 is live run its pre-020 copy |
+| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
 
 Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`. `010` also replaces `items_tags_compat_after`, which `023` replaces again: re-running `010` means re-running `023` after it.
 
@@ -56,7 +56,7 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 | tag lists | `create_tag_list`, `set_default_tag_list` (no longer called by the page or the app), `set_tag_list_archived`, `set_tag_list_hidden`, `leave_tag_list`, `tag_list_people`, `move_tags`, `merge_tags`, `merge_tag_lists` | 010/012 |
 | settings | `urgency_settings(p_profile)` | 014 |
 | task links | `link_items(p_from, p_to, p_kind)`, `unlink_items(p_from, p_to, p_kind)`; the trigger `item_links_guard` and its helper `link_would_loop` (no execute for anyone) | 018 |
-| reports | `kpi_events(p_lists)` (invoker), `review_report(p_weeks, p_lists, p_now)` (invoker), its pure helper `review_quadrant` | 013/016 |
+| reports | `kpi_events(p_lists)` (invoker), `review_report(p_weeks, p_lists, p_now)` (invoker), its pure helper `review_quadrant` | 013/016/020 |
 | access requests | `request_access`, `my_access_request`, `access_requests`, `access_request_decided` | 015 |
 | keep-alive | `keepalive`, `keepalive_status` | 002/010 |
 | helpers not callable through the API | `is_whitelisted(uuid)`, `shareable_email(uuid)` (022: the whitelist and a person's verified address, resolved on the server), `agent_tag_home_check`, `tag_lists_home_guard`, `tag_members_keep_home` (023) | 022/023 |

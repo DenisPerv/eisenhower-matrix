@@ -7,7 +7,7 @@
 -- profiles only; T8 callers: a person, an unlinked bot, a person the bot is not linked to -> 42501; T9 a viewer list is
 -- not offered for writing; T10 rights (definer, search_path, not for anon, ops.bot_links closed); T11 the seed (live DB);
 -- T12 (db/019) a removed bot stays out: an insert without a person behind it (a 017 re-run) is undone, a person adding it
--- back clears the opt-out, the same for tag lists, Access requests opted out; T13 review_quadrant (db/016) gives the
+-- back clears the opt-out, the same for tag lists, Access requests opted out; T13 review_quadrant (db/020) gives the
 -- shared quadrant cases (the rows between the quadrant-cases markers equal telegram-integration/tests/quadrant_cases.json;
 -- test/telegram-parity.test.js checks that).
 -- Fixtures: H1, H2 (household people), B and B2 (agents), G (a Google guest). Run after 019, 003, 011, the 012 policy

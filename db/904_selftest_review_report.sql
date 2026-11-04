@@ -7,7 +7,7 @@
 -- stay out; V11 bad input (22023); V12 rights (invoker, search_path, not for anon).
 -- Fixtures: H1 (household, allowlist row) and A (a Google guest), as in 902; items written as admin in week 2026-W10
 -- (2-8 March 2026, Europe/Lisbon = UTC+0 then) with p_now = 2026-03-05 12:00 UTC.
--- Run after 016, 003, 011, the 012 policy block, 900, 901, 902 and 903.
+-- Run after 020, 003, 011, the 012 policy block, 900, 901, 902 and 903.
 
 do $do$
 declare
@@ -144,7 +144,7 @@ begin
   -- V12 rights
   perform public._rv_as(null);
   perform public._rv_chk('V12a anon', (has_function_privilege('anon', 'public.review_report(text[], uuid[], timestamptz)', 'execute')
-                                       or has_function_privilege('anon', 'public.review_quadrant(text, int, text, boolean, timestamptz, timestamptz, numeric)', 'execute'))::text, 'false');
+                                       or has_function_privilege('anon', 'public.review_quadrant(text, text, boolean, timestamptz, timestamptz, numeric)', 'execute'))::text, 'false');
   perform public._rv_chk('V12b authenticated', has_function_privilege('authenticated', 'public.review_report(text[], uuid[], timestamptz)', 'execute')::text, 'true');
   perform public._rv_chk('V12c invoker and search_path', (select string_agg(p.proname || ':' || p.prosecdef || ':' || (coalesce(p.proconfig, '{}') @> array['search_path=""']), ',' order by p.proname)
                                                             from pg_proc p join pg_namespace n on n.oid = p.pronamespace
