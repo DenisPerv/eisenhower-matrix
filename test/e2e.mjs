@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|links|guests|request|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|appfilters|links|guests|request|smoke] [--page <html>]
 //   [--url <https origin or page> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/ or the page path given (https://host/board/, a
 // directory path ending in /), and sessions are seeded on <origin>/version.json
@@ -22,7 +22,7 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, PAGE_PATH = '/', ACCESS = null; // --url (origin, page path) and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'links', 'guests', 'request'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 // the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
 const OFFLINE = want.every(g => g === 'request');
@@ -642,6 +642,64 @@ async function gSearchRow() {
     check(G, 'opened again is remembered', (await pref()) === 'expanded' && (await hidden()) === false);
     check(G, 'no console errors', T.errors.length === errs, JSON.stringify(T.errors.slice(errs)));
   } finally { await T.size(1440, 900); }
+}
+// the phone's Search: tags by tag list and the selected list as on the board, the Mine picker on the Mine chip
+async function gAppFilters() {
+  const G = 'appfilters', made = [];
+  const mineSnap = ((await MK.rest('GET', 'profiles?select=mine_tag_ids&id=eq.' + MK.uid)).json[0] || {}).mine_tag_ids || [];
+  const lists = (await MK.rest('GET', 'tag_lists?select=id,name&archived_at=is.null&order=sort')).json || [];
+  const withTags = [];
+  for (const l of lists) { const t = (await MK.rest('GET', 'tags?select=id,name&deleted_at=is.null&order=sort&limit=1&tag_list_id=eq.' + l.id)).json || []; if (t.length) withTags.push({ l, t: t[0] }); }
+  if (withTags.length < 2) { check(G, 'two tag lists with a tag each to test on', false); return; }
+  const [{ t: a }, { t: b }] = withTags;
+  const tagIt = async (it, ...tags) => { for (const t of tags) { const r = await MK.rest('POST', 'item_tags', { item_id: it.id, tag_id: t.id }, { Prefer: 'return=minimal' }); if (!r.ok) throw new Error('tag: ' + r.message); } return it; };
+  try {
+    await MK.rest('PATCH', 'profiles?id=eq.' + MK.uid, { mine_tag_ids: [] });
+    const la = await mkList(MK, RUN + ' phone a', true); made.push(la);
+    const iBoth = await tagIt(await mkItem('phone both', { list_id: la.id }), a, b);
+    const iOne = await tagIt(await mkItem('phone one', { list_id: la.id }), a);
+    const iOther = await tagIt(await mkItem('phone other list'), a, b);
+    const P = await tab(B, await ctx(B), { width: 390, height: 844 });
+    await seed(P, await grantFor('maksym'));
+    await P.go(pathToFileURL(path.join(path.dirname(PAGE), 'app', 'index.html')).href);
+    check(G, 'the phone loaded the test tasks and no Mine tags', await P.wait('S.ready&&[' + [iBoth, iOther].map(x => JSON.stringify(x.id)).join() + '].every(id=>(D.all().find(t=>t.id===id)||{tags:[]}).tags.length===2)&&!(me().mine_tag_ids||[]).length', 30000));
+    await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
+    await P.click('.tab[data-tab=search]'); await P.wait('!!document.querySelector("#filters [data-k=mine]")', 8000);
+    const shown = () => P.ev('[...document.querySelectorAll("#results [data-tid]")].map(x=>x.dataset.tid)');
+    const has = (ids, it) => ids.includes(it.id);
+    await P.ev('setList("all"),SF.tag=[],renderSearch(),true'); await sleep(200);
+    const all0 = await shown();
+    check(G, 'All: results from every list', has(all0, iBoth) && has(all0, iOther));
+    await P.ev('setList(' + JSON.stringify(la.id) + '),renderSearch(),true'); await sleep(200);
+    const inA = await shown();
+    check(G, 'a selected list: only its tasks', has(inA, iBoth) && has(inA, iOne) && !has(inA, iOther), JSON.stringify(inA.length));
+    check(G, 'the count line names the list', (await P.text('#results .count-line')).includes(la.name));
+    await P.ev('SF.tag=' + JSON.stringify([a.id, b.id]) + ',renderSearch(),true'); await sleep(200);
+    const both = await shown();
+    check(G, 'tags from two tag lists: both must match', has(both, iBoth) && !has(both, iOne));
+    await P.ev('SF.tag=[],setList("all"),renderSearch(),true'); await sleep(200);
+    await P.click('#filters [data-k=mine]'); await sleep(200);
+    check(G, 'Mine with no tags opens the picker, Mine stays off', await P.has('#fopts [data-act=mine-pick]') && !(await P.ev('SF.mine')));
+    await P.shot('appfilters-picker-390x844');
+    await P.click('#fopts [data-act=mine-pick][data-v="' + a.id + '"]'); await sleep(1200);
+    const saved = ((await MK.rest('GET', 'profiles?select=mine_tag_ids&id=eq.' + MK.uid)).json[0] || {}).mine_tag_ids || [];
+    check(G, 'a tap saves the tag as Mine', saved.includes(a.id), JSON.stringify(saved));
+    await P.click('#fopts [data-act=mine-done]'); await sleep(200);
+    const mine = await shown();
+    check(G, 'Show my tasks switches Mine on with that tag', (await P.ev('SF.mine')) && has(mine, iBoth) && has(mine, iOne));
+    await P.ev('(()=>{const m=document.querySelector("#filters [data-k=mine]");m.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));return true})()'); await sleep(750);
+    check(G, 'a long press opens the picker', await P.has('#fopts [data-act=mine-pick]'));
+    await sleep(500); await P.ev('SF.open=null,renderSearch(),true');
+    await P.ev('document.querySelector("#filters [data-k=mine]").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})),true'); await sleep(200);
+    check(G, 'the right button opens it too', await P.has('#fopts [data-act=mine-pick]'));
+    await P.shot('appfilters-mine-390x844');
+    check(G, 'no sideways scroll', await P.ev('document.documentElement.scrollWidth<=innerWidth'));
+    await P.ev('SF.open=null,SF.mine=false,renderSearch(),true');
+  } finally {
+    const back = await MK.rest('PATCH', 'profiles?id=eq.' + MK.uid, { mine_tag_ids: mineSnap });
+    check(G, 'Mine tags of Maksym put back', back.ok);
+    for (const l of made) { await MK.rest('PATCH', 'lists?id=eq.' + l.id, { archived_at: new Date().toISOString() }); const r = await MK.rest('POST', 'rpc/delete_archived_list', { p_list: l.id }); check(G, 'test list deleted', r.ok, r.message); if (r.ok) testLists = testLists.filter(x => x.id !== l.id); }
+  }
 }
 async function gLists() {
   const G = 'lists', T = await maksymPage(), errs = T.errors.length, made = [];
@@ -2597,9 +2655,9 @@ const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, appfilters: gAppFilters, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'links', 'guests', 'request'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }
