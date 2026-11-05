@@ -1125,6 +1125,9 @@ async function gFiltersBody(G) {
   await T.click('#mine');
   let s = await nowShown(iMine, iMineOnly, iOwnedOther, iLater);
   check(G, 'Mine shows tasks with my tag and not tasks I only own', s[0] && s[1] && !s[2] && !s[3], JSON.stringify(s));
+  await T.ev(`(document.getElementById('mine').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true})),true)`);
+  check(G, 'the right button on Mine opens the picker and leaves the filter on', await T.wait(`document.querySelector('#pop .f-h')?.textContent.includes('Which tags')`, 2000) && await T.has('#mine[aria-pressed="true"]'));
+  await T.ev('(document.body.click(),true)');
   check(G, 'N of M shows while a filter is on', await T.ev(`/^\\d+ of \\d+$/.test(document.querySelector('.f-count')?.textContent||'')`));
   await T.click('#mine');
 
