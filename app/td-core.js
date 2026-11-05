@@ -63,6 +63,8 @@
     if (code === '22023' && !DB_TEXT[msg] && /archived/i.test(msg)) return e('denied', archived);
     if (code === '22023') return e('invalid', DB_TEXT[msg] || sentence(msg));
     if (code === '54000') return e('limit', DB_TEXT[msg] || sentence(msg));
+    // db/029 delete_archived_list: not archived, or a category's default list
+    if (code === '55000' || /default list of the category/.test(msg)) return e('invalid', sentence(msg));
     if (code === '42501' || status === 403) return e('denied', DB_TEXT[msg] || (/archived/i.test(msg) ? archived : /^owners cannot leave/.test(msg) ? 'Owners can\'t leave their own list.' : 'Not allowed for your role on this list.'));
     if (code === '23514') return e('invalid', /title/i.test(msg) ? 'The title is over 300 characters.' : 'A value is out of range: ' + msg);
     if (code === '23505') return e('duplicate', /tag.?list/i.test(msg) ? 'You already have a tag list with this name.' : /lists_slug|slug|list named/i.test(msg) ? 'A list with this name exists.' : 'Already saved.');
@@ -73,6 +75,9 @@
   // the database's own texts (db/010) in plain words; anything else is shown as a sentence
   const DB_TEXT = {
     'list limit reached': 'You have reached your limit of lists.',
+    'only the owner deletes a list': 'Only the owner deletes a list.',
+    'only people delete lists': 'Only people delete lists.',
+    'this is a system list, scripts use it': 'This is a system list: scripts use it, so it stays.',
     'item limit reached': 'This list is full: its item limit is reached.',
     'tag limit reached': 'You have reached your limit of tags.',
     'invitation limit for today reached': 'Invitation limit for today reached. Try again tomorrow.',
@@ -238,7 +243,7 @@
   const readFilterBar = raw => strs(raw) ? [...new Set(raw.filter(k => FILTER_BAR_KEY.test(k)))] : null;
   const defaultFilterBar = favs => ['due'].concat((favs || []).map(id => 'tl:' + id));
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
-    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard', filters: FILTERS_DEFAULTS, filterBar: null };
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard', filters: FILTERS_DEFAULTS, filterBar: null, listBar: null };
   // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
   // WELCOME_VERSION. welcomeSeen stays for clients that only know it
   const WELCOME_VERSION = 3;
@@ -282,6 +287,7 @@
     if (strs(raw.tagListFavs)) p.tagListFavs = [...new Set(raw.tagListFavs.filter(tlOk))];
     p.filters = readFilters(raw.filters);
     p.filterBar = readFilterBar(raw.filterBar);
+    p.listBar = readListBar(raw.listBar);
     return p;
   }
   function readCardLayout(raw, tagListIds) {
@@ -646,6 +652,82 @@
   function freeListName(name, names) {
     const taken = new Set((names || []).map(n => String(n).trim().toLowerCase())), base = String(name || '').trim();
     for (let i = 2; ; i++) { const n = base + ' (' + i + ')'; if (!taken.has(n.toLowerCase())) return n; }
+  }
+  // a list scripts depend on: no rename, archive or delete in the UI (delete_archived_list refuses it too, db/029)
+  const isSystemList = l => !!l && (l.slug === 'access-requests' || String(l.slug || '').startsWith('_'));
+
+  // ---- list panels (2026-11-05): prefs.listBar is null (the first LIST_BAR_DEFAULT of the order, as before) or { two, rows: [[ids], [ids]] }.
+  // A panel's count is its length. Ids are kept whatever this client knows (filter-bar lesson: the phone passes no such ids, and an
+  // archived list goes back to its place on Restore); only the display filters them. order: the live lists the person sees. ----
+  const LIST_PANEL_MAX = 12, LIST_BAR_DEFAULT = 4;
+  function readListBar(raw) {
+    if (!isObj(raw) || typeof raw.two !== 'boolean' || !Array.isArray(raw.rows) || raw.rows.length !== 2 || !strs(raw.rows[0]) || !strs(raw.rows[1])) return null;
+    const seen = new Set(), row = r => r.filter(x => x && !seen.has(x) && seen.add(x)).slice(0, LIST_PANEL_MAX);
+    return { two: raw.two, rows: [row(raw.rows[0]), row(raw.rows[1])] };
+  }
+  const listBarOf = (bar, order) => bar ? { two: !!bar.two, rows: [bar.rows[0].slice(), bar.rows[1].slice()] } : { two: false, rows: [(order || []).slice(0, LIST_BAR_DEFAULT), []] };
+  const listBarLive = (b, order) => { const known = new Set(order); return b.rows.map(r => r.filter(id => known.has(id))); };
+  const listBarRest = (b, order) => { const live = listBarLive(b, order), on = new Set(b.two ? live[0].concat(live[1]) : live[0]); return order.filter(id => !on.has(id)); };
+  const listBarZone = (bar, order, id) => { const b = listBarOf(bar, order); return b.rows[0].includes(id) ? 0 : b.two && b.rows[1].includes(id) ? 1 : 'rest'; };
+  // what to draw. o.sel: the selected list; o.overflow: lists that do not fit this window (they show under +N for now, nothing saved).
+  // rows has one entry per panel shown (an empty panel 2 is not drawn); stray: the selected list from +N, shown last on the last panel
+  function listPanels(bar, order, o) {
+    const b = listBarOf(bar, order), off = new Set((o && o.overflow) || []), sel = o && o.sel, live = listBarLive(b, order);
+    const rows = (b.two ? live : [live[0]]).map(r => r.filter(id => !off.has(id)));
+    if (rows.length > 1 && !rows[1].length) rows.length = 1;
+    const on = new Set(rows.flat()), rest = order.filter(id => !on.has(id));
+    const stray = sel && sel !== 'all' && rest.includes(sel) ? sel : null;
+    return { two: b.two, rows, stray, more: rest.filter(id => id !== stray), saved: b.two ? live : [live[0], []], rest: listBarRest(b, order) };
+  }
+  // the one write rule: moves a list into zone 0, 1 or 'rest', before or after target (no target: the end of a panel, the front of
+  // +N). A panel holds LIST_PANEL_MAX lists: a move into a full one is refused; ids of lists not shown here give way first.
+  function listBarMove(bar, order, id, zone, target, before) {
+    const b = listBarOf(bar, order), known = new Set(order), was = listBarZone(b, order, id);
+    if (zone !== 'rest' && zone !== was && listBarLive(b, order)[zone].length >= LIST_PANEL_MAX) return { bar: b, order: order.slice(), refused: true };
+    const rest = listBarRest(b, order).filter(x => x !== id);
+    b.rows = b.rows.map(r => r.filter(x => x !== id));
+    let ord = order.slice();
+    if (zone === 'rest') {
+      ord = ord.filter(x => x !== id);
+      const at = target && ord.includes(target) ? ord.indexOf(target) + (before ? 0 : 1) : rest.length ? ord.indexOf(rest[0]) : ord.length;
+      ord.splice(at, 0, id);
+    } else {
+      const r = b.rows[zone];
+      r.splice(target && r.includes(target) ? r.indexOf(target) + (before ? 0 : 1) : r.length, 0, id);
+      while (r.length > LIST_PANEL_MAX) { const i = r.findLastIndex(x => !known.has(x)); if (i < 0) break; r.splice(i, 1); }
+      if (zone === 1) b.two = true;
+    }
+    return { bar: b, order: listBarOrder(b, ord) };
+  }
+  // Alt+arrow: one step in the sequence panel 1, panel 2, +N, crossing a panel's edge when it reaches one. An end stays where it is
+  function listBarStep(bar, order, id, d) {
+    const b = listBarOf(bar, order), z = listBarZone(b, order, id), seq = zo => zo === 'rest' ? listBarRest(b, order) : listBarLive(b, order)[zo];
+    const s = seq(z), t = s[s.indexOf(id) + d];
+    if (t) return listBarMove(b, order, id, z, t, d < 0);
+    const zones = b.two ? [0, 1, 'rest'] : [0, 'rest'], nz = zones[zones.indexOf(z) + d];
+    if (nz === undefined) return { bar: b, order: order.slice() };
+    const ns = seq(nz);
+    return listBarMove(b, order, id, nz, d > 0 ? ns[0] : ns[ns.length - 1], d > 0);
+  }
+  // the − and + of a panel: −1 sends its last list to the front of +N, +1 takes the first from +N
+  function listBarCount(bar, order, zone, d) {
+    const b = listBarOf(bar, order);
+    if (d < 0) { const r = listBarLive(b, order)[zone]; return r.length ? listBarMove(b, order, r[r.length - 1], 'rest') : { bar: b, order: order.slice() }; }
+    const first = listBarRest(b, order)[0];
+    return first ? listBarMove(b, order, first, zone) : { bar: b, order: order.slice() };
+  }
+  // panel 2 on or off: off keeps its row (its lists show under +N and come back); on while empty takes the next LIST_BAR_DEFAULT from +N
+  function listBarSetTwo(bar, order, two) {
+    const b = listBarOf(bar, order);
+    b.two = !!two;
+    if (b.two && !listBarLive(b, order)[1].length) b.rows[1] = listBarRest(b, order).slice(0, LIST_BAR_DEFAULT);
+    return { bar: b, order: listBarOrder(b, order) };
+  }
+  // prefs.listOrder: the panels, then the rest, so the phone and Review keep the same order
+  function listBarOrder(bar, order) {
+    if (!bar) return order.slice();
+    const live = listBarLive(bar, order), on = bar.two ? live[0].concat(live[1]) : live[0];
+    return on.concat(order.filter(id => !on.includes(id)));
   }
 
   // ---- round 3, A5-A7: several tag lists with roles, first-share notices, the tag filter by id, the side menu by keyboard ----
@@ -1249,7 +1331,7 @@
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
-    createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
+    createdList, listNameClash, freeListName, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,

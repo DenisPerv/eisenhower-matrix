@@ -257,6 +257,7 @@ One row per person in `preferences` (`app = tasksdashboard`), upserted on `profi
 | `tagListFavs` | `[]` | my favourite (★) tag lists, any number, own or shared (ids; stale ids dropped): they open in the task window |
 | `filters` | `FILTERS_DEFAULTS`: `{ mine: false, due: 'any', from: '', to: '', tags: [], cats: [], low: false }` | what the filter row has on (`due`: `DUE_KINDS`; `from`, `to`: yyyy-mm-dd). Search text is not saved. Checked for type and shape only: the phone writes the row without the board's ids, the board drops stale ones |
 | `filterBar` | `null` | the buttons after Mine, in order: `due`, `cat`, `low`, `tl:<tag list id>`; null follows the starred tag lists |
+| `listBar` | `null` | the list panels of the top bar: `null` (first `LIST_BAR_DEFAULT` = 4 of `listOrder`) or `{ two, rows: [[ids], [ids]] }`, one row per panel, `LIST_PANEL_MAX` = 12 lists each. Core `readListBar` checks the shape only: ids this client does not know are kept (an archived list returns to its place), the page filters them at display. `listOrder` is rewritten as the panels, then the rest (`listBarOrder`) |
 | `settings` | below | Account menu → Urgency settings |
 
 Unknown keys (`tagListsOpen` since the tags round: groups now open and close within the window only), version 1 path keys and ids that no longer exist are dropped; a value of the wrong type takes its default.
