@@ -16,7 +16,8 @@ Run the files in the SQL editor (or with an admin tool), each file whole, in thi
 | 6 | `013_kpi.sql`, `014_urgency_app.sql`, `015_access_requests.sql`, `016_review_report.sql`, `017_telegram_scope.sql`, `018_task_links.sql`, `019_bot_opt_out.sql`, `020_priority_retired.sql`, `022_share_by_person.sql`, `023_agent_tag_home.sql` | KPI history RPC, urgency settings by app, access requests, the review report API, the chat bot's scope, task links, the bot's opt-out, functions without priority (priority by position) |
 | 7 | `003`, `011`, the 012 policy block | again |
 | 7a | `021_drop_priority.sql` | drops `items.priority`, only once every client runs a page without priority (the hosted copy, both household machines, the Telegram bot); then 7 and 8 again |
-| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
+| 7b | `029_delete_lists.sql` | `delete_archived_list(p_list)` (owner, archived, not a system or category default list; deletes the list with its tasks), `members_keep_owner` honouring `td.deleting_list`, `last_backup_at()`, `ops.record_backup()` (the one write the backup role makes); re-run it after `010`; then 7 and 8 again |
+| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` (`913_selftest_delete_lists.sql` for 029) | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
 
 Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`. `010` also replaces `items_tags_compat_after`, which `023` replaces again: re-running `010` means re-running `023` after it.
 
