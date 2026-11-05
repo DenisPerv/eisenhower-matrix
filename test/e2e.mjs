@@ -1170,13 +1170,45 @@ async function gFiltersBody(G) {
   await T.ev('(document.getElementById("clear").click(),true)');
   check(G, 'clear switches everything off', !(await T.has('#clear')) && !(await T.has('.f-count')));
 
-  // screens
-  await T.click('#barmenu'); await sleep(200); await T.shot('filters-plus-menu-1440x900');
+  // one drag in the filtered side menu: the card hidden by the filter keeps its key and its place
+  const dA = await tagIt(await mkItem('filter drag a', { sort_key: 10 }), a1);
+  const dH = await mkItem('filter drag hidden', { sort_key: 20 });
+  const dC = await tagIt(await mkItem('filter drag c', { sort_key: 30 }), a1);
+  await T.ev('dispatchEvent(new Event("focus")),true');
+  await T.wait(`!!document.querySelector('[data-card="${dC.id}"]')&&!!document.querySelector('[data-card="${dH.id}"]')`, 15000);
+  if (!(await T.has(`.line [id="tl:${A.l.id}"]`))) { await T.click('#barmenu'); await T.click(`[data-bar="tl:${A.l.id}"]`); await T.ev('(document.body.click(),true)'); }
+  await T.ev(`(document.getElementById('tl:${A.l.id}').click(),true)`);
+  await T.click(`[data-tag="${a1.id}"]`);
   await T.ev('(document.body.click(),true)');
-  await T.size(390, 844); await sleep(400);
-  check(G, '390 wide: no sideways scroll', await T.ev('document.documentElement.scrollWidth<=innerWidth'));
-  await T.click('#barmenu'); await sleep(200); await T.shot('filters-plus-menu-390x844');
-  check(G, '390 wide: the menu stays inside the window', await T.ev(`(()=>{const r=document.getElementById('pop').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth})()`));
+  await sleep(200);
+  check(G, 'the filtered side menu shows the tagged rows and not the hidden one', await T.has(`.mrow[data-open="${dC.id}"]`) && await T.has(`.mrow[data-open="${dA.id}"]`) && !(await T.has(`.mrow[data-open="${dH.id}"]`)));
+  await T.ev(`(()=>{const src=document.querySelector('.mrow[data-open="${dC.id}"]'),dst=document.querySelector('.mrow[data-open="${dA.id}"]');const dt=new DataTransfer();const r=dst.getBoundingClientRect();
+    const fire=(el,type,y)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+10,clientY:y}));
+    fire(src,'dragstart',0);fire(dst,'dragover',r.top+1);fire(dst,'drop',r.top+1);fire(src,'dragend',0);return true})()`);
+  const dk = await until(async () => { const [x, y, h] = [await item(dA.id), await item(dC.id), await item(dH.id)]; return y.sort_key < x.sort_key && [y.sort_key, x.sort_key, h.sort_key]; });
+  check(G, 'a drag in the filtered side menu: the card moves, the hidden card keeps its key and its place', !!dk && dk[0] < dk[1] && dk[1] < dk[2] && dk[2] === 20, JSON.stringify(dk));
+  await T.ev('(document.getElementById("clear").click(),true)');
+
+  // screens: the default row, an open tag list menu, the + menu and the Mine picker at both widths, no sideways scroll, no console errors
+  await T.click('#barmenu'); await T.click('[data-bardefault]'); await T.ev('(document.body.click(),true)');
+  const errs = T.errors.length;
+  for (const [w, h] of [[1440, 900], [390, 844]]) {
+    await T.size(w, h); await sleep(400);
+    await T.shot(`filters-default-${w}x${h}`);
+    check(G, `${w} wide: no sideways scroll`, await T.ev('document.documentElement.scrollWidth<=innerWidth'));
+    const inside = `(()=>{const r=document.getElementById('pop').getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth})()`;
+    if (!(await T.has(`.line [id="tl:${A.l.id}"]`))) { await T.click('#barmenu'); await T.click(`[data-bar="tl:${A.l.id}"]`); await T.ev('(document.body.click(),true)'); }
+    await T.ev(`(document.getElementById('tl:${A.l.id}').click(),true)`); await sleep(200); await T.shot(`filters-list-menu-${w}x${h}`);
+    check(G, `${w} wide: the tag list menu stays inside the window`, await T.ev(inside));
+    await T.ev('(document.body.click(),true)');
+    await T.click('#barmenu'); await sleep(200); await T.shot(`filters-plus-menu-${w}x${h}`);
+    check(G, `${w} wide: the + menu stays inside the window`, await T.ev(inside));
+    await T.click('[data-minepick]'); await sleep(200); await T.shot(`filters-mine-picker-${w}x${h}`);
+    check(G, `${w} wide: the Mine picker stays inside the window`, await T.ev(`document.querySelector('#pop .f-h')?.textContent.includes('Which tags')`) && await T.ev(inside));
+    await T.ev('(document.body.click(),true)');
+    await T.click('#barmenu'); await T.click('[data-bardefault]'); await T.ev('(document.body.click(),true)');
+  }
+  check(G, 'no console errors on these screens', T.errors.length === errs, T.errors.slice(errs).join(' / '));
   await T.close();
 }
 
