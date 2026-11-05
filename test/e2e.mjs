@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|links|guests|request|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|appfilters|links|guests|request|smoke] [--page <html>]
 //   [--url <https origin or page> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/ or the page path given (https://host/board/, a
 // directory path ending in /), and sessions are seeded on <origin>/version.json
@@ -22,7 +22,7 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, PAGE_PATH = '/', ACCESS = null; // --url (origin, page path) and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'links', 'guests', 'request'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 // the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
 const OFFLINE = want.every(g => g === 'request');
@@ -34,7 +34,7 @@ const RUN = 'e2e-' + new Date().toISOString().replace(/\D/g, '').slice(2, 12);
 const CYR_LIST = 'Тестовий список ' + RUN.slice(4).replace(/\d/g, (d) => 'абвгдежзик'[d]);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // real key presses (CDP Input): implicit form submission and the dialog's Escape only follow trusted keys. Modifiers: Alt 1
-const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 },
+const KEYS = { Enter: { code: 'Enter', vk: 13, text: '\r' }, Escape: { code: 'Escape', vk: 27 }, F2: { code: 'F2', vk: 113 }, ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowDown: { code: 'ArrowDown', vk: 40 },
   ArrowLeft: { code: 'ArrowLeft', vk: 37 }, ArrowRight: { code: 'ArrowRight', vk: 39 }, PageUp: { code: 'PageUp', vk: 33 }, PageDown: { code: 'PageDown', vk: 34 }, Tab: { code: 'Tab', vk: 9 } };
 const rows = [], leftovers = [], kpiTimes = [], reviewApiTimes = [], timelineTimes = [];
 let pass = 0, fail = 0, skipped = 0;
@@ -549,33 +549,420 @@ async function gSync() {
   gSync.A = A;
 }
 
+// a test list this run made: archived, then deleted for good through the RPC (never a real list), so no leftover stays
+async function dropTestList(l) {
+  await MK.rest('PATCH', 'lists?id=eq.' + l.id, { archived_at: new Date().toISOString() });
+  const r = await MK.rest('POST', 'rpc/delete_archived_list', { p_list: l.id });
+  if (r.ok) testLists = testLists.filter(x => x.id !== l.id);
+  return r;
+}
 async function gArchive() {
-  const G = 'archive', T = await maksymPage();
-  const z = await mkItem('in archived list');
+  const G = 'archive', T = await maksymPage(), AL = await mkList(MK, `${RUN} archive`, true);
+  const z = await mkItem('in archived list', { list_id: AL.id });
   await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1500);
-  await pick(T, ST.id);
+  await pick(T, AL.id);
   await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-archive-list]")'); await T.click('[data-archive-list]');
-  await T.wait('!!document.getElementById("cf-ok")'); await T.click('#cf-ok');
-  check(G, 'the chip menu archives _selftest (archived_at set)', await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + ST.id)).json[0].archived_at));
-  await T.wait(`!document.querySelector('.lists [data-list="${ST.id}"]')`, 8000);
-  check(G, 'it leaves the chips and All', !(await T.has(`[data-list="${ST.id}"]`)) && !(await T.has(`[data-card="${z.id}"]`)));
+  check(G, 'the chip menu archives a test list (archived_at set)', await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + AL.id)).json[0].archived_at));
+  await T.wait(`!document.querySelector('.lists [data-list="${AL.id}"]')`, 8000);
+  check(G, 'it leaves the chips and All', !(await T.has(`[data-list="${AL.id}"]`)) && !(await T.has(`[data-card="${z.id}"]`)));
   await T.ev(`(()=>{const q=document.getElementById('q');q.value=${JSON.stringify(RUN + ' in archived')};q.dispatchEvent(new Event('input'));return true})()`);
   check(G, 'search finds nothing in it', await T.wait('/No matches/.test((document.getElementById("dd")||{}).textContent||"")', 5000));
   await T.click('#clear');
   const pr = await MK.rest('PATCH', 'items?id=eq.' + z.id, { title: 'thaw' });
   check(G, 'a PATCH of one of its items is refused (42501, list archived)', !pr.ok && pr.err.kind === 'denied' && /archived/.test(pr.err.message), pr.err && pr.err.message);
-  await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=archived]")'); await T.click('[data-menu=archived]');
-  check(G, 'it shows under Archived lists with Restore', await T.wait(`!!document.querySelector('[data-restore-list="${ST.id}"]')`));
-  await T.click(`[data-restore-list="${ST.id}"]`);
-  const rt = await T.wait(`!!document.querySelector('.lists [data-list="${ST.id}"]') || !!document.getElementById('more')`, 10000);
+  await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=lists]")'); await T.click('[data-menu=lists]');
+  await T.wait('!!document.querySelector("dialog[open] #lm-sw")', 5000); await T.click('#lm-sw');
+  check(G, 'it shows under Archived lists with Restore', await T.wait(`!!document.querySelector('[data-restore-list="${AL.id}"]')`));
+  await T.click(`[data-restore-list="${AL.id}"]`);
+  const rt = await T.wait(`!!document.querySelector('.lists [data-list="${AL.id}"]') || !!document.getElementById('more')`, 10000);
   // #more is there already when many lists overflow the chips, so wait for the database rather than the page alone
-  check(G, 'Restore brings it back', rt && await until(async () => !(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + ST.id)).json[0].archived_at),(await toastText(T)) + ' | dialogs ' + (await T.ev('document.querySelectorAll("dialog").length')) + ' | ' + T.errors.slice(-2).join(' / '));
-  await pick(T, ST.id);
-  await T.click('#listmenu'); await T.click('[data-archive-list]'); await T.wait('!!document.getElementById("cf-ok")'); await T.click('#cf-ok');
-  check(G, 'archived again', await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + ST.id)).json[0].archived_at));
-  // the rest of the run needs it open
-  await MK.rest('PATCH', 'lists?id=eq.' + ST.id, { archived_at: null });
+  check(G, 'Restore brings it back', rt && await until(async () => !(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + AL.id)).json[0].archived_at),(await toastText(T)) + ' | dialogs ' + (await T.ev('document.querySelectorAll("dialog").length')) + ' | ' + T.errors.slice(-2).join(' / '));
+  await closeDialogs(T); await sleep(200);
+  await pick(T, AL.id);
+  await T.click('#listmenu'); await T.click('[data-archive-list]');
+  check(G, 'archived again', await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + AL.id)).json[0].archived_at));
+  const dr = await dropTestList(AL);
+  check(G, 'the test list is deleted afterwards', dr.ok, dr.err && dr.err.message);
   await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1500);
+}
+
+// the list panels and the Lists window (2026-11-05): writes only in lists this run makes, and preferences put back by cleanup(); _selftest
+// is only refused. Delete happens only to test lists.
+// the search line folds away (#searchhandle) and stays as it was left (prefs.searchRow); the snapshot puts prefs back
+async function gSearchRow() {
+  const G = 'searchrow', T = await maksymPage(), errs = T.errors.length;
+  const hidden = () => T.ev('document.getElementById("searchrow").hidden');
+  const real = () => T.ev('Math.round(document.querySelector(".top").getBoundingClientRect().height)');
+  const pref = async () => { const r = (await MK.rest('GET', 'preferences?select=prefs&app=eq.tasksdashboard&profile_id=eq.' + MK.uid)).json[0]; return r && r.prefs && r.prefs.searchRow; };
+  try {
+    check(G, 'it starts as the preference says', (await hidden()) === ((await pref()) === 'collapsed'));
+    if (await hidden()) { await T.click('#searchhandle'); await sleep(200); } // the person's own setting may be Collapsed
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      await T.size(w, h); await sleep(300);
+      check(G, w + ': open before folding', (await hidden()) === false);
+      await T.shot('searchrow-open-' + w + 'x' + h);
+      const h0 = await real();
+      await T.click('#searchhandle'); await sleep(200);
+      check(G, w + ': the button folds it', (await hidden()) === true);
+      check(G, w + ': the top bar gets shorter', (await real()) < h0, JSON.stringify([h0, await real()]));
+      check(G, w + ': --top matches the bar', w < 700 || Math.abs((await real()) - parseInt(await T.ev('getComputedStyle(document.documentElement).getPropertyValue("--top")'))) <= 2, JSON.stringify([await real(), await T.ev('getComputedStyle(document.documentElement).getPropertyValue("--top")')]));
+      check(G, w + ': no sideways scroll', await T.ev('document.documentElement.scrollWidth<=innerWidth'));
+      await T.shot('searchrow-closed-' + w + 'x' + h);
+      await T.click('#searchhandle'); await sleep(200);
+      check(G, w + ': the button brings it back and focuses search', (await hidden()) === false && await T.ev('document.activeElement.id==="q"'));
+      check(G, w + ': the handle is centred on the bar', await T.ev('(()=>{const r=document.getElementById("searchhandle").getBoundingClientRect(),t=document.querySelector(".top").getBoundingClientRect();return Math.abs(r.left+r.width/2-(t.left+t.width/2))<=2&&r.top<t.bottom&&r.bottom>t.bottom})()'));
+      await T.click('#searchhandle'); await sleep(200);
+      check(G, w + ': the handle folds it and stays on the bar', (await hidden()) === true && await T.ev('(()=>{const r=document.getElementById("searchhandle").getBoundingClientRect(),t=document.querySelector(".top").getBoundingClientRect();return r.height>=24&&r.top<t.bottom&&r.bottom>t.bottom})()'));
+      await T.shot('searchhandle-closed-' + w + 'x' + h);
+      await T.click('#searchhandle'); await sleep(200);
+      check(G, w + ': the handle opens it', (await hidden()) === false);
+      await T.shot('searchhandle-open-' + w + 'x' + h);
+    }
+    await T.size(1440, 900); await sleep(300);
+    await T.ev('document.activeElement.blur(),true');
+    await T.click('#searchhandle'); await sleep(100);
+    await T.ev('document.body.dispatchEvent(new KeyboardEvent("keydown",{key:"/",bubbles:true})),true'); await sleep(200);
+    check(G, 'the / key opens it', (await hidden()) === false && await T.ev('document.activeElement.id==="q"'));
+    await T.ev('(()=>{const q=document.getElementById("q");q.value="zzz";q.dispatchEvent(new Event("input",{bubbles:true}));return true})()'); await sleep(200);
+    await T.click('#searchhandle'); await sleep(200);
+    check(G, 'folded with search on: the button shows it', await T.ev('document.getElementById("searchhandle").classList.contains("on")'));
+    await T.shot('searchrow-closed-filter-1440x900');
+    await T.click('#searchhandle'); await sleep(100); await T.click('#clear'); await sleep(200);
+    await sleep(1800);
+    check(G, 'an open row is remembered', (await pref()) === 'expanded', JSON.stringify(await pref()));
+    await T.click('#searchhandle'); await sleep(1800);
+    check(G, 'a folded row is remembered', (await pref()) === 'collapsed', JSON.stringify(await pref()));
+    await T.ev('location.reload(),true'); await sleep(1500); await T.wait('!!document.getElementById("searchhandle")', 15000); await sleep(800);
+    check(G, 'a reload stays folded', (await hidden()) === true);
+    await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=general]")', 4000); await T.click('[data-menu=general]');
+    await T.wait('!!document.getElementById("s-name")', 4000);
+    check(G, 'General settings has no search line setting', await T.ev('!document.getElementById("s-search")'));
+    await closeDialogs(T); await sleep(100);
+    await T.click('#searchhandle'); await sleep(1800);
+    check(G, 'opened again is remembered', (await pref()) === 'expanded' && (await hidden()) === false);
+    check(G, 'no console errors', T.errors.length === errs, JSON.stringify(T.errors.slice(errs)));
+  } finally { await T.size(1440, 900); }
+}
+// the phone's Search: tags by tag list and the selected list as on the board, the Mine picker on the Mine chip
+async function gAppFilters() {
+  const G = 'appfilters', made = [];
+  const mineSnap = ((await MK.rest('GET', 'profiles?select=mine_tag_ids&id=eq.' + MK.uid)).json[0] || {}).mine_tag_ids || [];
+  const lists = (await MK.rest('GET', 'tag_lists?select=id,name&archived_at=is.null&order=sort')).json || [];
+  const withTags = [];
+  for (const l of lists) { const t = (await MK.rest('GET', 'tags?select=id,name&deleted_at=is.null&order=sort&limit=1&tag_list_id=eq.' + l.id)).json || []; if (t.length) withTags.push({ l, t: t[0] }); }
+  if (withTags.length < 2) { check(G, 'two tag lists with a tag each to test on', false); return; }
+  const [{ t: a }, { t: b }] = withTags;
+  const tagIt = async (it, ...tags) => { for (const t of tags) { const r = await MK.rest('POST', 'item_tags', { item_id: it.id, tag_id: t.id }, { Prefer: 'return=minimal' }); if (!r.ok) throw new Error('tag: ' + r.message); } return it; };
+  try {
+    await MK.rest('PATCH', 'profiles?id=eq.' + MK.uid, { mine_tag_ids: [] });
+    const la = await mkList(MK, RUN + ' phone a', true); made.push(la);
+    const iBoth = await tagIt(await mkItem('phone both', { list_id: la.id }), a, b);
+    const iOne = await tagIt(await mkItem('phone one', { list_id: la.id }), a);
+    const iOther = await tagIt(await mkItem('phone other list'), a, b);
+    const P = await tab(B, await ctx(B), { width: 390, height: 844 });
+    await seed(P, await grantFor('maksym'));
+    await P.go(pathToFileURL(path.join(path.dirname(PAGE), 'app', 'index.html')).href);
+    check(G, 'the phone loaded the test tasks and no Mine tags', await P.wait('S.ready&&[' + [iBoth, iOther].map(x => JSON.stringify(x.id)).join() + '].every(id=>(D.all().find(t=>t.id===id)||{tags:[]}).tags.length===2)&&!(me().mine_tag_ids||[]).length', 30000));
+    await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
+    await P.click('.tab[data-tab=search]'); await P.wait('!!document.querySelector("#filters [data-k=mine]")', 8000);
+    const shown = () => P.ev('[...document.querySelectorAll("#results [data-tid]")].map(x=>x.dataset.tid)');
+    const has = (ids, it) => ids.includes(it.id);
+    await P.ev('setList("all"),SF.tag=[],renderSearch(),true'); await sleep(200);
+    const all0 = await shown();
+    check(G, 'All: results from every list', has(all0, iBoth) && has(all0, iOther));
+    await P.ev('setList(' + JSON.stringify(la.id) + '),renderSearch(),true'); await sleep(200);
+    const inA = await shown();
+    check(G, 'a selected list: only its tasks', has(inA, iBoth) && has(inA, iOne) && !has(inA, iOther), JSON.stringify(inA.length));
+    check(G, 'the count line names the list', (await P.text('#results .count-line')).includes(la.name));
+    await P.ev('SF.tag=' + JSON.stringify([a.id, b.id]) + ',renderSearch(),true'); await sleep(200);
+    const both = await shown();
+    check(G, 'tags from two tag lists: both must match', has(both, iBoth) && !has(both, iOne));
+    await P.ev('SF.tag=[],setList("all"),renderSearch(),true'); await sleep(200);
+    await P.click('#filters [data-k=mine]'); await sleep(200);
+    check(G, 'Mine with no tags opens the picker, Mine stays off', await P.has('#fopts [data-act=mine-pick]') && !(await P.ev('SF.mine')));
+    await P.shot('appfilters-picker-390x844');
+    await P.click('#fopts [data-act=mine-pick][data-v="' + a.id + '"]'); await sleep(1200);
+    const saved = ((await MK.rest('GET', 'profiles?select=mine_tag_ids&id=eq.' + MK.uid)).json[0] || {}).mine_tag_ids || [];
+    check(G, 'a tap saves the tag as Mine', saved.includes(a.id), JSON.stringify(saved));
+    await P.click('#fopts [data-act=mine-done]'); await sleep(200);
+    const mine = await shown();
+    check(G, 'Show my tasks switches Mine on with that tag', (await P.ev('SF.mine')) && has(mine, iBoth) && has(mine, iOne));
+    const chipH = await P.ev('Math.max(...[...document.querySelectorAll("#filters .chip")].map(c=>c.getBoundingClientRect().height))');
+    check(G, 'Mine on: the filter chips keep their height', chipH <= 48, String(chipH));
+    check(G, 'Mine on: the hint sits in the results, not in the chip row', await P.ev('!document.querySelector("#filters p")&&document.getElementById("results").innerText.includes("Hold Mine")'));
+    await P.shot('appfilters-mine-on-390x844');
+    await P.ev('(()=>{const m=document.querySelector("#filters [data-k=mine]");m.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));return true})()'); await sleep(750);
+    check(G, 'a long press opens the picker', await P.has('#fopts [data-act=mine-pick]'));
+    await sleep(500); await P.ev('SF.open=null,renderSearch(),true');
+    await P.ev('document.querySelector("#filters [data-k=mine]").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true})),true'); await sleep(200);
+    check(G, 'the right button opens it too', await P.has('#fopts [data-act=mine-pick]'));
+    await P.shot('appfilters-mine-390x844');
+    check(G, 'no sideways scroll', await P.ev('document.documentElement.scrollWidth<=innerWidth'));
+    await P.ev('SF.open=null,SF.mine=false,renderSearch(),true');
+  } finally {
+    const back = await MK.rest('PATCH', 'profiles?id=eq.' + MK.uid, { mine_tag_ids: mineSnap });
+    check(G, 'Mine tags of Maksym put back', back.ok);
+    for (const l of made) { await MK.rest('PATCH', 'lists?id=eq.' + l.id, { archived_at: new Date().toISOString() }); const r = await MK.rest('POST', 'rpc/delete_archived_list', { p_list: l.id }); check(G, 'test list deleted', r.ok, r.message); if (r.ok) testLists = testLists.filter(x => x.id !== l.id); }
+  }
+}
+async function gLists() {
+  const G = 'lists', T = await maksymPage(), errs = T.errors.length, made = [];
+  const mk = async n => { const l = await mkList(MK, `${RUN} ${n}`, true); made.push(l); return l; };
+  try {
+    await T.size(1440, 900); await sleep(300);
+    const [la, lb, lc, ld] = [await mk('pa'), await mk('pb'), await mk('pc'), await mk('pd')];
+    const i1 = await mkItem('task one', { list_id: la.id }), i2 = await mkItem('task two', { list_id: la.id });
+    await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(2000);
+    const rowsNow = () => T.ev(`[...document.querySelectorAll('.panels .lists')].map(r=>[...r.querySelectorAll('[data-list]')].map(b=>b.dataset.list).filter(x=>x!=='all'))`);
+    const openLM = async arch => {
+      await closeDialogs(T); await sleep(100);
+      await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=lists]")', 4000); await T.click('[data-menu=lists]');
+      const ok = await T.wait('!!document.querySelector("dialog[open] .lm-seg")', 5000);
+      await T.wait('/\\(\\d+\\)/.test((document.querySelector("#lm-sw")||{}).textContent||"")', 8000); // the archive has been read
+      if (arch) { await T.click('#lm-sw'); await T.wait('document.querySelector("#lm-t").textContent==="Archived lists"', 3000); }
+      return ok;
+    };
+    const dragTo = (src, dst, before, vertical) => T.ev(`(()=>{const dt=new DataTransfer(),s=document.querySelector(${JSON.stringify(src)}),d=document.querySelector(${JSON.stringify(dst)});if(!s||!d)return false;const r=d.getBoundingClientRect();
+      const o={bubbles:true,cancelable:true,dataTransfer:dt,clientX:${vertical} ? r.left+10 : (${before} ? r.left+1 : r.right-1),clientY:${vertical} ? (${before} ? r.top+1 : r.bottom-1) : r.top+r.height/2};
+      const f=(el,t)=>el.dispatchEvent(new DragEvent(t,o));f(s,'dragstart');f(d,'dragover');f(d,'drop');f(s,'dragend');return true})()`);
+    const savedBar = async () => { await sleep(2400); const r = await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard'); return r.ok && r.json[0] ? r.json[0].prefs.listBar : undefined; };
+
+    // the menu and panel 2
+    await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=lists]")', 4000);
+    check(G, 'the account menu has Lists instead of Archived lists and Hidden lists', !(await T.has('[data-menu=archived]')) && !(await T.has('[data-menu=hidden]')));
+    await T.ev('document.body.click(),true'); await sleep(100);
+    check(G, 'the Lists window opens with panels and zones', await openLM() && await T.has('dialog[open] [data-zone="0"]') && await T.has('dialog[open] [data-zone="rest"]'));
+    await T.click('[data-lm-two="0"]'); await sleep(150);
+    await T.shot('lists-panels-one-1440x900');
+    await T.click('[data-lm-two="1"]'); await sleep(200);
+    const geo = await T.ev(`(()=>{const t=document.querySelector('.top').getBoundingClientRect(),m=document.querySelector('#matrix').getBoundingClientRect(),v=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--top'));return {two:document.documentElement.classList.contains('two-panels'),p2:!!document.querySelector('.lists.p2'),top:t.height,matrix:m.top,v,zone:!!document.querySelector('dialog[open] [data-zone="1"]')}})()`);
+    check(G, 'Two panels: a second row shows on the board behind the window, the bar fits --top and the matrix starts under it', geo.two && geo.p2 && geo.zone && geo.top <= geo.v + 1 && geo.matrix >= geo.top - 1, JSON.stringify(geo));
+    const n0 = await T.ev(`+document.querySelector('[data-zone="1"] output').textContent`);
+    await T.click('[data-lm-less="1"]'); await sleep(150);
+    const n1 = await T.ev(`+document.querySelector('[data-zone="1"] output').textContent`), b1 = (await rowsNow())[1] || [];
+    await T.click('[data-lm-more="1"]'); await sleep(150);
+    const n2 = await T.ev(`+document.querySelector('[data-zone="1"] output').textContent`);
+    check(G, 'the − and + of a panel change its count and the board', n1 === n0 - 1 && b1.length <= n1 && n2 === n0, `${n0} ${n1} ${n2}`);
+    await closeDialogs(T); await sleep(100);
+    const sb = await savedBar();
+    await T.reload(); await T.ready(); await sleep(400);
+    check(G, 'panels survive a reload', !!sb && sb.two === true && await T.has('.lists.p2'), JSON.stringify(sb));
+
+    // the stray chip, the list menu, moves across panels
+    await pick(T, la.id);
+    const stray = await T.ev(`!!document.querySelector('.lists.p2 .chip.stray [data-list="${la.id}"]') && !!document.querySelector('.lists.p2 #listmenu')`);
+    check(G, 'a list selected from +N shows last on the last panel, dashed, with … on its row', stray);
+    await T.click('#listmenu'); await T.wait('!!document.querySelector("#pop [data-list-to]")', 3000);
+    const menu = await T.ev(`[...document.querySelectorAll('#pop button')].map(b=>b.textContent)`);
+    check(G, 'the list menu: Rename, Share, Move to panel 1 and 2, Archive, All lists', ['Rename', 'Move to panel 1', 'Move to panel 2', 'Archive', 'All lists…'].every(x => menu.includes(x)) && menu.some(x => /^Share /.test(x)) && !menu.includes('Move under +N'), menu.join(' | '));
+    await T.click('[data-list-to="0"]'); await sleep(200);
+    let r0 = await rowsNow();
+    check(G, 'Move to panel 1 puts it at the end of panel 1, not stray', r0[0][r0[0].length - 1] === la.id && !(await T.has('.chip.stray')), JSON.stringify(r0));
+    await dragTo(`.lists [data-list="${la.id}"]`, `.lists.p2 [data-list]`, true); await sleep(200);
+    r0 = await rowsNow();
+    check(G, 'a chip dragged onto panel 2 lands there, before the chip it was dropped on', r0[1][0] === la.id && !r0[0].includes(la.id), JSON.stringify(r0));
+    await T.ev(`document.querySelector('.lists [data-list="${la.id}"]').focus()`); await T.key('ArrowLeft', 1); await sleep(200);
+    r0 = await rowsNow();
+    check(G, 'Alt+Left at the start of panel 2 crosses to the end of panel 1', r0[0][r0[0].length - 1] === la.id, JSON.stringify(r0));
+    check(G, 'the focus stays on the chip', await T.ev(`document.activeElement===document.querySelector('.lists [data-list="${la.id}"]')`));
+    await T.key('ArrowRight', 1); await sleep(200);
+    r0 = await rowsNow();
+    check(G, 'Alt+Right crosses back', r0[1][0] === la.id, JSON.stringify(r0));
+
+    // the window's drag, panel 2 off and on
+    await openLM();
+    await dragTo(`[data-grip="${lb.id}"]`, `[data-row="${la.id}"]`, false, true); await sleep(200);
+    r0 = await rowsNow();
+    check(G, 'a row dragged in the window lands on that panel, and the board follows', r0[1][0] === la.id && r0[1][1] === lb.id, JSON.stringify(r0));
+    await T.shot('lists-window-1440x900');
+    await T.ev(`document.querySelector('[data-name="${lb.id}"]').focus()`); await T.key('ArrowUp', 1); await sleep(200);
+    r0 = await rowsNow();
+    check(G, 'Alt+Up in the window moves the row', r0[1][0] === lb.id && r0[1][1] === la.id, JSON.stringify(r0));
+    const before2 = r0[1].slice();
+    await T.click('[data-lm-two="0"]'); await sleep(200);
+    const off = await rowsNow(), note = await T.text('dialog[open] [data-zone="rest"] .lm-note');
+    check(G, 'Panel 2 off: its lists leave the board and wait under +N, with a note', off.length === 1 && /Panel 2 is off/.test(note), JSON.stringify(off) + ' ' + note);
+    await T.click('[data-lm-two="1"]'); await sleep(200);
+    check(G, 'Panel 2 on: they come back in the same order', JSON.stringify((await rowsNow())[1]) === JSON.stringify(before2));
+
+    // rename: double-click, F2, the window; a clash; a system list
+    await closeDialogs(T); await sleep(100);
+    await pick(T, la.id);
+    await T.ev(`document.querySelector('.lists [data-list="${la.id}"]').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,detail:2})),true`);
+    check(G, 'a double-click on a chip opens the name box', await T.wait('!!document.getElementById("ren")', 2000));
+    const newName = `${RUN} renamed`;
+    await T.insert('#ren', newName); await T.key('Enter');
+    const renamed = await until(async () => (await MK.rest('GET', 'lists?select=name,slug&id=eq.' + la.id)).json[0].name === newName, 6000);
+    const row = (await MK.rest('GET', 'lists?select=name,slug&id=eq.' + la.id)).json[0];
+    check(G, 'Enter renames: the name changes, the slug stays', renamed && row.slug === la.slug, JSON.stringify(row));
+    check(G, 'the chip shows the new name', (await T.text(`.lists [data-list="${la.id}"]`)).includes(newName));
+    await T.ev(`document.querySelector('.lists [data-list="${la.id}"]').focus()`); await T.key('F2'); await T.wait('!!document.getElementById("ren")', 2000);
+    await T.insert('#ren', 'not this'); await T.key('Escape'); await sleep(200);
+    check(G, 'F2 opens the name box, Escape leaves the name as it was', !(await T.has('#ren')) && (await MK.rest('GET', 'lists?select=name&id=eq.' + la.id)).json[0].name === newName);
+    await T.ev(`document.querySelector('.lists [data-list="${la.id}"]').focus()`); await T.key('F2'); await T.wait('!!document.getElementById("ren")', 2000);
+    await T.insert('#ren', lb.name); await T.key('Enter'); await sleep(900);
+    check(G, 'a name in use is refused with a message', /already have/.test(await toastText(T)) && (await MK.rest('GET', 'lists?select=name&id=eq.' + la.id)).json[0].name === newName, await toastText(T));
+    await openLM();
+    await T.ev(`(()=>{const i=document.querySelector('[data-name="${lc.id}"]');i.value=${JSON.stringify(RUN + ' pc2')};i.dispatchEvent(new Event('change'));return true})()`);
+    check(G, 'the name box in the window renames too', await until(async () => (await MK.rest('GET', 'lists?select=name&id=eq.' + lc.id)).json[0].name === RUN + ' pc2', 6000));
+    check(G, 'a system list has no name box and no Archive in the window', !(await T.has(`[data-name="${ST.id}"]`)) && !(await T.has(`[data-lm-arch="${ST.id}"]`)) && await T.has(`[data-keys="${ST.id}"]`));
+
+    // New list from the window
+    const nn = `${RUN} from window`;
+    await T.insert('#lm-new', nn); await T.key('Enter');
+    const created = await until(async () => { const r = await MK.rest('GET', 'lists?select=id,slug,name&name=eq.' + encodeURIComponent(nn)); return r.ok && r.json[0]; }, 6000);
+    if (created) { testLists.push(created); made.push(created); }
+    check(G, 'New list in the window creates it, opens it and it waits under +N', !!created && await T.wait(`!!document.querySelector('.chip.stray [data-list="${created.id}"]') && !!document.querySelector('dialog[open] [data-zone="rest"] [data-row="${created.id}"]')`, 4000));
+    await closeDialogs(T); await sleep(100);
+
+    // system list on the board
+    await pick(T, ST.id);
+    await T.ev(`document.querySelector('.lists [data-list="${ST.id}"]').focus()`); await T.key('F2'); await sleep(150);
+    await T.click('#listmenu'); await T.wait('!!document.querySelector("#pop [data-list-to]")', 3000);
+    check(G, '_selftest: no name box on F2, no Rename or Archive in its menu', !(await T.has('#ren')) && !(await T.has('#pop [data-rename-list]')) && !(await T.has('#pop [data-archive-list]')));
+    await T.ev('document.body.click(),true'); await sleep(100);
+
+    // right-click opens the same menu
+    const onlyChip = (await rowsNow())[0][0];
+    await T.ev(`document.querySelector('.lists [data-list="${onlyChip}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:400,clientY:30})),true`);
+    check(G, 'a right-click selects the list and opens its menu', await T.wait(`!!document.querySelector('#pop [data-list-to]') && document.querySelector('.lists [data-list="${onlyChip}"]').getAttribute('aria-pressed')==='true'`, 2000));
+    await T.ev('document.body.click(),true'); await sleep(100);
+
+    // archive and restore to its place
+    await pick(T, lc.id); await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-list-to=\\"1\\"]")', 3000); await T.click('[data-list-to="1"]'); await sleep(200);
+    await T.ev(`document.querySelector('.lists [data-list="${lc.id}"]').focus()`); await T.key('ArrowLeft', 1); await sleep(200);
+    const place = (await savedBar()).rows[1].indexOf(lc.id);
+    await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-archive-list]")', 3000); await T.click('[data-archive-list]');
+    await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + lc.id)).json[0].archived_at, 6000);
+    await T.wait(`!document.querySelector('.lists [data-list="${lc.id}"]')`, 6000);
+    check(G, 'Archive takes it off the board without a question and offers Undo', !(await T.has(`[data-list="${lc.id}"]`)) && /Archived/.test(await toastText(T)) && await T.has('.toast button'), await toastText(T));
+    await openLM(true);
+    check(G, 'it shows in the archive with its date and Restore and Delete', await T.wait(`!!document.querySelector('[data-arow="${lc.id}"] [data-restore-list]') && !!document.querySelector('[data-arow="${lc.id}"] [data-delete-list]') && /\\d{4}-\\d\\d-\\d\\d/.test(document.querySelector('[data-arow="${lc.id}"] .lm-meta').textContent)`, 8000));
+    check(G, 'a system list in the archive has no action, when one is there', await T.ev(`!document.querySelector('[data-restore-list="${ST.id}"]')`));
+    await T.click(`[data-restore-list="${lc.id}"]`);
+    const backOn = await T.wait(`!!document.querySelector('[data-zone="1"] [data-row="${lc.id}"], .lists [data-list="${lc.id}"]')`, 8000);
+    const sbp = await savedBar();
+    check(G, 'Restore returns it to its old place on the panel', backOn && place >= 0 && sbp.rows[1].indexOf(lc.id) === place, 'place ' + place + ', now ' + sbp.rows[1].indexOf(lc.id));
+
+    // delete: only from the archive, with a popup, with its tasks. A member also loses it and sees no action
+    const del = await MK.rest('POST', 'rpc/delete_archived_list', { p_list: la.id });
+    check(G, 'a list that is not archived is refused by the RPC', !del.ok, del.err && del.err.message);
+    await MK.rest('POST', 'list_members?on_conflict=list_id,profile_id', [{ list_id: la.id, profile_id: AN.uid, role: 'viewer' }], { Prefer: 'resolution=ignore-duplicates' });
+    await T.ev('(document.querySelector("#lm-sw").click(),true)'); await closeDialogs(T); await sleep(100);
+    await pick(T, la.id); await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-archive-list]")', 3000); await T.click('[data-archive-list]');
+    await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + la.id)).json[0].archived_at, 6000);
+    await sleep(500);
+    const A = await tab(B, await ctx(B)); await open(A, await grantFor('anastasiia'));
+    await A.click('#profile'); await A.wait('!!document.querySelector("[data-menu=lists]")', 5000); await A.click('[data-menu=lists]');
+    await A.wait('/\\(\\d+\\)/.test((document.querySelector("#lm-sw")||{}).textContent||"")', 8000); await A.click('#lm-sw');
+    check(G, 'a member sees it in the archive without Restore or Delete', await A.wait(`!!document.querySelector('[data-arow="${la.id}"]')`, 8000) && !(await A.has(`[data-restore-list="${la.id}"]`)) && !(await A.has(`[data-delete-list="${la.id}"]`)));
+    await A.close().catch(() => {});
+    await openLM(true);
+    await T.wait(`!!document.querySelector('[data-lm-tasks="${la.id}"]')`, 8000);
+    const count = await T.text(`[data-lm-tasks="${la.id}"]`);
+    await T.click(`[data-lm-tasks="${la.id}"]`); await sleep(150);
+    const titles = await T.ev(`[...document.querySelectorAll('.lm-tasks li')].map(x=>x.textContent)`);
+    check(G, 'the archive shows the task count and read-only titles', count === '2 tasks' && titles.some(x => x.includes('task one')) && titles.some(x => x.includes('task two')) && !(await T.has('.lm-tasks input')), count + ' ' + titles.join(' | '));
+    await T.shot('lists-archive-1440x900');
+    await T.click(`[data-delete-list="${la.id}"]`);
+    await T.wait('!!document.querySelector("#dl-go") && !document.querySelector("#dl-go").disabled', 8000);
+    const pop = await T.ev(`({warn:document.querySelector('.lm-del .warn').textContent,who:document.querySelector('#dl-who').textContent,bk:document.querySelector('#dl-bk').textContent,focus:document.activeElement.id})`);
+    check(G, 'the popup says what goes, that it cannot be undone, who also loses it and the last backup; Cancel has the focus', /the list and its 2 tasks/.test(pop.warn) && /can't be undone/.test(pop.warn) && /Anastasiia.* also loses? it/.test(pop.who) && !/bot/i.test(pop.who) && /^Last backup (\d{4}-\d\d-\d\d \d\d:\d\d|time unknown)$/.test(pop.bk) && pop.focus === 'dl-no', JSON.stringify(pop));
+    await T.shot('lists-delete-popup-1440x900');
+    await T.click('#dl-no'); await sleep(200);
+    check(G, 'Cancel deletes nothing', (await MK.rest('GET', 'lists?select=id&id=eq.' + la.id)).json.length === 1);
+    await T.click(`[data-delete-list="${la.id}"]`);
+    await T.wait('!!document.querySelector("#dl-go") && !document.querySelector("#dl-go").disabled', 8000);
+    await T.click('#dl-go');
+    const gone = await until(async () => (await MK.rest('GET', 'lists?select=id&id=eq.' + la.id)).json.length === 0, 8000);
+    const left = (await MK.rest('GET', `items?select=id&id=in.(${i1.id},${i2.id})`)).json.length;
+    if (gone) testLists = testLists.filter(x => x.id !== la.id);
+    check(G, 'Delete removes the list and its tasks', gone && left === 0, `items left ${left}`);
+    check(G, 'the row leaves the archive at once', await T.wait(`!document.querySelector('[data-arow="${la.id}"]')`, 8000) && /Deleted/.test(await toastText(T)), await toastText(T));
+    await closeDialogs(T); await sleep(100);
+    const sb2 = await savedBar();
+    check(G, 'the deleted list leaves the saved panels', !!sb2 && !sb2.rows.flat().includes(la.id), JSON.stringify(sb2));
+
+    // refusals on _selftest
+    const r1 = await MK.rest('POST', 'rpc/delete_archived_list', { p_list: ST.id });
+    check(G, '_selftest open: the RPC refuses', !r1.ok, r1.err && r1.err.message);
+    await MK.rest('PATCH', 'lists?id=eq.' + ST.id, { archived_at: new Date().toISOString() });
+    try {
+      const r2 = await MK.rest('POST', 'rpc/delete_archived_list', { p_list: ST.id });
+      check(G, '_selftest archived: the RPC refuses, a system list', !r2.ok && /system list/.test(r2.err.message), r2.err && r2.err.message);
+      await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1200);
+      await openLM(true);
+      await T.wait(`!!document.querySelector('[data-arow="${ST.id}"]')`, 8000);
+      check(G, '_selftest in the archive: no Restore, no Delete', await T.has(`[data-arow="${ST.id}"]`) && !(await T.has(`[data-restore-list="${ST.id}"]`)) && !(await T.has(`[data-delete-list="${ST.id}"]`)));
+    } finally {
+      await MK.rest('PATCH', 'lists?id=eq.' + ST.id, { archived_at: null });
+      await closeDialogs(T); await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(1500);
+    }
+
+    // too narrow: what does not fit shows under +N, the saved rows do not change
+    await openLM();
+    for (let i = 0; i < 12; i++) { if (!(await T.has('[data-lm-more="0"]:not([disabled])'))) break; await T.click('[data-lm-more="0"]'); await sleep(60); }
+    await closeDialogs(T); await sleep(100);
+    const sb3 = await savedBar();
+    await T.size(800, 800); await sleep(500);
+    const nar = await T.ev(`[...document.querySelectorAll('.panels .lists')].every(x=>x.scrollWidth<=x.clientWidth+1)`), shown = (await rowsNow()).flat().length;
+    const sb4 = await savedBar();
+    check(G, 'a narrow window: each panel stays one line, what does not fit goes under +N, the saved rows stay', nar && JSON.stringify(sb3.rows) === JSON.stringify(sb4.rows) && shown < sb3.rows[0].length + sb3.rows[1].length, `shown ${shown} of ${sb3.rows.flat().length}`);
+    await openLM();
+    check(G, 'the window says why', /out of room/.test(await T.text('dialog[open] [data-zone="rest"] .lm-note')));
+    await closeDialogs(T); await sleep(100);
+    await T.size(1440, 900); await sleep(500);
+
+    // screens at both widths, both themes: one panel, two panels, the window, the archive
+    for (const theme of ['light', 'dark']) {
+      await T.ev(`(document.documentElement.dataset.theme=${JSON.stringify(theme)},true)`); await sleep(150); // the person's saved theme would win over T.theme
+      for (const [w, h] of [[1440, 900], [390, 844]]) {
+        await T.size(w, h); await sleep(400);
+        const tag = `${w}x${h}-${theme}`;
+        await openLM(); await T.click('[data-lm-two="1"]'); await sleep(200); await T.shot(`lists-window-${tag}`);
+        await T.click('[data-lm-two="0"]'); await sleep(150); await closeDialogs(T); await sleep(200); await T.shot(`lists-one-panel-${tag}`);
+        await openLM(); await T.click('[data-lm-two="1"]'); await sleep(150); await closeDialogs(T); await sleep(200); await T.shot(`lists-two-panels-${tag}`);
+        const wide = await T.ev('document.documentElement.scrollWidth>innerWidth');
+        check(G, `no sideways scroll at ${tag}`, !wide);
+        await openLM(true); await sleep(300); await T.shot(`lists-archive-${tag}`);
+        if (await T.has('[data-delete-list]')) {
+          await T.click('[data-delete-list]'); await T.wait('!!document.querySelector("#dl-no")', 3000); await sleep(500); await T.shot(`lists-delete-${tag}`); await T.click('#dl-no'); await sleep(150);
+        }
+        await closeDialogs(T); await sleep(150);
+      }
+    }
+    await T.size(1440, 900);
+
+    // the phone: the archive's tasks, Delete with the same popup and the backup line, at 390 px
+    await mkItem('phone task', { list_id: ld.id });
+    await MK.rest('PATCH', 'lists?id=eq.' + ld.id, { archived_at: new Date().toISOString() });
+    const P = await tab(B, await ctx(B), { width: 390, height: 844 });
+    await seed(P, await grantFor('maksym'));
+    await P.go(pathToFileURL(path.join(path.dirname(PAGE), 'app', 'index.html')).href);
+    await P.wait('!!document.querySelector(".tab[data-tab=me]")', 20000); await sleep(1500);
+    await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
+    await P.click('.tab[data-tab=me]'); await P.wait('!!document.querySelector("[data-act=pg-alists]")', 8000); await P.click('[data-act=pg-alists]');
+    const pHas = await P.wait(`!!document.querySelector('[data-alist="${ld.id}"] [data-act="alist-tasks"]')`, 10000);
+    await P.click(`[data-alist="${ld.id}"] [data-act="alist-tasks"]`); await sleep(200);
+    check(G, 'phone: the archived page shows the task count and titles, with Restore and Delete', pHas && (await P.text(`[data-alist="${ld.id}"] .altasks`)).includes('phone task') && await P.has(`[data-alist="${ld.id}"] [data-act="alist-restore"]`) && await P.has(`[data-alist="${ld.id}"] [data-act="alist-delete"]`) && !(await P.ev('document.documentElement.scrollWidth>innerWidth')));
+    check(G, 'phone: a system list offers nothing', !(await P.has(`[data-act="alist-delete"][data-id="${ST.id}"]`)));
+    await sleep(300); await P.shot('lists-phone-archive-390x844');
+    await P.click(`[data-alist="${ld.id}"] [data-act="alist-delete"]`);
+    await P.wait('document.querySelector("#dlg-confirm").open', 8000);
+    const pp = await P.ev(`({h:document.querySelector('#cf-h').textContent,p:document.querySelector('#cf-p').textContent,n:document.querySelector('#cf-n').textContent})`);
+    check(G, 'phone: the popup says it cannot be undone and shows the last backup in small print', /and its 1 task/.test(pp.p) && /can't be undone/.test(pp.p) && /^Last backup (\d{4}-\d\d-\d\d \d\d:\d\d|time unknown)$/.test(pp.n), JSON.stringify(pp));
+    await sleep(300); await P.shot('lists-phone-delete-390x844');
+    await P.click('#cf-yes');
+    const pg = await until(async () => (await MK.rest('GET', 'lists?select=id&id=eq.' + ld.id)).json.length === 0, 8000);
+    if (pg) testLists = testLists.filter(x => x.id !== ld.id);
+    check(G, 'phone: Delete removes the list and the row', pg && await P.wait(`!document.querySelector('[data-alist="${ld.id}"]')`, 8000));
+    await P.close().catch(() => {});
+    check(G, 'no console errors in this group', T.errors.length === errs, T.errors.slice(errs).join(' / '));
+  } finally {
+    await closeDialogs(T).catch(() => {});
+    for (const l of made) if (testLists.some(x => x.id === l.id)) { const r = await dropTestList(l); check(G, 'test list deleted: ' + l.name, r.ok, r.err && r.err.message); }
+    await T.reload().catch(() => {}); await T.ready().catch(() => {});
+  }
 }
 
 async function gErrors() {
@@ -2272,9 +2659,9 @@ const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, appfilters: gAppFilters, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'links', 'guests', 'request'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }

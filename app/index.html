@@ -140,6 +140,7 @@ svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .chiprow.fade-start.fade-end,.weeks.fade-start.fade-end{-webkit-mask-image:linear-gradient(to right,transparent,#000 32px,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(to right,transparent,#000 32px,#000 calc(100% - 32px),transparent)}
 .chiprow::-webkit-scrollbar{display:none}
 .chip{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--hair2);background:var(--glass2);color:var(--ink);font:500 14px/1 var(--ui);white-space:nowrap;scroll-snap-align:start}
+#filters [data-k="mine"]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .chip .n{color:var(--ink3);font-weight:500}
 .chip[aria-pressed="true"],.chip[aria-current="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .chip[aria-pressed="true"] .n,.chip[aria-current="true"] .n{color:inherit;opacity:.75}
@@ -487,6 +488,9 @@ hr.rv-sep{border:0;border-top:1px solid var(--hair2);margin:18px 0 12px}
 .rowb.out{color:var(--danger-ink);justify-content:center}
 .later{font:600 12px/1 var(--ui);padding:5px 9px;border-radius:999px;border:1px dashed var(--hair2);color:var(--ink2)}
 .rowsub{display:block;font:400 13px/1.35 var(--ui);color:var(--ink2);margin-top:2px}
+.alacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 14px 10px}
+.altasks{margin:0;padding:0 14px 12px;list-style:none;font:400 14px/1.6 var(--font);color:var(--ink2)}
+dialog.alert p.cf-small{margin:-8px 0 18px;font:400 12.5px/1.4 var(--ui);color:var(--ink2)}
 .sub .back{margin:8px 0 0 -10px}
 .sub h2{margin:4px 0 12px;font:500 40px/1 var(--serif)}
 .stepper{display:flex;align-items:center;gap:8px}
@@ -924,7 +928,7 @@ h2[tabindex="-1"]:focus{outline:none}
   <div class="sbody" id="share-body"></div>
 </dialog>
 <dialog class="alert" id="dlg-confirm" role="alertdialog" aria-labelledby="cf-h" aria-describedby="cf-p">
-  <h2 id="cf-h"></h2><p id="cf-p"></p>
+  <h2 id="cf-h"></h2><p id="cf-p"></p><p id="cf-n" class="cf-small" hidden></p>
   <div class="row"><button type="button" class="btn" id="cf-no"></button><button type="button" class="btn primary" id="cf-yes"></button></div>
 </dialog>
 
@@ -1228,9 +1232,9 @@ document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('close', () => { if (d.contains($('#toast'))) document.body.appendChild($('#toast')); if (lastFocus && document.contains(lastFocus) && !document.querySelector('dialog[open]')) lastFocus.focus(); });
   d.addEventListener('click', e => { if (e.target === d && !['dlg-signin', 'dlg-access', 'dlg-confirm'].includes(d.id)) { if (d.id === 'dlg-task') tryCloseTask(); else if (d.id === 'dlg-add') tryCloseAdd(); else d.close(); } });
 });
-function confirmDlg({ title, body, yes, no }) {
+function confirmDlg({ title, body, yes, no, note }) {
   return new Promise(res => {
-    $('#cf-h').textContent = title; $('#cf-p').textContent = body; $('#cf-yes').textContent = yes; $('#cf-no').textContent = no || ''; $('#cf-no').hidden = !no;
+    $('#cf-h').textContent = title; $('#cf-p').textContent = body; $('#cf-n').textContent = note || ''; $('#cf-n').hidden = !note; $('#cf-yes').textContent = yes; $('#cf-no').textContent = no || ''; $('#cf-no').hidden = !no;
     const d = openDlg('dlg-confirm');
     const done = v => { d.close(); $('#cf-yes').onclick = $('#cf-no').onclick = null; res(v); };
     $('#cf-yes').onclick = () => done(true); $('#cf-no').onclick = () => done(false);
@@ -1921,6 +1925,14 @@ document.addEventListener('click', async e => {
   document.addEventListener('pointerup', end); document.addEventListener('pointercancel', () => { if (g) { g.li.classList.remove('dragging'); g.li.style.transform = ''; clearTimeout(g.timer); } g = null; });
   document.addEventListener('keydown', e => { const gr = e.target.closest && e.target.closest('.lgrip'); if (!gr || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return; e.preventDefault(); const id = gr.dataset.id; if (moveListPos(id, e.key === 'ArrowUp' ? -1 : 1)) { renderLists(); $(`#lists-body .lgrip[data-id="${id}"]`).focus(); toast(`Moved ${lname(id)} ${e.key === 'ArrowUp' ? 'up' : 'down'}.`); } });
 })();
+/* long press on Mine opens the tag picker (the web: the right button on Mine) */
+(function () {
+  let t = null; const f = $('#filters'), isMine = e => e.target.closest && e.target.closest('[data-k="mine"]');
+  const stop = () => { clearTimeout(t); t = null; };
+  f.addEventListener('pointerdown', e => { if (!isMine(e)) return; stop(); t = setTimeout(() => { t = null; suppressClick = Date.now() + 400; openMinePick(); }, 550); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => f.addEventListener(n, stop));
+  f.addEventListener('contextmenu', e => { if (!isMine(e)) return; e.preventDefault(); stop(); suppressClick = Date.now() + 400; openMinePick(); });
+})();
 /* long press on the list chips opens the Lists sheet */
 (function () {
   let t = null; const r = $('#chiprow');
@@ -2209,33 +2221,48 @@ const dueName = v => (DUE.find(x => x[0] === v) || [, ''])[1];
 function passF(t, q, noDue) {
   if (!matchQ(t, q)) return false;
   if (!noDue && SF.due && !C.dueMatch(t, { due: SF.due }, now())) return false; // the board's rule (core)
-  if (SF.tag.length && !t.tags.some(id => SF.tag.includes(id))) return false;
+  if (SF.tag.length) { const of = {}; SF.tag.forEach(id => { of[id] = D.tags[id] && D.tags[id].tag_list_id; }); if (!C.tagFilterHit(t.tags, new Set(SF.tag), of)) return false; }
   if (SF.cat.length && !SF.cat.includes(t.category)) return false;
   if (SF.check && !lowConf(t)) return false;
   if (SF.mine && !C.isMine(t, me(), D.tagNames)) return false;
   return true;
 }
 const catName = slug => (D.categories[slug] || {}).name || slug;
+const inScope = t => { const id = curListId(); return id === 'all' || t.list === id; }; // Search reads the selected list, as the web's inList
+const mineTagsShown = () => (me().mine_tag_ids || []).some(id => D.labels[id] !== undefined);
+function openMinePick() { SF.open = 'minepick'; renderSearch(); const f = $('#fopts .chip'); if (f) f.focus(); }
 function renderFilters() {
   const n = SF.tag.length, k = SF.cat.length, any = SF.due || n || k || SF.check || SF.mine;
   const b = (key, label, on, toggle) => `<button class="chip" data-act="${toggle ? 'f-toggle' : 'f-open'}" data-k="${key}" ${toggle ? `aria-pressed="${!!on}"` : `aria-expanded="${SF.open === key}" aria-pressed="${!!on}"`}>${label}${toggle ? '' : ic('chev')}</button>`;
-  $('#filters').innerHTML = b('due', SF.due ? `Due: ${dueName(SF.due)}` : 'Due', SF.due) + b('tag', n ? `Tag: ${n === 1 ? esc(D.labels[SF.tag[0]] || '?') : n}` : 'Tag', n) + b('cat', k ? `Category: ${k === 1 ? esc(catName(SF.cat[0])) : k}` : 'Category', k)
-    + b('check', 'To check', SF.check, 1) + b('mine', 'Mine', SF.mine, 1) + (any ? '<button class="chip ghost" data-act="f-clear">Clear filters</button>' : '')
-    + (SF.mine && !(me().mine_tag_ids || []).some(id => D.labels[id] !== undefined) ? '<p class="src" style="margin:0;flex-basis:100%">Mine shows tasks with your tags. Open Tags, pick a tag, then Count as Mine.</p>' : '');
+  $('#filters').innerHTML = `<button class="chip" data-act="f-toggle" data-k="mine" aria-pressed="${!!SF.mine}" aria-haspopup="true" aria-expanded="${SF.open === 'minepick'}" title="Hold to choose which tags are yours">Mine</button>` + b('due', SF.due ? `Due: ${dueName(SF.due)}` : 'Due', SF.due) + b('tag', n ? `Tag: ${n === 1 ? esc(D.labels[SF.tag[0]] || '?') : n}` : 'Tag', n) + b('cat', k ? `Category: ${k === 1 ? esc(catName(SF.cat[0])) : k}` : 'Category', k)
+    + b('check', 'To check', SF.check, 1) + (any ? '<button class="chip ghost" data-act="f-clear">Clear filters</button>' : '');
   const o = $('#fopts'); if (!SF.open) { o.hidden = true; o.innerHTML = ''; return; } o.hidden = false;
   const opt = (key, v, label, on) => `<button class="chip" data-act="f-set" data-k="${key}" data-v="${esc(v)}" aria-pressed="${!!on}">${esc(label)}</button>`;
   if (SF.open === 'due') o.innerHTML = DUE.map(([v, l]) => opt('due', v, l, v === 'any' ? !SF.due : SF.due === v)).join('');
   if (SF.open === 'tag') { const ids = Object.keys(D.labels).sort((a, c) => String(D.labels[a]).localeCompare(String(D.labels[c]))); o.innerHTML = ids.map(id => opt('tag', id, D.labels[id], SF.tag.includes(id))).join('') || '<p class="src" style="margin:0">No tags yet.</p>'; }
-  if (SF.open === 'cat') { const cs = [...new Set(D.all().map(t => t.category))].sort((a, c) => catName(a).localeCompare(catName(c))); o.innerHTML = cs.map(c => opt('cat', c, catName(c), SF.cat.includes(c))).join(''); }
+  /* web: pops.minepick. Each tap saves the tag at once (D.setMineTags) */
+  if (SF.open === 'minepick') {
+    const gs = groupsNow(), all = gs.flatMap(g => g.tags), sug = C.mineSuggestions(all, D.tagNames, me()), mine = new Set(me().mine_tag_ids || []);
+    const h = s => `<p class="src" style="margin:0;flex-basis:100%">${esc(s)}</p>`;
+    const pick = (id, label) => `<button class="chip" data-act="mine-pick" data-v="${esc(id)}" aria-pressed="${mine.has(id)}">${esc(label)}</button>`;
+    o.innerHTML = !all.length ? h('You have no tags yet. Add them in Me, Tags, or ask a list owner to share theirs.') :
+      h('Which tags mean a task is yours?') + (sug.length ? h('Suggested') + sug.map(id => pick(id, D.tagNames[id])).join('') : '') +
+      gs.map(g => { const rest = g.tags.filter(id => !sug.includes(id)); return rest.length ? h(g.list.name) + rest.map(id => pick(id, D.tagNames[id])).join('') : ''; }).join('') +
+      h("Tags from lists you don't have aren't shown here. Ask the list owner to share them.") + '<button class="chip" data-act="mine-done">Show my tasks</button>';
+  }
+  if (SF.open === 'cat') { const cs = [...new Set(D.all().filter(inScope).map(t => t.category))].sort((a, c) => catName(a).localeCompare(catName(c))); o.innerHTML = cs.map(c => opt('cat', c, catName(c), SF.cat.includes(c))).join(''); }
 }
 function renderSearch() {
   renderFilters();
   const q = $('#q').value.trim(), any = q || SF.due || SF.tag.length || SF.cat.length || SF.check || SF.mine;
-  const hits = openAll().filter(t => passF(t, q));
-  const arch = any ? D.all().filter(t => isClosed(t) && passF(t, q, true)).length : 0;
+  const cl = curList(), where = cl ? ` in ${esc(cl.name)}` : '';
+  // under the chips, never in their row: #filters does not wrap, so text there stretches every chip
+  const mineHint = SF.mine ? '<p class="src" style="margin:0 0 8px">Hold Mine to change which tags are yours.</p>' : '';
+  const hits = openAll().filter(t => inScope(t) && passF(t, q));
+  const arch = any ? D.all().filter(t => isClosed(t) && inScope(t) && passF(t, q, true)).length : 0;
   const archLink = arch ? `<button class="btn quiet" data-act="arch-open" style="margin-top:8px;padding:0 4px">${arch} in archive</button>` : '';
-  if (!hits.length) { $('#results').innerHTML = `<div class="empty"><p>${any ? 'No tasks match. Try another word or clear the filters.' : 'No open tasks.'}</p></div>${archLink}`; return; }
-  $('#results').innerHTML = `<p class="count-line">${hits.length} open ${hits.length === 1 ? 'task' : 'tasks'}${any ? (hits.length === 1 ? ' matches' : ' match') : ''}.</p>` + QS.map(qq => {
+  if (!hits.length) { $('#results').innerHTML = `${mineHint}<div class="empty"><p>${any ? `No tasks match${where}. Try another word or clear the filters.` : `No open tasks${where}.`}</p></div>${archLink}`; return; }
+  $('#results').innerHTML = `${mineHint}<p class="count-line">${hits.length} open ${hits.length === 1 ? 'task' : 'tasks'}${any ? (hits.length === 1 ? ' matches' : ' match') : ''}${where}.</p>` + QS.map(qq => {
     const g = hits.filter(t => t.q === qq).sort(C.byOrder); if (!g.length) return '';
     return `<div class="grp" data-q="${qq}"><h3>${QN[qq]}</h3><ul class="rlist">${g.map(t => { const di = dueInfo(t); return `<li class="rr"><button class="rbtn" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span><span>${esc(plainT(t.title))}</span><small>${esc(lname(t.list))}${di ? `, ${di.txt}` : ''}</small></button></li>`; }).join('')}</ul></div>`;
   }).join('') + archLink;
@@ -2245,7 +2272,7 @@ $('#q').addEventListener('input', renderSearch);
 /* ---------- S9 Me and its pages (web: account menu, openSettings, openCardLayout, openTags, openSharing, archiveHtml, openArchivedLists,
    openHiddenLists, timelineHtml) ---------- */
 let mePage = null, MTQ = '';
-const AR = { sort: 'completed', q: '' };
+const AR = { sort: 'completed', q: '', list: null };
 const TLW = { off: 0, fold: new Set() };
 const INST_KEY = 'td.app.installHint';
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -2416,17 +2443,28 @@ const PAGES = {
   } },
   'pg-archive': { title: 'Archive', render(el) {
     const key = t => t.doneAt ? t.doneAt.getTime() : 0, by = { completed: (a, b) => key(b) - key(a), end: (a, b) => (a.deadline || Infinity) - (b.deadline || Infinity), title: (a, b) => plainT(a.title).localeCompare(plainT(b.title)) }[AR.sort];
-    const all = closedAll(), rows = all.filter(t => matchQ(t, AR.q)).sort(by), clear = rows.filter(t => D.canDo('delete', t));
+    const all = closedAll(), rows = all.filter(t => matchQ(t, AR.q) && (!AR.list || t.list === AR.list)).sort(by), clear = rows.filter(t => D.canDo('delete', t));
     el.innerHTML = `<div class="artools"><label class="field"><span>Sort</span><select class="inp" id="ar-sort">${[['completed', 'Completed'], ['end', 'End'], ['title', 'Title']].map(([v, l]) => `<option value="${v}"${AR.sort === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>${clear.length ? '<button class="btn" data-act="ar-clear">Clear</button>' : ''}</div>
-      ${AR.q ? `<p class="src" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px">Matching “${esc(AR.q)}”: ${rows.length} of ${all.length}.<button class="btn quiet" data-act="ar-all" style="padding:0 6px">Show all</button></p>` : ''}
+      ${AR.q || AR.list ? `<p class="src" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px">${AR.q ? `Matching “${esc(AR.q)}”` : 'Showing'}${AR.list ? ` in ${esc(lname(AR.list))}` : ''}: ${rows.length} of ${all.length}.<button class="btn quiet" data-act="ar-all" style="padding:0 6px">Show all</button></p>` : ''}
       ${rows.length ? `<ul class="rlist">${rows.slice(0, 300).map(t => `<li class="arow"><span class="day">${t.doneAt ? dayLabel(t.doneAt) : ''}</span><span><button class="linkb" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span>${esc(plainT(t.title))}</button><span class="rowsub">${t.status === 'done' ? 'Done' : 'Cancelled'}, ${esc(lname(t.list))}${t.deadline ? `, end ${dayLabel(t.deadline)}` : ''}</span></span><span class="aracts">${D.canDo('edit', t) && !(L(t.list) || {}).archived_at ? `<button class="btn quiet" data-act="restore" data-tid="${t.id}">Restore<span class="vh"> ${esc(plainT(t.title))}</span></button>` : ''}${D.canDo('delete', t) ? `<button class="btn quiet dq" data-act="ar-del" data-tid="${t.id}">Delete<span class="vh"> ${esc(plainT(t.title))}</span></button>` : ''}</span></li>`).join('')}</ul>${rows.length > 300 ? `<p class="src">The first 300 of ${rows.length}. Search narrows them.</p>` : ''}` : `<div class="empty"><p>${all.length ? 'No finished task matches.' : 'Nothing finished yet.'}</p></div>`}`;
     el.onchange = e => { if (e.target.id === 'ar-sort') { AR.sort = e.target.value; e.target.blur(); mePage.render(el); $('#ar-sort').focus(); } };
   } },
-  'pg-alists': { title: 'Archived lists', rows: null, err: '',
-    async load() { const pg = mePage, r = await D.archivedLists(); if (mePage !== pg) return; pg.rows = r.ok ? r.lists : []; pg.err = r.ok ? '' : r.err.message; reMe(); },
+  'pg-alists': { title: 'Archived lists', rows: null, err: '', tasks: {}, shown: null,
+    async load() {
+      const pg = mePage, r = await D.archivedLists(); if (mePage !== pg) return;
+      pg.rows = r.ok ? r.lists : []; pg.err = r.ok ? '' : r.err.message; pg.shown = pg.shown || new Set();
+      const t = r.ok ? await D.archivedTasks(r.lists.map(l => l.id)) : null; if (mePage !== pg) return;
+      pg.tasks = t && t.ok ? t.tasks : {};
+      reMe();
+    },
     render(el) {
-      const a = this.rows;
-      el.innerHTML = a === null ? '<p class="src">Loading…</p>' : (this.err ? `<p class="err">${esc(this.err)}</p>` : '') + (a.length ? `<p class="src">Their tasks stay hidden until the list is restored.</p><ul class="rows">${a.map(l => `<li><div class="rowb">${esc(l.name)}<span class="rowsub">Archived ${dayLabel(new Date(l.archived_at))}</span><span class="v">${l.canRestore ? `<button class="btn quiet" data-act="alist-restore" data-id="${l.id}">Restore<span class="vh"> ${esc(l.name)}</span></button>` : ''}</span></div></li>`).join('')}</ul>` : '<p class="src">No archived lists.</p>');
+      const a = this.rows, T = this.tasks, TASKS_SHOWN = 30;
+      el.innerHTML = a === null ? '<p class="src">Loading…</p>' : (this.err ? `<p class="err">${esc(this.err)}</p>` : '') + (a.length ? `<p class="src">Nothing in an archived list can be changed. Restore puts it back. Delete removes it and its tasks for good.</p><ul class="rows">${a.map(l => {
+        const ts = T[l.id] || [], open = this.shown && this.shown.has(l.id);
+        return `<li data-alist="${l.id}"><div class="rowb"><span style="min-width:0">${esc(l.name)}<span class="rowsub">Archived ${dayLabel(new Date(l.archived_at))}</span></span></div>
+          <div class="alacts">${ts.length ? `<button class="btn quiet" data-act="alist-tasks" data-id="${l.id}" aria-expanded="${!!open}">${ts.length} ${ts.length === 1 ? 'task' : 'tasks'}</button>` : '<span class="rowsub">No tasks</span>'}${l.canRestore ? `<button class="btn quiet" data-act="alist-restore" data-id="${l.id}">Restore<span class="vh"> ${esc(l.name)}</span></button><button class="btn danger" data-act="alist-delete" data-id="${l.id}">Delete<span class="vh"> ${esc(l.name)}</span></button>` : ''}</div>
+          ${open ? `<ul class="altasks">${ts.slice(0, TASKS_SHOWN).map(x => `<li>${esc(plainT(x))}</li>`).join('')}${ts.length > TASKS_SHOWN ? `<li>and ${ts.length - TASKS_SHOWN} more</li>` : ''}</ul>` : ''}</li>`;
+      }).join('')}</ul>` : '<p class="src">No archived lists.</p>');
     } },
   'pg-hlists': { title: 'Hidden lists', render(el) {
     const a = D.hiddenLists;
@@ -2569,11 +2607,18 @@ async function part2Click(a, b) {
       else { SF[k] = SF[k].includes(v) ? SF[k].filter(x => x !== v) : [...SF[k], v]; renderSearch(); const nb = [...document.querySelectorAll('#fopts [data-v]')].find(x => x.dataset.v === v); if (nb) nb.focus(); }
       break;
     }
-    case 'f-toggle': { const k = b.dataset.k; SF[k] = !SF[k]; renderSearch(); $(`#filters [data-k="${k}"]`).focus(); break; }
+    case 'mine-pick': {
+      const v = b.dataset.v, s = new Set(me().mine_tag_ids || []); s.has(v) ? s.delete(v) : s.add(v);
+      const r = await D.setMineTags([...s]); if (!r.ok) toast(r.err.message);
+      renderSearch(); const nb = [...document.querySelectorAll('#fopts [data-act="mine-pick"]')].find(x => x.dataset.v === v); if (nb) nb.focus();
+      break;
+    }
+    case 'mine-done': SF.mine = mineTagsShown(); SF.open = null; renderSearch(); $('#filters [data-k="mine"]').focus(); break;
+    case 'f-toggle': { const k = b.dataset.k; if (k === 'mine' && !SF.mine && !mineTagsShown()) { openMinePick(); break; } SF[k] = !SF[k]; renderSearch(); $(`#filters [data-k="${k}"]`).focus(); break; }
     case 'f-clear': Object.assign(SF, { due: null, tag: [], cat: [], check: false, mine: false, open: null }); renderSearch(); $('#q').focus(); break;
-    case 'arch-open': AR.q = $('#q').value.trim(); openPage('pg-archive'); break;
-    case 'me-back': mePage = null; renderMe(); $('#me-h').focus(); break;
-    case 'ar-all': AR.q = ''; renderMe(); $('#me-h').focus(); break;
+    case 'arch-open': AR.q = $('#q').value.trim(); AR.list = curListId() === 'all' ? null : curListId(); openPage('pg-archive'); break;
+    case 'me-back': AR.list = null; mePage = null; renderMe(); $('#me-h').focus(); break;
+    case 'ar-all': AR.q = ''; AR.list = null; renderMe(); $('#me-h').focus(); break;
     case 'restore': { const r = await D.restoreTask(tid); if (r) toast(r.msg + '.', r.undo); else toast('That did not go through.'); renderAll(); break; }
     case 'ar-del': { const t = task(tid); if (!t) break; if (await confirmDlg({ title: `Delete ${ref(t)}?`, body: plainT(t.title), yes: 'Delete', no: 'Keep' })) { said(D.removeTask(tid), `Deleted ${ref(t)}.`); renderAll(); } break; }
     case 'ar-clear': {
@@ -2582,6 +2627,16 @@ async function part2Click(a, b) {
       break;
     }
     case 'alist-restore': { const r = await D.restoreList(id); said(r); if (r.ok && mePage) { mePage.rows = null; mePage.load(); } renderAll(); break; }
+    case 'alist-tasks': { if (!mePage || !mePage.shown) break; mePage.shown.has(id) ? mePage.shown.delete(id) : mePage.shown.add(id); reMe(); document.querySelector(`[data-act="alist-tasks"][data-id="${id}"]`)?.focus(); break; }
+    case 'alist-delete': {
+      const pg = mePage, l = pg && (pg.rows || []).find(x => x.id === id); if (!l) break;
+      const n = (pg.tasks[id] || []).length, info = await D.deleteInfo(id);
+      const go = await confirmDlg({ title: `Delete ${l.name}?`, body: `This deletes ${n ? `the list and its ${n} ${n === 1 ? 'task' : 'tasks'}` : 'the list'}. It can't be undone.${info.others.length ? ` ${info.others.join(', ')} also ${info.others.length === 1 ? 'loses' : 'lose'} it.` : ''}`, note: info.backup, yes: 'Delete list', no: 'Cancel' });
+      if (!go) break;
+      const r = await D.deleteArchivedList(id); said(r);
+      if (r.ok && mePage === pg) { pg.rows = null; pg.load(); reMe(); }
+      break;
+    }
     case 'hlist-show': { const r = await D.hideList(id, false); said(r); renderAll(); break; }
     case 'swm-hide': { const l = L(id); const r = await D.hideList(id, true); if (r.ok) toast(`Hid ${l ? l.name : 'the list'}.`, async () => { said(await D.hideList(id, false)); renderAll(); }); else said(r); renderAll(); break; }
     case 'swm-leave': { const l = L(id) || D.hiddenLists.find(x => x.id === id); if (l && await confirmDlg({ title: `Leave ${l.name}?`, body: `You lose access until ${D.names[l.owner_id] || 'the owner'} invites you again.`, yes: 'Leave list', no: 'Stay' })) { said(await D.leaveList(id)); renderAll(); } break; }

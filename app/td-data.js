@@ -437,6 +437,7 @@
       if (order.length) LISTS.sort((a, b) => (order.indexOf(a) + 1 || 1e6) - (order.indexOf(b) + 1 || 1e6));
       CATS = {}; cats.json.forEach(c => { CATS[c.slug] = c; });
       me = profs.json.find(p => p.id === uid) || null;
+      NOT_PEOPLE = new Set(profs.json.filter(p => p.kind && p.kind !== 'human').map(p => p.id));
       NAMES = {}; HANDLE_NAMES = {}; profs.json.concat(vis.json || []).forEach(p => { NAMES[p.id] = p.display_name; if (p.handle) HANDLE_NAMES[p.handle] = p.display_name; });
       const tlRole = {}, tlHidden = new Set();
       tlm.json.forEach(m => { tlRole[m.tag_list_id] = m.role; if (m.hidden_at) tlHidden.add(m.tag_list_id); });
@@ -961,7 +962,7 @@
       setPrefs({ list: l.id });
       return { ok: true, list: l, msg: 'List created: ' + l.name };
     }
-    // no web twin: the web has no list rename; PATCH lists.name as the owner (RLS decides)
+    // web: renameList, without its name clash check; PATCH lists.name as the owner (RLS decides). The slug stays
     async function renameList(id, name) {
       const r = await rest('PATCH', 'lists?id=eq.' + id, { name: String(name || '').trim() }, { Prefer: 'return=representation' });
       if (!r.ok || r.json.length !== 1) return { ok: false, err: r.ok ? { kind: 'denied', message: 'Only an owner renames a list' } : r.err };
@@ -982,7 +983,29 @@
       await refreshMeta();
       return { ok: true, msg: 'Restored list: ' + r.json[0].name };
     }
-    async function archivedLists() { const r = await rest('GET', 'lists?select=id,name,archived_at,owner_id&archived_at=not.is.null&order=archived_at.desc'); return r.ok ? { ok: true, lists: r.json.map(l => Object.assign({}, l, { canRestore: ROLE[l.id] === 'owner' && me.kind === 'human' })) } : r; }
+    // web: openLists' archive. canRestore also decides Delete: the owner, a person, not a system list
+    async function archivedLists() { const r = await rest('GET', 'lists?select=id,slug,name,archived_at,owner_id&archived_at=not.is.null&order=archived_at.desc'); return r.ok ? { ok: true, lists: r.json.map(l => Object.assign({}, l, { canRestore: ROLE[l.id] === 'owner' && me.kind === 'human' && !C.isSystemList(l) })) } : r; }
+    // { <list id>: [task title, …] } of archived lists, read only: the same rows the delete counts, soft-deleted ones aside
+    async function archivedTasks(ids) {
+      const out = {}; (ids || []).forEach(id => { out[id] = []; });
+      if (!ids || !ids.length) return { ok: true, tasks: out };
+      const r = await getAll('items?select=list_id,title,num&deleted_at=is.null&order=num.asc&list_id=in.(' + ids.join(',') + ')');
+      if (!r.ok) return r;
+      r.json.forEach(x => { if (out[x.list_id]) out[x.list_id].push(x.title); });
+      return { ok: true, tasks: out };
+    }
+    async function lastBackupAt() { const r = await rpc('last_backup_at', {}); return r.ok ? r.json : null; }
+    // web: askDeleteList. Only from the archive, only the owner, always with the tasks; db/029 refuses everything else. The other members lose it
+    let NOT_PEOPLE = new Set(); // the household's bot and agent logins (profiles.kind), left out of "also loses it"
+    async function deleteInfo(id) {
+      const [ppl, at] = await Promise.all([people('list', id), lastBackupAt()]);
+      return { others: ppl.ok ? C.deleteLosers(ppl.json, me.id, NOT_PEOPLE) : [], backup: C.backupLine(at) };
+    }
+    async function deleteArchivedList(id) {
+      const r = await rpc('delete_archived_list', { p_list: id });
+      if (!r.ok) return r;
+      return { ok: true, msg: 'Deleted: ' + (r.json && r.json.name ? r.json.name : 'the list') };
+    }
     async function hideList(id, hide) { const r = await rpc('set_list_hidden', { p_list: id, p_hidden: !!hide }); if (!r.ok) return r; await afterMembership(); return { ok: true, msg: hide ? 'Hidden for you. Me, Hidden lists brings it back.' : 'Shown again' }; }
     async function leaveList(id) { const l = LIST[id] || HIDDEN_LISTS.find(x => x.id === id); const r = await rpc('leave_list', { p_list: id }); if (!r.ok) return r; await afterMembership(); return { ok: true, msg: 'Left ' + (l ? l.name : 'the list') }; }
 
@@ -1114,7 +1137,7 @@
       // writes
       edit, makeTask, create: createTask, saveTask, flush, flushAll, undoEdit, markDone, cancelTask, removeTask, restoreTask, moveTask, moveToList, placeIn, topKey,
       linkOp, setTags, ensureTags, renameTag, deleteTag, sortTag, moveTags, createTagList, renameTagList, sortTagList, saveTagListOrder, toggleTagListFav, archiveTagList, hideTagList, leaveTagList, setMineTags, saveProfile,
-      createList, renameList, reorderLists, archiveList, restoreList, archivedLists, hideList, leaveList,
+      createList, renameList, reorderLists, archiveList, restoreList, archivedLists, archivedTasks, lastBackupAt, deleteInfo, deleteArchivedList, hideList, leaveList,
       people, share, setRole, removeMember, revokeInvite, acceptInvite, declineInvite, answerNotice,
       setPrefs, writePrefs,
     };

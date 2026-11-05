@@ -528,6 +528,58 @@ test('filter row: a phone write keeps the board\'s filters and filterBar, ids th
   assert.deepEqual(d.prefs.filterBar, filterBar);
 });
 
+test('list panels: listBar survives a phone write, ids the phone does not know included', async () => {
+  const listBar = { two: true, rows: [['list-the-phone-does-not-know'], ['another']] }, saved = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/preferences/, () => [200, [{ prefs: { version: 2, listBar, tagListOrderV: 2 } }]]],
+    ['POST', /^\/rest\/v1\/preferences/, (m, body) => { saved.push(body.prefs); return [201, undefined]; }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  assert.equal((await d.loadAll()).ok, true);
+  d.setPrefs({ theme: 'dark' });
+  assert.deepEqual(d.prefs.listBar, listBar);
+  await d.writePrefs();
+  assert.deepEqual(saved[saved.length - 1].listBar, listBar);
+});
+
+test('archived lists: tasks by list, Delete through the RPC, who else loses it, the backup line', async () => {
+  const OLD = 'cccccccc-cccc-4ccc-8ccc-cccccccccc11', SYS = 'cccccccc-cccc-4ccc-8ccc-cccccccccc12', calls = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=list_id,title,num/, () => [200, [{ list_id: OLD, title: 'One', num: 1 }, { list_id: OLD, title: 'Two', num: 2 }]]],
+    ['POST', /^\/rest\/v1\/rpc\/list_people/, () => [200, [{ state: 'member', profile_id: UID, display_name: 'Me' }, { state: 'member', profile_id: OTHER, display_name: 'Ana' }, { state: 'invited', email: 'x@example.com' }]]],
+    ['POST', /^\/rest\/v1\/rpc\/last_backup_at/, () => [200, '2026-11-05T06:14:00Z']],
+    ['POST', /^\/rest\/v1\/rpc\/delete_archived_list/, (m, body) => { calls.push(body); return [200, { name: 'Old', items: 2 }]; }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  assert.equal((await d.loadAll()).ok, true);
+  const t = await d.archivedTasks([OLD, SYS]);
+  assert.deepEqual(t.tasks, { [OLD]: ['One', 'Two'], [SYS]: [] });
+  const info = await d.deleteInfo(OLD);
+  assert.deepEqual(info.others, ['Ana']);
+  assert.match(info.backup, /^Last backup 2026-11-05 \d\d:\d4$/);
+  const r = await d.deleteArchivedList(OLD);
+  assert.equal(r.ok, true);
+  assert.equal(r.msg, 'Deleted: Old');
+  assert.deepEqual(calls, [{ p_list: OLD }]);
+});
+
+test('archived lists: no backup time yet reads as unknown; a refusal comes back as a sentence', async () => {
+  const f = fakeSupabase([
+    ['POST', /^\/rest\/v1\/rpc\/list_people/, () => [200, []]],
+    ['POST', /^\/rest\/v1\/rpc\/last_backup_at/, () => [200, null]],
+    ['POST', /^\/rest\/v1\/rpc\/delete_archived_list/, () => [409, { code: '23503', message: 'this list is the default list of the category task' }]],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  assert.equal((await d.loadAll()).ok, true);
+  assert.equal((await d.deleteInfo(LIST)).backup, 'Last backup time unknown');
+  const r = await d.deleteArchivedList(LIST);
+  assert.equal(r.ok, false);
+  assert.equal(r.err.message, 'This list is the default list of the category task.');
+});
+
 test('tag lists (tags round): an old prefs row is migrated to the full order with the landing list as favourite and saved; ★ and a move write prefs and own sort', async () => {
   const A = 'cccccccc-cccc-4ccc-8ccc-cccccccccc01', B = 'cccccccc-cccc-4ccc-8ccc-cccccccccc02', S = 'cccccccc-cccc-4ccc-8ccc-cccccccccc03';
   const sorts = { [A]: 2, [B]: 1 }, saved = [], patched = [];
