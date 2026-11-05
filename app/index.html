@@ -2235,8 +2235,7 @@ function renderFilters() {
   const n = SF.tag.length, k = SF.cat.length, any = SF.due || n || k || SF.check || SF.mine;
   const b = (key, label, on, toggle) => `<button class="chip" data-act="${toggle ? 'f-toggle' : 'f-open'}" data-k="${key}" ${toggle ? `aria-pressed="${!!on}"` : `aria-expanded="${SF.open === key}" aria-pressed="${!!on}"`}>${label}${toggle ? '' : ic('chev')}</button>`;
   $('#filters').innerHTML = `<button class="chip" data-act="f-toggle" data-k="mine" aria-pressed="${!!SF.mine}" aria-haspopup="true" aria-expanded="${SF.open === 'minepick'}" title="Hold to choose which tags are yours">Mine</button>` + b('due', SF.due ? `Due: ${dueName(SF.due)}` : 'Due', SF.due) + b('tag', n ? `Tag: ${n === 1 ? esc(D.labels[SF.tag[0]] || '?') : n}` : 'Tag', n) + b('cat', k ? `Category: ${k === 1 ? esc(catName(SF.cat[0])) : k}` : 'Category', k)
-    + b('check', 'To check', SF.check, 1) + (any ? '<button class="chip ghost" data-act="f-clear">Clear filters</button>' : '')
-    + (SF.mine ? '<p class="src" style="margin:0;flex-basis:100%">Hold Mine to change which tags are yours.</p>' : '');
+    + b('check', 'To check', SF.check, 1) + (any ? '<button class="chip ghost" data-act="f-clear">Clear filters</button>' : '');
   const o = $('#fopts'); if (!SF.open) { o.hidden = true; o.innerHTML = ''; return; } o.hidden = false;
   const opt = (key, v, label, on) => `<button class="chip" data-act="f-set" data-k="${key}" data-v="${esc(v)}" aria-pressed="${!!on}">${esc(label)}</button>`;
   if (SF.open === 'due') o.innerHTML = DUE.map(([v, l]) => opt('due', v, l, v === 'any' ? !SF.due : SF.due === v)).join('');
@@ -2257,11 +2256,13 @@ function renderSearch() {
   renderFilters();
   const q = $('#q').value.trim(), any = q || SF.due || SF.tag.length || SF.cat.length || SF.check || SF.mine;
   const cl = curList(), where = cl ? ` in ${esc(cl.name)}` : '';
+  // under the chips, never in their row: #filters does not wrap, so text there stretches every chip
+  const mineHint = SF.mine ? '<p class="src" style="margin:0 0 8px">Hold Mine to change which tags are yours.</p>' : '';
   const hits = openAll().filter(t => inScope(t) && passF(t, q));
   const arch = any ? D.all().filter(t => isClosed(t) && inScope(t) && passF(t, q, true)).length : 0;
   const archLink = arch ? `<button class="btn quiet" data-act="arch-open" style="margin-top:8px;padding:0 4px">${arch} in archive</button>` : '';
-  if (!hits.length) { $('#results').innerHTML = `<div class="empty"><p>${any ? `No tasks match${where}. Try another word or clear the filters.` : `No open tasks${where}.`}</p></div>${archLink}`; return; }
-  $('#results').innerHTML = `<p class="count-line">${hits.length} open ${hits.length === 1 ? 'task' : 'tasks'}${any ? (hits.length === 1 ? ' matches' : ' match') : ''}${where}.</p>` + QS.map(qq => {
+  if (!hits.length) { $('#results').innerHTML = `${mineHint}<div class="empty"><p>${any ? `No tasks match${where}. Try another word or clear the filters.` : `No open tasks${where}.`}</p></div>${archLink}`; return; }
+  $('#results').innerHTML = `${mineHint}<p class="count-line">${hits.length} open ${hits.length === 1 ? 'task' : 'tasks'}${any ? (hits.length === 1 ? ' matches' : ' match') : ''}${where}.</p>` + QS.map(qq => {
     const g = hits.filter(t => t.q === qq).sort(C.byOrder); if (!g.length) return '';
     return `<div class="grp" data-q="${qq}"><h3>${QN[qq]}</h3><ul class="rlist">${g.map(t => { const di = dueInfo(t); return `<li class="rr"><button class="rbtn" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span><span>${esc(plainT(t.title))}</span><small>${esc(lname(t.list))}${di ? `, ${di.txt}` : ''}</small></button></li>`; }).join('')}</ul></div>`;
   }).join('') + archLink;

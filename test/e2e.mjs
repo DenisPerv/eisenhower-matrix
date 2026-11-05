@@ -687,6 +687,10 @@ async function gAppFilters() {
     await P.click('#fopts [data-act=mine-done]'); await sleep(200);
     const mine = await shown();
     check(G, 'Show my tasks switches Mine on with that tag', (await P.ev('SF.mine')) && has(mine, iBoth) && has(mine, iOne));
+    const chipH = await P.ev('Math.max(...[...document.querySelectorAll("#filters .chip")].map(c=>c.getBoundingClientRect().height))');
+    check(G, 'Mine on: the filter chips keep their height', chipH <= 48, String(chipH));
+    check(G, 'Mine on: the hint sits in the results, not in the chip row', await P.ev('!document.querySelector("#filters p")&&document.getElementById("results").innerText.includes("Hold Mine")'));
+    await P.shot('appfilters-mine-on-390x844');
     await P.ev('(()=>{const m=document.querySelector("#filters [data-k=mine]");m.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));return true})()'); await sleep(750);
     check(G, 'a long press opens the picker', await P.has('#fopts [data-act=mine-pick]'));
     await sleep(500); await P.ev('SF.open=null,renderSearch(),true');
