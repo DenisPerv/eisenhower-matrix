@@ -88,6 +88,7 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 | Key | Type | Written by | Meaning |
 |---|---|---|---|
 | `v` | 1 | routine | contract version |
+| `kind` | `check`, `delegate` or absent | creator | absent: a self-improvement card. With a kind: a click leaves `status` alone and HomeOS's `settle.js` closes the card (`HomeOS-TasksBoardHarness/docs/card-contract.md`) |
 | `label_1`, `label_0` | text | routine | the button texts (Yes / No, Accept / Decline, …); the block shows only when both are set |
 | `answer` | `1`, `0` or `null` | client | the button clicked; `null` until then |
 | `module` | `m1` … `m8` | routine | the routine module that made the card |
@@ -97,7 +98,7 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 | `answered_by`, `answered_at` | handle, ISO time | client | who answered and when |
 | `applied_at`, `applied_result` | ISO time, text | routine | set when the next run applied the answer (No: "declined, no change"); from then on the clients refuse a new answer |
 
-- **A click** (`answerDecision`): `answer`, `answered_by`, `answered_at` and `status` `done` in one versioned PATCH with the window's other changes; every other key of `details` (and of `decision`) is kept. Undo sends the earlier `details` and status back.
+- **A click** (`answerDecision`): `answer`, `answered_by`, `answered_at` and, with no `kind`, `status` `done` in one versioned PATCH with the window's other changes; every other key of `details` (and of `decision`) is kept. Undo sends the earlier `details` and status back.
 - **Without the buttons** (Telegram, the CLI): the routine also takes the first word of the description when it equals `label_1` or `label_0` (case ignored), the same idea as `cli/access.mjs` `decisionOf`.
 - **Closed without an answer:** nothing is applied; the card stays as it is.
 

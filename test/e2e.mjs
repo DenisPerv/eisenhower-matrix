@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|appfilters|links|guests|request|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|appfilters|links|card|guests|request|smoke] [--page <html>]
 //   [--url <https origin or page> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/ or the page path given (https://host/board/, a
 // directory path ending in /), and sessions are seeded on <origin>/version.json
@@ -22,7 +22,7 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, PAGE_PATH = '/', ACCESS = null; // --url (origin, page path) and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'guests', 'request'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'card', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 // the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
 const OFFLINE = want.every(g => g === 'request');
@@ -1377,6 +1377,154 @@ async function gUi() {
 // Web: the decision block sits above the description; Yes saves the window's other change with it, marks the task done, keeps
 // every other details key and closes the window; Undo puts both back; an applied answer turns the buttons off. Phone (app/ from
 // file://): the same block in the task sheet, No answers. Screenshots of both at 1440x900 and 390x844
+// the task window's text and check cards (HomeOS-TasksBoardHarness/docs/card-contract.md), on the local version (node scripts/tasksdb/serve-local.js):
+// read mode renders, edit mode is the raw text and a save keeps every other byte, blocks newest first, an open answer on top, an answer by kind leaves
+// the status alone, done and archived tasks read only, the badge, the Continue button beside the number chip (the test writes ai on its own _selftest rows, as
+// the harness does on real ones). Writes stay in _selftest and a test list. Screenshots at 1280x800 and 375x812
+async function gCard() {
+  const G = 'card', LOCAL = 'http://localhost:8788';
+  if (ORIGIN || !(await fetch(LOCAL + '/board/').then(r => r.ok, () => false))) { skip(G, 'the card checks', 'the local server is not running on ' + LOCAL); return; }
+  const SID = '11111111-2222-3333-4444-555555555555', W = 'dialog[open]';
+  const T = await tab(B, await ctx(B), { width: 1280, height: 800 });
+  const local = async (P, page) => { const g = await grantFor('maksym'); await P.go(LOCAL + '/privacy'); await P.ev('(()=>{localStorage.removeItem("td.auth");sessionStorage.removeItem("td.auth");localStorage.setItem("td.auth",' + JSON.stringify(JSON.stringify({ refresh_token: g.refresh_token })) + ');localStorage.setItem("td.app.list",' + JSON.stringify(ST.id) + ');return true})()'); await P.go(LOCAL + page); };
+  await local(T, '/board/');
+  check(G, 'the board loads on the local version', await T.ready(), T.errors.slice(-1).join(''));
+  const wide = '| ' + Array.from({ length: 14 }, (_, i) => 'column ' + i).join(' | ') + ' |\n|' + '---|'.repeat(14) + '\n| ' + Array.from({ length: 14 }, (_, i) => 'value ' + i).join(' | ') + ' |';
+  const RICH = 'First paragraph, **bold**, `code`.\n\n## Plan\n\n### Steps\n\n' + wide + '\n\n* a star bullet  \n  - a nested one\n1) a number\n\n[site](https://example.com/a?b=1&c=2) [bad](javascript:window.__xss=1) <img src=x onerror="window.__xss=1">\n\n---\n\nunder a rule\n\n## Result\n\nthe newest block\n';
+  const rich = await mkItem('card rich', { body_md: RICH, sort_key: 9000001 });
+  const CARD = '## What was done\nA thing.\n\n## How to check it\nOpen it.\n\n## Deviations\nNone that matter.\n\n## How to answer\nAccept, Needs changes, or text below.\n\n## When it takes effect\nOn the next run.\n\n## Your answer\n_Write your answer below this line, then save. Agents read it on the next scan._\n\n## Links\n- [a/b.md](https://github.com/x/y/blob/abc/a/b.md)\n';
+  const DEC = { v: 1, kind: 'check', label_1: 'Accept', label_0: 'Needs changes', answer: null };
+  const card = await mkItem('card check', { body_md: CARD, quadrant: 'C', sort_key: 9000002, details: { decision: DEC, e2e: RUN } });
+  const done = await mkItem('card done', { body_md: '## Result\n\n| a | b |\n|---|---|\n| 1 | 2 |', status: 'done', sort_key: 9000003 });
+  const wait = await mkItem('card waiting', { status: 'waiting', sort_key: 9000004 });
+  const AL = await mkList(MK, RUN + ' card', true);
+  const za = await mkItem('card in archived list', { list_id: AL.id, body_md: '## Result\n\n| a | b |\n|---|---|\n| 1 | 2 |' });
+  await T.reload(); await T.ready(); await pick(T, ST.id);
+  await T.wait('!!document.querySelector(\'[data-card="' + rich.id + '"]\')', 15000);
+  // read mode
+  await T.click('[data-card="' + rich.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fread")', 8000); await sleep(900);
+  const read = await T.ev('(()=>{const d=document.querySelector("' + W + '"),m=d.querySelector(".fmd"),a=[...m.querySelectorAll("a")],txt=m.textContent;return {h:!!m.querySelector("h4")&&!!m.querySelector("h5"),table:!!m.querySelector(".md-tbl table"),rule:!!m.querySelector("hr:not(.md-blockrule)"),link:a.length===1&&a[0].href.startsWith("https://example.com/")&&a[0].rel==="noopener"&&a[0].target==="_blank",code:!!m.querySelector("code"),img:!!m.querySelector("img"),bad:txt.includes("[bad](javascript:"),xss:window.__xss===1,newest:txt.indexOf("the newest block")<txt.indexOf("Steps"),blockrule:m.querySelectorAll("hr.md-blockrule").length,raw:d.querySelector("#fn").hidden}})()');
+  check(G, 'read mode: table, heading, link and rule render; a javascript: link is plain text; no HTML from the data', read.h && read.table && read.rule && read.link && read.code && !read.img && read.bad && !read.xss && read.raw, JSON.stringify(read));
+  check(G, 'read mode: blocks newest first with a rule between them; the text before the first heading stays last', read.newest && read.blockrule === 2, JSON.stringify(read));
+  await T.shot('card-read-1280x800');
+  await T.size(375, 812); await sleep(500);
+  check(G, 'read mode at 375: the table scrolls inside its box, the page does not', await T.ev('(()=>{const b=document.querySelector("' + W + ' .md-tbl");return b.scrollWidth>b.clientWidth&&document.documentElement.scrollWidth<=innerWidth&&b.getBoundingClientRect().right<=innerWidth})()'));
+  await T.shot('card-read-375x812');
+  await T.size(1280, 800); await sleep(300);
+  // edit mode: raw text, and a save keeps every other byte
+  await T.ev('(()=>{const f=document.querySelector("' + W + ' #fd");f.value="2030-01-02T10:00";f.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("' + W + ' #fs").click();return true})()');
+  const kept = await until(async () => { const x = await item(rich.id); return x && x.due_at ? x : null; });
+  check(G, 'a save that did not touch the description keeps it byte for byte', !!kept && kept.body_md === RICH, kept && kept.body_md.length + ' of ' + RICH.length);
+  await T.wait('!document.querySelector("' + W + '")', 4000);
+  await T.wait('!!document.querySelector(\'[data-card="' + rich.id + '"]\')', 5000);
+  await T.click('[data-card="' + rich.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fedit")', 8000);
+  await T.click(W + ' #fedit'); await sleep(200);
+  const raw = await T.ev('(()=>{const f=document.querySelector("' + W + ' #fn");return {shown:!f.hidden,same:f.value===' + JSON.stringify(RICH) + ',noEditable:f.tagName==="TEXTAREA",read:document.querySelector("' + W + ' #fread").hidden}})()');
+  check(G, 'Edit text shows the raw text, in a plain text box', raw.shown && raw.same && raw.noEditable && raw.read, JSON.stringify(raw));
+  await sleep(500); await T.shot('card-edit-1280x800');
+  await T.ev('(()=>{const f=document.querySelector("' + W + ' #fn");f.value=f.value.replace("under a rule","under a rule, changed");document.querySelector("' + W + ' #fs").click();return true})()');
+  const ed = await until(async () => { const x = await item(rich.id); return x && x.body_md.includes('changed') ? x : null; });
+  check(G, 'a save through edit mode changes only what the person changed', !!ed && ed.body_md === RICH.replace('under a rule', 'under a rule, changed').replace(/\s+$/, ''), ed && ed.body_md.length + '');
+  await T.wait('!document.querySelector("' + W + '")', 4000);
+  // the small card
+  const sm = await T.ev('(()=>{const c=document.querySelector(\'[data-card="' + rich.id + '"]\');const m=c&&c.querySelector(".md");return m?{table:!!m.querySelector("table"),first:m.textContent.startsWith("First paragraph")}:null})()');
+  if (sm) check(G, 'an open card shows the first paragraph only, no table', sm.first && !sm.table, JSON.stringify(sm)); else skip(G, 'an open card shows the first paragraph only', 'cards are compact in this person\'s Card layout; unit test covers cardDesc');
+  // the check card: answer first, stored order, links last, the answer writes in its place and the status stays
+  await T.wait('!!document.querySelector(\'[data-card="' + card.id + '"]\')', 8000);
+  await T.click('[data-card="' + card.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fans")', 8000); await sleep(900);
+  const cv = await T.ev('(()=>{const d=document.querySelector("' + W + '"),a=d.querySelector("#fans"),m=d.querySelector(".fmd"),t=m.textContent,b=[...d.querySelectorAll("[data-dec]")];return {first:!!(a.compareDocumentPosition(m)&Node.DOCUMENT_POSITION_FOLLOWING),order:t.indexOf("What was done")<t.indexOf("How to check")&&t.indexOf("How to check")<t.indexOf("Deviations"),links:t.lastIndexOf("a/b.md")>t.indexOf("When it takes effect"),noPrompt:!t.includes("Write your answer below"),labels:b.map(x=>x.textContent),noBadge:!d.querySelector(".tb.check")}})()');
+  check(G, 'a check card shows its answer box first, its sections in stored order, its links last', cv.first && cv.order && cv.links && cv.noPrompt && cv.noBadge && JSON.stringify(cv.labels) === '["Accept","Needs changes"]', JSON.stringify(cv));
+  await T.shot('card-check-1280x800');
+  await T.size(375, 812); await sleep(500);
+  check(G, 'a check card at 375 fits', await T.ev('document.documentElement.scrollWidth<=innerWidth'));
+  await T.shot('card-check-375x812');
+  await T.size(1280, 800); await sleep(300);
+  await T.ev('(()=>{const a=document.querySelector("' + W + ' #fans");a.value="Please redo it";a.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("' + W + ' [data-dec=\\"0\\"]").click();return true})()');
+  const ans = await until(async () => { const x = await item(card.id); return x && x.details && x.details.decision && x.details.decision.answer === 0 ? x : null; });
+  check(G, 'Needs changes: the answer and the text saved, the status stays open, every other key and byte kept', !!ans && ans.status === 'open' && ans.details.decision.answered_by === 'maksym' && ans.details.e2e === RUN && ans.body_md === CARD.replace('next scan._\n\n## Links', 'next scan._\nPlease redo it\n\n## Links'), ans && JSON.stringify([ans.status, ans.body_md.slice(-90)]));
+  await closeDialogs(T);
+  // the badge reads the data
+  const setAi = async (id, ai) => { await MK.rest('PATCH', 'items?id=eq.' + id, { ai }); await T.reload(); await T.ready(); await pick(T, ST.id); await T.wait('!!document.querySelector(\'[data-card="' + id + '"]\')', 15000); };
+  await setAi(wait.id, { check: { n: 1 } });
+  check(G, 'the badge "waits for your check" shows from status waiting and ai.check', (await T.text('[data-card="' + wait.id + '"] .tb.check')) === 'waits for your check');
+  await T.shot('card-badge-1280x800');
+  await setAi(wait.id, { check: { n: 1, settled_n: 1 } });
+  check(G, 'no badge once settled', !(await T.has('[data-card="' + wait.id + '"] .tb.check')));
+  // the Continue button
+  const openWith = async (id, ai) => { await closeDialogs(T); await setAi(id, ai); await T.click('[data-card="' + id + '"]'); await T.wait('!!document.querySelector("' + W + ' #ft")', 5000); await sleep(150); };
+  await openWith(wait.id, null);
+  check(G, 'no ai.sessions: no Continue button', !(await T.has(W + ' .fcont')));
+  await openWith(wait.id, { sessions: [{ session_id: 'not-a-uuid', role: 'do' }] });
+  check(G, 'a session id that is not a UUID: no button', !(await T.has(W + ' .fcont')));
+  await openWith(wait.id, { sessions: [{ session_id: SID, role: 'do', name: 'x', at: '2026-11-05T10:00:00Z' }] });
+  await sleep(800);
+  const btn = await T.ev('(()=>{const d=document.querySelector("' + W + '"),a=d.querySelector(".fbar .fwho a.fcont"),c=a&&a.nextElementSibling,cs=a&&getComputedStyle(a),rs=c&&getComputedStyle(c);return a?{text:a.textContent,href:a.getAttribute("href"),next:!!c&&c.classList.contains("fref")&&!c.classList.contains("fcont"),left:a.getBoundingClientRect().right<=c.getBoundingClientRect().left,bg:cs.backgroundColor===rs.backgroundColor,border:cs.borderColor===rs.borderColor,radius:cs.borderRadius===rs.borderRadius,h:Math.round(a.getBoundingClientRect().height)===Math.round(c.getBoundingClientRect().height),color:cs.color===rs.color,tip:/install-continue-handler\.ps1/.test(a.title),cmd:d.querySelector("[data-copy-cmd]").dataset.copyCmd}:null})()');
+  check(G, 'the Continue button sits directly left of the number chip, in its style, with the tooltip and the copy command', !!btn && btn.text === 'Continue in Claude' && btn.next && btn.left && btn.bg && btn.border && btn.radius && btn.h && btn.color && btn.tip && btn.cmd === 'claude --desktop --resume ' + SID + ' --fork-session' && /^homeos-claude:\/\/continue\?sid=11111111-2222-3333-4444-555555555555&ref=_?[a-z0-9_-]+%23\d+$/.test(btn.href), JSON.stringify(btn));
+  await T.shot('card-continue-1280x800');
+  await T.size(375, 812); await sleep(500);
+  check(G, 'the button at 375 fits', await T.ev('(()=>{const a=document.querySelector("' + W + ' a.fcont");return a.getBoundingClientRect().right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth})()'));
+  await T.shot('card-continue-375x812');
+  await T.size(1280, 800); await sleep(300);
+  await closeDialogs(T);
+  // done: from the archive, read only, the button stays
+  await MK.rest('PATCH', 'items?id=eq.' + done.id, { ai: { sessions: [{ session_id: SID, role: 'plan' }] } }); await T.reload(); await T.ready(); await pick(T, ST.id);
+  await T.ev('(document.querySelector("[data-view=archive]")?.click(),true)');
+  const arOk = await T.wait('!!document.querySelector(\'.ar-open[data-open="' + done.id + '"]\')', 8000);
+  if (arOk) { await T.click('.ar-open[data-open="' + done.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #ft")', 5000); await sleep(800); }
+  const ro = arOk ? await T.ev('(()=>{const d=document.querySelector("' + W + '");return {save:!!d.querySelector("#fs"),title:d.querySelector("#ft").getAttribute("contenteditable"),list:d.querySelector("#fl").disabled,del:!!d.querySelector("#fdel"),edit:!!d.querySelector("#fedit"),table:!!d.querySelector(".fmd table"),cont:!!d.querySelector("a.fcont"),h:d.querySelector("#tk-h").textContent,fmt:!!d.querySelector(".fmt")}})()') : null;
+  check(G, 'a done task opens from the archive read only, rendered, with the Continue button', !!ro && !ro.save && ro.title === 'false' && ro.list && !ro.del && !ro.edit && ro.table && ro.cont && ro.h === 'Task' && !ro.fmt, JSON.stringify(ro));
+  await T.shot('card-done-1280x800');
+  await T.size(375, 812); await sleep(500); await T.shot('card-done-375x812'); await T.size(1280, 800); await sleep(200);
+  await closeDialogs(T);
+  await T.ev('(document.querySelector("[data-view=matrix]")?.click(),true)'); await T.wait('!!document.querySelector(".matrix")', 5000);
+  // an archived list's task, web
+  await T.reload(); await T.ready(); await pick(T, AL.id); await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-archive-list]")'); await T.click('[data-archive-list]');
+  await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + AL.id)).json[0].archived_at);
+  await sleep(600);
+  await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=lists]")', 5000); await T.click('[data-menu=lists]');
+  await T.wait('/\\(\\d+\\)/.test((document.querySelector("#lm-sw")||{}).textContent||"")', 8000); await T.click('#lm-sw');
+  await T.wait('!!document.querySelector(\'[data-lm-tasks="' + AL.id + '"]\')', 8000); await T.click('[data-lm-tasks="' + AL.id + '"]');
+  await T.wait('!!document.querySelector(\'[data-lm-open="' + za.id + '"]\')', 5000); await T.click('[data-lm-open="' + za.id + '"]');
+  const az = await T.wait('!!document.querySelector(".ro-task .fmd table")', 8000);
+  check(G, 'a task of an archived list opens read only, rendered, from the Lists window', az && !(await T.has('.ro-task #fs')) && !(await T.has('.ro-task input, .ro-task textarea')));
+  await sleep(500); await T.shot('card-archived-1280x800');
+  await T.size(375, 812); await sleep(400); await T.shot('card-archived-375x812'); await T.size(1280, 800);
+  await closeDialogs(T); await T.close().catch(() => {});
+  // the phone app
+  const P = await tab(B, await ctx(B), { width: 375, height: 812 });
+  await local(P, '/app/');
+  // the phone shows one quadrant: pick the card's own, and drop filters another group left on
+  const phoneCard = async (sel, q) => { await P.wait('!!document.querySelector(".card, [data-act=quad]")', 20000); await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); await P.click('[data-act="quad"][data-q="' + q + '"]'); return P.wait('!!document.querySelector(\'' + sel + '\')', 8000); };
+  const pc = '.card[data-tid="' + rich.id + '"] .cmain';
+  let sh = await phoneCard(pc, 'B');
+  if (sh) { await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.id!=="dlg-task"&&d.close()),true'); await P.click(pc); sh = await P.wait('!!document.querySelector("#dlg-task[open] #t-read .fmd")', 8000); }
+  await sleep(700);
+  const pr = sh ? await P.ev('(()=>{const d=document.querySelector("#dlg-task"),m=d.querySelector(".fmd"),t=m.textContent,b=m.querySelector(".md-tbl");return {table:!!b&&b.scrollWidth>b.clientWidth,wide:document.documentElement.scrollWidth>innerWidth,head:!!m.querySelector("h4"),rule:!!m.querySelector("hr"),newest:t.indexOf("the newest block")<t.indexOf("Steps"),raw:d.querySelector("#t-desc").hidden,cont:!!d.querySelector(".fcont")}})()') : null;
+  check(G, 'phone: read mode renders, newest first, the table scrolls inside its box; no Continue button', !!pr && pr.table && !pr.wide && pr.head && pr.rule && pr.newest && pr.raw && !pr.cont, JSON.stringify(pr));
+  await P.shot('card-phone-read-375x812');
+  await P.click('#t-edit'); await sleep(200);
+  check(G, 'phone: Edit text shows the raw text', await P.ev('(()=>{const f=document.querySelector("#t-desc");return !!f&&!f.hidden&&f.value.includes("* a star bullet")})()'));
+  await P.ev('(document.querySelector(\'[data-act="task-close"]\')?.click(),true)'); await sleep(300);
+  const c2 = await mkItem('card phone check', { body_md: CARD, quadrant: 'C', sort_key: 9000005, details: { decision: DEC, e2e: RUN } });
+  await P.reload(); const pc2 = '.card[data-tid="' + c2.id + '"] .cmain';
+  let sh2 = await phoneCard(pc2, 'C');
+  if (sh2) { await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.id!=="dlg-task"&&d.close()),true'); await P.click(pc2); sh2 = await P.wait('!!document.querySelector("#dlg-task[open] #t-ans")', 8000); }
+  await sleep(700); await P.shot('card-phone-check-375x812');
+  if (sh2) {
+    await P.ev('(()=>{const a=document.querySelector("#t-ans");a.value="Phone answer";a.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector(\'[data-act="t-decide"][data-v="1"]\').click();return true})()');
+    const pa = await until(async () => { const x = await item(c2.id); return x && x.details.decision.answer === 1 ? x : null; });
+    check(G, 'phone: Accept with an answer: the status stays open, the text in its place', !!pa && pa.status === 'open' && pa.body_md === CARD.replace('next scan._\n\n## Links', 'next scan._\nPhone answer\n\n## Links'), pa && JSON.stringify([pa.status, pa.body_md.slice(-80)]));
+  } else check(G, 'phone: the check card opens with its answer box', false, P.errors.slice(-2).join(' / '));
+  // phone: an archived list's row opens
+  await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
+  await P.click('.tab[data-tab=me]'); await P.wait('!!document.querySelector("[data-act=pg-alists]")', 8000); await P.click('[data-act=pg-alists]');
+  await P.wait('!!document.querySelector(\'[data-alist="' + AL.id + '"] [data-act="alist-tasks"]\')', 10000); await P.click('[data-alist="' + AL.id + '"] [data-act="alist-tasks"]'); await sleep(200);
+  await P.click('[data-act="alist-open"][data-id="' + za.id + '"]');
+  check(G, 'phone: a task of an archived list opens read only, rendered', await P.wait('!!document.querySelector("#dlg-ro[open] .fmd table")', 8000) && !(await P.has('#dlg-ro textarea')));
+  await sleep(500); await P.shot('card-phone-archived-375x812');
+  await P.close().catch(() => {});
+}
+
 async function gDecision(G, T) {
   const AG = MK;
   const DEC = { v: 1, label_1: 'Yes', label_0: 'No', answer: null, module: 'm2', problem_key: 'm2:e2e-' + RUN, action: { kind: 'none' }, run_id: RUN,
@@ -1759,6 +1907,7 @@ async function gLinks() {
   await press('prev'); await isOpen(ids[0]);
   const nav = await T.ev('(()=>{__nav.stop=true;const c=document.querySelector("dialog[open] .tk-card");return {gaps:__nav.gaps,other:__nav.other,closes:__nav.closes,frames:__nav.frames,turns:__nav.turns,sameCard:c===__nav.card}})()');
   check(G, 'switching keeps one modal: the same dialog node and card, no frame without it, no close event; Standard never turns the row', nav.gaps === 0 && nav.other === 0 && nav.closes === 0 && nav.frames > 10 && nav.sameCard && nav.turns === 0, JSON.stringify(nav));
+  await T.ev("(document.querySelector('dialog[open] #fedit')?.click(),true)");
   const fn = await T.ev(`(()=>{const r=document.querySelector('dialog[open] #fn').getBoundingClientRect();return [Math.round(r.left+20),Math.round(r.top+r.height/2)]})()`);
   await T.mouse(fn[0], fn[1], hx, hy); await sleep(400);
   check(G, 'a text selection dragged from the description into the right zone does not switch', await openTitle() === await titleOf(ids[0]), await openTitle());
@@ -2659,9 +2808,9 @@ const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, appfilters: gAppFilters, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, appfilters: gAppFilters, links: gLinks, card: gCard, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'guests', 'request'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'card', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }

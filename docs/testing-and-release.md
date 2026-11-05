@@ -45,6 +45,7 @@ node test/e2e.mjs --env <env file> --out <dir> [--group auth,data,sync,archive,e
 - Tasks Grouping (2026-10-29): group `links` checks the switch's name and its confirm (Cancel puts it back, Apply keeps it); screenshots `ui-grouping-confirm-*`.
 - Group `links` makes a parent tree and a predecessor chain in `_selftest` through the task window and `rpc/link_items`, checks the badges, Group by parent and the Timeline (tree, arrows, fold), and draws 200 more rows in under 100 ms (report table "Timeline render").
 - The Edit window checks (2026-10-29, groups `data` and `ui`): no Quadrant field (a quadrant moves by a card drag), no "Who it is for", no archived tag list in Card layout, the info line on the formatting row at 1440 and under it at 390 without horizontal scroll; screenshots `ui-edit-window-*`.
+- Card window (2026-11-05, group `card`, on the local server `http://localhost:8788`, skipped when it is down and with `--url`): read and edit modes at 1280×800 and 375×812, a save keeps every other byte of the body, blocks newest first, a check card's answer box first and its answer writing in place with the status left open, the badge, done and archived-list tasks read only, the Continue button beside the number chip, the phone sheet; screenshots `card-*`. Test rows get `ai` directly, as the harness writes it.
 - `--url` runs the same checks against a hosted copy; `--access-env` adds the Access service-token headers to that origin only.
 
 ## Branches and release

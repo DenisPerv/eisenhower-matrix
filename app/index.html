@@ -323,6 +323,16 @@ dialog.alert p{margin:0 0 18px;color:var(--ink2)}
 .field>span,.flabel{display:block;margin:0 0 6px;font:600 13px/1.2 var(--ui);color:var(--ink2)}
 .inp,select.inp,textarea.inp{width:100%;min-height:48px;padding:10px 12px;border-radius:var(--r);border:1px solid var(--hair2);background:var(--bg);color:var(--ink);font:400 16px/1.4 var(--font)}
 textarea.inp{min-height:110px;resize:vertical}
+textarea.inp[hidden]{display:none}
+/* renderMd: what read mode and the cards show; a table scrolls inside its own box (web: the same rules) */
+.md{overflow-wrap:anywhere;font:400 15px/1.5 var(--font);color:var(--ink)}.md p{margin:0 0 8px}.md>:last-child{margin-bottom:0}.md ul,.md ol{margin:2px 0 8px;padding-left:20px}.md li.md-sub{margin-left:18px}
+.md h3,.md h4,.md h5,.md h6{margin:12px 0 4px;font:600 15px/1.35 var(--ui)}.md h3{font-size:17px}.md>:first-child{margin-top:0}
+.md hr{border:0;border-top:1px solid var(--hair);margin:10px 0}.md hr.md-blockrule{border-top-color:var(--hair2);margin:16px 0}
+.md a{color:var(--accent-ink);text-decoration:underline}.md code{font-size:13px;padding:0 4px;border-radius:4px;background:var(--well)}
+.md pre{margin:0 0 8px;padding:8px 10px;overflow-x:auto;border-radius:8px;background:var(--well)}.md pre code{padding:0;background:none}
+.md blockquote{margin:0 0 8px;padding-left:10px;border-left:3px solid var(--hair2);color:var(--ink2)}
+.md-tbl{max-width:100%;overflow-x:auto;margin:0 0 8px}.md-tbl table{border-collapse:collapse;font-size:13px}.md-tbl th,.md-tbl td{padding:4px 8px;border:1px solid var(--hair);text-align:left;vertical-align:top;min-width:64px;overflow-wrap:normal}.md-tbl th{background:var(--well);font-weight:600}
+.fmd{padding:10px 12px;border:1px solid var(--hair);border-radius:var(--r)}.fans{margin:0 0 10px}.fedit{min-height:36px;margin:0 0 8px}
 .rich{min-height:110px;line-height:1.5;overflow-wrap:anywhere}
 .rich ul,.extra ul{margin:4px 0;padding-left:22px}
 .rich:empty::before{content:attr(data-ph);color:var(--ink2)}
@@ -902,6 +912,12 @@ h2[tabindex="-1"]:focus{outline:none}
 </dialog>
 
 <!-- link search, a sub-sheet over the task sheet -->
+<dialog class="sheet" id="dlg-ro" aria-labelledby="ro-h">
+  <div class="grabzone" aria-hidden="true"><span class="grab" style="display:block"></span></div>
+  <div class="shead"><h2 id="ro-h">Task</h2><button type="button" class="ib" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  <div class="sbody" id="ro-body"></div>
+</dialog>
+
 <dialog class="sheet" id="dlg-link" aria-labelledby="lk-h">
   <div class="grabzone" aria-hidden="true"><span class="grab" style="display:block"></span></div>
   <div class="shead"><h2 id="lk-h">Add a subtask</h2><button type="button" class="ib" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
@@ -1138,13 +1154,14 @@ function cardHTML(t, i, ro, row) {
   if (wt.length) meta += `<span class="badge wt" title="Waiting for ${esc(wt.map(x => ref(x) + ' ' + x.title).join(', '))}"><span aria-hidden="true">Wait&nbsp;</span><span class="vh">Waiting for </span>${wt.length}</span>`;
   if (pg) meta += `<span class="badge pg"><span class="vh">Subtasks done: </span>${pg.done}/${pg.total}<i aria-hidden="true" style="--p:${Math.round(100 * pg.done / pg.total)}%"></i></span>`;
   if (lowConf(t)) meta += `<span class="badge" title="Added by an assistant with low confidence${t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : ''}">To check</span>`;
-  if (t.status && t.status !== 'open') meta += `<span class="badge st">${esc(t.status)}</span>`;
+  if (C.awaitingCheck(t)) meta += '<span class="badge st">waits for your check</span>';
+  else if (t.status && t.status !== 'open') meta += `<span class="badge st">${esc(t.status)}</span>`;
   if (t.category !== 'task' && showSource()) meta += `<span class="badge">${esc((D.categories[t.category] || {}).name || t.category)}</span>`;
   if (CL.created && t.createdAt) meta += `<span class="badge">created ${dayLabel(t.createdAt)}</span>`;
   if (CL.creator && t.createdBy) meta += `<span class="badge">by ${esc(personName(t.createdBy))}</span>`;
-  const tids = shownTagIds(t), more = S.more.has(t.id), cut = C.descClip(t.notes, CL.autoCollapse), clipped = cut.clipped && !more;
+  const tids = shownTagIds(t), more = S.more.has(t.id), dsc = C.cardDesc(t.notes, CL.autoCollapse, more);
   const hasExtra = (CL.description && t.notes) || tids.length;
-  const extra = ex ? `<div class="extra">${CL.description && t.notes ? `<div class="d">${md(clipped ? cut.text + ' …' : t.notes)}</div>${cut.clipped ? `<button type="button" class="morebtn" data-act="desc-more" aria-expanded="${more}">${more ? 'Show less' : 'Show more'}<span class="vh">: ${esc(t.title)}</span></button>` : ''}` : ''}${tids.length ? `<div class="tags">${tids.map(g => `<span class="badge tag${mineTag(g) ? ' mine' : ''}">${esc(D.labels[g])}${mineTag(g) ? '<span class="vh">, counts as Mine</span>' : ''}</span>`).join('')}</div>` : ''}${!hasExtra ? '<p>No description or tags.</p>' : ''}</div>` : '';
+  const extra = ex ? `<div class="extra">${CL.description && t.notes ? `<div class="d md">${C.renderMd(dsc.md)}</div>${dsc.hasMore ? `<button type="button" class="morebtn" data-act="desc-more" aria-expanded="${more}">${more ? 'Show less' : 'Show more'}<span class="vh">: ${esc(t.title)}</span></button>` : ''}` : ''}${tids.length ? `<div class="tags">${tids.map(g => `<span class="badge tag${mineTag(g) ? ' mine' : ''}">${esc(D.labels[g])}${mineTag(g) ? '<span class="vh">, counts as Mine</span>' : ''}</span>`).join('')}</div>` : ''}${!hasExtra ? '<p>No description or tags.</p>' : ''}</div>` : '';
   return `<li class="card${ro ? ' readonly' : ''}${depth ? ' kid' : ''}" data-q="${t.q}" data-tid="${t.id}" style="--i:${i}${depth ? `;--d:${depth}` : ''}">
     <div class="swbg" aria-hidden="true"><span class="l">Done</span><span class="r">Move</span></div>
     <div class="cin">
@@ -1413,7 +1430,13 @@ function openTask(id, swap, draft) {
   setEdge($('#t-prev'), i > 0 ? task(ids[i - 1]) : null, 'Previous task', i >= 0);
   setEdge($('#t-next'), i >= 0 && i < ids.length - 1 ? task(ids[i + 1]) : null, 'Next task', i >= 0);
   const info = [CL.number ? `<span class="refc"><span class="vh">Number </span>${esc(ref(t))}</span>` : '', CL.created && t.createdAt ? `<span>Created ${ymd(t.createdAt)}</span>` : '', CL.creator && t.createdBy ? `<span>By ${esc(personName(t.createdBy))}</span>` : ''].join('');
-  const tb = ro ? '' : `<div class="tb" role="toolbar" aria-label="Text style"><button type="button" class="ib" data-act="fmt" data-f="b" aria-label="Bold">B</button><button type="button" class="ib" data-act="fmt" data-f="i" aria-label="Italic"><i>I</i></button><button type="button" class="ib" data-act="fmt" data-f="l" aria-label="List">${ic('lists')}</button></div>`;
+  /* the description (web: openTask readHtml): read mode renders it, blocks newest first, an open answer section on top with its box; Edit text
+     shows the raw text, so a save changes only what the person changed. An empty task or a draft opens on the raw text */
+  const notesBase = draft ? draft.notes : t.notes, readFirst = !draft && (!!notesBase.trim() || ro);
+  const view = readFirst ? C.cardView(notesBase, { check: C.decisionKind(t) === 'check', answerable: !ro }) : null;
+  const ansHtml = view && view.answer ? '<div class="fans"><label class="flabel" for="t-ans">Your answer</label><textarea class="inp" id="t-ans" rows="3" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
+  const readHtml = !readFirst ? '' : `<div id="t-read">${ansHtml}${view.blocks.length || view.links ? `<div class="md fmd">${C.cardViewHtml(view)}</div>` : ansHtml ? '' : '<p class="src">No description.</p>'}</div>`;
+  const tb = ro ? '' : `<div class="tb" id="t-tb"${readFirst ? ' hidden' : ''} role="toolbar" aria-label="Text style"><button type="button" class="ib" data-act="fmt" data-f="b" aria-label="Bold">B</button><button type="button" class="ib" data-act="fmt" data-f="i" aria-label="Italic"><i>I</i></button><button type="button" class="ib" data-act="fmt" data-f="l" aria-label="List">${ic('lists')}</button></div>`;
   const dis = ro ? ' readonly' : '';
   const sT = t.start && hm(t.start) !== START_T ? hm(t.start) : '', eT = t.deadline && hm(t.deadline) !== END_T ? hm(t.deadline) : '';
   const lists = D.lists.filter(l => canAdd(l) || l === t.list);
@@ -1424,11 +1447,12 @@ function openTask(id, swap, draft) {
   const decDay = s => { const ms = Date.parse(s || ''); return isNaN(ms) ? '' : ymd(new Date(ms)); };
   const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
     : dec.answer !== null ? ['Answered “' + (dec.answer ? dec.label_1 : dec.label_0) + '”', decWho(dec.answered_by), decDay(dec.answered_at)].filter(Boolean).join(' · ')
-    : ro ? 'Only an editor of this list can answer' : '';
+    : ro && !closed && !(L(t.list) && L(t.list).archived_at) ? 'Only an editor of this list can answer' : '';
   const decHtml = !dec ? '' : `<div class="field fdec" role="group" aria-labelledby="t-dec-l"><span class="flabel" id="t-dec-l">Decision</span><div class="fdec-b">${[1, 0].map(v => `<button type="button" class="btn${v ? ' primary' : ''}" data-act="t-decide" data-v="${v}" aria-pressed="${dec.answer === v}"${decOn ? '' : ' disabled'}>${dec.answer === v ? '✓ ' : ''}${esc(v ? dec.label_1 : dec.label_0)}</button>`).join('')}</div>${decState ? `<p class="fdec-s" id="t-dec-s">${esc(decState)}</p>` : ''}</div>`;
   $('#task-body').innerHTML = `
     ${lowConf(t) ? `<p class="note info">Added by an assistant with low confidence${t.aiConfidence !== null ? ` (${t.aiConfidence.toFixed(2)})` : ''}. Check the list and the text.</p>` : ''}
     ${closed ? `<div class="banner">${ic('lock')}<span>${t.status === 'done' ? 'Done' : 'Cancelled'}${t.doneAt ? ' ' + ymd(t.doneAt) : ''}. Restore it from Me, Archive, to change it.</span></div>` : ''}
+    ${C.awaitingCheck(t) ? '<p class="note info">Waits for your check: answer its check card.</p>' : ''}
     <div class="note" id="t-conflict" role="alert" hidden></div>
     <label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label>
     <p class="err" id="t-title-err" hidden></p>
@@ -1436,7 +1460,8 @@ function openTask(id, swap, draft) {
     ${decHtml}
     <div class="field"><span class="flabel" id="t-desc-l">Description</span>
       ${tb || info ? `<div class="fbar">${tb}${info ? `<p class="info">${info}</p>` : ''}</div>` : ''}
-      <div class="inp rich" id="t-desc" role="textbox" aria-multiline="true" aria-labelledby="t-desc-l" contenteditable="${ro ? 'false' : 'true'}"${ro ? ' aria-readonly="true"' : ''}>${md(draft ? draft.notes : t.notes)}</div></div>
+      ${readFirst && !ro ? '<button type="button" class="btn quiet fedit" id="t-edit" data-act="t-edit">Edit text</button>' : ''}${readHtml}
+      <textarea class="inp" id="t-desc" rows="6" aria-labelledby="t-desc-l"${readFirst ? ' hidden' : ''}${ro ? ' readonly' : ''}>${esc(notesBase)}</textarea></div>
     <label class="field"><span>List</span><select class="inp" id="t-list"${ro ? ' disabled' : ''}>${lists.map(l => `<option value="${l}"${l === t.list ? ' selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></label>
     <div class="row2"><label class="field"><span>Start date</span><input class="inp" type="date" id="t-sdate" value="${ymd(t.start)}" aria-describedby="t-start-err"${dis}></label><label class="field"><span>Start time</span><input class="inp" type="time" id="t-stime" value="${sT}"${dis}></label></div>
     <p class="err" id="t-start-err" style="margin:-8px 0 14px" hidden>Start is after End.</p>
@@ -1447,6 +1472,7 @@ function openTask(id, swap, draft) {
     ${ro ? '' : `<div class="dangerrow"><button type="button" class="btn" data-act="t-cancel">Mark cancelled</button>${canDel(t) ? '<button type="button" class="btn danger" data-act="t-delete">Delete</button>' : ''}</div>`}`;
   $('#task-save').hidden = ro; $('#task-save').disabled = true; $('#task-save').textContent = 'Save';
   hideAsk(); renderTTags(); renderLinks();
+  TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value;
   TS.dates = dateInputs(); TS.snap = draft ? null : snapTask();
   if (draft) onTaskInput();
   if (showSource()) loadSources(t.id);
@@ -1462,7 +1488,21 @@ async function loadSources(id) {
 }
 const dateInputs = () => [$('#t-sdate').value, $('#t-stime').value, $('#t-date').value, $('#t-time').value].join('|');
 const linkSig = () => { const x = tsLinks(); return JSON.stringify([x.par, x.sub.slice().sort(), x.prev.slice().sort(), x.next.slice().sort()]); };
-function snapTask() { return JSON.stringify([$('#t-title').value, cleanMd($('#t-desc')), $('#t-list').value, dateInputs(), TS.tags.slice().sort(), linkSig(), TS.mk]); }
+/* the body a save sends (web: notesNow): only a change in the raw text or the answer box changes it; untouched, it is the stored text byte for byte */
+function notesNow() {
+  const raw = $('#t-desc').value; if (raw !== TS.fn0) return raw.replace(/\s+$/, '');
+  const b = $('#t-ans'), a = b && !$('#t-read').hidden ? b.value.trim() : '';
+  return a ? C.setAnswer(TS.notes0, a) : TS.notes0;
+}
+function showRaw() { const r = $('#t-read'); if (r) r.hidden = true; const e = $('#t-edit'); if (e) e.hidden = true; const tb = $('#t-tb'); if (tb) tb.hidden = false; const d = $('#t-desc'); d.hidden = false; d.style.height = ''; d.style.height = Math.min(d.scrollHeight + 2, Math.round(innerHeight * .6)) + 'px'; return d; }
+/* the toolbar on the raw text: markers around the selection, or a list marker on each selected line */
+function fmtRaw(ed, f) {
+  const a = ed.selectionStart, b = ed.selectionEnd, v = ed.value;
+  if (f !== 'l') { const m = f === 'b' ? '**' : '*'; ed.setRangeText(m + v.slice(a, b) + m, a, b, 'end'); ed.setSelectionRange(a + m.length, b + m.length); return; }
+  const from = v.lastIndexOf('\n', a - 1) + 1;
+  ed.setRangeText(v.slice(from, b).split('\n').map(l => '- ' + l).join('\n'), from, b, 'end');
+}
+function snapTask() { return JSON.stringify([$('#t-title').value, notesNow(), $('#t-list').value, dateInputs(), TS.tags.slice().sort(), linkSig(), TS.mk]); }
 const dirty = () => !!TS && !TS.ro && snapTask() !== TS.snap;
 function validTask() {
   let ok = true; const ti = $('#t-title'), e = $('#t-title-err'), len = ti.value.trim().length;
@@ -1531,7 +1571,7 @@ async function saveTask(decision) {
   if (!validTask()) { const f = $('#t-title[aria-invalid]') || $('#t-sdate[aria-invalid]'); if (f) f.focus(); return false; }
   saving = true;
   try {
-    const st = TS, f = { title: $('#t-title').value.trim(), notes: cleanMd($('#t-desc')) };
+    const st = TS, f = { title: $('#t-title').value.trim(), notes: notesNow() };
     if ($('#t-list').value !== t.list) f.list = $('#t-list').value;
     if (dateInputs() !== st.dates) { f.start = fromInputs($('#t-sdate').value, $('#t-stime').value, START_T); f.deadline = fromInputs($('#t-date').value, $('#t-time').value, END_T); }
     f.tags = await commitTags('t', st.tags);
@@ -1575,7 +1615,7 @@ D.on('conflict', p => {
   const t = task(p.id); if (!t) return;
   if (p.origin !== 'dialog') { toast(p.msg); return; }
   if (!TS || TS.id !== p.id) { if (TS && dirty()) { toast(p.msg); return; } openTask(p.id, !!TS, p.draft); }
-  else { $('#t-title').value = p.draft.title; $('#t-desc').innerHTML = md(p.draft.notes); }
+  else { $('#t-title').value = p.draft.title; showRaw().value = p.draft.notes; }
   TS.conflict = true; TS.theirs = { title: t.title, notes: t.notes };
   const n = $('#t-conflict'); n.hidden = false;
   n.innerHTML = `${esc(p.msg)}<span class="theirs">Their title: ${esc(t.title)}</span><button type="button" class="btn" data-act="t-theirs">Use theirs</button>`;
@@ -1798,11 +1838,14 @@ document.addEventListener('click', async e => {
     case 't-prev': navTask(-1); break;
     case 't-next': navTask(1); break;
     case 'fmt': {
-      const ed = document.getElementById(b.dataset.ed || 't-desc'), sl = document.getSelection(); ed.focus(); sl.removeAllRanges();
+      const ed = document.getElementById(b.dataset.ed || 't-desc'), sl = document.getSelection(); ed.focus();
+      if (ed.id === 't-desc') { fmtRaw(ed, b.dataset.f); onTaskInput(); break; }
+      sl.removeAllRanges();
       if (edRange && ed.contains(edRange.startContainer)) sl.addRange(edRange); else { const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); sl.addRange(r); }
       document.execCommand(b.dataset.f === 'b' ? 'bold' : b.dataset.f === 'i' ? 'italic' : 'insertUnorderedList'); onTaskInput(); break;
     }
-    case 't-theirs': { const x = TS.theirs; $('#t-title').value = x.title; $('#t-desc').innerHTML = md(x.notes); TS.conflict = false; $('#t-conflict').hidden = true; TS.snap = snapTask(); $('#task-save').textContent = 'Save'; onTaskInput(); toast('Kept their version.'); break; }
+    case 't-edit': { const a = $('#t-ans'), v = a ? a.value.trim() : ''; const d = showRaw(); if (v) { d.value = C.setAnswer(TS.notes0, v); a.value = ''; } d.focus(); onTaskInput(); break; }
+    case 't-theirs': { const x = TS.theirs; $('#t-title').value = x.title; const d = showRaw(); d.value = x.notes; TS.notes0 = x.notes; TS.fn0 = d.value; TS.conflict = false; $('#t-conflict').hidden = true; TS.snap = snapTask(); $('#task-save').textContent = 'Save'; onTaskInput(); toast('Kept their version.'); break; }
     case 't-decide': {
       /* the answer with every other change of the sheet in one versioned write, then close with Undo (web: the [data-dec] click) */
       if (!TS || TS.ro) break; const st = TS;
@@ -2463,7 +2506,7 @@ const PAGES = {
         const ts = T[l.id] || [], open = this.shown && this.shown.has(l.id);
         return `<li data-alist="${l.id}"><div class="rowb"><span style="min-width:0">${esc(l.name)}<span class="rowsub">Archived ${dayLabel(new Date(l.archived_at))}</span></span></div>
           <div class="alacts">${ts.length ? `<button class="btn quiet" data-act="alist-tasks" data-id="${l.id}" aria-expanded="${!!open}">${ts.length} ${ts.length === 1 ? 'task' : 'tasks'}</button>` : '<span class="rowsub">No tasks</span>'}${l.canRestore ? `<button class="btn quiet" data-act="alist-restore" data-id="${l.id}">Restore<span class="vh"> ${esc(l.name)}</span></button><button class="btn danger" data-act="alist-delete" data-id="${l.id}">Delete<span class="vh"> ${esc(l.name)}</span></button>` : ''}</div>
-          ${open ? `<ul class="altasks">${ts.slice(0, TASKS_SHOWN).map(x => `<li>${esc(plainT(x))}</li>`).join('')}${ts.length > TASKS_SHOWN ? `<li>and ${ts.length - TASKS_SHOWN} more</li>` : ''}</ul>` : ''}</li>`;
+          ${open ? `<ul class="altasks">${ts.slice(0, TASKS_SHOWN).map(x => `<li><button type="button" class="linkb" data-act="alist-open" data-id="${x.id}" data-list="${l.id}">${esc(plainT(x.title))}</button></li>`).join('')}${ts.length > TASKS_SHOWN ? `<li>and ${ts.length - TASKS_SHOWN} more</li>` : ''}</ul>` : ''}</li>`;
       }).join('')}</ul>` : '<p class="src">No archived lists.</p>');
     } },
   'pg-hlists': { title: 'Hidden lists', render(el) {
@@ -2627,6 +2670,14 @@ async function part2Click(a, b) {
       break;
     }
     case 'alist-restore': { const r = await D.restoreList(id); said(r); if (r.ok && mePage) { mePage.rows = null; mePage.load(); } renderAll(); break; }
+    case 'alist-open': {
+      /* a task of an archived list: not loaded with the board, read fresh and shown read only (card contract 7); no Continue button on the phone */
+      const r = await D.archivedTask(id); if (!r.ok) { toast(r.err.message); break; }
+      const x = r.task, list = mePage && mePage.rows ? mePage.rows.find(l => l.id === b.dataset.list) : null, v = C.cardView(x.notes, { check: C.decisionKind(x) === 'check', answerable: false });
+      $('#ro-h').textContent = '#' + x.num;
+      $('#ro-body').innerHTML = `<div class="banner">${ic('lock')}<span>In the archived list ${esc(list ? list.name : '')}. Read only.</span></div><h3 style="margin:0 0 10px;font:600 17px/1.35 var(--ui)">${esc(plainT(x.title))}</h3>${v.blocks.length || v.links ? `<div class="md fmd">${C.cardViewHtml(v)}</div>` : '<p class="src">No description.</p>'}`;
+      openDlg('dlg-ro'); break;
+    }
     case 'alist-tasks': { if (!mePage || !mePage.shown) break; mePage.shown.has(id) ? mePage.shown.delete(id) : mePage.shown.add(id); reMe(); document.querySelector(`[data-act="alist-tasks"][data-id="${id}"]`)?.focus(); break; }
     case 'alist-delete': {
       const pg = mePage, l = pg && (pg.rows || []).find(x => x.id === id); if (!l) break;

@@ -769,7 +769,7 @@
       return u && { msg: 'Restored: ' + plain(t.title), undo: undoEdit(t, u) };
     }
     // fields from a form or a sheet: { title, notes, tags, deadline, start, list, decision }. A list change puts the task on top of its
-    // quadrant. decision (1 or 0): the answer of a self-improvement card (C.answerDecision: details.decision, status done), sent in the
+    // quadrant. decision (1 or 0): the answer of a card (C.answerDecision: details.decision; status done only with no kind), sent in the
     // same versioned write as the other fields (web: openTask save with decide)
     function saveTask(id, f, eo) {
       const t = find(id); if (!t) return null;
@@ -985,14 +985,20 @@
     }
     // web: openLists' archive. canRestore also decides Delete: the owner, a person, not a system list
     async function archivedLists() { const r = await rest('GET', 'lists?select=id,slug,name,archived_at,owner_id&archived_at=not.is.null&order=archived_at.desc'); return r.ok ? { ok: true, lists: r.json.map(l => Object.assign({}, l, { canRestore: ROLE[l.id] === 'owner' && me.kind === 'human' && !C.isSystemList(l) })) } : r; }
-    // { <list id>: [task title, …] } of archived lists, read only: the same rows the delete counts, soft-deleted ones aside
+    // { <list id>: [{ id, title }, …] } of archived lists, read only: the same rows the delete counts, soft-deleted ones aside
     async function archivedTasks(ids) {
       const out = {}; (ids || []).forEach(id => { out[id] = []; });
       if (!ids || !ids.length) return { ok: true, tasks: out };
-      const r = await getAll('items?select=list_id,title,num&deleted_at=is.null&order=num.asc&list_id=in.(' + ids.join(',') + ')');
+      const r = await getAll('items?select=id,list_id,title,num&deleted_at=is.null&order=num.asc&list_id=in.(' + ids.join(',') + ')');
       if (!r.ok) return r;
-      r.json.forEach(x => { if (out[x.list_id]) out[x.list_id].push(x.title); });
+      r.json.forEach(x => { if (out[x.list_id]) out[x.list_id].push({ id: x.id, title: x.title }); });
       return { ok: true, tasks: out };
+    }
+    // one task of an archived list, read fresh, for the read-only sheet (web: openArchivedTask)
+    async function archivedTask(id) {
+      const r = await rest('GET', 'items?select=*&id=eq.' + id);
+      if (!r.ok) return r;
+      return r.json[0] ? { ok: true, task: C.rowToTask(r.json[0]) } : { ok: false, err: { message: 'That task is gone.' } };
     }
     async function lastBackupAt() { const r = await rpc('last_backup_at', {}); return r.ok ? r.json : null; }
     // web: askDeleteList. Only from the archive, only the owner, always with the tasks; db/029 refuses everything else. The other members lose it
@@ -1137,7 +1143,7 @@
       // writes
       edit, makeTask, create: createTask, saveTask, flush, flushAll, undoEdit, markDone, cancelTask, removeTask, restoreTask, moveTask, moveToList, placeIn, topKey,
       linkOp, setTags, ensureTags, renameTag, deleteTag, sortTag, moveTags, createTagList, renameTagList, sortTagList, saveTagListOrder, toggleTagListFav, archiveTagList, hideTagList, leaveTagList, setMineTags, saveProfile,
-      createList, renameList, reorderLists, archiveList, restoreList, archivedLists, archivedTasks, lastBackupAt, deleteInfo, deleteArchivedList, hideList, leaveList,
+      createList, renameList, reorderLists, archiveList, restoreList, archivedLists, archivedTasks, archivedTask, lastBackupAt, deleteInfo, deleteArchivedList, hideList, leaveList,
       people, share, setRole, removeMember, revokeInvite, acceptInvite, declineInvite, answerNotice,
       setPrefs, writePrefs,
     };
