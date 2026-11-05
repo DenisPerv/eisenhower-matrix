@@ -1259,6 +1259,55 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 .tagchip.mine{box-shadow:inset 0 -2px 0 var(--accent)}
 .tgm-new{margin-top:10px}
 .tgm-menu{min-width:190px;z-index:30}
+/* list panels and the Lists window (2026-11-05, from the approved prototype). A second panel makes the bar taller, so --top follows */
+.panels{display:grid;gap:2px;min-width:0}
+.bar .panels .lists{grid-area:auto}
+.panels .lists{flex-wrap:nowrap;justify-content:safe center;max-height:none;overflow:hidden}
+.panels .lists.p2 .chip button{font-size:14px;min-height:30px}
+.chip input.ren{font:500 15px var(--ui);width:11ch;min-height:32px;padding:0 8px;border:1px solid var(--accent);border-radius:var(--r);background:var(--solid);color:var(--ink)}
+@media (min-width:701px){:root.two-panels{--top:146px}}
+@media (max-width:700px){.bar .panels{grid-area:lists}.bar .panels .lists{justify-content:flex-start;flex-wrap:wrap}}
+#more.drop-after{box-shadow:0 0 0 2px var(--accent)}
+.actions .sp{flex:1}
+.lm-seg{display:flex;align-items:center;gap:12px;margin:14px 0 4px;flex-wrap:wrap}
+.lm-seg span{font:500 13px var(--ui);color:var(--ink2)}
+.lm-seg .seg{display:inline-flex;border:1px solid var(--hair2);border-radius:var(--r);overflow:hidden}
+.lm-seg .seg button{border:0;border-radius:0;background:transparent;color:var(--ink2);min-height:34px;padding:0 14px;font:500 13px var(--ui)}
+.lm-seg .seg button[aria-pressed="true"]{background:var(--accent-bg);color:var(--accent-ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.lm-zone{border-top:1px solid var(--hair2);padding:12px 0 10px}
+.lm-zh{display:flex;align-items:center;gap:10px;min-height:32px}
+.lm-zh strong{font:600 13.5px var(--ui);color:var(--ink)}
+.lm-zh .sp{flex:1}
+.lm-step{display:inline-flex;align-items:center;gap:2px}
+.lm-step button{width:30px;min-width:30px;height:30px;min-height:30px;padding:0;font:500 15px var(--ui)}
+.lm-step output{min-width:26px;text-align:center;font:500 13px var(--ui);font-variant-numeric:tabular-nums;color:var(--ink)}
+.lm-all{display:flex;align-items:center;gap:8px;min-height:34px;padding:0 6px 0 26px;color:var(--ink3);font:400 13px var(--ui)}
+.lm-row{display:flex;align-items:center;gap:8px;min-height:40px;padding:2px 6px;border-radius:var(--r-sm)}
+.lm-row:hover{background:var(--hover)}
+.lm-row.dragging{opacity:.35}
+.lm-row.drop-before{box-shadow:inset 0 2px 0 var(--accent)}
+.lm-row.drop-after{box-shadow:inset 0 -2px 0 var(--accent)}
+.lm-grip{cursor:grab;color:var(--ink3);width:14px;text-align:center;user-select:none}
+.lm-name{flex:1;min-width:0;border:1px solid transparent;background:transparent;color:var(--ink);font:500 14px var(--ui);padding:5px 7px;border-radius:var(--r-sm);min-height:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog input.lm-name{width:auto;min-height:32px;padding:5px 7px;border-color:transparent;background:transparent;font:500 14px var(--ui)}
+dialog input.lm-name:hover{border-color:var(--hair2)}
+dialog input.lm-name:focus{border-color:var(--accent);background:var(--solid);box-shadow:none}
+.lm-meta{font:400 12.5px var(--ui);color:var(--ink3);white-space:nowrap}
+.lm-n{font:400 12.5px var(--ui);font-variant-numeric:tabular-nums;color:var(--ink3);min-width:22px;text-align:right}
+.lm-acts{display:flex;gap:4px;flex:none;align-items:center}
+.lm-acts button{min-height:30px;padding:0 8px;font:500 12.5px var(--ui);background:transparent;border-color:transparent;color:var(--ink3)}
+.lm-row:hover .lm-acts button,.lm-acts button:focus-visible{color:var(--ink2)}
+.lm-acts button:hover{background:var(--hover);color:var(--ink)}
+.lm-acts button.danger,.lm-row:hover .lm-acts button.danger{color:var(--danger-ink)}
+button.lm-name{display:block;text-align:left;justify-content:flex-start}
+.lm-empty{margin:4px 0;padding:12px;border:1px dashed var(--hair2);border-radius:var(--r-sm);color:var(--ink3);font:400 13px var(--ui);text-align:center}
+.lm-empty.drop-before,.lm-empty.drop-after{border-color:var(--accent);color:var(--accent-ink)}
+.lm-note{margin:4px 0 0;color:var(--ink3);font:400 12.5px/1.45 var(--ui)}
+.lm-tasks{margin:0 0 6px 30px;padding:0;list-style:none;color:var(--ink2);font:400 13px/1.7 var(--ui)}
+.lm-del .danger-go{color:var(--danger-ink);border-color:var(--danger-ink);background:transparent}
+.lm-del .danger-go:disabled{opacity:.5}
+.lm-del .warn{color:var(--danger-ink);font:400 13px/1.45 var(--ui);margin:10px 0 0}
+@media (max-width:700px){.lm-row{flex-wrap:wrap}.lm-name{flex:1 1 60%}.lm-acts{width:100%;padding-left:22px}}
 .menu-pop .danger{color:var(--danger-ink)}
 @media (max-width:700px){.tgl-h{flex-wrap:wrap}.tgl-b{flex-basis:100%;justify-content:flex-start}}
 /* round 3, A10: side-menu rows drag between quadrant groups */
@@ -1964,6 +2013,16 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     const taken = new Set((names || []).map(n => String(n).trim().toLowerCase())), base = String(name || '').trim();
     for (let i = 2; ; i++) { const n = base + ' (' + i + ')'; if (!taken.has(n.toLowerCase())) return n; }
   }
+  // an ISO time as local "yyyy-mm-dd hh:mm", '' when there is none. backupLine: the small print of the delete popup (rpc/last_backup_at, db/029)
+  function localStamp(iso) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return '';
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  const backupLine = iso => { const s = localStamp(iso); return s ? 'Last backup ' + s : 'Last backup time unknown'; };
+  // the delete popup names the people who also lose the list: members other than me, not the bot or the agent (list_people rows)
+  const deleteLosers = (rows, meId, notPeople) => (Array.isArray(rows) ? rows : []).filter(p => p.state === 'member' && p.profile_id !== meId && !(notPeople && notPeople.has(p.profile_id))).map(p => p.display_name || 'Someone');
   // a list scripts depend on: no rename, archive or delete in the UI (delete_archived_list refuses it too, db/029)
   const isSystemList = l => !!l && (l.slug === 'access-requests' || String(l.slug || '').startsWith('_'));
 
@@ -2642,7 +2701,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
-    createdList, listNameClash, freeListName, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
+    createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
@@ -2810,7 +2869,9 @@ async function toggleMineTag(id) {
   if (!r.ok || !r.json.length) { me.mine_tag_ids = before; toast(r.ok ? 'Not saved.' : r.err.message); renderSoon(); }
 }
 const hl = (title, q) => { q = q.trim(); if (!q || /^#?\p{L}?\d+$/iu.test(q)) return esc(title); const i = title.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(title) : esc(title.slice(0, i)) + '<mark>' + esc(title.slice(i, i + q.length)) + '</mark>' + esc(title.slice(i + q.length)); };
-const VISIBLE = 5;
+let LB = null; // prefs.listBar: the list panels (core listPanels)
+let lbOverflow = [], lbFitKey = '', lbRenaming = null, lbRenVal = null, lbMenuXY = null, lbWidth = 0, lbResize = 0;
+let NOT_PEOPLE = new Set(); // the household's bot and agent logins (profiles.kind), left out of "also loses it"
 
 // ---- session: Google sign-in (here, or on /signin when hosted); the access token lives in memory, the refresh token in td.auth ----
 // "Stay signed in" keeps td.auth in localStorage, unticked in sessionStorage (this tab only). Tabs share a refresh through a
@@ -3048,8 +3109,10 @@ async function loadMeta() {
   lists.json.forEach(l => { if (hidden.has(l.id)) HIDDEN_LISTS.push(l); else LIST[l.id] = l; });
   LISTS = lists.json.filter(l => LIST[l.id]).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)).map(l => l.id);
   if (order.length) LISTS.sort((a, b) => (order.indexOf(a) + 1 || 1e6) - (order.indexOf(b) + 1 || 1e6));
+  if (LB) LISTS = C.listBarOrder(LB, LISTS);
   CATS = {}; cats.json.forEach(c => { CATS[c.slug] = c; });
   me = profs.json.find(p => p.id === uid) || null;
+  NOT_PEOPLE = new Set(profs.json.filter(p => p.kind && p.kind !== 'human').map(p => p.id));
   NAMES = {}; HANDLE_NAMES = {}; profs.json.concat(vis.json || []).forEach(p => { NAMES[p.id] = p.display_name; if (p.handle) HANDLE_NAMES[p.handle] = p.display_name; });
   const tlRole = {}, tlHidden = new Set();
   tlm.json.forEach(m => { tlRole[m.tag_list_id] = m.role; if (m.hidden_at) tlHidden.add(m.tag_list_id); });
@@ -3447,6 +3510,7 @@ const collectPrefs = () => ({
   menuCollapsed: QS.filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] }, settings: Object.assign({}, settings),
   cardLayout: JSON.parse(JSON.stringify(cardLayout)), welcomeSeen, welcomeVersion, tagListOrder: tagListOrder.slice(), tagListOrderV, tagListFavs: tagListFavs.slice(), taskSwitcher,
   filters: { mine: st.mine, due: st.due, from: st.dueFrom, to: st.dueTo, tags: [...st.tags], cats: [...st.cats], low: st.lowc }, filterBar: st.bar ? st.bar.slice() : null,
+  listBar: LB ? JSON.parse(JSON.stringify(LB)) : null,
 });
 const prefsText = () => JSON.stringify(collectPrefs());
 // stale entries (a list, item or tag that no longer exists) are dropped
@@ -3454,6 +3518,8 @@ function applyPrefs(p) {
   themePref = p.theme; applyTheme();
   st.view = p.view;
   LISTS.sort((a, b) => (p.listOrder.indexOf(a) + 1 || 1e6) - (p.listOrder.indexOf(b) + 1 || 1e6));
+  LB = p.listBar;
+  if (LB) LISTS = C.listBarOrder(LB, LISTS);
   st.list = p.list === 'all' || LIST[p.list] ? p.list : 'all';
   const known = new Set(Object.keys(TAG)); // tag ids (before multi-user: names, dropped here)
   tagOrder = p.tagOrder.filter(x => known.has(x));
@@ -3687,12 +3753,12 @@ function bindLogo() {
   if (logoT0) { const t = performance.now() - logoT0; b.getAnimations({ subtree: true }).forEach(a => { a.currentTime = t; }); }
 }
 
-// list order: All stays first; the other lists keep the order the person dragged them into (saved in their preferences)
-const moveList = (l, to) => {
-  LISTS.splice(LISTS.indexOf(l), 1);
-  LISTS.splice(Math.max(0, Math.min(LISTS.length, to)), 0, l);
-};
-// drag a list chip (from the bar or the +N menu) before or after another; dropping on All puts it first. Alt+arrows move a focused chip.
+// list panels: All stays first on panel 1; every other list has one place, on a panel or under +N (core listBarMove, saved in prefs.listBar)
+// a change of the panels: the one write path; a full panel refuses
+const barDo = r => { if (r.refused) { toast('A panel holds ' + C.LIST_PANEL_MAX + ' lists at most'); return false; } LB = r.bar; LISTS = r.order; return true; };
+const canEditList = id => ROLE[id] === 'owner' && !!me && me.kind === 'human' && !C.isSystemList(LIST[id]);
+// drag a list chip (from the bar or the +N menu) before or after another, across panels; dropping on All puts it first on panel 1, on +N
+// under +N. Alt+arrows move a focused chip one step, across a panel's edge. F2 or a double-click renames.
 let dragList = null;
 // drag lag fix (2026-10-29): the one drop marker on the page; a dragover measures first and changes classes only when the
 // marked element or its side changes (no document-wide clearing on every event)
@@ -3718,9 +3784,10 @@ function bindListDrag(app) {
       b.ondragstart = e => { dragList = l; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', l); b.classList.add('dragging'); };
       b.ondragend = () => { dragList = null; clear(); };
       b.onkeydown = e => {
+        if (e.key === 'F2' && !inMenu && canEditList(l)) { e.preventDefault(); lbRenaming = l; render(); return; }
         if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
         e.preventDefault();
-        moveList(l, LISTS.indexOf(l) + (e.key === 'ArrowLeft' ? -1 : 1));
+        barDo(C.listBarStep(LB, LISTS, l, e.key === 'ArrowLeft' ? -1 : 1));
         render();
         document.querySelector('.lists [data-list="' + l + '"], #more')?.focus();
       };
@@ -3736,13 +3803,33 @@ function bindListDrag(app) {
       e.preventDefault(); e.stopPropagation();
       const before = side(e), moving = dragList;
       dragList = null;
-      LISTS.splice(LISTS.indexOf(moving), 1);
-      LISTS.splice(l === 'all' ? 0 : LISTS.indexOf(l) + (before ? 0 : 1), 0, moving);
+      if (l === 'all') barDo(C.listBarMove(LB, LISTS, moving, 0, C.listPanels(LB, LISTS).saved[0][0], true));
+      else barDo(C.listBarMove(LB, LISTS, moving, C.listBarZone(LB, LISTS, l), l, before));
       st.pop = null;
       render();
     };
   });
+  const more = document.getElementById('more');
+  if (more) {
+    more.ondragover = e => { if (!dragList) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; markDrop(more, 'drop-after'); };
+    more.ondragleave = () => unmarkDrop(more);
+    more.ondrop = e => { if (!dragList) return; e.preventDefault(); e.stopPropagation(); const moving = dragList; dragList = null; barDo(C.listBarMove(LB, LISTS, moving, 'rest')); st.pop = null; render(); };
+  }
 }
+// what fits: one line per panel from 701 px. A chip that does not fit shows under +N for now (the saved rows do not change); the selected
+// list always stays. Measured after a render; only the panels are drawn again.
+function fitPanels(paint) {
+  if (innerWidth <= 700) return;
+  for (let guard = 0; guard < 40; guard++) {
+    const bad = [...document.querySelectorAll('.panels .lists')].find(x => x.scrollWidth > x.clientWidth + 1);
+    if (!bad) return;
+    const ids = [...bad.querySelectorAll('[data-list]')].map(b => b.dataset.list).filter(x => x !== 'all' && x !== st.list && !lbOverflow.includes(x));
+    if (!ids.length) return;
+    lbOverflow.push(ids[ids.length - 1]);
+    paint();
+  }
+}
+addEventListener('resize', () => { clearTimeout(lbResize); lbResize = setTimeout(() => { if (innerWidth !== lbWidth && !boot.gate && me) render(); }, 150); });
 
 const fcRow = (attr, key, label, on, n, extra) => '<div class="frow"><button class="fc" type="button" ' + attr + '="' + esc(key) + '" aria-pressed="' + !!on + '"><span class="fbox" aria-hidden="true">' + I.check + '</span><span class="nm">' + esc(label) + '</span>' + (n === undefined ? '' : '<span class="n">' + n + '</span>') + '</button>' + (extra || '') + '</div>';
 const rmRow = k => '<hr><button class="f-rm" data-rmbar="' + esc(k) + '">Remove from the bar</button>';
@@ -3756,12 +3843,28 @@ function render() {
   live.forEach(t => { t.q = C.deriveQuadrant(t, settings, TODAY.getTime()); });
   const open = live.filter(t => !t.doneAt);
   const shown = open.filter(t => inList(t) && passFilters(t)).sort(C.byOrder);
-  const chips = ['all'].concat(LISTS);
-  let visible = chips.slice(0, VISIBLE), rest = chips.slice(VISIBLE);
-  if (rest.includes(st.list)) { visible = visible.concat(st.list); rest = rest.filter(c => c !== st.list); } // shown sixth, ready to be dragged into the first five
+  const fitKey = innerWidth + '|' + JSON.stringify(C.listPanels(LB, LISTS).saved) + '|' + st.list;
+  if (fitKey !== lbFitKey) { lbFitKey = fitKey; lbOverflow = []; }
+  lbWidth = innerWidth;
   const count = l => open.filter(t => l === 'all' || t.list === l).length;
   const od = l => open.filter(t => (l === 'all' || t.list === l) && overdue(t)).length;
-  const chip = l => '<span class="chip' + (chips.indexOf(l) >= VISIBLE ? ' stray' : '') + '"><button data-list="' + esc(l) + '" aria-pressed="' + (st.list === l) + '">' + (l === 'all' ? 'All' : esc(label(l))) + ' <span class="n">' + count(l) + '</span>' + (od(l) ? ' <span class="badge" aria-label="' + od(l) + ' overdue">' + od(l) + '</span>' : '') + '</button></span>';
+  const chip = (l, stray) => lbRenaming === l ? '<span class="chip"><input class="ren" id="ren" value="' + esc(lbRenVal === null ? label(l) : lbRenVal) + '" maxlength="60" aria-label="Rename list"></span>'
+    : '<span class="chip' + (stray ? ' stray' : '') + '"><button data-list="' + esc(l) + '" aria-pressed="' + (st.list === l) + '"' + (l !== 'all' && canEditList(l) ? ' title="Double-click or F2 to rename. Right-click for options."' : l !== 'all' ? ' title="Right-click for options."' : '') + '>' + (l === 'all' ? 'All' : esc(label(l))) + ' <span class="n">' + count(l) + '</span>' + (od(l) ? ' <span class="badge" aria-label="' + od(l) + ' overdue">' + od(l) + '</span>' : '') + '</button></span>';
+  // the top bar's rows (core listPanels): All first on panel 1, +N at the end of the last panel, New list on panel 1, … on the row of the selected list
+  let P = null;
+  const panelsHtml = () => {
+    const old = document.getElementById('ren');
+    if (old) { if (lbRenaming) lbRenVal = old.value; old.onblur = null; }
+    P = C.listPanels(LB, LISTS, { sel: st.list, overflow: lbOverflow });
+    const last = P.rows.length - 1, more = P.more.length;
+    document.documentElement.classList.toggle('two-panels', P.rows.length > 1);
+    return P.rows.map((r, i) => '<div class="lists' + (i ? ' p2' : '') + '" role="toolbar" aria-label="' + (P.rows.length > 1 ? 'Lists, panel ' + (i + 1) : 'Lists') + '">' +
+      (i === 0 ? chip('all') : '') + r.map(l => chip(l)).join('') + (P.stray && i === last ? chip(P.stray, true) : '') +
+      (i === last && more ? '<span class="chip"><button id="more" aria-label="' + more + (more === 1 ? ' more list' : ' more lists') + '" aria-expanded="' + (st.pop === 'more') + '" title="' + more + (more === 1 ? ' more list' : ' more lists') + '">+' + more + '</button></span>' : '') +
+      (st.list !== 'all' && (r.includes(st.list) || (P.stray && i === last)) ? '<span class="chip"><button id="listmenu" aria-label="List options" aria-haspopup="menu" aria-expanded="' + (st.pop === 'listmenu') + '">' + I.dots + '</button></span>' : '') +
+      (i === 0 && me.kind === 'human' ? '<span class="chip"><button id="newlist">New list</button></span>' : '') + '</div>').join('');
+  };
+  const panelsNow = panelsHtml();
   const allCats = [...new Set(open.filter(inList).map(t => t.category))].sort();
   const anyFilter = st.q || st.due !== 'any' || st.tags.size || st.cats.size || st.lowc || st.mine;
   const dueLabel = st.due === 'range' && (st.dueFrom || st.dueTo) ? (st.dueFrom.slice(5) || '…') + ' to ' + (st.dueTo.slice(5) || '…') : { any: 'Due', overdue: 'Overdue', today: 'Today', week: 'Next 7 days', none: 'No date', range: 'Dates' }[st.due];
@@ -3809,16 +3912,18 @@ function render() {
     profile: () => '<div class="who-am" role="none"><strong>' + esc(me.display_name) + '</strong>' + (session.user.email ? '<span>' + esc(session.user.email) + '</span>' : '') + '</div>' +
       (human ? '<button data-menu="tags">Tags</button><button data-menu="sharing">Sharing' + (INVITES.length ? ' <span class="badge" aria-label="' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '">' + INVITES.length + '</span>' : '') + '</button>' : '') +
       (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
-      '<hr><button data-menu="timeline">Timeline</button><button data-menu="cardlayout">Card layout</button><button data-menu="archived">Archived lists</button>' +
-      (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : '') +
+      '<hr><button data-menu="timeline">Timeline</button><button data-menu="cardlayout">Card layout</button><button data-menu="lists">Lists</button>' +
       '<hr>' + (C.versionSwitchUrl(location.origin, 'app') ? '<button data-switch="app">Switch to mobile version</button>' : '') + '<button data-signout>Sign out</button>',
-    more: () => rest.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
-    listmenu: () => (human && listActs.includes('share') ? '<button data-share-list="' + esc(st.list) + '">Share ' + esc(label(st.list)) + '…</button>' : '') +
+    more: () => P.more.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
+    listmenu: () => { const z = C.listBarZone(LB, LISTS, st.list);
+      return (canEditList(st.list) ? '<button data-rename-list="' + esc(st.list) + '">Rename</button>' : '') +
+      (human && listActs.includes('share') ? '<button data-share-list="' + esc(st.list) + '">Share ' + esc(label(st.list)) + '…</button>' : '') +
       (listActs.includes('people') ? '<button data-people-list="' + esc(st.list) + '">People</button>' : '') +
-      (human && listActs.includes('archive') ? '<button data-archive-list="' + esc(st.list) + '">Archive ' + esc(label(st.list)) + '</button>' : '') +
+      '<hr>' + (z !== 0 ? '<button data-list-to="0">Move to panel 1</button>' : '') + (z !== 1 ? '<button data-list-to="1">Move to panel 2</button>' : '') + (z !== 'rest' ? '<button data-list-to="rest">Move under +N</button>' : '') +
+      '<hr>' + (canEditList(st.list) && listActs.includes('archive') ? '<button data-archive-list="' + esc(st.list) + '">Archive</button>' : '') +
       (listActs.includes('hide') ? '<button data-hide-list="' + esc(st.list) + '">Hide for me</button>' : '') +
       (listActs.includes('leave') ? '<button data-leave-list="' + esc(st.list) + '">Leave ' + esc(label(st.list)) + '</button>' : '') +
-      '<hr><button data-menu="archived">Archived lists</button>' + (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : ''),
+      '<button data-menu="lists">All lists…</button>'; },
     due: () => ['any:Any', 'overdue:Overdue', 'today:Today', 'week:Next 7 days', 'none:No date', 'range:Choose dates'].map(x => fcRow('data-due', x.split(':')[0], x.split(':')[1], st.due === x.split(':')[0])).join('') +
       (st.due === 'range' ? '<div class="f-dates"><label>From<input type="date" id="f-from" value="' + esc(st.dueFrom) + '"></label><label>To<input type="date" id="f-to" value="' + esc(st.dueTo) + '"></label></div>' : '') + rmRow('due'),
     cat: () => (allCats.map(x => fcRow('data-cat', x, catName(x), st.cats.has(x))).join('') || '<p class="f-hint">No categories in this list.</p>') + rmRow('cat'),
@@ -3840,10 +3945,7 @@ function render() {
   const pop = popHtml ? '<div class="menu-pop' + (isTlPop || ['due', 'cat', 'barmenu', 'minepick'].includes(st.pop) ? ' fm' : '') + '" id="pop" role="menu" data-for="' + esc(st.pop === 'minepick' ? 'mine' : st.pop) + '">' + popHtml + '</div>' : '';
   const matrix = st.expanded ? '<div class="matrix one">' + quad(st.expanded) + '</div>' : '<div class="matrix">' + quad('B') + quad('A') + quad('D') + quad('C') + '</div>';
   document.getElementById('app').innerHTML =
-    '<header class="top"><div class="bar"><button type="button" class="logo' + (logoT0 ? ' play' : '') + '" aria-label="TasksDashboard">' + ADV_LOGO + '</button><div class="lists" role="toolbar" aria-label="Lists">' + visible.map(chip).join('') +
-    (rest.length ? '<span class="chip"><button id="more" aria-label="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '" aria-expanded="' + (st.pop === 'more') + '" title="' + rest.length + (rest.length === 1 ? ' more list' : ' more lists') + '">+' + rest.length + '</button></span>' : '') +
-    (st.list !== 'all' ? '<span class="chip"><button id="listmenu" aria-label="List options" aria-haspopup="menu" aria-expanded="' + (st.pop === 'listmenu') + '">' + I.dots + '</button></span>' : '') +
-    (me.kind === 'human' ? '<span class="chip"><button id="newlist">New list</button></span>' : '') + '</div>' +
+    '<header class="top"><div class="bar"><button type="button" class="logo' + (logoT0 ? ' play' : '') + '" aria-label="TasksDashboard">' + ADV_LOGO + '</button><div class="panels" id="panels">' + panelsNow + '</div>' +
     '<div class="who"><button id="profile"' + (welcomeOn ? ' class="beacon"' : '') + ' aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '"' + (INVITES.length ? ' aria-label="' + esc(me.display_name) + ', ' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '"' : '') + '>' + esc(me.display_name) + (INVITES.length ? ' <span class="badge" aria-hidden="true">' + INVITES.length + '</span>' : '') + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
     '<div class="searchrow"><div class="line"><span class="si" aria-hidden="true">' + I.search + '</span><input id="q" placeholder="Search" aria-label="Search tasks" role="combobox" aria-expanded="' + !!st.q.trim() + '" aria-controls="dd" value="' + esc(st.q) + '">' +
     '<button class="f" id="mine" aria-pressed="' + st.mine + '" aria-haspopup="menu" aria-expanded="' + (st.pop === 'minepick') + '" title="' + esc(mineIds().length ? mineIds().map(id => TAG_LISTS[TAG[id].tag_list_id].name + ' / ' + TAG_NAME[id]).join(', ') + '. Right-click to change' : 'Choose the tags that mean a task is yours') + '">' + I.person + 'Mine</button>' +
@@ -3865,6 +3967,8 @@ function render() {
     '<main class="content" id="matrix"><h1 class="sr">' + (st.list === 'all' ? 'All lists' : esc(label(st.list))) + '</h1>' +
     (st.view === 'archive' ? archiveHtml() : st.view === 'timeline' ? timelineHtml() : st.view === 'review' ? reviewHtml() : matrix) + '</main></div>';
   bind();
+  fitPanels(() => { document.getElementById('panels').innerHTML = panelsHtml(); bindPanels(document.getElementById('app')); });
+  const ren = document.getElementById('ren'); if (ren) { ren.focus(); if (lbRenVal === null) ren.select(); else ren.setSelectionRange(ren.value.length, ren.value.length); }
   if (st.view === 'timeline') tlFit(tR0);
   anchorPop();
   const qi = document.getElementById('q'); if (st.focusQ) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); st.focusQ = false; }
@@ -3877,7 +3981,8 @@ function anchorPop() {
   const p = document.getElementById('pop'); if (!p) return;
   const btn = document.getElementById(p.dataset.for), top = document.querySelector('.top');
   if (!btn || !top) return;
-  const r = btn.getBoundingClientRect(), t = top.getBoundingClientRect();
+  const t = top.getBoundingClientRect(), xy = p.dataset.for === 'listmenu' && lbMenuXY; // a right-click opens the list menu where the pointer is
+  const r = xy ? { left: xy.x, bottom: xy.y } : btn.getBoundingClientRect();
   p.style.top = (r.bottom - t.top + 4) + 'px';
   const left = Math.min(r.left - t.left, t.width - p.offsetWidth - 8);
   p.style.left = Math.max(8, left) + 'px';
@@ -3888,7 +3993,7 @@ function toast(msg, undo) {
   lastUndo = undo || null;
   const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status');
   el.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button>Undo</button>' : '');
-  (DECK && DECK.dlg.open ? DECK.dlg : document.body).append(el); // above the task window while it is open (its modal makes the page inert)
+  (DECK && DECK.dlg.open ? DECK.dlg : LM && LM.dlg.open ? LM.dlg : document.body).append(el); // above a task window or the Lists window while it is open (a modal makes the page inert)
   if (undo) el.querySelector('button').onclick = () => runUndo();
   toastTimer = setTimeout(() => { el.remove(); lastUndo = null; }, UNDO_MS);
 }
@@ -5182,18 +5287,10 @@ function openNewList() {
   name.focus(); name.oninput = () => say('');
   const mineNow = () => Object.values(LIST).concat(HIDDEN_LISTS, archived);
   const create = async n => {
-    const body = { p_name: n, p_shared: hh && dlg.querySelector('#nl-shared').checked };
-    const r = await rest('POST', 'rpc/create_list_row', body);
+    const r = await createListRow(n, hh && dlg.querySelector('#nl-shared').checked);
     // a same-name list the page did not know about (another tab made it): look again, so the message below can name it
-    if (!r.ok && r.err.kind === 'duplicate') { await readArchived(); await refreshMeta(); }
-    performance.mark('td:list-rpc');
-    if (!r.ok) return r;
-    const l = C.createdList(r.json, { name: n, slug: null, ownerId: me.id, sort: Math.max(0, ...Object.values(LIST).filter(y => y.owner_id === me.id).map(y => y.sort || 0)) + 1 });
-    if (!l) return { ok: false, err: { message: 'The list was made, but the answer was not understood. Reload the page.' } };
-    LIST[l.id] = l; ROLE[l.id] = 'owner';
-    if (!LISTS.includes(l.id)) LISTS.push(l.id);
-    st.list = l.id; st.expanded = null; if (st.view !== 'matrix' && st.view !== 'archive') st.view = 'matrix';
-    return { ok: true, list: l };
+    if (!r.ok && r.err.kind === 'duplicate') await readArchived();
+    return r;
   };
   const run = async (n, ignoreArchived) => {
     if (go.disabled) return;
@@ -5228,32 +5325,213 @@ function openNewList() {
   // round 3 P1, F1: Enter in the name (or on the check box) is Create; the form's first button is Cancel, which Enter would press
   dlg.querySelector('form').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); go.click(); } });
 }
-// Archive a list (owners, people only): it leaves the chips, All and search; nothing in it can be edited until it is restored
+// create_list_row, put in locally from the answer and selected at once (New list, the Lists window). The list waits under +N
+async function createListRow(n, shared) {
+  const r = await rest('POST', 'rpc/create_list_row', { p_name: n, p_shared: !!shared });
+  if (!r.ok && r.err.kind === 'duplicate') await refreshMeta();
+  performance.mark('td:list-rpc');
+  if (!r.ok) return r;
+  const l = C.createdList(r.json, { name: n, slug: null, ownerId: me.id, sort: Math.max(0, ...Object.values(LIST).filter(y => y.owner_id === me.id).map(y => y.sort || 0)) + 1 });
+  if (!l) return { ok: false, err: { message: 'The list was made, but the answer was not understood. Reload the page.' } };
+  LIST[l.id] = l; ROLE[l.id] = 'owner';
+  if (!LISTS.includes(l.id)) LISTS.push(l.id);
+  st.list = l.id; st.expanded = null; if (st.view !== 'matrix' && st.view !== 'archive') st.view = 'matrix';
+  return { ok: true, list: l };
+}
+// Rename (owners, not system lists): lists.name only, the slug stays, so code that names a list by slug goes on working
+const myArchived = () => rest('GET', 'lists?select=id,name,owner_id,archived_at&archived_at=not.is.null&owner_id=eq.' + me.id);
+async function renameList(id, value) {
+  const n = String(value || '').trim();
+  if (!n || !LIST[id] || n === LIST[id].name) return false;
+  const a = await myArchived();
+  const c = C.listNameClash(n, Object.values(LIST).concat(HIDDEN_LISTS, a.ok ? a.json : []).filter(l => l.id !== id), me.id);
+  if (c.live || c.archived) { toast('You already have ' + (c.live ? 'a list' : 'an archived list') + ' named ' + (c.live || c.archived).name); return false; }
+  const r = await rest('PATCH', 'lists?id=eq.' + id, { name: n }, { Prefer: 'return=representation' });
+  if (!r.ok || r.json.length !== 1) { toast(r.ok ? 'Only an owner renames a list' : r.err.kind === 'duplicate' ? 'You already have a list named ' + n : r.err.message); return false; }
+  LIST[id] = Object.assign({}, LIST[id], { name: r.json[0].name });
+  toast('Renamed to ' + r.json[0].name);
+  render();
+  return true;
+}
+// Archive a list (owners, people only): it leaves the chips, All and search; nothing in it can be edited until it is restored. Its id stays
+// in the panel's row, so Restore (or Undo) puts it back where it was
 async function archiveList(id) {
-  const name = label(id);
+  const name = label(id), keep = C.listBarOf(LB, LISTS);
   const r = await rest('PATCH', 'lists?id=eq.' + id, { archived_at: new Date().toISOString() }, { Prefer: 'return=representation' });
   if (!r.ok || r.json.length !== 1) { toast(r.ok ? 'Only an owner archives a list' : r.err.message); return; }
+  LB = keep;
   await writePrefs();
   await refreshMeta();
   if (st.list === id) st.list = 'all';
   toast('Archived: ' + name, () => restoreList(id));
   render();
+  if (LM && LM.dlg.open) LM.refresh();
 }
 async function restoreList(id) {
   const r = await rest('PATCH', 'lists?id=eq.' + id, { archived_at: null }, { Prefer: 'return=representation' });
   if (!r.ok || r.json.length !== 1) { toast(r.ok ? 'Only an owner restores a list' : r.err.message); return false; }
   await refreshMeta();
-  toast('Restored list: ' + r.json[0].name);
+  toast('Restored: ' + r.json[0].name);
   render();
+  if (LM && LM.dlg.open) LM.refresh();
   return true;
 }
-async function openArchivedLists() {
-  const r = await rest('GET', 'lists?select=id,name,archived_at&archived_at=not.is.null&order=archived_at.desc');
-  const rows = r.ok ? r.json : [];
-  const dlg = dialogShell('<form method="dialog"><strong>Archived lists</strong>' + (!r.ok ? '<p class="err">' + esc(r.err.message) + '</p>' : '') +
-    (rows.length ? rows.map(l => '<div class="al"><span>' + esc(l.name) + ' <span class="n">' + fmtDay(new Date(l.archived_at)) + '</span></span>' + (ROLE[l.id] === 'owner' && me.kind === 'human' ? '<button type="button" data-restore-list="' + esc(l.id) + '">Restore</button>' : '') + '</div>').join('') : '<p class="n">No archived lists</p>') +
-    '<div class="actions"><button value="close" autofocus>Close</button></div></form>', '#profile');
-  dlg.querySelectorAll('[data-restore-list]').forEach(b => b.onclick = async () => { b.disabled = true; if (await restoreList(b.dataset.restoreList)) dlg.close(); else b.disabled = false; });
+// Account menu → Lists: panels One or Two, the zones Panel 1, Panel 2 and Under +N (drag a row, Alt+Up or Down, − and +), rename in place, new
+// list, Hidden for me, and the archive. Changes apply as you go, like Tags.
+let LM = null; // the open Lists window: { dlg, view, arch, refresh, draw }
+function openLists(view) {
+  const dlg = dialogShell('<form method="dialog" class="tgm"><strong id="lm-t">Lists</strong><div id="lm-body" class="tgm-body"></div><div class="actions"><button type="button" id="lm-sw" class="quiet"></button><span class="sp"></span><button value="close">Close</button></div></form>', '#profile');
+  const body = dlg.querySelector('#lm-body'), sw = dlg.querySelector('#lm-sw');
+  const lm = LM = { dlg, view: view || 'lists', arch: null, open: new Set() };
+  let dragRow = null;
+  const nameOf = id => esc(label(id));
+  // ---- the zones ----
+  const rowHtml = id => {
+    const mine = ROLE[id] === 'owner', canEdit = canEditList(id), n = count(id), l = LIST[id];
+    return '<div class="lm-row" data-row="' + esc(id) + '" role="listitem"><span class="lm-grip" draggable="true" data-grip="' + esc(id) + '" title="Drag to move" aria-hidden="true">⋮⋮</span>' +
+      (canEdit ? '<input class="lm-name" data-name="' + esc(id) + '" value="' + nameOf(id) + '" maxlength="60" aria-label="Name of ' + nameOf(id) + '" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown">'
+        : '<button type="button" class="lm-name" data-keys="' + esc(id) + '" title="' + (C.isSystemList(l) ? 'A system list: scripts use it, so it stays' : 'Only the owner renames it') + '">' + nameOf(id) + '</button>') +
+      (!mine ? '<span class="lm-meta">' + esc(personName(l.owner_id)) + '</span>' : C.isSystemList(l) ? '<span class="lm-meta">System</span>' : '') +
+      '<span class="lm-n" title="Open tasks">' + n + '</span><span class="lm-acts">' +
+      (canEdit ? '<button type="button" data-lm-arch="' + esc(id) + '">Archive</button>' : '') +
+      (!mine ? '<button type="button" data-lm-hide="' + esc(id) + '">Hide</button><button type="button" class="danger" data-lm-leave="' + esc(id) + '">Leave</button>' : '') + '</span></div>';
+  };
+  const count = id => all().filter(t => !t.doneAt && t.list === id).length;
+  const zoneHtml = (z, title, ids, rest, note) => {
+    const stepper = z === 'rest' ? '' : '<span class="sp"></span><span class="lm-step" role="group" aria-label="Lists on ' + title + '"><button type="button" data-lm-less="' + z + '" aria-label="One list fewer"' + (ids.length ? '' : ' disabled') + '>−</button><output>' + ids.length + '</output><button type="button" data-lm-more="' + z + '" aria-label="One list more"' + (rest.length && ids.length < C.LIST_PANEL_MAX ? '' : ' disabled') + '>+</button></span>';
+    return '<section class="lm-zone" data-zone="' + z + '"><div class="lm-zh"><strong>' + title + '</strong>' + stepper + '</div>' + (z === 0 ? '<div class="lm-all">All, always first</div>' : '') +
+      (ids.length ? '<div role="list">' + ids.map(rowHtml).join('') + '</div>' : '<div class="lm-empty" data-empty="' + z + '">' + (z === 'rest' ? 'Every list is on a panel' : 'Drag a list here') + '</div>') + (note ? '<p class="lm-note">' + note + '</p>' : '') + '</section>';
+  };
+  const change = (r, focus) => { if (barDo(r)) { render(); draw(focus); } };
+  const keyMove = (e, id, focus) => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault(); change(C.listBarStep(LB, LISTS, id, e.key === 'ArrowUp' ? -1 : 1), focus);
+  };
+  const drawZones = focus => {
+    const p = C.listPanels(LB, LISTS), b = C.listBarOf(LB, LISTS), waiting = !b.two ? b.rows[1].filter(id => LIST[id]).length : 0, hh = me.kind === 'human';
+    body.innerHTML = '<p class="sh-note">Drag a list to move it. Click a name to rename it. The board changes as you go.</p>' +
+      '<div class="lm-seg"><span>Panels on the board</span><span class="seg" role="group" aria-label="Panels"><button type="button" data-lm-two="0" aria-pressed="' + !b.two + '">One</button><button type="button" data-lm-two="1" aria-pressed="' + b.two + '">Two</button></span></div>' +
+      zoneHtml(0, 'Panel 1', p.saved[0], p.rest) + (b.two ? zoneHtml(1, 'Panel 2', p.saved[1], p.rest) : '') +
+      zoneHtml('rest', 'Under +N', p.rest, p.rest, lbOverflow.length ? lbOverflow.length + ' more on a panel but out of room in this window, so they show under +N for now.' : waiting ? 'Panel 2 is off. Its ' + waiting + (waiting === 1 ? ' list waits' : ' lists wait') + ' here and go back when you turn it on.' : '') +
+      (HIDDEN_LISTS.length ? '<section class="lm-zone"><div class="lm-zh"><strong>Hidden for me</strong></div>' + HIDDEN_LISTS.map(l => '<div class="lm-row"><span class="lm-name">' + esc(l.name) + '</span><span class="lm-meta">' + esc(personName(l.owner_id)) + '</span><span class="lm-acts"><button type="button" data-lm-show="' + esc(l.id) + '">Show</button></span></div>').join('') + '</section>' : '') +
+      (hh ? '<div class="tg-row tgm-new"><input id="lm-new" maxlength="60" placeholder="New list" aria-label="Name of a new list"><button type="button" id="lm-add">Create list</button></div>' : '');
+    const on = (sel, fn) => body.querySelectorAll(sel).forEach(fn);
+    on('[data-lm-two]', x => x.onclick = () => change(C.listBarSetTwo(LB, LISTS, x.dataset.lmTwo === '1'), '[data-lm-two="' + x.dataset.lmTwo + '"]'));
+    on('[data-lm-less]', x => x.onclick = () => change(C.listBarCount(LB, LISTS, +x.dataset.lmLess, -1), '[data-lm-less="' + x.dataset.lmLess + '"]'));
+    on('[data-lm-more]', x => x.onclick = () => change(C.listBarCount(LB, LISTS, +x.dataset.lmMore, 1), '[data-lm-more="' + x.dataset.lmMore + '"]'));
+    on('[data-name]', i => {
+      const id = i.dataset.name;
+      i.onchange = async () => { if (!(await renameList(id, i.value)) && LIST[id]) i.value = LIST[id].name; };
+      i.onkeydown = e => {
+        if (e.key === 'Enter') { e.preventDefault(); i.blur(); }
+        if (e.key === 'Escape' && LIST[id] && i.value !== LIST[id].name) { e.preventDefault(); i.value = LIST[id].name; }
+        keyMove(e, id, '[data-name="' + id + '"]');
+      };
+    });
+    on('[data-keys]', x => x.onkeydown = e => keyMove(e, x.dataset.keys, '[data-keys="' + x.dataset.keys + '"]'));
+    on('[data-grip]', g => {
+      const row = g.closest('.lm-row'), id = g.dataset.grip;
+      g.ondragstart = e => { dragRow = id; e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); };
+      g.ondragend = () => { dragRow = null; row.classList.remove('dragging'); unmarkDrop(); };
+    });
+    on('[data-row]', r => {
+      const id = r.dataset.row, b4 = e => { const x = r.getBoundingClientRect(); return e.clientY < x.top + x.height / 2; };
+      r.ondragover = e => { if (!dragRow || dragRow === id) return; e.preventDefault(); markDrop(r, b4(e) ? 'drop-before' : 'drop-after'); };
+      r.ondragleave = () => unmarkDrop(r);
+      r.ondrop = e => { if (!dragRow || dragRow === id) return; e.preventDefault(); const m = dragRow; dragRow = null; dropMark = null; change(C.listBarMove(LB, LISTS, m, C.listBarZone(LB, LISTS, id), id, b4(e))); };
+    });
+    on('[data-empty]', x => {
+      const z = x.dataset.empty === 'rest' ? 'rest' : +x.dataset.empty;
+      x.ondragover = e => { if (dragRow) { e.preventDefault(); markDrop(x, 'drop-after'); } };
+      x.ondragleave = () => unmarkDrop(x);
+      x.ondrop = e => { if (!dragRow) return; e.preventDefault(); const m = dragRow; dragRow = null; dropMark = null; change(C.listBarMove(LB, LISTS, m, z)); };
+    });
+    on('[data-lm-arch]', x => x.onclick = () => { x.disabled = true; archiveList(x.dataset.lmArch); });
+    on('[data-lm-hide]', x => x.onclick = async () => { await hideList(x.dataset.lmHide, true); draw('#lm-sw'); });
+    on('[data-lm-leave]', x => x.onclick = () => leaveList(x.dataset.lmLeave, () => draw('#lm-sw')));
+    on('[data-lm-show]', x => x.onclick = async () => { await hideList(x.dataset.lmShow, false); draw('#lm-sw'); });
+    const nw = body.querySelector('#lm-new'), add = body.querySelector('#lm-add');
+    if (nw) {
+      const create = async () => {
+        const n = nw.value.trim(); if (!n || add.disabled) return;
+        add.disabled = true;
+        const a = await myArchived(), c = C.listNameClash(n, Object.values(LIST).concat(HIDDEN_LISTS, a.ok ? a.json : []), me.id);
+        const r = c.live || c.archived ? null : await createListRow(n, !!me.is_household);
+        add.disabled = false;
+        if (!r) { toast('You already have ' + (c.live ? 'a list' : 'an archived list') + ' named ' + (c.live || c.archived).name); nw.focus(); return; }
+        if (!r.ok) { toast(r.err.message); nw.focus(); return; }
+        toast('List created: ' + r.list.name); render(); draw('#lm-new');
+      };
+      add.onclick = create;
+      nw.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); create(); } };
+    }
+    if (focus) body.querySelector(focus)?.focus(); else if (document.activeElement === document.body) sw.focus();
+  };
+  // ---- the archive: date, task count, read-only titles, Restore and Delete for the owner; a system list has no action ----
+  const TASKS_SHOWN = 30;
+  const loadArchive = async () => {
+    const r = await rest('GET', 'lists?select=id,slug,name,owner_id,archived_at&archived_at=not.is.null&order=archived_at.desc');
+    if (!r.ok) { lm.arch = { err: r.err.message, rows: [], items: {} }; return; }
+    const items = {};
+    r.json.forEach(l => { items[l.id] = []; });
+    if (r.json.length) {
+      const t = await getAll('items?select=list_id,title,num&deleted_at=is.null&order=num.asc&list_id=in.(' + r.json.map(l => l.id).join(',') + ')');
+      if (t.ok) t.json.forEach(x => items[x.list_id].push(plain(x.title)));
+    }
+    lm.arch = { err: null, rows: r.json, items };
+  };
+  const drawArchive = focus => {
+    const a = lm.arch;
+    if (!a) { body.innerHTML = '<p class="sh-note">Loading…</p>'; return; }
+    body.innerHTML = '<p class="sh-note">Nothing in an archived list can be changed. Restore puts it back where it was. Delete removes it and its tasks for good.</p>' + (a.err ? '<p class="err">' + esc(a.err) + '</p>' : '') +
+      (a.rows.length ? a.rows.map(l => {
+        const tasks = a.items[l.id] || [], act = ROLE[l.id] === 'owner' && me.kind === 'human' && !C.isSystemList(l), shown = lm.open.has(l.id);
+        return '<div class="lm-row" data-arow="' + esc(l.id) + '"><span class="lm-name">' + esc(l.name) + '</span><span class="lm-meta">' + C.localStamp(l.archived_at).slice(0, 10) + '</span><span class="lm-acts">' +
+          (tasks.length ? '<button type="button" data-lm-tasks="' + esc(l.id) + '" aria-expanded="' + shown + '">' + tasks.length + (tasks.length === 1 ? ' task' : ' tasks') + '</button>' : '<span class="lm-meta">no tasks</span>') +
+          (act ? '<button type="button" data-restore-list="' + esc(l.id) + '">Restore</button><button type="button" class="danger" data-delete-list="' + esc(l.id) + '">Delete</button>' : '') + '</span></div>' +
+          (shown ? '<ul class="lm-tasks">' + tasks.slice(0, TASKS_SHOWN).map(t => '<li>' + esc(t) + '</li>').join('') + (tasks.length > TASKS_SHOWN ? '<li>and ' + (tasks.length - TASKS_SHOWN) + ' more</li>' : '') + '</ul>' : '');
+      }).join('') : (a.err ? '' : '<p class="lm-empty">No archived lists</p>'));
+    body.querySelectorAll('[data-lm-tasks]').forEach(b => b.onclick = () => { const i = b.dataset.lmTasks; lm.open.has(i) ? lm.open.delete(i) : lm.open.add(i); drawArchive('[data-lm-tasks="' + i + '"]'); });
+    body.querySelectorAll('[data-restore-list]').forEach(b => b.onclick = async () => { b.disabled = true; if (!(await restoreList(b.dataset.restoreList))) b.disabled = false; });
+    body.querySelectorAll('[data-delete-list]').forEach(b => b.onclick = () => askDeleteList(a.rows.find(l => l.id === b.dataset.deleteList), (a.items[b.dataset.deleteList] || []).length));
+    if (focus) body.querySelector(focus)?.focus();
+  };
+  const draw = lm.draw = focus => {
+    dlg.querySelector('#lm-t').textContent = lm.view === 'lists' ? 'Lists' : 'Archived lists';
+    sw.textContent = lm.view === 'lists' ? 'Archived lists' + (lm.arch ? ' (' + lm.arch.rows.length + ')' : '') : 'Back to lists';
+    if (lm.view === 'lists') drawZones(focus); else drawArchive(focus);
+  };
+  // after an archive, a restore or a delete: the archive read again, this window drawn again
+  lm.refresh = async () => { await loadArchive(); if (dlg.open) draw(lm.view === 'lists' ? null : '#lm-sw'); };
+  sw.onclick = () => { lm.view = lm.view === 'lists' ? 'arch' : 'lists'; draw('#lm-sw'); };
+  draw();
+  lm.refresh();
+}
+// Delete: only from the archive, only the owner, always with the tasks, after this popup. db/029 delete_archived_list refuses everything else
+function askDeleteList(l, n) {
+  const what = n ? 'the list and its ' + n + (n === 1 ? ' task' : ' tasks') : 'the list';
+  const dlg = dialogShell('<form method="dialog" class="lm-del"><strong>Delete “' + esc(l.name) + '”?</strong><p class="warn">This deletes ' + what + '. It can\'t be undone.</p>' +
+    '<p class="sh-note" id="dl-who" hidden></p><div class="err" id="dl-e" aria-live="polite"></div><p class="lm-note" id="dl-bk">Last backup …</p>' +
+    '<div class="actions"><button value="cancel" id="dl-no" autofocus>Cancel</button><button type="button" id="dl-go" class="danger-go" disabled>Delete list</button></div></form>', '#lm-sw');
+  const go = dlg.querySelector('#dl-go'), err = dlg.querySelector('#dl-e');
+  dlg.querySelector('#dl-no').focus();
+  // who else loses it and the last backup are shown before Delete can be pressed
+  Promise.all([rpc('list_people', { p_list: l.id }), rpc('last_backup_at', {})]).then(([ppl, bk]) => {
+    if (!dlg.open) return;
+    const others = ppl.ok ? C.deleteLosers(ppl.json, me.id, NOT_PEOPLE) : [];
+    if (others.length) { const w = dlg.querySelector('#dl-who'); w.textContent = others.join(', ') + ' also ' + (others.length === 1 ? 'loses' : 'lose') + ' it.'; w.hidden = false; }
+    dlg.querySelector('#dl-bk').textContent = C.backupLine(bk.ok ? bk.json : null);
+    go.disabled = false;
+  });
+  go.onclick = async () => {
+    go.disabled = true; err.textContent = '';
+    const r = await rpc('delete_archived_list', { p_list: l.id });
+    if (!r.ok) { err.textContent = r.err.message; go.disabled = false; return; }
+    if (LB) LB = { two: LB.two, rows: LB.rows.map(x => x.filter(id => id !== l.id)) };
+    dlg.close();
+    toast('Deleted: ' + l.name);
+    if (LM && LM.dlg.open) LM.refresh();
+  };
 }
 
 // ---- sharing (multi-user T9, review §6): a list or a tag list is shared by invitation; nothing shows before Accept ----
@@ -5418,11 +5696,11 @@ function openSharing() {
   dlg.querySelectorAll('[data-hide-list],[data-unhide-list]').forEach(b => b.onclick = async () => { await hideList(b.dataset.hideList || b.dataset.unhideList, !!b.dataset.hideList); again(); });
   dlg.querySelectorAll('[data-leave-list]').forEach(b => b.onclick = () => leaveList(b.dataset.leaveList, () => again()));
 }
-// Hide for me (list_members.hidden_at): the list leaves my chips, All and search; Hidden lists brings it back
+// Hide for me (list_members.hidden_at): the list leaves my chips, All and search; Lists, Hidden for me brings it back
 async function hideList(id, hide) {
   const r = await rpc('set_list_hidden', { p_list: id, p_hidden: hide });
   if (!r.ok) return toast(r.err.message);
-  await afterMembership(hide ? 'Hidden for you. Account menu, Hidden lists brings it back.' : 'Shown again');
+  await afterMembership(hide ? 'Hidden for you. Account menu, Lists brings it back.' : 'Shown again');
 }
 // Leave: my membership goes (owners cannot leave); only the owner can invite me again
 function leaveList(id, then) {
@@ -5433,12 +5711,6 @@ function leaveList(id, then) {
     await afterMembership('Left ' + (l ? l.name : 'the list'));
     if (then) then();
   }, '#profile');
-}
-function openHiddenLists() {
-  const dlg = dialogShell('<form method="dialog"><strong>Hidden lists</strong>' +
-    (HIDDEN_LISTS.length ? HIDDEN_LISTS.map(l => '<div class="al"><span>' + esc(l.name) + '</span><button type="button" data-unhide-list="' + esc(l.id) + '">Show again</button></div>').join('') : '<p class="n">No hidden lists</p>') +
-    '<div class="actions"><button value="close" autofocus>Close</button></div></form>', '#profile');
-  dlg.querySelectorAll('[data-unhide-list]').forEach(b => b.onclick = async () => { b.disabled = true; await hideList(b.dataset.unhideList, false); dlg.close(); });
 }
 
 // Account menu → Tags (round 3, adjustment 5; tags round): every tag list I can see, stacked in my one free order (prefs
@@ -5720,16 +5992,47 @@ function openTags(archivedView) {
   draw();
 }
 
+// the list chips: drawn again alone when the panels are fitted to the window
+const popBtn = (id, name) => { const b = document.getElementById(id); if (b) b.onclick = e => { e.stopPropagation(); lbMenuXY = null; st.pop = st.pop === name ? null : name; st.popQ = ''; render(); }; };
+function bindPanels(app) {
+  app.querySelectorAll('[data-list]').forEach(b => b.onclick = e => {
+    const l = b.dataset.list;
+    // a double-click renames (the first click has drawn the chip again, so the count of clicks is what is left of it)
+    if (e.detail >= 2 && l !== 'all' && b.closest('.lists') && canEditList(l)) { lbRenaming = l; render(); return; }
+    st.list = l; st.pop = null; st.expanded = null; render();
+    if (e.detail === 0) document.querySelector('.lists [data-list="' + l + '"]')?.focus();
+  });
+  app.querySelectorAll('.lists [data-list]:not([data-list="all"])').forEach(b => b.oncontextmenu = e => {
+    e.preventDefault(); e.stopPropagation();
+    st.list = b.dataset.list; st.expanded = null; st.pop = 'listmenu'; lbMenuXY = { x: e.clientX, y: e.clientY }; render();
+  });
+  bindListDrag(app);
+  popBtn('more', 'more'); popBtn('listmenu', 'listmenu');
+  const nl = document.getElementById('newlist'); if (nl) nl.onclick = () => openNewList();
+  const ren = document.getElementById('ren');
+  if (ren) {
+    const done = async ok => {
+      const id = lbRenaming; if (!id) return;
+      const v = ren.value;
+      lbRenaming = null; lbRenVal = null; ren.onblur = null;
+      render();
+      if (ok) await renameList(id, v);
+      document.querySelector('.lists [data-list="' + id + '"]')?.focus();
+    };
+    ren.onclick = e => e.stopPropagation();
+    ren.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); done(true); } if (e.key === 'Escape') { e.preventDefault(); done(false); } };
+    ren.onblur = () => done(true);
+  }
+}
 function bind() {
   const app = document.getElementById('app');
   bindLogo();
-  app.querySelectorAll('[data-list]').forEach(b => b.onclick = () => { st.list = b.dataset.list; st.pop = null; st.expanded = null; render(); });
-  bindListDrag(app);
-  const popBtn = (id, name) => { const b = document.getElementById(id); if (b) b.onclick = e => { e.stopPropagation(); st.pop = st.pop === name ? null : name; st.popQ = ''; render(); }; };
-  popBtn('more', 'more'); popBtn('listmenu', 'listmenu'); popBtn('due', 'due'); popBtn('cat', 'cat'); popBtn('barmenu', 'barmenu'); popBtn('profile', 'profile');
+  bindPanels(app);
+  popBtn('due', 'due'); popBtn('cat', 'cat'); popBtn('barmenu', 'barmenu'); popBtn('profile', 'profile');
   app.querySelectorAll('.line [id^="tl:"]').forEach(b => popBtn(b.id, b.id));
-  const nl = document.getElementById('newlist'); if (nl) nl.onclick = () => openNewList();
-  app.querySelectorAll('[data-archive-list]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.archiveList; st.pop = null; render(); confirmAsk('Archive the list “' + label(id) + '”? It disappears from the board and nothing in it can be changed until an owner restores it.', 'Archive', () => archiveList(id), '#listmenu'); });
+  app.querySelectorAll('#pop [data-archive-list]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.archiveList; st.pop = null; render(); archiveList(id); });
+  app.querySelectorAll('#pop [data-rename-list]').forEach(b => b.onclick = e => { e.stopPropagation(); lbRenaming = b.dataset.renameList; st.pop = null; render(); });
+  app.querySelectorAll('#pop [data-list-to]').forEach(b => b.onclick = e => { e.stopPropagation(); const v = b.dataset.listTo; st.pop = null; barDo(C.listBarMove(LB, LISTS, st.list, v === 'rest' ? 'rest' : +v)); render(); document.getElementById('listmenu')?.focus(); });
   // the theme starts as Auto (follows the system); a click sets Light or Dark
   document.getElementById('theme').onclick = () => { themePref = st.theme ? 'light' : 'dark'; applyTheme(); render(); document.getElementById('theme').focus(); };
   const qi = document.getElementById('q');
@@ -5763,7 +6066,7 @@ function bind() {
     pq.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const f = st.pop; st.pop = null; render(); document.getElementById(f)?.focus(); } };
   }
   const lc = document.getElementById('lowc'); if (lc) lc.onclick = e => { e.stopPropagation(); st.lowc = !st.lowc; st.keep.clear(); render(); document.getElementById('lowc')?.focus(); };
-  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ timeline: () => { st.view = 'timeline'; st.expanded = null; render(); }, general: () => openSettings('general'), urgency: () => openSettings('urgency'), cardlayout: openCardLayout, archived: openArchivedLists, tags: openTags, sharing: openSharing, hidden: openHiddenLists })[b.dataset.menu](); });
+  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ timeline: () => { st.view = 'timeline'; st.expanded = null; render(); }, general: () => openSettings('general'), urgency: () => openSettings('urgency'), cardlayout: openCardLayout, lists: () => openLists(), tags: openTags, sharing: openSharing })[b.dataset.menu](); });
   // the list chip menu: Share or People, Hide for me, Leave
   app.querySelectorAll('#pop [data-share-list], #pop [data-people-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); openShare('list', b.dataset.shareList || b.dataset.peopleList, '#listmenu'); });
   app.querySelectorAll('#pop [data-hide-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); hideList(b.dataset.hideList, true); });

@@ -487,6 +487,9 @@ hr.rv-sep{border:0;border-top:1px solid var(--hair2);margin:18px 0 12px}
 .rowb.out{color:var(--danger-ink);justify-content:center}
 .later{font:600 12px/1 var(--ui);padding:5px 9px;border-radius:999px;border:1px dashed var(--hair2);color:var(--ink2)}
 .rowsub{display:block;font:400 13px/1.35 var(--ui);color:var(--ink2);margin-top:2px}
+.alacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 14px 10px}
+.altasks{margin:0;padding:0 14px 12px;list-style:none;font:400 14px/1.6 var(--font);color:var(--ink2)}
+dialog.alert p.cf-small{margin:-8px 0 18px;font:400 12.5px/1.4 var(--ui);color:var(--ink2)}
 .sub .back{margin:8px 0 0 -10px}
 .sub h2{margin:4px 0 12px;font:500 40px/1 var(--serif)}
 .stepper{display:flex;align-items:center;gap:8px}
@@ -924,7 +927,7 @@ h2[tabindex="-1"]:focus{outline:none}
   <div class="sbody" id="share-body"></div>
 </dialog>
 <dialog class="alert" id="dlg-confirm" role="alertdialog" aria-labelledby="cf-h" aria-describedby="cf-p">
-  <h2 id="cf-h"></h2><p id="cf-p"></p>
+  <h2 id="cf-h"></h2><p id="cf-p"></p><p id="cf-n" class="cf-small" hidden></p>
   <div class="row"><button type="button" class="btn" id="cf-no"></button><button type="button" class="btn primary" id="cf-yes"></button></div>
 </dialog>
 
@@ -1228,9 +1231,9 @@ document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('close', () => { if (d.contains($('#toast'))) document.body.appendChild($('#toast')); if (lastFocus && document.contains(lastFocus) && !document.querySelector('dialog[open]')) lastFocus.focus(); });
   d.addEventListener('click', e => { if (e.target === d && !['dlg-signin', 'dlg-access', 'dlg-confirm'].includes(d.id)) { if (d.id === 'dlg-task') tryCloseTask(); else if (d.id === 'dlg-add') tryCloseAdd(); else d.close(); } });
 });
-function confirmDlg({ title, body, yes, no }) {
+function confirmDlg({ title, body, yes, no, note }) {
   return new Promise(res => {
-    $('#cf-h').textContent = title; $('#cf-p').textContent = body; $('#cf-yes').textContent = yes; $('#cf-no').textContent = no || ''; $('#cf-no').hidden = !no;
+    $('#cf-h').textContent = title; $('#cf-p').textContent = body; $('#cf-n').textContent = note || ''; $('#cf-n').hidden = !note; $('#cf-yes').textContent = yes; $('#cf-no').textContent = no || ''; $('#cf-no').hidden = !no;
     const d = openDlg('dlg-confirm');
     const done = v => { d.close(); $('#cf-yes').onclick = $('#cf-no').onclick = null; res(v); };
     $('#cf-yes').onclick = () => done(true); $('#cf-no').onclick = () => done(false);
@@ -2422,11 +2425,22 @@ const PAGES = {
       ${rows.length ? `<ul class="rlist">${rows.slice(0, 300).map(t => `<li class="arow"><span class="day">${t.doneAt ? dayLabel(t.doneAt) : ''}</span><span><button class="linkb" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span>${esc(plainT(t.title))}</button><span class="rowsub">${t.status === 'done' ? 'Done' : 'Cancelled'}, ${esc(lname(t.list))}${t.deadline ? `, end ${dayLabel(t.deadline)}` : ''}</span></span><span class="aracts">${D.canDo('edit', t) && !(L(t.list) || {}).archived_at ? `<button class="btn quiet" data-act="restore" data-tid="${t.id}">Restore<span class="vh"> ${esc(plainT(t.title))}</span></button>` : ''}${D.canDo('delete', t) ? `<button class="btn quiet dq" data-act="ar-del" data-tid="${t.id}">Delete<span class="vh"> ${esc(plainT(t.title))}</span></button>` : ''}</span></li>`).join('')}</ul>${rows.length > 300 ? `<p class="src">The first 300 of ${rows.length}. Search narrows them.</p>` : ''}` : `<div class="empty"><p>${all.length ? 'No finished task matches.' : 'Nothing finished yet.'}</p></div>`}`;
     el.onchange = e => { if (e.target.id === 'ar-sort') { AR.sort = e.target.value; e.target.blur(); mePage.render(el); $('#ar-sort').focus(); } };
   } },
-  'pg-alists': { title: 'Archived lists', rows: null, err: '',
-    async load() { const pg = mePage, r = await D.archivedLists(); if (mePage !== pg) return; pg.rows = r.ok ? r.lists : []; pg.err = r.ok ? '' : r.err.message; reMe(); },
+  'pg-alists': { title: 'Archived lists', rows: null, err: '', tasks: {}, shown: null,
+    async load() {
+      const pg = mePage, r = await D.archivedLists(); if (mePage !== pg) return;
+      pg.rows = r.ok ? r.lists : []; pg.err = r.ok ? '' : r.err.message; pg.shown = pg.shown || new Set();
+      const t = r.ok ? await D.archivedTasks(r.lists.map(l => l.id)) : null; if (mePage !== pg) return;
+      pg.tasks = t && t.ok ? t.tasks : {};
+      reMe();
+    },
     render(el) {
-      const a = this.rows;
-      el.innerHTML = a === null ? '<p class="src">Loading…</p>' : (this.err ? `<p class="err">${esc(this.err)}</p>` : '') + (a.length ? `<p class="src">Their tasks stay hidden until the list is restored.</p><ul class="rows">${a.map(l => `<li><div class="rowb">${esc(l.name)}<span class="rowsub">Archived ${dayLabel(new Date(l.archived_at))}</span><span class="v">${l.canRestore ? `<button class="btn quiet" data-act="alist-restore" data-id="${l.id}">Restore<span class="vh"> ${esc(l.name)}</span></button>` : ''}</span></div></li>`).join('')}</ul>` : '<p class="src">No archived lists.</p>');
+      const a = this.rows, T = this.tasks, TASKS_SHOWN = 30;
+      el.innerHTML = a === null ? '<p class="src">Loading…</p>' : (this.err ? `<p class="err">${esc(this.err)}</p>` : '') + (a.length ? `<p class="src">Nothing in an archived list can be changed. Restore puts it back. Delete removes it and its tasks for good.</p><ul class="rows">${a.map(l => {
+        const ts = T[l.id] || [], open = this.shown && this.shown.has(l.id);
+        return `<li data-alist="${l.id}"><div class="rowb"><span style="min-width:0">${esc(l.name)}<span class="rowsub">Archived ${dayLabel(new Date(l.archived_at))}</span></span></div>
+          <div class="alacts">${ts.length ? `<button class="btn quiet" data-act="alist-tasks" data-id="${l.id}" aria-expanded="${!!open}">${ts.length} ${ts.length === 1 ? 'task' : 'tasks'}</button>` : '<span class="rowsub">No tasks</span>'}${l.canRestore ? `<button class="btn quiet" data-act="alist-restore" data-id="${l.id}">Restore<span class="vh"> ${esc(l.name)}</span></button><button class="btn danger" data-act="alist-delete" data-id="${l.id}">Delete<span class="vh"> ${esc(l.name)}</span></button>` : ''}</div>
+          ${open ? `<ul class="altasks">${ts.slice(0, TASKS_SHOWN).map(x => `<li>${esc(plainT(x))}</li>`).join('')}${ts.length > TASKS_SHOWN ? `<li>and ${ts.length - TASKS_SHOWN} more</li>` : ''}</ul>` : ''}</li>`;
+      }).join('')}</ul>` : '<p class="src">No archived lists.</p>');
     } },
   'pg-hlists': { title: 'Hidden lists', render(el) {
     const a = D.hiddenLists;
@@ -2582,6 +2596,16 @@ async function part2Click(a, b) {
       break;
     }
     case 'alist-restore': { const r = await D.restoreList(id); said(r); if (r.ok && mePage) { mePage.rows = null; mePage.load(); } renderAll(); break; }
+    case 'alist-tasks': { if (!mePage || !mePage.shown) break; mePage.shown.has(id) ? mePage.shown.delete(id) : mePage.shown.add(id); reMe(); document.querySelector(`[data-act="alist-tasks"][data-id="${id}"]`)?.focus(); break; }
+    case 'alist-delete': {
+      const pg = mePage, l = pg && (pg.rows || []).find(x => x.id === id); if (!l) break;
+      const n = (pg.tasks[id] || []).length, info = await D.deleteInfo(id);
+      const go = await confirmDlg({ title: `Delete ${l.name}?`, body: `This deletes ${n ? `the list and its ${n} ${n === 1 ? 'task' : 'tasks'}` : 'the list'}. It can't be undone.${info.others.length ? ` ${info.others.join(', ')} also ${info.others.length === 1 ? 'loses' : 'lose'} it.` : ''}`, note: info.backup, yes: 'Delete list', no: 'Cancel' });
+      if (!go) break;
+      const r = await D.deleteArchivedList(id); said(r);
+      if (r.ok && mePage === pg) { pg.rows = null; pg.load(); reMe(); }
+      break;
+    }
     case 'hlist-show': { const r = await D.hideList(id, false); said(r); renderAll(); break; }
     case 'swm-hide': { const l = L(id); const r = await D.hideList(id, true); if (r.ok) toast(`Hid ${l ? l.name : 'the list'}.`, async () => { said(await D.hideList(id, false)); renderAll(); }); else said(r); renderAll(); break; }
     case 'swm-leave': { const l = L(id) || D.hiddenLists.find(x => x.id === id); if (l && await confirmDlg({ title: `Leave ${l.name}?`, body: `You lose access until ${D.names[l.owner_id] || 'the owner'} invites you again.`, yes: 'Leave list', no: 'Stay' })) { said(await D.leaveList(id)); renderAll(); } break; }

@@ -653,6 +653,16 @@
     const taken = new Set((names || []).map(n => String(n).trim().toLowerCase())), base = String(name || '').trim();
     for (let i = 2; ; i++) { const n = base + ' (' + i + ')'; if (!taken.has(n.toLowerCase())) return n; }
   }
+  // an ISO time as local "yyyy-mm-dd hh:mm", '' when there is none. backupLine: the small print of the delete popup (rpc/last_backup_at, db/029)
+  function localStamp(iso) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return '';
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  const backupLine = iso => { const s = localStamp(iso); return s ? 'Last backup ' + s : 'Last backup time unknown'; };
+  // the delete popup names the people who also lose the list: members other than me, not the bot or the agent (list_people rows)
+  const deleteLosers = (rows, meId, notPeople) => (Array.isArray(rows) ? rows : []).filter(p => p.state === 'member' && p.profile_id !== meId && !(notPeople && notPeople.has(p.profile_id))).map(p => p.display_name || 'Someone');
   // a list scripts depend on: no rename, archive or delete in the UI (delete_archived_list refuses it too, db/029)
   const isSystemList = l => !!l && (l.slug === 'access-requests' || String(l.slug || '').startsWith('_'));
 
@@ -1331,7 +1341,7 @@
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
-    createdList, listNameClash, freeListName, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
+    createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,

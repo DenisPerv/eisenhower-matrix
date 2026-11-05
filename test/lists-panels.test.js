@@ -157,6 +157,16 @@ test('listOrder is the panels, then the rest', () => {
   assert.deepEqual(C.listBarMove(null, ['a', 'b', 'c', 'd', 'e'], 'e', 0, 'a', true).order, ['e', 'a', 'b', 'c', 'd']);
 });
 
+test('the delete popup: the time in local form, unknown without one, and only other people lose the list', () => {
+  assert.equal(C.backupLine(null), 'Last backup time unknown');
+  assert.equal(C.backupLine('not a date'), 'Last backup time unknown');
+  assert.match(C.backupLine('2026-11-05T06:14:00Z'), /^Last backup 2026-11-05 \d\d:\d4$/);
+  assert.equal(C.localStamp(null), '');
+  const rows = [{ state: 'member', profile_id: 'me', display_name: 'Me' }, { state: 'member', profile_id: 'bot', display_name: 'Telegram bot' }, { state: 'member', profile_id: 'a', display_name: 'Ana' }, { state: 'member', profile_id: 'b', display_name: null }, { state: 'pending', email: 'x@example.com' }];
+  assert.deepEqual(C.deleteLosers(rows, 'me', new Set(['bot'])), ['Ana', 'Someone']);
+  assert.deepEqual(C.deleteLosers(null, 'me'), []);
+});
+
 test('isSystemList: access-requests and slugs starting with _', () => {
   assert.equal(C.isSystemList({ slug: 'access-requests' }), true);
   assert.equal(C.isSystemList({ slug: '_selftest' }), true);
