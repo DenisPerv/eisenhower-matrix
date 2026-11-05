@@ -54,19 +54,6 @@ test('tagGroups without an order: my lists by sort, then shared lists by owner n
   assert.ok(!C.tagGroups(noRole, tags, 'me', names).some(x => x.list.id === 'Z'), 'a list I am not on is not offered');
 });
 
-test('tag filter: by tag id; "All named X" is an explicit choice', () => {
-  const labels = { t1: 'urgent', t3: 'urgent', t4: 'urgent ·A', t2: 'calls' };
-  const nameOf = { t1: 'urgent', t3: 'urgent', t4: 'urgent', t2: 'calls' };
-  const opts = C.tagFilterOptions(['t1', 't3', 't4', 't2', 't1', 'tx'], labels, nameOf);
-  assert.deepEqual(opts.map(o => o.key), ['t2', 'name:urgent', 't1', 't3', 't4']);
-  assert.equal(opts[1].label, 'All named urgent'); assert.equal(opts[1].all, true);
-  assert.equal(C.tagFilterHit(['t3'], new Set(['t1']), nameOf), false, 'filtering on my urgent does not match another urgent');
-  assert.equal(C.tagFilterHit(['t1', 't2'], new Set(['t1']), nameOf), true);
-  assert.equal(C.tagFilterHit(['t4'], new Set([C.tagFilterKey('Urgent')]), nameOf), true, 'all named urgent, any case');
-  assert.equal(C.tagFilterHit(['t2'], new Set(), nameOf), true, 'no filter');
-  assert.equal(C.tagFilterHit(['t9'], new Set(['name:urgent']), nameOf), false, 'a tag I cannot see');
-});
-
 test('poll merge (adjustment 4): an unknown tag id is reported, then fetched and labelled; a rename relabels the chips', () => {
   const L = lists();
   const tasks = [{ id: 'i1', tags: [] }, { id: 'i2', tags: ['t4'] }];

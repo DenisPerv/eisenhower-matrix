@@ -1084,7 +1084,7 @@
       Object.assign(me, p); NAMES[me.id] = me.display_name; changed('me');
       return { ok: true, msg: 'Settings saved' };
     }
-    async function setMineTags(ids) { const r = await rest('PATCH', 'profiles?id=eq.' + me.id, { mine_tag_ids: [...ids] }, { Prefer: 'return=representation' }); if (r.ok && r.json.length) { me.mine_tag_ids = r.json[0].mine_tag_ids; changed('me'); } return r; }
+    async function setMineTags(ids) { const r = await rest('PATCH', 'profiles?id=eq.' + me.id + '&select=mine_tag_ids', { mine_tag_ids: [...ids] }, { Prefer: 'return=representation' }); if (r.ok && r.json.length) { me.mine_tag_ids = r.json[0].mine_tag_ids; changed('me'); } return r; }
 
     // ---- wiring to the page: online, visibility, focus (the UI calls attach(window, document) once) ----
     function attach(win, doc) {

@@ -22,7 +22,7 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, PAGE_PATH = '/', ACCESS = null; // --url (origin, page path) and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'links', 'guests', 'request'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'links', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 // the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
 const OFFLINE = want.every(g => g === 'request');
@@ -133,6 +133,7 @@ async function tab(B, ctxId, opts = {}) {
   T.ready = async () => {
     const ok = await T.wait('!document.querySelector(".gate") && !!document.querySelector(".matrix, .ar, .tl, .rvw")', 20000);
     if (ok && !T.keepWelcome) await T.ev('(document.getElementById("wl-later")?.click(),true)');
+    if (ok && !T.keepFilters) await T.ev('(document.getElementById("clear")?.click(),true)'); // saved filters must not hide the run's cards
     if (ok && !(await T.has('.matrix'))) { await T.click('[data-view=matrix]'); await T.wait('!!document.querySelector(".matrix")', 5000); }
     return ok;
   };
@@ -968,6 +969,7 @@ async function gUi() {
       lowNote += '; after reload: ' + (lowOk ? 'shown' : await T.ev(`(()=>{const c=document.querySelector('[data-card="${low.id}"]');return c?'card '+c.className:'no card'})()`));
     }
     check(G, 'the low-confidence marker shows on the card', lowOk, lowNote);
+    await T.click('#barmenu'); await T.click('[data-bar="low"]'); await T.ev('(document.body.click(),true)');
     await T.click('#lowc');
     check(G, 'the "To check" filter shows only those items', await T.ev(`[...document.querySelectorAll('[data-card]')].every(c=>c.classList.contains('lowc')) && !!document.querySelector('[data-card="${low.id}"]')`));
     await T.click('#lowc');
@@ -1059,6 +1061,125 @@ async function gDecision(G, T) {
 // the search, one created there), a predecessor chain and a parent by rpc/link_items, a loop left out of the picker, Start and
 // Priority saved; badges and Group by parent on the board (a faded parent heads its child in another quadrant); the Timeline's
 // tree, arrows (one late) and fold; 200 rows drawn in under 100 ms; screenshots at both widths, light and dark.
+// the filter row (README Features): Mine by my tags, tags by list, the person's buttons, Due, saved in preferences. Items stay in _selftest;
+// preferences go back in cleanup; Maksym's mine_tag_ids are cleared for the group and put back in its finally
+async function gFilters() {
+  const G = 'filters';
+  const mineSnap = ((await MK.rest('GET', 'profiles?select=mine_tag_ids&id=eq.' + MK.uid)).json[0] || {}).mine_tag_ids || [];
+  try {
+    await MK.rest('PATCH', 'profiles?id=eq.' + MK.uid, { mine_tag_ids: [] });
+    await gFiltersBody(G);
+  } finally {
+    const back = await MK.rest('PATCH', 'profiles?id=eq.' + MK.uid, { mine_tag_ids: mineSnap });
+    check(G, 'Mine tags of Maksym put back', back.ok);
+  }
+}
+async function gFiltersBody(G) {
+  const lists = (await MK.rest('GET', 'tag_lists?select=id,name&archived_at=is.null&order=sort')).json || [];
+  const withTags = [];
+  for (const l of lists) { const t = (await MK.rest('GET', 'tags?select=id,name&deleted_at=is.null&order=sort&limit=2&tag_list_id=eq.' + l.id)).json || []; if (t.length === 2) withTags.push({ l, t }); }
+  if (withTags.length < 2) { check(G, 'two tag lists with two tags each to test on', false, 'found ' + withTags.length); return; }
+  const [A, B2] = withTags, [a1, a2] = A.t, [b1] = B2.t;
+  const tagIt = async (it, ...tags) => { for (const t of tags) { const r = await MK.rest('POST', 'item_tags', { item_id: it.id, tag_id: t.id }, { Prefer: 'return=minimal' }); if (!r.ok) throw new Error('tag: ' + r.err.message); } return it; };
+  const soon = new Date(Date.now() + 60 * 1000), today = new Date(); today.setHours(23, 30, 0, 0);
+  const iOwnedOther = await tagIt(await mkItem('filter owned, other tag'), a2);
+  const iMine = await tagIt(await mkItem('filter mine', { due_at: today.toISOString() }), a1, b1);
+  const iMineOnly = await tagIt(await mkItem('filter mine only'), a1);
+  const later = new Date(Date.now() + 20 * 864e5);
+  const iLater = await mkItem('filter later', { due_at: later.toISOString() });
+  const T = await tab(B, await ctx(B));
+  T.keepFilters = true;
+  check(G, 'opens signed in', await open(T, await grantFor('maksym')));
+  await T.ev('(document.getElementById("clear")?.click(),true)');
+  await T.click('#barmenu'); await T.click('[data-bardefault]'); await T.ev('(document.body.click(),true)');
+  await pick(T, ST.id);
+  const has = it => T.ev(`!!document.querySelector('[data-card="${it.id}"]')`);
+  await T.wait(`!!document.querySelector('[data-card="${iLater.id}"]')`, 15000);
+  const nowShown = async (...its) => { await sleep(150); return (await Promise.all(its.map(has))); };
+  check(G, 'the row: Mine, then the starred lists and Due, then +', await T.ev(`(()=>{const k=[...document.querySelectorAll('.line .f')].map(b=>b.id);return k[0]==='mine'&&k.includes('due')&&k.includes('barmenu')&&k.every(x=>!/^tag$/.test(x))})()`));
+
+  // the two tag lists on the row
+  for (const l of [A.l, B2.l]) if (!(await T.has(`.line [id="tl:${l.id}"]`))) { await T.click('#barmenu'); await T.click(`[data-bar="tl:${l.id}"]`); await T.ev('(document.body.click(),true)'); }
+
+  // Mine: only my tags, the owner does not count
+  await T.click('#mine');
+  check(G, 'Mine with no tags opens the picker', await T.wait(`document.querySelector('#pop .f-h')?.textContent.includes('Which tags')`, 2000));
+  await T.ev('(document.body.click(),true)');
+  await T.ev(`(document.getElementById('tl:${A.l.id}').click(),true)`);
+  const iconHit = await T.click(`[data-mine-tag="${a1.id}"]`);
+  check(G, 'the person icon counts a tag as Mine (profiles.mine_tag_ids)', !!(await until(async () => ((await MK.rest('GET', 'profiles?select=mine_tag_ids&id=eq.' + MK.uid)).json[0].mine_tag_ids || []).includes(a1.id))), `clicked ${iconHit}; toast: ${await T.ev('document.querySelector(".toast")?.textContent||""')}; errors: ${T.errors.slice(-2).join(' / ')}`);
+  await T.ev('(document.body.click(),true)');
+  await T.click('#mine');
+  let s = await nowShown(iMine, iMineOnly, iOwnedOther, iLater);
+  check(G, 'Mine shows tasks with my tag and not tasks I only own', s[0] && s[1] && !s[2] && !s[3], JSON.stringify(s));
+  check(G, 'N of M shows while a filter is on', await T.ev(`/^\\d+ of \\d+$/.test(document.querySelector('.f-count')?.textContent||'')`));
+  await T.click('#mine');
+
+  // tags by list: any inside a list, every list with a selection
+  await T.ev(`(document.getElementById('tl:${A.l.id}').click(),true)`);
+  await T.click(`[data-tag="${a1.id}"]`); await T.click(`[data-tag="${a2.id}"]`);
+  s = await nowShown(iMine, iMineOnly, iOwnedOther, iLater);
+  check(G, 'two tags of one list: either passes', s[0] && s[1] && s[2] && !s[3], JSON.stringify(s));
+  await T.ev('(document.body.click(),true)');
+  await T.ev(`(document.getElementById('tl:${B2.l.id}').click(),true)`);
+  await T.click(`[data-tag="${b1.id}"]`);
+  s = await nowShown(iMine, iMineOnly, iOwnedOther, iLater);
+  check(G, 'a second tag list narrows the result', s[0] && !s[1] && !s[2] && !s[3], JSON.stringify(s));
+  const cnt = await T.ev(`(()=>{const n=document.querySelectorAll('[data-body] [data-card]').length,c=document.querySelector('.f-count b').textContent;return Number(c)===n})()`);
+  check(G, 'N equals the cards drawn', cnt);
+  check(G, 'the side menu shows only the filtered rows', await T.ev(`document.querySelectorAll('.mrow[data-open]').length===document.querySelectorAll('[data-body] [data-card]').length`));
+
+  // saved: survives a reload
+  await T.ev('(document.body.click(),true)');
+  await sleep(1800);
+  await T.reload();
+  await T.wait('!!document.querySelector(".matrix")', 20000);
+  await pick(T, ST.id);
+  await T.wait(`!!document.querySelector('[data-card="${iMine.id}"]')`, 15000);
+  s = await nowShown(iMine, iMineOnly);
+  check(G, 'filters and the row survive a reload', s[0] && !s[1] && await T.has(`.line [id="tl:${A.l.id}"][aria-pressed="true"]`), JSON.stringify(s));
+
+  // removing a button switches its filter off
+  await T.ev(`(document.getElementById('tl:${B2.l.id}').click(),true)`);
+  await T.click(`[data-rmbar="tl:${B2.l.id}"]`);
+  s = await nowShown(iMine, iMineOnly);
+  check(G, 'Remove from the bar: the button goes and its filter is off', s[0] && s[1] && !(await T.has(`.line [id="tl:${B2.l.id}"]`)), JSON.stringify(s));
+  await T.click('#barmenu');
+  await T.click(`[data-bar="tl:${A.l.id}"]`);
+  await T.ev('(document.body.click(),true)');
+  s = await nowShown(iOwnedOther);
+  check(G, 'unticking in + removes the button and its filter too', s[0] && !(await T.has(`.line [id="tl:${A.l.id}"]`)), JSON.stringify(s));
+  check(G, 'Mine cannot be removed', !(await T.has('[data-bar="mine"]')) && await T.has('#mine'));
+
+  // Due: today and a range, and a card created under an active filter stays and counts
+  await T.click('#barmenu'); await T.click('[data-bardefault]'); await T.ev('(document.body.click(),true)');
+  await T.click('#due'); await T.click('[data-due="today"]');
+  s = await nowShown(iMine, iLater, iMineOnly);
+  check(G, 'Due Today', s[0] && !s[1] && !s[2], JSON.stringify(s));
+  await T.click('#due'); await T.click('[data-due="range"]');
+  const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  await T.ev(`(()=>{const a=document.getElementById('f-from');a.value='${ymd(new Date(later.getTime() - 864e5))}';a.dispatchEvent(new Event('change'));const b=document.getElementById('f-to');b.value='${ymd(new Date(later.getTime() + 864e5))}';b.dispatchEvent(new Event('change'));return true})()`);
+  s = await nowShown(iLater, iMine);
+  check(G, 'Due Choose dates: a range', s[0] && !s[1], JSON.stringify(s));
+  await T.shot('filters-row-1440x900');
+  await T.ev('(document.body.click(),true)');
+  await T.click('[data-add="B"]'); await dialogSave(T, { title: RUN + ' filter new', list: ST.id });
+  const newShown = await T.wait(`[...document.querySelectorAll('[data-card]')].some(c=>c.textContent.includes(RUNTXT))`.replace('RUNTXT', JSON.stringify(RUN + ' filter new')), 5000);
+  const kept = await T.ev(`Number(document.querySelector('.f-count b').textContent)===document.querySelectorAll('[data-body] [data-card]').length`);
+  check(G, 'a card created under an active filter stays visible and is counted', newShown && kept);
+  await T.ev('(document.getElementById("clear").click(),true)');
+  check(G, 'clear switches everything off', !(await T.has('#clear')) && !(await T.has('.f-count')));
+
+  // screens
+  await T.click('#barmenu'); await sleep(200); await T.shot('filters-plus-menu-1440x900');
+  await T.ev('(document.body.click(),true)');
+  await T.size(390, 844); await sleep(400);
+  check(G, '390 wide: no sideways scroll', await T.ev('document.documentElement.scrollWidth<=innerWidth'));
+  await T.click('#barmenu'); await sleep(200); await T.shot('filters-plus-menu-390x844');
+  check(G, '390 wide: the menu stays inside the window', await T.ev(`(()=>{const r=document.getElementById('pop').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth})()`));
+  await T.close();
+}
+
 async function gLinks() {
   const G = 'links';
   const T = await tab(B, await ctx(B));
@@ -2103,9 +2224,9 @@ const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'links', 'guests', 'request'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'links', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }

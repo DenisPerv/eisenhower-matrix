@@ -512,6 +512,22 @@ test('saveProfile: PATCH profiles with display_name and timezone, names follow; 
   assert.equal((await d.saveProfile({ display_name: 'X' })).err.kind, 'denied');
 });
 
+test('filter row: a phone write keeps the board\'s filters and filterBar, ids the phone does not know included', async () => {
+  const filters = { mine: true, due: 'range', from: '2026-11-01', to: '2026-11-09', tags: ['tag-the-phone-does-not-know'], cats: ['task'], low: false };
+  const filterBar = ['due', 'tl:list-the-phone-does-not-know', 'low'], saved = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/preferences/, () => [200, [{ prefs: { version: 2, filters, filterBar, tagListOrderV: 2 } }]]],
+    ['POST', /^\/rest\/v1\/preferences/, (m, body) => { saved.push(body.prefs); return [201, undefined]; }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  assert.equal((await d.loadAll()).ok, true);
+  d.setPrefs({ theme: 'dark' });
+  await d.flushPrefs?.();
+  assert.deepEqual(d.prefs.filters, filters);
+  assert.deepEqual(d.prefs.filterBar, filterBar);
+});
+
 test('tag lists (tags round): an old prefs row is migrated to the full order with the landing list as favourite and saved; ★ and a move write prefs and own sort', async () => {
   const A = 'cccccccc-cccc-4ccc-8ccc-cccccccccc01', B = 'cccccccc-cccc-4ccc-8ccc-cccccccccc02', S = 'cccccccc-cccc-4ccc-8ccc-cccccccccc03';
   const sorts = { [A]: 2, [B]: 1 }, saved = [], patched = [];

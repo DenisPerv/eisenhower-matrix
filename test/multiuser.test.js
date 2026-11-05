@@ -257,9 +257,10 @@ test('tagLabels: a name two owners hold is marked with the other owner\'s initia
 });
 
 // round 3 (db/012): by tag id (mine_tag_ids), no longer by name (mine_tags)
-test('isMine: owner_id is me, or a visible tag whose id is in my mine_tag_ids', () => {
+test('isMine: only a visible tag whose id is in my mine_tag_ids; the owner does not count', () => {
   const me = { id: 'me', mine_tags: ['maksym'], mine_tag_ids: ['g1', 'g2'] };
-  assert.equal(C.isMine({ ownerId: 'me', tags: [] }, me, {}), true);
+  assert.equal(C.isMine({ ownerId: 'me', tags: [] }, me, {}), false, 'I own it, nothing says it is assigned to me');
+  assert.equal(C.isMine({ ownerId: 'me', tags: ['other'] }, me, { other: 'anastasiia' }), false, 'I own it, it is assigned to someone else');
   assert.equal(C.isMine({ ownerId: 'b', tags: ['g1'] }, me, { g1: 'maksym' }), true);
   assert.equal(C.isMine({ ownerId: null, tags: ['g2'] }, me, { g1: 'maksym' }), false, 'a tag I cannot see does not count');
   assert.equal(C.isMine({ ownerId: null, tags: ['g3'] }, me, { g3: 'maksym' }), false, 'a name in mine_tags no longer counts');

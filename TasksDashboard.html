@@ -151,8 +151,8 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .line .f{min-height:30px;padding:0 10px;border-color:transparent;background:transparent;color:var(--ink2);border-radius:var(--r)}
 .line .f:hover{background:var(--hover);color:var(--ink)}
 .line .f[aria-expanded="true"]{background:var(--hover)}
-#due{margin-left:var(--s3);position:relative}
-#due::before{content:"";position:absolute;left:-7px;top:6px;bottom:6px;border-left:1px solid var(--hair2)}
+#mine{margin-left:var(--s3);position:relative}
+#mine::before{content:"";position:absolute;left:-7px;top:6px;bottom:6px;border-left:1px solid var(--hair2)}
 #clear{color:var(--ink3);padding:0 8px;border-radius:50%}
 .sq{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c,var(--qd));flex:none;box-shadow:0 0 10px -1px var(--c,var(--qd))}
 .sq[data-q]{background:var(--c)}
@@ -435,8 +435,8 @@ dialog form > .n{font-family:var(--mono);font-size:12px}
   .line .si{padding-left:6px}
   .line input{flex:1 1 calc(100% - 40px);font-size:16px;min-height:32px}
   .line .f{min-height:34px;padding:0 8px}
-  #due{margin-left:0}
-  #due::before{display:none}
+  #mine{margin-left:0}
+  #mine::before{display:none}
   .main{grid-template-columns:minmax(0,1fr);min-height:0}
   .rail{position:static;margin:12px 12px 0;height:auto;max-height:250px}
   .content{padding:12px}
@@ -1260,7 +1260,6 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 .tgm-new{margin-top:10px}
 .tgm-menu{min-width:190px;z-index:30}
 .menu-pop .danger{color:var(--danger-ink)}
-.menu-pop button.all{color:var(--accent-ink)}
 @media (max-width:700px){.tgl-h{flex-wrap:wrap}.tgl-b{flex-basis:100%;justify-content:flex-start}}
 /* round 3, A10: side-menu rows drag between quadrant groups */
 .mrow.dragging{opacity:.4}
@@ -1276,6 +1275,35 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 .ntc-b .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
 .ntc-b .danger{color:var(--danger-ink)}
 @media (max-width:700px){.notices{left:8px;right:8px;width:auto}}
+/* the filter row: Mine, the person's buttons, + (README Features) */
+.line .f{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.line .f .ic{width:15px;height:15px;flex:none}
+.f-count{font:500 13px var(--ui);color:var(--ink2);white-space:nowrap;padding:0 4px}
+.f-count b{font-weight:600;color:var(--accent-ink)}
+.menu-pop.fm{width:300px;max-width:calc(100vw - 16px)}
+.fm-find{margin:2px 2px 6px;min-height:32px;width:calc(100% - 4px);padding:0 10px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--glass2);font-size:14px;color:var(--ink)}
+.frow{display:flex;align-items:center;gap:2px;width:100%}
+.menu-pop .frow button.fc{flex:1;min-width:0;display:flex;align-items:center;justify-content:flex-start;gap:8px;min-height:30px;padding:0 8px;border:0;background:transparent;border-radius:var(--r);font:500 14px var(--ui);color:var(--ink);text-align:left;box-shadow:none}
+.menu-pop .frow button.fc:hover{background:var(--hover)}
+.fbox{width:15px;height:15px;flex:none;border:1.5px solid var(--hair2);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:var(--on-accent)}
+.fc[aria-pressed="true"] .fbox{background:var(--accent);border-color:var(--accent)}
+.fbox .ic{width:11px;height:11px;visibility:hidden}
+.fc[aria-pressed="true"] .fbox .ic{visibility:visible}
+.fc .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fc .n{margin-left:auto;font:400 12px var(--mono);color:var(--ink3)}
+.menu-pop .frow button.fme{flex:none;width:28px;min-height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;border-radius:var(--r);color:var(--ink3);opacity:.6;box-shadow:none}
+.menu-pop .frow button.fme:hover{background:var(--hover);opacity:1;color:var(--ink)}
+.menu-pop .frow button.fme[aria-pressed="true"]{color:var(--accent-ink);opacity:1;background:var(--accent-bg)}
+.fme .ic{width:15px;height:15px}
+.menu-pop button.f-rm{color:var(--ink2);font:500 13px var(--ui)}
+.f-h{margin:4px 8px 6px;font:600 14px/1.35 var(--ui);color:var(--ink);max-width:none}
+.f-g{margin:6px 8px 2px;font:600 13px var(--ui);color:var(--ink2);max-width:none}
+.f-hint{margin:6px 8px 4px;font:400 12.5px/1.4 var(--font);color:var(--ink3);max-width:none}
+.menu-pop button.f-go{margin:8px 4px 2px;min-height:32px;justify-content:center;background:var(--accent);color:var(--on-accent);font:600 13px var(--ui);text-align:center}
+.menu-pop button.f-go:hover{background:var(--accent);filter:brightness(1.08)}
+.f-dates{display:flex;flex-wrap:wrap;gap:6px;padding:4px 8px 6px}
+.f-dates label{display:flex;flex-direction:column;gap:2px;font:500 12px var(--ui);color:var(--ink2);flex:1 1 110px}
+.f-dates input{min-height:30px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--glass2);padding:0 6px;font-size:13px;color:var(--ink);width:100%}
 </style>
 </head>
 <body>
@@ -1499,8 +1527,29 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
   // before it: only the shared ones, migrated once by tagListPrefsMigrate); tagListFavs = my favourite (★) tag lists, any number, own
   // or shared: they open in the task window. tagListsOpen (U7) is gone: groups open and close within the window only
   const TAG_LIST_ORDER_V = 2;
+  // the board's filter row. filters: what is on. filterBar: which buttons show after the fixed Mine, in order ('due', 'cat', 'low',
+  // 'tl:<tag list id>'); null follows the starred tag lists (defaultFilterBar). Both are checked for type and shape only: the phone
+  // writes this row without the board's tag ids, so the page drops stale ids when it applies them
+  const DUE_KINDS = ['any', 'overdue', 'today', 'week', 'none', 'range'];
+  const FILTERS_DEFAULTS = { mine: false, due: 'any', from: '', to: '', tags: [], cats: [], low: false };
+  const FILTER_BAR_KEY = /^(due|cat|low|tl:.+)$/;
+  const DAY_TEXT = /^\d{4}-\d{2}-\d{2}$/;
+  function readFilters(raw) {
+    const f = clone(FILTERS_DEFAULTS);
+    if (!isObj(raw)) return f;
+    if (typeof raw.mine === 'boolean') f.mine = raw.mine;
+    if (typeof raw.low === 'boolean') f.low = raw.low;
+    if (DUE_KINDS.includes(raw.due)) f.due = raw.due;
+    if (typeof raw.from === 'string' && DAY_TEXT.test(raw.from)) f.from = raw.from;
+    if (typeof raw.to === 'string' && DAY_TEXT.test(raw.to)) f.to = raw.to;
+    if (strs(raw.tags)) f.tags = [...new Set(raw.tags)];
+    if (strs(raw.cats)) f.cats = [...new Set(raw.cats)];
+    return f;
+  }
+  const readFilterBar = raw => strs(raw) ? [...new Set(raw.filter(k => FILTER_BAR_KEY.test(k)))] : null;
+  const defaultFilterBar = favs => ['due'].concat((favs || []).map(id => 'tl:' + id));
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
-    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard' };
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard', filters: FILTERS_DEFAULTS, filterBar: null };
   // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
   // WELCOME_VERSION. welcomeSeen stays for clients that only know it
   const WELCOME_VERSION = 3;
@@ -1542,6 +1591,8 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     if (strs(raw.tagListOrder)) p.tagListOrder = [...new Set(raw.tagListOrder.filter(tlOk))];
     if (Number.isInteger(raw.tagListOrderV) && raw.tagListOrderV >= 0 && raw.tagListOrderV <= 1000) p.tagListOrderV = raw.tagListOrderV;
     if (strs(raw.tagListFavs)) p.tagListFavs = [...new Set(raw.tagListFavs.filter(tlOk))];
+    p.filters = readFilters(raw.filters);
+    p.filterBar = readFilterBar(raw.filterBar);
     return p;
   }
   function readCardLayout(raw, tagListIds) {
@@ -1820,9 +1871,16 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     });
     return out;
   }
-  // "Mine": the item is for me (owner_id), or carries a tag I can see whose id is in my mine_tag_ids (db/012; with several tag
-  // lists a name can mean different tags, so mine_tags names are no longer read)
-  const isMine = (t, me, tagNames) => !!me && (t.ownerId === me.id || (t.tags || []).some(id => tagNames[id] !== undefined && (me.mine_tag_ids || []).includes(id)));
+  // "Mine": the item carries a tag I can see whose id is in my mine_tag_ids (db/012). The owner does not count: it says who made the
+  // item, not who does it (filter row, 2026-11-05). With several tag lists a name can mean different tags, so mine_tags names are not read
+  const isMine = (t, me, tagNames) => !!me && (t.tags || []).some(id => tagNames[id] !== undefined && (me.mine_tag_ids || []).includes(id));
+  // the tags the Mine picker suggests first: named like me (display name, its first word, or handle), any case
+  function mineSuggestions(ids, nameOf, me) {
+    if (!me) return [];
+    const dn = String(me.display_name || '').trim().toLowerCase();
+    const want = new Set([dn, dn.split(/\s+/)[0], String(me.handle || '').trim().toLowerCase()].filter(Boolean));
+    return (ids || []).filter(id => want.has(String(nameOf[id] || '').trim().toLowerCase()));
+  }
   const tagDiff = (before, after) => ({ add: (after || []).filter(x => !(before || []).includes(x)), remove: (before || []).filter(x => !(after || []).includes(x)) });
   // item_tags rows (load or poll) applied to the tasks; items with writes waiting are skipped; unknown tag ids are reported
   function mergeTagRows(tasks, rows, opts) {
@@ -1996,22 +2054,31 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     const nm = typeof nameOf === 'function' ? nameOf : id => (nameOf || {})[id];
     return (groups || []).map(g => Object.assign({}, g, { tags: g.tags.filter(id => String(nm(id) || '').toLowerCase().includes(q)) })).filter(g => g.tags.length);
   }
-  // the Tag filter: a key is a tag id, or 'name:<lower name>' for "All named X" (an explicit choice); an item passes with any key
-  const tagFilterKey = name => 'name:' + String(name).toLowerCase();
-  const tagFilterHit = (ids, keys, nameOf) => !keys || !keys.size || (ids || []).some(id => keys.has(id) || (nameOf[id] !== undefined && keys.has(tagFilterKey(nameOf[id]))));
-  // the filter menu: one entry per tag id (its chip label), and "All named X" before the tags when several tags share the name
-  function tagFilterOptions(ids, labels, nameOf) {
-    const uniq = [...new Set(ids || [])].filter(id => labels[id] !== undefined && nameOf[id] !== undefined);
-    const count = {};
-    uniq.forEach(id => { const k = tagFilterKey(nameOf[id]); count[k] = (count[k] || 0) + 1; });
-    uniq.sort((a, b) => String(nameOf[a]).localeCompare(String(nameOf[b])) || String(labels[a]).localeCompare(String(labels[b])));
-    const out = [], done = new Set();
-    uniq.forEach(id => {
-      const k = tagFilterKey(nameOf[id]);
-      if (count[k] > 1 && !done.has(k)) { done.add(k); out.push({ key: k, label: 'All named ' + nameOf[id], all: true }); }
-      out.push({ key: id, label: labels[id] });
-    });
-    return out;
+  // the tag filter: keys are tag ids. Any tag inside one tag list passes; every tag list with a selection must pass
+  function tagFilterHit(ids, keys, listOf) {
+    if (!keys || !keys.size) return true;
+    const by = new Map();
+    keys.forEach(k => { const l = (listOf || {})[k]; by.set(l, (by.get(l) || []).concat(k)); });
+    return [...by.values()].every(g => g.some(k => (ids || []).includes(k)));
+  }
+  // the Due filter. f: { due, from, to } (DUE_KINDS). Overdue is the card's overdue mark (before now); the rest are local calendar days.
+  // A range keeps both end days; an empty end is open, both empty pass everything, a from after the to is swapped
+  function dueMatch(t, f, now) {
+    const kind = f && f.due, at = t.deadline ? t.deadline.getTime() : null;
+    const n = new Date(now), day = k => new Date(n.getFullYear(), n.getMonth(), n.getDate() + k).getTime();
+    const parse = (s, k) => { const m = DAY_TEXT.test(s || '') ? s.split('-').map(Number) : null; return m ? new Date(m[0], m[1] - 1, m[2] + k).getTime() : null; };
+    if (kind === 'overdue') return at !== null && at < n.getTime();
+    if (kind === 'today') return at !== null && at >= day(0) && at < day(1);
+    if (kind === 'week') return at !== null && at >= day(0) && at < day(8);
+    if (kind === 'none') return at === null;
+    if (kind === 'range') {
+      let from = f.from || '', to = f.to || '';
+      if (!from && !to) return true;
+      if (from && to && from > to) [from, to] = [to, from];
+      const a = parse(from, 0), b = parse(to, 1);
+      return at !== null && (a === null || at >= a) && (b === null || at < b);
+    }
+    return true;
   }
   // the one-time note of a first share (shared_notices, db/012)
   const ROLE_LABEL = { owner: 'Owner', editor: 'Editor', contributor: 'Contributor', viewer: 'Viewer' };
@@ -2495,7 +2562,7 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
-    TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
+    TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
     cancelTimes, isTestList, chipSelect, kpiTicks,
@@ -2520,6 +2587,7 @@ const I = {
   chevD: svg('<path d="m6 9 6 6 6-6"/>'),
   check: svg('<path d="M20 6 9 17l-5-5"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  person: svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.2-6.5 8-6.5s7 2 8 6.5"/>'),
   expand: svg('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>'),
   x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
   undo: svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
@@ -2564,7 +2632,7 @@ const label = l => LIST[l] ? LIST[l].name : '?';
 const initial = l => (label(l)[0] || '?').toUpperCase();
 const all = () => tasks.filter(t => !t.deleted && LIST[t.list]);
 const find = id => tasks.find(t => t.id === id);
-const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, quads: new Set(), theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), more: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2, tlCollapsed: new Set(), tlDayW: 0 };
+const st = { list: 'all', q: '', due: 'any', tags: new Set(), cats: new Set(), lowc: false, mine: false, dueFrom: '', dueTo: '', bar: null, popQ: '', theme: matchMedia('(prefers-color-scheme: dark)').matches ? 1 : 0, collapsed: new Set(), sel: -1, pop: null, keep: new Set(), expanded: null, open: new Set(), cardMode: 'collapsed', flip: new Set(), more: new Set(), view: 'matrix', arSort: 'completed', tlStart: null, tlWeeks: 2, tlCollapsed: new Set(), tlDayW: 0 };
 const THEMES = ['light', 'dark'];
 let toastTimer = null, lastUndo = null, dragId = null;
 const overdue = t => t.deadline && t.deadline < TODAY;
@@ -2628,16 +2696,37 @@ const passFilters = t => {
   if (st.keep.has(t.id)) return true;
   if (!matchQ(t, st.q)) return false;
   if (st.mine && !C.isMine(t, me, TAG_NAME)) return false;
-  if (!C.tagFilterHit(shownTags(t), st.tags, TAG_NAME)) return false; // st.tags: tag ids, or "All named X" keys
+  if (st.tags.size) { const of = {}; st.tags.forEach(id => { of[id] = TAG[id] && TAG[id].tag_list_id; }); if (!C.tagFilterHit(shownTags(t), st.tags, of)) return false; }
   if (st.cats.size && !st.cats.has(t.category)) return false;
   if (st.lowc && !lowConf(t)) return false;
-  if (st.quads.size && !st.quads.has(t.q)) return false;
-  if (st.due === 'overdue' && !overdue(t)) return false;
-  if (st.due === 'today' && !(t.deadline && t.deadline <= new Date(TODAY.getTime() + DAY))) return false;
-  if (st.due === 'week' && !(t.deadline && t.deadline <= new Date(TODAY.getTime() + 7 * DAY))) return false;
-  if (st.due === 'none' && t.deadline) return false;
-  return true;
+  return C.dueMatch(t, { due: st.due, from: st.dueFrom, to: st.dueTo }, TODAY.getTime());
 };
+// the filter row: Mine is fixed, the rest are the person's buttons (st.bar; null follows the starred tag lists). A filter whose button is
+// gone is switched off, so nothing filters unseen: removed from the bar, a tag list hidden, archived or unshared, a star taken away
+const mineIds = () => (me.mine_tag_ids || []).filter(id => LABEL[id] !== undefined);
+const usableTagList = id => { const l = TAG_LISTS[id]; return !!l && !!l.role && !l.hidden && !l.archived_at; };
+const barKeys = () => (st.bar || C.defaultFilterBar(tagListFavs)).filter(k => !k.startsWith('tl:') || usableTagList(k.slice(3)));
+function pruneFilters() {
+  const b = barKeys();
+  [...st.tags].forEach(id => { if (LABEL[id] === undefined || !TAG[id] || !b.includes('tl:' + TAG[id].tag_list_id)) st.tags.delete(id); });
+  if (!b.includes('due')) { st.due = 'any'; st.dueFrom = ''; st.dueTo = ''; }
+  if (!b.includes('cat')) st.cats.clear();
+  if (!b.includes('low')) st.lowc = false;
+  if (st.mine && !mineIds().length) st.mine = false;
+}
+function toggleBar(k) {
+  const b = (st.bar || C.defaultFilterBar(tagListFavs)).slice(), i = b.indexOf(k);
+  if (i >= 0) b.splice(i, 1); else b.push(k);
+  st.bar = b; st.keep.clear();
+}
+// the person icon in a tag menu and the Mine picker: profiles.mine_tag_ids, as "Count as Mine" in the Tags window
+async function toggleMineTag(id) {
+  const before = (me.mine_tag_ids || []).slice(), ids = new Set(before);
+  if (ids.has(id)) ids.delete(id); else if (ids.size >= 50) return toast('Mine counts at most 50 tags.'); else ids.add(id);
+  me.mine_tag_ids = [...ids]; render();
+  const r = await rest('PATCH', 'profiles?id=eq.' + me.id + '&select=mine_tag_ids', { mine_tag_ids: [...ids] }, { Prefer: 'return=representation' });
+  if (!r.ok || !r.json.length) { me.mine_tag_ids = before; toast(r.ok ? 'Not saved.' : r.err.message); renderSoon(); }
+}
 const hl = (title, q) => { q = q.trim(); if (!q || /^#?\p{L}?\d+$/iu.test(q)) return esc(title); const i = title.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(title) : esc(title.slice(0, i)) + '<mark>' + esc(title.slice(i, i + q.length)) + '</mark>' + esc(title.slice(i + q.length)); };
 const VISIBLE = 5;
 
@@ -3275,6 +3364,7 @@ const collectPrefs = () => ({
   axes: window.tdAxes && window.tdAxes.get ? window.tdAxes.get() : { fx: 0.5, fy: 0.5 },
   menuCollapsed: QS.filter(q => st.collapsed.has(q)), cards: { mode: st.cardMode, flipped: [...st.flip] }, settings: Object.assign({}, settings),
   cardLayout: JSON.parse(JSON.stringify(cardLayout)), welcomeSeen, welcomeVersion, tagListOrder: tagListOrder.slice(), tagListOrderV, tagListFavs: tagListFavs.slice(), taskSwitcher,
+  filters: { mine: st.mine, due: st.due, from: st.dueFrom, to: st.dueTo, tags: [...st.tags], cats: [...st.cats], low: st.lowc }, filterBar: st.bar ? st.bar.slice() : null,
 });
 const prefsText = () => JSON.stringify(collectPrefs());
 // stale entries (a list, item or tag that no longer exists) are dropped
@@ -3291,6 +3381,7 @@ function applyPrefs(p) {
   st.flip = new Set(p.cards.flipped);
   settings = C.readSettings(p.settings);
   cardLayout = p.cardLayout; welcomeSeen = p.welcomeSeen; welcomeVersion = p.welcomeVersion; taskSwitcher = p.taskSwitcher;
+  Object.assign(st, { mine: p.filters.mine, due: p.filters.due, dueFrom: p.filters.from, dueTo: p.filters.to, lowc: p.filters.low, tags: new Set(p.filters.tags), cats: new Set(p.filters.cats), bar: p.filterBar });
   if (window.tdAxes && window.tdAxes.set) window.tdAxes.set(p.axes.fx, p.axes.fy);
 }
 function savePrefsSoon() {
@@ -3571,10 +3662,14 @@ function bindListDrag(app) {
   });
 }
 
+const fcRow = (attr, key, label, on, n, extra) => '<div class="frow"><button class="fc" type="button" ' + attr + '="' + esc(key) + '" aria-pressed="' + !!on + '"><span class="fbox" aria-hidden="true">' + I.check + '</span><span class="nm">' + esc(label) + '</span>' + (n === undefined ? '' : '<span class="n">' + n + '</span>') + '</button>' + (extra || '') + '</div>';
+const rmRow = k => '<hr><button class="f-rm" data-rmbar="' + esc(k) + '">Remove from the bar</button>';
+const NOT_SHARED = '<p class="f-hint">Tags from lists you don\'t have aren\'t shown here. Ask the list owner to share them.</p>';
 function render() {
   if (boot.gate) return gate(boot.gate);
   const tR0 = performance.now();
   TODAY = new Date(); // "now" is recomputed on every render
+  pruneFilters();
   const live = all();
   live.forEach(t => { t.q = C.deriveQuadrant(t, settings, TODAY.getTime()); });
   const open = live.filter(t => !t.doneAt);
@@ -3585,19 +3680,15 @@ function render() {
   const count = l => open.filter(t => l === 'all' || t.list === l).length;
   const od = l => open.filter(t => (l === 'all' || t.list === l) && overdue(t)).length;
   const chip = l => '<span class="chip' + (chips.indexOf(l) >= VISIBLE ? ' stray' : '') + '"><button data-list="' + esc(l) + '" aria-pressed="' + (st.list === l) + '">' + (l === 'all' ? 'All' : esc(label(l))) + ' <span class="n">' + count(l) + '</span>' + (od(l) ? ' <span class="badge" aria-label="' + od(l) + ' overdue">' + od(l) + '</span>' : '') + '</button></span>';
-  // round 3: the Tag filter is by tag id; a name several tags share also offers "All named X" (C.tagFilterOptions)
-  const allTags = C.tagFilterOptions(open.filter(inList).flatMap(shownTags), LABEL, TAG_NAME);
-  const tagKeyLabel = k => k.startsWith('name:') ? 'all ' + k.slice(5) : LABEL[k] || '?';
   const allCats = [...new Set(open.filter(inList).map(t => t.category))].sort();
-  const anyLow = open.some(t => inList(t) && lowConf(t));
-  const anyFilter = st.q || st.due !== 'any' || st.tags.size || st.cats.size || st.lowc || st.mine || st.quads.size;
-  const dueLabel = { any: 'Due', overdue: 'Overdue', today: 'Today', week: 'Next 7 days', none: 'No date' }[st.due];
-  const tagLabel = !st.tags.size ? 'Tag' : st.tags.size === 1 ? 'Tag: ' + tagKeyLabel([...st.tags][0]) : 'Tags: ' + st.tags.size;
+  const anyFilter = st.q || st.due !== 'any' || st.tags.size || st.cats.size || st.lowc || st.mine;
+  const dueLabel = st.due === 'range' && (st.dueFrom || st.dueTo) ? (st.dueFrom.slice(5) || '…') + ' to ' + (st.dueTo.slice(5) || '…') : { any: 'Due', overdue: 'Overdue', today: 'Today', week: 'Next 7 days', none: 'No date', range: 'Dates' }[st.due];
+  const groups = C.tagGroups(TAG_LISTS, TAG, me.id, NAMES, { order: tagListOrder });
   const catName = c => CATS[c] ? CATS[c].name : c;
   const catLabel = !st.cats.size ? 'Category' : st.cats.size === 1 ? catName([...st.cats][0]) : 'Categories: ' + st.cats.size;
   RLX = LINKS_READY ? linkIx() : null;
   const menuGroups = QS.map(q => {
-    const rows = byShownOrder(open.filter(t => inList(t) && t.q === q).sort(C.byOrder));
+    const rows = byShownOrder(shown.filter(t => t.q === q));
     const col = st.collapsed.has(q);
     return '<button class="grp" data-q="' + q + '" aria-expanded="' + !col + '"><span>' + q + ' ' + QN[q] + '</span><span>' + rows.length + '</span></button>' +
       (col ? '' : rows.map(t => '<button class="mrow' + (overdue(t) ? ' overdue' : soon(t) ? ' soon' : '') + '" data-open="' + t.id + '" data-hl="' + t.id + '" data-mq="' + q + '"' +
@@ -3610,7 +3701,7 @@ function render() {
     const total = open.filter(t => inList(t) && t.q === q).length;
     const over = q === 'A' && settings.doLimit > 0 && total > settings.doLimit;
     const ex = st.expanded === q;
-    return '<section class="q" data-q="' + q + '" aria-label="' + QN[q] + '"><div class="qh"><span class="ql" data-q="' + q + '" aria-hidden="true">' + q + '</span><span>' + QN[q] + '</span><span class="cnt' + (over ? ' over' : '') + '">' + total + '</span><span class="sp"></span>' +
+    return '<section class="q" data-q="' + q + '" aria-label="' + QN[q] + '"><div class="qh"><span class="ql" data-q="' + q + '" aria-hidden="true">' + q + '</span><span>' + QN[q] + '</span><span class="cnt' + (over ? ' over' : '') + '">' + (anyFilter ? cards.length + '/' + total : total) + '</span><span class="sp"></span>' +
       (addable ? '<button data-add="' + q + '" aria-label="Add to ' + QN[q] + '">' + I.plus + '</button>' : '') + '<button data-expand="' + q + '" aria-label="' + (ex ? 'Collapse ' : 'Expand ') + QN[q] + '" aria-pressed="' + ex + '">' + I.expand + '</button></div>' +
       '<div class="qb" data-body="' + q + '">' + body + '</div></section>';
   };
@@ -3646,11 +3737,25 @@ function render() {
       (listActs.includes('hide') ? '<button data-hide-list="' + esc(st.list) + '">Hide for me</button>' : '') +
       (listActs.includes('leave') ? '<button data-leave-list="' + esc(st.list) + '">Leave ' + esc(label(st.list)) + '</button>' : '') +
       '<hr><button data-menu="archived">Archived lists</button>' + (HIDDEN_LISTS.length ? '<button data-menu="hidden">Hidden lists</button>' : ''),
-    due: () => ['any:Any', 'overdue:Overdue', 'today:Today', 'week:Next 7 days', 'none:No date'].map(x => '<button data-due="' + x.split(':')[0] + '" aria-pressed="' + (st.due === x.split(':')[0]) + '">' + x.split(':')[1] + '</button>').join(''),
-    tag: () => allTags.map(o => '<button data-tag="' + esc(o.key) + '"' + (o.all ? ' class="all"' : '') + ' aria-pressed="' + st.tags.has(o.key) + '">' + esc(o.label) + '</button>').join(''),
-    cat: () => allCats.map(x => '<button data-cat="' + esc(x) + '" aria-pressed="' + st.cats.has(x) + '">' + esc(catName(x)) + '</button>').join(''),
+    due: () => ['any:Any', 'overdue:Overdue', 'today:Today', 'week:Next 7 days', 'none:No date', 'range:Choose dates'].map(x => fcRow('data-due', x.split(':')[0], x.split(':')[1], st.due === x.split(':')[0])).join('') +
+      (st.due === 'range' ? '<div class="f-dates"><label>From<input type="date" id="f-from" value="' + esc(st.dueFrom) + '"></label><label>To<input type="date" id="f-to" value="' + esc(st.dueTo) + '"></label></div>' : '') + rmRow('due'),
+    cat: () => (allCats.map(x => fcRow('data-cat', x, catName(x), st.cats.has(x))).join('') || '<p class="f-hint">No categories in this list.</p>') + rmRow('cat'),
+    barmenu: () => { const b = barKeys(); const row = (k, l, n) => fcRow('data-bar', k, l, b.includes(k), n);
+      return '<p class="f-h">Show in the bar</p>' + row('due', 'Due') + groups.map(g => row('tl:' + g.list.id, (tagListFavs.includes(g.list.id) ? '★ ' : '') + g.list.name, g.tags.length)).join('') + row('cat', 'Category') + row('low', 'To check') +
+        '<hr><button class="f-rm" data-minepick>Choose my tags for Mine</button>' + (st.bar ? '<button class="f-rm" data-bardefault>Back to Due and ★ lists</button>' : '') + NOT_SHARED; },
+    minepick: () => { const all = groups.flatMap(g => g.tags), sug = C.mineSuggestions(all, TAG_NAME, me), mine = new Set(me.mine_tag_ids || []);
+      const pick = (id, l) => fcRow('data-mine-pick', id, l, mine.has(id));
+      return '<p class="f-h">Which tags mean a task is yours?</p>' + (sug.length ? '<p class="f-g">Suggested</p>' + sug.map(id => pick(id, TAG_LISTS[TAG[id].tag_list_id].name + ' / ' + TAG_NAME[id])).join('') : '') +
+        groups.map(g => { const rest = g.tags.filter(id => !sug.includes(id)); return rest.length ? '<p class="f-g">' + esc(g.list.name) + '</p>' + rest.map(id => pick(id, TAG_NAME[id])).join('') : ''; }).join('') +
+        (all.length ? NOT_SHARED + '<button class="f-go" data-mine-done>Show my tasks</button>' : '<p class="f-hint">You have no tags yet. Add them in Tags, or ask a list owner to share theirs.</p><button class="f-rm" data-menu="tags">Open Tags</button>'); },
   };
-  const pop = st.pop && pops[st.pop] ? '<div class="menu-pop" id="pop" role="menu" data-for="' + st.pop + '">' + pops[st.pop]() + '</div>' : '';
+  const tagCount = id => open.filter(t => inList(t) && t.tags.includes(id)).length;
+  const tagMenu = tl => { const g = groups.find(x => x.list.id === tl); if (!g) return ''; const q = st.popQ.trim().toLowerCase(), mine = new Set(me.mine_tag_ids || []);
+    const rows = g.tags.filter(id => !q || String(TAG_NAME[id]).toLowerCase().includes(q)).map(id => fcRow('data-tag', id, TAG_NAME[id], st.tags.has(id), tagCount(id),
+      '<button class="fme" type="button" data-mine-tag="' + esc(id) + '" aria-pressed="' + mine.has(id) + '" aria-label="' + (mine.has(id) ? 'Stop counting ' : 'Count ') + esc(TAG_NAME[id]) + ' as Mine" title="' + (mine.has(id) ? 'Counts as Mine' : 'Count as Mine') + '">' + I.person + '</button>')).join('');
+    return (g.tags.length > 8 ? '<input class="fm-find" id="popq" placeholder="Find a tag" aria-label="Find a tag" value="' + esc(st.popQ) + '">' : '') + (rows || '<p class="f-hint">' + (q ? 'No tag with that name.' : 'No tags in this list yet.') + '</p>') + rmRow('tl:' + tl); };
+  const isTlPop = st.pop && st.pop.startsWith('tl:'), popHtml = isTlPop ? tagMenu(st.pop.slice(3)) : st.pop && pops[st.pop] ? pops[st.pop]() : '';
+  const pop = popHtml ? '<div class="menu-pop' + (isTlPop || ['due', 'cat', 'barmenu', 'minepick'].includes(st.pop) ? ' fm' : '') + '" id="pop" role="menu" data-for="' + esc(st.pop === 'minepick' ? 'mine' : st.pop) + '">' + popHtml + '</div>' : '';
   const matrix = st.expanded ? '<div class="matrix one">' + quad(st.expanded) + '</div>' : '<div class="matrix">' + quad('B') + quad('A') + quad('D') + quad('C') + '</div>';
   document.getElementById('app').innerHTML =
     '<header class="top"><div class="bar"><button type="button" class="logo' + (logoT0 ? ' play' : '') + '" aria-label="TasksDashboard">' + ADV_LOGO + '</button><div class="lists" role="toolbar" aria-label="Lists">' + visible.map(chip).join('') +
@@ -3659,11 +3764,18 @@ function render() {
     (me.kind === 'human' ? '<span class="chip"><button id="newlist">New list</button></span>' : '') + '</div>' +
     '<div class="who"><button id="profile"' + (welcomeOn ? ' class="beacon"' : '') + ' aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '"' + (INVITES.length ? ' aria-label="' + esc(me.display_name) + ', ' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '"' : '') + '>' + esc(me.display_name) + (INVITES.length ? ' <span class="badge" aria-hidden="true">' + INVITES.length + '</span>' : '') + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
     '<div class="searchrow"><div class="line"><span class="si" aria-hidden="true">' + I.search + '</span><input id="q" placeholder="Search" aria-label="Search tasks" role="combobox" aria-expanded="' + !!st.q.trim() + '" aria-controls="dd" value="' + esc(st.q) + '">' +
-    '<button class="f" id="due" aria-haspopup="menu" aria-expanded="' + (st.pop === 'due') + '" aria-pressed="' + (st.due !== 'any') + '">' + dueLabel + '</button>' +
-    (allTags.length ? '<button class="f" id="tag" aria-haspopup="menu" aria-expanded="' + (st.pop === 'tag') + '" aria-pressed="' + !!st.tags.size + '">' + esc(tagLabel) + '</button>' : '') +
-    (allCats.length > 1 || st.cats.size ? '<button class="f" id="cat" aria-haspopup="menu" aria-expanded="' + (st.pop === 'cat') + '" aria-pressed="' + !!st.cats.size + '">' + esc(catLabel) + '</button>' : '') +
-    (anyLow || st.lowc ? '<button class="f" id="lowc" aria-pressed="' + st.lowc + '" title="Items an assistant added with low confidence">To check</button>' : '') +
-    '<button class="f" id="mine" aria-pressed="' + st.mine + '">Mine</button>' +
+    '<button class="f" id="mine" aria-pressed="' + st.mine + '" title="' + esc(mineIds().map(id => TAG_LISTS[TAG[id].tag_list_id].name + ' / ' + TAG_NAME[id]).join(', ') || 'Choose the tags that mean a task is yours') + '">' + I.person + 'Mine</button>' +
+    barKeys().map(k => {
+      const menu = (id, text, on) => '<button class="f" id="' + esc(id) + '" aria-haspopup="menu" aria-expanded="' + (st.pop === id) + '" aria-pressed="' + !!on + '">' + esc(text) + I.chevD + '</button>';
+      if (k === 'due') return menu('due', dueLabel, st.due !== 'any');
+      if (k === 'cat') return menu('cat', catLabel, st.cats.size);
+      if (k === 'low') return '<button class="f" id="lowc" aria-pressed="' + st.lowc + '" title="Items an assistant added with low confidence">To check</button>';
+      const g = groups.find(x => x.list.id === k.slice(3)); if (!g) return '';
+      const sel = g.tags.filter(id => st.tags.has(id));
+      return menu(k, g.list.name + (sel.length === 1 ? ': ' + TAG_NAME[sel[0]] : sel.length ? ': ' + sel.length : ''), sel.length);
+    }).join('') +
+    '<button class="f" id="barmenu" aria-label="Add or remove filters" title="Add or remove filters" aria-haspopup="menu" aria-expanded="' + (st.pop === 'barmenu') + '">' + I.plus + '</button>' +
+    (st.view === 'matrix' && anyFilter ? '<span class="f-count" role="status"><b>' + shown.length + '</b> of ' + open.filter(inList).length + '</span>' : '') +
     (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop + '</header>' +
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
     [['matrix', '▦'], ['archive', '▤'], ['review', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v || (v === 'matrix' && st.view === 'timeline') ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
@@ -5329,7 +5441,7 @@ function openTags(archivedView) {
   const toggleMine = async x => {
     const ids = new Set(me.mine_tag_ids || []);
     if (ids.has(x)) ids.delete(x); else if (ids.size >= 50) return say('Mine counts at most 50 tags.'); else ids.add(x);
-    const r = await rest('PATCH', 'profiles?id=eq.' + me.id, { mine_tag_ids: [...ids] }, { Prefer: 'return=representation' });
+    const r = await rest('PATCH', 'profiles?id=eq.' + me.id + '&select=mine_tag_ids', { mine_tag_ids: [...ids] }, { Prefer: 'return=representation' });
     if (!r.ok || !r.json.length) return say(r.ok ? 'Not saved.' : r.err.message);
     me.mine_tag_ids = r.json[0].mine_tag_ids || [...ids];
     after(ids.has(x) ? '“' + TAG[x].name + '” counts as Mine' : '“' + TAG[x].name + '” no longer counts as Mine', '[data-tag-menu="' + x + '"]');
@@ -5531,8 +5643,9 @@ function bind() {
   bindLogo();
   app.querySelectorAll('[data-list]').forEach(b => b.onclick = () => { st.list = b.dataset.list; st.pop = null; st.expanded = null; render(); });
   bindListDrag(app);
-  const popBtn = (id, name) => { const b = document.getElementById(id); if (b) b.onclick = e => { e.stopPropagation(); st.pop = st.pop === name ? null : name; render(); }; };
-  popBtn('more', 'more'); popBtn('listmenu', 'listmenu'); popBtn('due', 'due'); popBtn('tag', 'tag'); popBtn('cat', 'cat'); popBtn('profile', 'profile');
+  const popBtn = (id, name) => { const b = document.getElementById(id); if (b) b.onclick = e => { e.stopPropagation(); st.pop = st.pop === name ? null : name; st.popQ = ''; render(); }; };
+  popBtn('more', 'more'); popBtn('listmenu', 'listmenu'); popBtn('due', 'due'); popBtn('cat', 'cat'); popBtn('barmenu', 'barmenu'); popBtn('profile', 'profile');
+  app.querySelectorAll('.line [id^="tl:"]').forEach(b => popBtn(b.id, b.id));
   const nl = document.getElementById('newlist'); if (nl) nl.onclick = () => openNewList();
   app.querySelectorAll('[data-archive-list]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.archiveList; st.pop = null; render(); confirmAsk('Archive the list “' + label(id) + '”? It disappears from the board and nothing in it can be changed until an owner restores it.', 'Archive', () => archiveList(id), '#listmenu'); });
   // the theme starts as Auto (follows the system); a click sets Light or Dark
@@ -5546,10 +5659,28 @@ function bind() {
     else if (e.key === 'Enter') { e.preventDefault(); if (st.sel >= 0 && st.rows[st.sel]) { const id = st.rows[st.sel].id; st.sel = -1; openTask(id); } else { qi.blur(); document.getElementById('dd')?.remove(); } }
     else if (e.key === 'Escape') { document.getElementById('dd')?.remove(); st.sel = -1; }
   };
-  app.querySelectorAll('[data-due]').forEach(b => b.onclick = () => { st.due = b.dataset.due; st.pop = null; render(); });
-  app.querySelectorAll('[data-tag]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = b.dataset.tag; st.tags.has(x) ? st.tags.delete(x) : st.tags.add(x); render(); });
-  app.querySelectorAll('[data-cat]').forEach(b => b.onclick = e => { e.stopPropagation(); const x = b.dataset.cat; st.cats.has(x) ? st.cats.delete(x) : st.cats.add(x); render(); });
-  const lc = document.getElementById('lowc'); if (lc) lc.onclick = () => { st.lowc = !st.lowc; render(); };
+  // the filter row. A change clears st.keep (cards kept visible by an edit) and keeps the focus where it was, as the row is drawn again
+  const fAct = (attr, fn) => app.querySelectorAll('[data-' + attr + ']').forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const v = b.getAttribute('data-' + attr), sel = '[data-' + attr + '="' + v.replace(/"/g, '\\"') + '"]';
+    fn(v); st.keep.clear(); render(); document.querySelector(sel)?.focus();
+  });
+  fAct('due', v => { st.due = v; if (v !== 'range') { st.dueFrom = ''; st.dueTo = ''; st.pop = null; } });
+  fAct('tag', x => { st.tags.has(x) ? st.tags.delete(x) : st.tags.add(x); });
+  fAct('cat', x => { st.cats.has(x) ? st.cats.delete(x) : st.cats.add(x); });
+  fAct('bar', toggleBar);
+  fAct('rmbar', k => { toggleBar(k); st.pop = null; });
+  fAct('bardefault', () => { st.bar = null; });
+  fAct('minepick', () => { st.pop = 'minepick'; });
+  fAct('mine-done', () => { st.pop = null; if (mineIds().length) st.mine = true; });
+  ['mine-tag', 'mine-pick'].forEach(a => app.querySelectorAll('[data-' + a + ']').forEach(b => b.onclick = e => { e.stopPropagation(); toggleMineTag(b.getAttribute('data-' + a)); }));
+  [['f-from', 'dueFrom'], ['f-to', 'dueTo']].forEach(([id, k]) => { const el = document.getElementById(id); if (el) { el.onclick = e => e.stopPropagation(); el.onchange = () => { st[k] = el.value; st.keep.clear(); render(); document.getElementById(id)?.focus(); }; } });
+  const pq = document.getElementById('popq'); if (pq) {
+    pq.onclick = e => e.stopPropagation();
+    pq.oninput = () => { st.popQ = pq.value; render(); const n = document.getElementById('popq'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
+    pq.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const f = st.pop; st.pop = null; render(); document.getElementById(f)?.focus(); } };
+  }
+  const lc = document.getElementById('lowc'); if (lc) lc.onclick = e => { e.stopPropagation(); st.lowc = !st.lowc; st.keep.clear(); render(); document.getElementById('lowc')?.focus(); };
   app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ timeline: () => { st.view = 'timeline'; st.expanded = null; render(); }, general: () => openSettings('general'), urgency: () => openSettings('urgency'), cardlayout: openCardLayout, archived: openArchivedLists, tags: openTags, sharing: openSharing, hidden: openHiddenLists })[b.dataset.menu](); });
   // the list chip menu: Share or People, Hide for me, Leave
   app.querySelectorAll('#pop [data-share-list], #pop [data-people-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); openShare('list', b.dataset.shareList || b.dataset.peopleList, '#listmenu'); });
@@ -5560,8 +5691,8 @@ function bind() {
   app.querySelectorAll('[data-more]').forEach(b => b.onclick = e => { e.stopPropagation(); const id = b.dataset.more; st.more.has(id) ? st.more.delete(id) : st.more.add(id); render(); document.querySelector('[data-more="' + id + '"]')?.focus(); });
   app.querySelectorAll('[data-signout]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; signOut(); });
   app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); switchVersion(b.dataset.switch); });
-  document.getElementById('mine').onclick = () => { st.mine = !st.mine; render(); };
-  const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', mine: false, lowc: false, sel: -1 }); st.tags.clear(); st.cats.clear(); st.quads.clear(); render(); };
+  document.getElementById('mine').onclick = e => { e.stopPropagation(); if (mineIds().length) { st.mine = !st.mine; st.pop = null; st.keep.clear(); } else st.pop = st.pop === 'minepick' ? null : 'minepick'; render(); document.getElementById('mine')?.focus(); };
+  const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', dueFrom: '', dueTo: '', mine: false, lowc: false, sel: -1 }); st.tags.clear(); st.cats.clear(); st.keep.clear(); render(); };
   app.querySelectorAll('.grp').forEach(b => b.onclick = () => { const q = b.dataset.q; st.collapsed.has(q) ? st.collapsed.delete(q) : st.collapsed.add(q); render(); });
   app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openTask(b.dataset.open));
   // round 3, adjustments 8 and 9: Weekly review (weeks like files in Windows; ‹ › move the strip; list chips) and its KPI
