@@ -3764,7 +3764,7 @@ function render() {
     (me.kind === 'human' ? '<span class="chip"><button id="newlist">New list</button></span>' : '') + '</div>' +
     '<div class="who"><button id="profile"' + (welcomeOn ? ' class="beacon"' : '') + ' aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '"' + (INVITES.length ? ' aria-label="' + esc(me.display_name) + ', ' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '"' : '') + '>' + esc(me.display_name) + (INVITES.length ? ' <span class="badge" aria-hidden="true">' + INVITES.length + '</span>' : '') + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
     '<div class="searchrow"><div class="line"><span class="si" aria-hidden="true">' + I.search + '</span><input id="q" placeholder="Search" aria-label="Search tasks" role="combobox" aria-expanded="' + !!st.q.trim() + '" aria-controls="dd" value="' + esc(st.q) + '">' +
-    '<button class="f" id="mine" aria-pressed="' + st.mine + '" title="' + esc(mineIds().map(id => TAG_LISTS[TAG[id].tag_list_id].name + ' / ' + TAG_NAME[id]).join(', ') || 'Choose the tags that mean a task is yours') + '">' + I.person + 'Mine</button>' +
+    '<button class="f" id="mine" aria-pressed="' + st.mine + '" aria-haspopup="menu" aria-expanded="' + (st.pop === 'minepick') + '" title="' + esc(mineIds().length ? mineIds().map(id => TAG_LISTS[TAG[id].tag_list_id].name + ' / ' + TAG_NAME[id]).join(', ') + '. Right-click to change' : 'Choose the tags that mean a task is yours') + '">' + I.person + 'Mine</button>' +
     barKeys().map(k => {
       const menu = (id, text, on) => '<button class="f" id="' + esc(id) + '" aria-haspopup="menu" aria-expanded="' + (st.pop === id) + '" aria-pressed="' + !!on + '">' + esc(text) + I.chevD + '</button>';
       if (k === 'due') return menu('due', dueLabel, st.due !== 'any');
@@ -5692,6 +5692,8 @@ function bind() {
   app.querySelectorAll('[data-signout]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; signOut(); });
   app.querySelectorAll('[data-switch]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); switchVersion(b.dataset.switch); });
   document.getElementById('mine').onclick = e => { e.stopPropagation(); if (mineIds().length) { st.mine = !st.mine; st.pop = null; st.keep.clear(); } else st.pop = st.pop === 'minepick' ? null : 'minepick'; render(); document.getElementById('mine')?.focus(); };
+  // the right button (long press on a phone, the menu key) opens what Mine means; the left button switches the filter
+  document.getElementById('mine').oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); st.pop = st.pop === 'minepick' ? null : 'minepick'; render(); document.getElementById('mine')?.focus(); };
   const clear = document.getElementById('clear'); if (clear) clear.onclick = () => { Object.assign(st, { q: '', due: 'any', dueFrom: '', dueTo: '', mine: false, lowc: false, sel: -1 }); st.tags.clear(); st.cats.clear(); st.keep.clear(); render(); };
   app.querySelectorAll('.grp').forEach(b => b.onclick = () => { const q = b.dataset.q; st.collapsed.has(q) ? st.collapsed.delete(q) : st.collapsed.add(q); render(); });
   app.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openTask(b.dataset.open));
