@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|links|guests|request|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|links|guests|request|smoke] [--page <html>]
 //   [--url <https origin or page> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/ or the page path given (https://host/board/, a
 // directory path ending in /), and sessions are seeded on <origin>/version.json
@@ -22,7 +22,7 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, PAGE_PATH = '/', ACCESS = null; // --url (origin, page path) and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'links', 'guests', 'request'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'links', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 // the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
 const OFFLINE = want.every(g => g === 'request');
@@ -588,6 +588,52 @@ async function gArchive() {
 
 // the list panels and the Lists window (2026-11-05): writes only in lists this run makes, and preferences put back by cleanup(); _selftest
 // is only refused. Delete happens only to test lists.
+// the search line folds away (#searchtoggle) and General settings says how it starts (prefs.searchRow); the snapshot puts prefs back
+async function gSearchRow() {
+  const G = 'searchrow', T = await maksymPage(), errs = T.errors.length;
+  const hidden = () => T.ev('document.getElementById("searchrow").hidden');
+  const real = () => T.ev('Math.round(document.querySelector(".top").getBoundingClientRect().height)');
+  const pref = async () => { const r = (await MK.rest('GET', 'preferences?select=prefs&app=eq.tasksdashboard&profile_id=eq.' + MK.uid)).json[0]; return r && r.prefs && r.prefs.searchRow; };
+  const setPref = async v => {
+    await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=general]")', 4000); await T.click('[data-menu=general]');
+    await T.wait('!!document.getElementById("s-search")', 4000);
+    await T.ev('document.getElementById("s-search").value="' + v + '",true'); await T.click('#s-save'); await sleep(1800);
+  };
+  try {
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      await T.size(w, h); await sleep(300);
+      check(G, w + ': expanded by default', (await hidden()) === false);
+      await T.shot('searchrow-open-' + w + 'x' + h);
+      const h0 = await real();
+      await T.click('#searchtoggle'); await sleep(200);
+      check(G, w + ': the button folds it', (await hidden()) === true);
+      check(G, w + ': the top bar gets shorter', (await real()) < h0, JSON.stringify([h0, await real()]));
+      check(G, w + ': --top matches the bar', w < 700 || Math.abs((await real()) - parseInt(await T.ev('getComputedStyle(document.documentElement).getPropertyValue("--top")'))) <= 2, JSON.stringify([await real(), await T.ev('getComputedStyle(document.documentElement).getPropertyValue("--top")')]));
+      check(G, w + ': no sideways scroll', await T.ev('document.documentElement.scrollWidth<=innerWidth'));
+      await T.shot('searchrow-closed-' + w + 'x' + h);
+      await T.click('#searchtoggle'); await sleep(200);
+      check(G, w + ': the button brings it back and focuses search', (await hidden()) === false && await T.ev('document.activeElement.id==="q"'));
+    }
+    await T.size(1440, 900); await sleep(300);
+    await T.ev('document.activeElement.blur(),true');
+    await T.click('#searchtoggle'); await sleep(100);
+    await T.ev('document.body.dispatchEvent(new KeyboardEvent("keydown",{key:"/",bubbles:true})),true'); await sleep(200);
+    check(G, 'the / key opens it', (await hidden()) === false && await T.ev('document.activeElement.id==="q"'));
+    await T.ev('(()=>{const q=document.getElementById("q");q.value="zzz";q.dispatchEvent(new Event("input",{bubbles:true}));return true})()'); await sleep(200);
+    await T.click('#searchtoggle'); await sleep(200);
+    check(G, 'folded with search on: the button shows it', await T.ev('document.getElementById("searchtoggle").classList.contains("on")'));
+    await T.shot('searchrow-closed-filter-1440x900');
+    await T.click('#searchtoggle'); await sleep(100); await T.click('#clear'); await sleep(200);
+    await setPref('collapsed');
+    check(G, 'Save stores searchRow collapsed', (await pref()) === 'collapsed', JSON.stringify(await pref()));
+    check(G, 'Save folds it now', (await hidden()) === true);
+    await T.ev('location.reload(),true'); await sleep(1500); await T.wait('!!document.getElementById("searchtoggle")', 15000); await sleep(800);
+    check(G, 'a reload starts collapsed', (await hidden()) === true);
+    await setPref('expanded');
+    check(G, 'back to expanded', (await pref()) === 'expanded' && (await hidden()) === false);
+    check(G, 'no console errors', T.errors.length === errs, JSON.stringify(T.errors.slice(errs)));
+  } finally { await T.size(1440, 900); }
+}
 async function gLists() {
   const G = 'lists', T = await maksymPage(), errs = T.errors.length, made = [];
   const mk = async n => { const l = await mkList(MK, `${RUN} ${n}`, true); made.push(l); return l; };
@@ -2542,9 +2588,9 @@ const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, links: gLinks, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'links', 'guests', 'request'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'links', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }

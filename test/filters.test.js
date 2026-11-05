@@ -83,6 +83,13 @@ test('Due: a range keeps both end days, an empty end is open, both empty pass, a
   assert.equal(C.dueMatch(at(12), r('2026-11-12', '2026-11-10'), NOW), true, 'swapped, end day kept');
 });
 
+test('prefs: searchRow starts expanded, keeps collapsed, rejects anything else', () => {
+  assert.equal(C.prefsFromRow(null).searchRow, 'expanded');
+  assert.equal(C.prefsFromRow({ searchRow: 'collapsed' }).searchRow, 'collapsed');
+  assert.equal(C.prefsFromRow({ searchRow: 'hidden' }).searchRow, 'expanded');
+  assert.equal(C.prefsFromRow({ searchRow: 1 }).searchRow, 'expanded');
+});
+
 test('prefs: filters and filterBar default, reject wrong types and keep unknown ids', () => {
   const p = C.prefsFromRow(null);
   assert.deepEqual(p.filters, C.FILTERS_DEFAULTS);

@@ -243,7 +243,7 @@
   const readFilterBar = raw => strs(raw) ? [...new Set(raw.filter(k => FILTER_BAR_KEY.test(k)))] : null;
   const defaultFilterBar = favs => ['due'].concat((favs || []).map(id => 'tl:' + id));
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
-    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard', filters: FILTERS_DEFAULTS, filterBar: null, listBar: null };
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard', filters: FILTERS_DEFAULTS, filterBar: null, listBar: null, searchRow: 'expanded' };
   // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
   // WELCOME_VERSION. welcomeSeen stays for clients that only know it
   const WELCOME_VERSION = 3;
@@ -288,6 +288,7 @@
     p.filters = readFilters(raw.filters);
     p.filterBar = readFilterBar(raw.filterBar);
     p.listBar = readListBar(raw.listBar);
+    if (SEARCH_ROW_STATES.includes(raw.searchRow)) p.searchRow = raw.searchRow;
     return p;
   }
   function readCardLayout(raw, tagListIds) {
@@ -1262,6 +1263,7 @@
   // the card stays and its content slides, a dark band with an arrow beside each side that has a neighbour; 'coverflow' = the
   // neighbours are read-only copies of the window beside it (Swiper's coverflow effect), the row turns on a switch, dots below
   const TASK_SWITCHERS = ['standard', 'coverflow'];
+  const SEARCH_ROW_STATES = ['expanded', 'collapsed']; // prefs.searchRow: how the search line starts on the board
   // Swiper's coverflow: rotate 10, stretch 120, depth 200, modifier 1, no slide shadows, centred slides, perspective 1200
   const COVERFLOW = { p: 1200, rotate: 10, stretch: 120, depth: 200, modifier: 1, hoverDepth: 0.75, dur: 280, ease: 'cubic-bezier(.25,.75,.25,1)', dim: 0.9 };
   // a pose is one transform, always the same function list so a move interpolates per function. perspective() sits around the
