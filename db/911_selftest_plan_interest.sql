@@ -1,13 +1,13 @@
--- db/911_selftest_plan_interest.sql: the landing page's plan-button selftest (db/026) as admin SQL. Rolls everything back
--- and reports "SELFTEST <n> of <n> passed (rolled back). Failures: none" as the error text, like 900-910.
--- Cases: P1 a press with both contacts, as anon; P2 presses with no contact; P3 the same contact again; P4 bad values;
--- P5 caps (54000); P6 a flood does not use up the consulting caps; P7 what anon cannot do; P8 who reads the task;
--- P9 rights. Run after 026, 003, 011, the 012 policy block, 026 again and 900-910.
+-- db/911_selftest_plan_interest.sql: the landing page's plan-button selftest (db/026, db/030) as admin SQL. Rolls everything
+-- back and reports "SELFTEST <n> of <n> passed (rolled back). Failures: none" as the error text, like 900-910.
+-- Cases: P1 a press with both contacts, as anon; P2 presses with no email are refused; P3 the same contact again; P4 bad
+-- values; P5 caps (54000); P6 a flood does not use up the consulting caps; P7 what anon cannot do; P8 who reads the task;
+-- P9 rights. Run after 026, 003, 011, the 012 policy block, 026 and 030 again and 900-910.
 
 do $do$
 declare
   g uuid := gen_random_uuid();
-  mk uuid; an uuid; ha uuid; cl uuid; iid uuid; j jsonb;
+  mk uuid; an uuid; ha uuid; cl uuid; iid uuid; j jsonb; n bigint;
 begin
   execute $f$create function public._pi_admin() returns void language plpgsql as $b$
     begin reset role; perform set_config('request.jwt.claims', '', true); end $b$$f$;
@@ -60,20 +60,22 @@ begin
                                               and body_md like E'%- Email: ada@example.invalid\n- Telegram: https://t.me/ada_lovelace\n%')::text
                                         from public.items where id = iid), 'true');
 
-  -- P2 no contact at all is fine, one task per press, each with its button; blank strings count as nothing
+  -- P2 no email is refused on every plan and writes nothing: no contact, blank strings, Telegram only (db/030)
+  select count(*) into n from public.items where list_id = cl and created_via = 'rpc:request_plan_interest';
   perform public._pi_anon();
-  perform public.request_plan_interest('Demo');
-  perform public.request_plan_interest('Demo', '', '   ');
-  perform public.request_plan_interest('Team');
+  perform public._pi_chk('P2a no contact', public._pi('select public.request_plan_interest(''Demo'')::text'), 'ERR 22023%');
+  perform public._pi_chk('P2b team', public._pi('select public.request_plan_interest(''Team'')::text'), 'ERR 22023%');
+  perform public._pi_chk('P2c blank', public._pi('select public.request_plan_interest(''Demo'', '''', ''   '')::text'), 'ERR 22023%');
+  perform public._pi_chk('P2d telegram only', public._pi('select public.request_plan_interest(''Personal'', null, ''@tg_only_user'')::text'), 'ERR 22023%');
+  perform public._pi_chk('P2e blank email and telegram', public._pi('select public.request_plan_interest(''Personal'', ''  '', ''@tg_only_user'')::text'), 'ERR 22023%');
   perform public._pi_admin();
-  perform public._pi_chk('P2a demo', (select count(*)::text from public.items where list_id = cl and title = 'Interest in Demo: no contact' and quadrant = 'B'), '2');
-  perform public._pi_chk('P2b button', (select count(*)::text from public.items where list_id = cl and title = 'Interest in Team: no contact'
-                                          and body_md like 'Pressed "Subscribe to Team"%' and body_md like E'%- Email: -\n- Telegram: -\n%'), '1');
+  perform public._pi_chk('P2f nothing written', (select (count(*) = n)::text from public.items where list_id = cl and created_via = 'rpc:request_plan_interest'), 'true');
 
-  -- P3 the same contact and plan again: no second task and the same answer; a t.me link is the same name; another plan is new
+  -- P3 the same contact and plan again: no second task and the same answer; the same Telegram with another email is the same
+  -- contact, also as a t.me link; another plan is new
   perform public._pi_anon();
   perform public._pi_chk('P3a answer', public.request_plan_interest('Personal', 'ada@example.invalid')::text, '{"ok": true}');
-  perform public.request_plan_interest('Personal', null, 'https://t.me/ada_lovelace');
+  perform public.request_plan_interest('Personal', 'ada2@example.invalid', 'https://t.me/ada_lovelace');
   perform public.request_plan_interest('Team', 'ada@example.invalid');
   perform public._pi_admin();
   -- counts this test's contact only: real presses may already be in the list
@@ -96,8 +98,8 @@ begin
   perform public._pi_chk('P4d email markup', public._pi('select public.request_plan_interest(''Team'', ''a<b>@example.invalid'')::text'), 'ERR 22023%');
   perform public._pi_chk('P4e email newline', public._pi(format('select public.request_plan_interest(''Team'', %L)::text', E'a@example.invalid\n- x')), 'ERR 22023%');
   perform public._pi_chk('P4f long email', public._pi(format('select public.request_plan_interest(''Team'', %L)::text', repeat('a', 250) || '@example.invalid')), 'ERR 22023%');
-  perform public._pi_chk('P4g telegram', public._pi('select public.request_plan_interest(''Team'', null, ''ab'')::text'), 'ERR 22023%');
-  perform public._pi_chk('P4h telegram link', public._pi('select public.request_plan_interest(''Team'', null, ''https://evil.example/x_y_z'')::text'), 'ERR 22023%');
+  perform public._pi_chk('P4g telegram', public._pi('select public.request_plan_interest(''Team'', ''tg@example.invalid'', ''ab'')::text'), 'ERR 22023%');
+  perform public._pi_chk('P4h telegram link', public._pi('select public.request_plan_interest(''Team'', ''tg@example.invalid'', ''https://evil.example/x_y_z'')::text'), 'ERR 22023%');
   perform public._pi_chk('P4i card-like email', public._pi('select public.request_plan_interest(''Team'', ''4111111111111111@example.invalid'')::text'), 'ERR 22023%');
   perform public._pi_admin();
   perform public._pi_chk('P4j nothing written', (select count(*)::text from public.items where list_id = cl and body_md like '%evil.example%'), '0');

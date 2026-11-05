@@ -136,6 +136,7 @@
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
       createdAt: date(r.created_at), details: plainDetails(r.details),
+      ai: isPlain(r.ai) ? JSON.parse(JSON.stringify(r.ai)) : null, // read only here: the harness writes it (ai.check, ai.sessions)
     };
   }
   // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
@@ -178,7 +179,7 @@
     });
     return { value: out, clash };
   }
-  // self-improvement cards (HomeOS): details.decision = { v, label_1, label_0, answer 1|0|null, module, problem_key, action, run_id,
+  // cards with two answers: details.decision = { v, kind (check, delegate, absent: a self-improvement card), label_1, label_0, answer 1|0|null, module, problem_key, action, run_id,
   // answered_by, answered_at, applied_at, applied_result }. decisionOf: null unless both labels are set; the window shows the block then
   function decisionOf(t) {
     const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null;
@@ -187,14 +188,154 @@
     return { label_1: lab(d.label_1), label_0: lab(d.label_0), answer: d.answer === 1 || d.answer === 0 ? d.answer : null,
       answered_by: d.answered_by || null, answered_at: d.answered_at || null, applied_at: d.applied_at || null, applied_result: d.applied_result || null };
   }
-  // the answer of a click: the task fields to change (details with every other key kept, status done), or null when the task has no
-  // decision, the value is not 1 or 0, or the routine already applied the answer (applied_at set: too late to change it)
+  // the answer of a click: the task fields to change (details with every other key kept), or null when the task has no decision, the
+  // value is not 1 or 0, or the answer was already applied (applied_at set: too late to change it). Only a decision with no kind (a
+  // self-improvement card) also sets status done; with a kind (check, delegate) settle.js closes the card, last (card contract 1)
   function answerDecision(t, value, who, nowIso) {
     const d = decisionOf(t);
     if (!d || d.applied_at || (value !== 1 && value !== 0)) return null;
     const details = plainDetails(t.details);
     details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
-    return { details, status: 'done' };
+    return details.decision.kind ? { details } : { details, status: 'done' };
+  }
+  const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
+
+  // ---- the task window's text (card contract 5, 6, 11). Display only: storage stays chronological and carries no markers ----
+  const ANSWER_HEADING = '## Your answer', ANSWER_PROMPT = '_Write your answer below this line, then save. Agents read it on the next scan._', LINKS_HEADING = '## Links';
+  const escHtml = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // inline: esc first; `code` and links are held out, so a * inside them stays a *; only http(s) links, anything else stays plain text
+  function renderInline(s) {
+    const held = [], keep = h => { held.push(h); return '\u0000' + (held.length - 1) + '\u0000'; };
+    return escHtml(String(s || '').replace(/\u0000/g, ''))
+      .replace(/`([^`\n]+)`/g, (m, c) => keep('<code>' + c + '</code>'))
+      .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, text, url) => /^https?:\/\//i.test(url) && !/&(?:quot|#39|lt|gt);/.test(url) ? keep('<a href="' + url + '" target="_blank" rel="noopener">') + text + keep('</a>') : m)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(?!\s)(.+?)\*/g, '<em>$1</em>')
+      .replace(/\u0000(\d+)\u0000/g, (m, i) => held[Number(i)]);
+  }
+  const MD_RULE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/, MD_HEAD = /^(#{1,6})\s+(.*)$/, MD_ROW_SEP = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/, MD_FENCE = /^\s*```/;
+  const mdCells = l => l.trim().replace(/^\|/, '').replace(/(^|[^\\])\|$/, '$1').split(/(?<!\\)\|/).map(c => c.trim().replace(/\\\|/g, '|'));
+  // Markdown to HTML: headings, tables, rules, lists, quotes, code, links, bold, italic. No HTML from the database reaches the page
+  function renderMd(md) {
+    const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
+    let out = '', list = null, para = [];
+    const closeList = () => { if (list) { out += '</' + list + '>'; list = null; } };
+    const closePara = () => { if (para.length) { out += '<p>' + para.map(renderInline).join('<br>') + '</p>'; para = []; } };
+    const flush = () => { closePara(); closeList(); };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (MD_FENCE.test(line)) {
+        flush();
+        const code = [];
+        for (i++; i < lines.length && !MD_FENCE.test(lines[i]); i++) code.push(lines[i]);
+        out += '<pre><code>' + escHtml(code.join('\n')) + '</code></pre>';
+        continue;
+      }
+      if (!line.trim()) { flush(); continue; }
+      const h = line.match(MD_HEAD);
+      if (h) { flush(); const n = Math.min(6, h[1].length + 2); out += '<h' + n + '>' + renderInline(h[2].replace(/\s+#+\s*$/, '')) + '</h' + n + '>'; continue; }
+      if (MD_RULE.test(line)) { flush(); out += '<hr>'; continue; }
+      if (line.includes('|') && i + 1 < lines.length && lines[i + 1].includes('-') && lines[i + 1].includes('|') && MD_ROW_SEP.test(lines[i + 1])) {
+        flush();
+        const head = mdCells(line), rows = [];
+        for (i += 2; i < lines.length && lines[i].trim() && lines[i].includes('|'); i++) rows.push(mdCells(lines[i]));
+        i--;
+        out += '<div class="md-tbl" tabindex="0"><table><thead><tr>' + head.map(c => '<th>' + renderInline(c) + '</th>').join('') + '</tr></thead><tbody>' +
+          rows.map(r => '<tr>' + head.map((x, k) => '<td>' + renderInline(r[k] || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+        continue;
+      }
+      const ul = line.match(/^(\s*)[-*]\s+(.*)$/), ol = line.match(/^(\s*)\d+[.)]\s+(.*)$/);
+      if (ul || ol) {
+        closePara();
+        const kind = ul ? 'ul' : 'ol', m = ul || ol;
+        if (list !== kind) { closeList(); out += '<' + kind + '>'; list = kind; }
+        out += '<li' + (m[1].length >= 2 ? ' class="md-sub"' : '') + '>' + renderInline(m[2]) + '</li>';
+        continue;
+      }
+      const q = line.match(/^\s*>\s?(.*)$/);
+      if (q) { flush(); out += '<blockquote>' + renderInline(q[1]) + '</blockquote>'; continue; }
+      closeList(); para.push(line);
+    }
+    flush();
+    return out;
+  }
+  // the section people answer in: from the last line equal to the heading to the first following line equal to ## Links, or the end
+  function answerSection(md) {
+    const lines = String(md || '').split('\n'), eq = (l, x) => l.trimEnd() === x;
+    let at = -1;
+    lines.forEach((l, i) => { if (eq(l, ANSWER_HEADING)) at = i; });
+    if (at < 0) return null;
+    let end = lines.length;
+    for (let i = at + 1; i < lines.length; i++) if (eq(lines[i], LINKS_HEADING)) { end = i; break; }
+    return { at, end, text: lines.slice(at + 1, end).filter(l => l.trim() !== ANSWER_PROMPT).join('\n').trim() };
+  }
+  // writes the answer in that place and nowhere else: every other byte of the body stays as it was
+  function setAnswer(md, text) {
+    const s = String(md || ''), a = answerSection(s), body = String(text || '').trim();
+    if (!a) return s;
+    const lines = s.split('\n'), keep = lines.slice(a.at + 1, a.end).filter(l => l.trim() === ANSWER_PROMPT).slice(0, 1);
+    const part = lines.slice(0, a.at + 1).concat(keep, body ? body.split('\n') : []);
+    return part.concat(a.end < lines.length ? [''].concat(lines.slice(a.end)) : []).join('\n');
+  }
+  const MD_BLOCK = /^## (?:(?:Plan|Result|Next|Decisions|Deviations|Usage log|Your answer)(?![\p{L}\p{N}_-])|Delegate · |Answer \(read )/u;
+  // the text split at the fixed block headings, in stored order. Text before the first heading is the first block; no heading inside a code fence counts
+  function mdBlocks(md) {
+    const blocks = [];
+    let cur = [], fence = false;
+    String(md || '').split('\n').forEach(l => {
+      if (MD_FENCE.test(l)) fence = !fence;
+      if (!fence && MD_BLOCK.test(l) && cur.join('').trim()) { blocks.push(cur); cur = []; }
+      cur.push(l);
+    });
+    if (cur.join('').trim()) blocks.push(cur);
+    return blocks.map(b => b.join('\n').replace(/\s+$/, '').replace(/(?:^|\n)\s*---\s*$/, '').replace(/\s+$/, '')).filter(Boolean);
+  }
+  // what read mode shows: an open answer section first (the box), the blocks newest first (a check card: stored order), ## Links last.
+  // opts: check (a check card), answerable (the person can answer here; the item is open). Nothing here changes what is stored
+  function cardView(md, opts) {
+    const o = opts || {}, lines = String(md || '').split('\n'), a = answerSection(md);
+    let linksAt = -1;
+    lines.forEach((l, i) => { if (l.trimEnd() === LINKS_HEADING) linksAt = i; });
+    if (a && linksAt < a.at) linksAt = -1;
+    const links = linksAt >= 0 ? lines.slice(linksAt).join('\n').trim() : '';
+    const rest = linksAt >= 0 ? lines.slice(0, linksAt) : lines.slice();
+    const answer = !!a && !!o.answerable && !a.text;
+    if (answer) rest.splice(a.at, a.end - a.at);
+    const text = rest.join('\n');
+    const blocks = mdBlocks(text);
+    return { answer, links, blocks: o.check ? (blocks.length ? [blocks.join('\n\n')] : []) : blocks.reverse() };
+  }
+  // the same view as HTML: blocks with a rule between them, then the links
+  function cardViewHtml(view) {
+    return view.blocks.map(renderMd).join('<hr class="md-blockrule">') + (view.links ? (view.blocks.length ? '<hr class="md-blockrule">' : '') + renderMd(view.links) : '');
+  }
+  // the first paragraph of a text: leading headings and rules skipped, up to a blank line, a heading, a rule or a table
+  function firstParagraph(md) {
+    const out = [];
+    for (const l of String(md || '').replace(/\r\n/g, '\n').split('\n')) {
+      const stop = !l.trim() || MD_HEAD.test(l) || MD_RULE.test(l) || MD_FENCE.test(l);
+      if (stop && !out.length) continue;
+      if (stop || (l.includes('|') && MD_ROW_SEP.test(l))) break;
+      out.push(l);
+    }
+    return out.join('\n');
+  }
+  // a board card's description: the first paragraph, cut at n (descClip); more = Show more was pressed, the whole text
+  function cardDesc(md, n, more) {
+    const whole = String(md || '').trim(), head = firstParagraph(whole), clip = descClip(head, n);
+    return { md: more ? whole : clip.clipped ? clip.text + ' …' : head, hasMore: clip.clipped || head.length < whole.length };
+  }
+  // the original task while it waits for its check (card contract 2): the data decides, not the tag
+  const awaitingCheck = t => !!t && t.status === 'waiting' && isPlain(t.ai) && isPlain(t.ai.check) && t.ai.check.settled_n !== t.ai.check.n;
+  // read only (card contract 7): closed, or in an archived list
+  const readOnlyTask = (t, listArchived) => !!t && (CLOSED.includes(t.status) || !!listArchived);
+  const SESSION_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/, CONTINUE_REF = /^[a-z0-9_-]{1,64}#[0-9]{1,7}$/;
+  // Continue in Claude (card contract 8-10): the latest do session, else the latest plan; null when there is none or its id or ref is not clean
+  function continueLink(t, slug) {
+    const all = t && isPlain(t.ai) && Array.isArray(t.ai.sessions) ? t.ai.sessions.filter(isPlain) : [];
+    const pick = role => { const r = all.filter(s => s.role === role); return r.length ? r[r.length - 1] : null; };
+    const s = pick('do') || pick('plan'), ref = String(slug || '') + '#' + (t ? t.num : '');
+    if (!s || !SESSION_ID.test(String(s.session_id || '')) || !CONTINUE_REF.test(ref)) return null;
+    return { sid: s.session_id, href: 'homeos-claude://continue?sid=' + s.session_id + '&ref=' + encodeURIComponent(ref), command: 'claude --resume ' + s.session_id + ' --fork-session' };
   }
   // the inverse of an action, sent as a new versioned PATCH
   function inverseOf(action, before, fields, nowIso) {
@@ -1337,7 +1478,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,

@@ -276,6 +276,16 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .card .details .tags button{font-size:12px;padding:0 8px;min-height:22px;border-radius:999px}
 .card .tagtxt{font-size:12px;line-height:20px;padding:0 9px;border-radius:999px;background:var(--accent-bg);color:var(--accent-ink);font-weight:500}
 .rt ul,.rt ol,.md ul,.md ol{margin:2px 0;padding-left:20px}
+/* renderMd: what read mode and the cards show; a table scrolls inside its own box */
+.md p{margin:0 0 8px}.md>:last-child{margin-bottom:0}.md li.md-sub{margin-left:18px}
+.md h3,.md h4,.md h5,.md h6{margin:12px 0 4px;font:600 14px/1.35 var(--ui);color:var(--ink)}.md h3{font-size:16px}.md h4{font-size:15px}.md>:first-child{margin-top:0}
+.md hr{border:0;border-top:1px solid var(--hair);margin:10px 0}.md hr.md-blockrule{border-top-color:var(--hair2);margin:16px 0}
+.md a{color:var(--accent-ink);text-decoration:underline;overflow-wrap:anywhere}
+.md code{font:12.5px var(--mono);padding:0 4px;border-radius:4px;background:var(--well)}
+.md pre{margin:0 0 8px;padding:8px 10px;overflow-x:auto;border-radius:8px;background:var(--well)}.md pre code{padding:0;background:none}
+.md blockquote{margin:0 0 8px;padding-left:10px;border-left:3px solid var(--hair2);color:var(--ink2)}
+.md-tbl{max-width:100%;overflow-x:auto;margin:0 0 8px}.md-tbl table{border-collapse:collapse;font-size:13px}
+.md-tbl th,.md-tbl td{padding:4px 8px;border:1px solid var(--hair);text-align:left;vertical-align:top;min-width:64px}.md-tbl th{background:var(--well);font-weight:600}
 
 /* first load only: panes rise in, staggered (the page marks itself settled afterwards) */
 html:not(.settled) .q{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
@@ -1030,6 +1040,17 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .fbar .fwho{margin:0 0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:4px 12px;font-variant-numeric:tabular-nums}
 .fbar .fwho:only-child{margin-left:0;justify-content:flex-start}
 .fref{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;background:var(--well);border:1px solid var(--hair);border-radius:var(--r);color:var(--ink2);font-weight:600}
+/* Continue in Claude: styled as the number chip beside it, with a small copy icon */
+a.fcont{font-size:inherit;text-decoration:none;white-space:nowrap}a.fcont:hover,button.fcopy:hover{border-color:var(--hair2);color:var(--ink)}
+button.fcopy{padding:0 6px;font:inherit;box-shadow:none;cursor:pointer}button.fcopy .ic{width:14px;height:14px}
+/* the description: read mode renders, edit mode is the raw text (a save changes only what the person changed) */
+.flabel-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.flabel-row .fedit{min-height:26px;padding:0 10px;font-size:12.5px;margin-top:var(--s2)}
+.fmd{margin-top:var(--s2);padding:9px 12px;border:1px solid var(--hair);border-radius:12px;background:var(--glass2);font-size:14px;overflow-wrap:anywhere}
+.rt.fraw{display:block;width:100%;box-sizing:border-box;resize:vertical;font:400 14px/1.5 var(--font);color:var(--ink)}.rt.fraw[hidden]{display:none}
+.fans{margin-top:var(--s2)}.fans .rt.fraw{min-height:72px;margin-top:4px}
+.tb.check{border-color:var(--accent-line);background:var(--accent-bg);color:var(--accent-ink)}
+button.ar-open,button.lm-open{all:unset;cursor:pointer;text-decoration:underline;text-decoration-color:var(--hair2);text-underline-offset:2px}button.ar-open:hover,button.lm-open:hover{text-decoration-color:currentColor}button.ar-open:focus-visible,button.lm-open:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px}
+.ro-task{min-width:min(640px,calc(100vw - 72px))}.ro-title{font:500 15px/1.35 var(--ui);margin-top:var(--s2)}
 @media (max-width:519px){.fbar .fwho{margin-left:0;justify-content:flex-start;flex-basis:100%}}
 /* round 3 P1: the task window is wider (U5); List, Quadrant and End share a row; Save stays in view at the bottom */
 .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 var(--s4)}
@@ -1507,6 +1528,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
       createdAt: date(r.created_at), details: plainDetails(r.details),
+      ai: isPlain(r.ai) ? JSON.parse(JSON.stringify(r.ai)) : null, // read only here: the harness writes it (ai.check, ai.sessions)
     };
   }
   // the app's task -> PATCH body for the named fields. '' and [] instead of null for body_md and tags (both not null).
@@ -1549,7 +1571,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
     });
     return { value: out, clash };
   }
-  // self-improvement cards (HomeOS): details.decision = { v, label_1, label_0, answer 1|0|null, module, problem_key, action, run_id,
+  // cards with two answers: details.decision = { v, kind (check, delegate, absent: a self-improvement card), label_1, label_0, answer 1|0|null, module, problem_key, action, run_id,
   // answered_by, answered_at, applied_at, applied_result }. decisionOf: null unless both labels are set; the window shows the block then
   function decisionOf(t) {
     const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null;
@@ -1558,14 +1580,154 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
     return { label_1: lab(d.label_1), label_0: lab(d.label_0), answer: d.answer === 1 || d.answer === 0 ? d.answer : null,
       answered_by: d.answered_by || null, answered_at: d.answered_at || null, applied_at: d.applied_at || null, applied_result: d.applied_result || null };
   }
-  // the answer of a click: the task fields to change (details with every other key kept, status done), or null when the task has no
-  // decision, the value is not 1 or 0, or the routine already applied the answer (applied_at set: too late to change it)
+  // the answer of a click: the task fields to change (details with every other key kept), or null when the task has no decision, the
+  // value is not 1 or 0, or the answer was already applied (applied_at set: too late to change it). Only a decision with no kind (a
+  // self-improvement card) also sets status done; with a kind (check, delegate) settle.js closes the card, last (card contract 1)
   function answerDecision(t, value, who, nowIso) {
     const d = decisionOf(t);
     if (!d || d.applied_at || (value !== 1 && value !== 0)) return null;
     const details = plainDetails(t.details);
     details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
-    return { details, status: 'done' };
+    return details.decision.kind ? { details } : { details, status: 'done' };
+  }
+  const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
+
+  // ---- the task window's text (card contract 5, 6, 11). Display only: storage stays chronological and carries no markers ----
+  const ANSWER_HEADING = '## Your answer', ANSWER_PROMPT = '_Write your answer below this line, then save. Agents read it on the next scan._', LINKS_HEADING = '## Links';
+  const escHtml = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // inline: esc first; `code` and links are held out, so a * inside them stays a *; only http(s) links, anything else stays plain text
+  function renderInline(s) {
+    const held = [], keep = h => { held.push(h); return '\u0000' + (held.length - 1) + '\u0000'; };
+    return escHtml(String(s || '').replace(/\u0000/g, ''))
+      .replace(/`([^`\n]+)`/g, (m, c) => keep('<code>' + c + '</code>'))
+      .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, text, url) => /^https?:\/\//i.test(url) && !/&(?:quot|#39|lt|gt);/.test(url) ? keep('<a href="' + url + '" target="_blank" rel="noopener">') + text + keep('</a>') : m)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(?!\s)(.+?)\*/g, '<em>$1</em>')
+      .replace(/\u0000(\d+)\u0000/g, (m, i) => held[Number(i)]);
+  }
+  const MD_RULE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/, MD_HEAD = /^(#{1,6})\s+(.*)$/, MD_ROW_SEP = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/, MD_FENCE = /^\s*```/;
+  const mdCells = l => l.trim().replace(/^\|/, '').replace(/(^|[^\\])\|$/, '$1').split(/(?<!\\)\|/).map(c => c.trim().replace(/\\\|/g, '|'));
+  // Markdown to HTML: headings, tables, rules, lists, quotes, code, links, bold, italic. No HTML from the database reaches the page
+  function renderMd(md) {
+    const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
+    let out = '', list = null, para = [];
+    const closeList = () => { if (list) { out += '</' + list + '>'; list = null; } };
+    const closePara = () => { if (para.length) { out += '<p>' + para.map(renderInline).join('<br>') + '</p>'; para = []; } };
+    const flush = () => { closePara(); closeList(); };
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (MD_FENCE.test(line)) {
+        flush();
+        const code = [];
+        for (i++; i < lines.length && !MD_FENCE.test(lines[i]); i++) code.push(lines[i]);
+        out += '<pre><code>' + escHtml(code.join('\n')) + '</code></pre>';
+        continue;
+      }
+      if (!line.trim()) { flush(); continue; }
+      const h = line.match(MD_HEAD);
+      if (h) { flush(); const n = Math.min(6, h[1].length + 2); out += '<h' + n + '>' + renderInline(h[2].replace(/\s+#+\s*$/, '')) + '</h' + n + '>'; continue; }
+      if (MD_RULE.test(line)) { flush(); out += '<hr>'; continue; }
+      if (line.includes('|') && i + 1 < lines.length && lines[i + 1].includes('-') && lines[i + 1].includes('|') && MD_ROW_SEP.test(lines[i + 1])) {
+        flush();
+        const head = mdCells(line), rows = [];
+        for (i += 2; i < lines.length && lines[i].trim() && lines[i].includes('|'); i++) rows.push(mdCells(lines[i]));
+        i--;
+        out += '<div class="md-tbl" tabindex="0"><table><thead><tr>' + head.map(c => '<th>' + renderInline(c) + '</th>').join('') + '</tr></thead><tbody>' +
+          rows.map(r => '<tr>' + head.map((x, k) => '<td>' + renderInline(r[k] || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+        continue;
+      }
+      const ul = line.match(/^(\s*)[-*]\s+(.*)$/), ol = line.match(/^(\s*)\d+[.)]\s+(.*)$/);
+      if (ul || ol) {
+        closePara();
+        const kind = ul ? 'ul' : 'ol', m = ul || ol;
+        if (list !== kind) { closeList(); out += '<' + kind + '>'; list = kind; }
+        out += '<li' + (m[1].length >= 2 ? ' class="md-sub"' : '') + '>' + renderInline(m[2]) + '</li>';
+        continue;
+      }
+      const q = line.match(/^\s*>\s?(.*)$/);
+      if (q) { flush(); out += '<blockquote>' + renderInline(q[1]) + '</blockquote>'; continue; }
+      closeList(); para.push(line);
+    }
+    flush();
+    return out;
+  }
+  // the section people answer in: from the last line equal to the heading to the first following line equal to ## Links, or the end
+  function answerSection(md) {
+    const lines = String(md || '').split('\n'), eq = (l, x) => l.trimEnd() === x;
+    let at = -1;
+    lines.forEach((l, i) => { if (eq(l, ANSWER_HEADING)) at = i; });
+    if (at < 0) return null;
+    let end = lines.length;
+    for (let i = at + 1; i < lines.length; i++) if (eq(lines[i], LINKS_HEADING)) { end = i; break; }
+    return { at, end, text: lines.slice(at + 1, end).filter(l => l.trim() !== ANSWER_PROMPT).join('\n').trim() };
+  }
+  // writes the answer in that place and nowhere else: every other byte of the body stays as it was
+  function setAnswer(md, text) {
+    const s = String(md || ''), a = answerSection(s), body = String(text || '').trim();
+    if (!a) return s;
+    const lines = s.split('\n'), keep = lines.slice(a.at + 1, a.end).filter(l => l.trim() === ANSWER_PROMPT).slice(0, 1);
+    const part = lines.slice(0, a.at + 1).concat(keep, body ? body.split('\n') : []);
+    return part.concat(a.end < lines.length ? [''].concat(lines.slice(a.end)) : []).join('\n');
+  }
+  const MD_BLOCK = /^## (?:(?:Plan|Result|Next|Decisions|Deviations|Usage log|Your answer)(?![\p{L}\p{N}_-])|Delegate · |Answer \(read )/u;
+  // the text split at the fixed block headings, in stored order. Text before the first heading is the first block; no heading inside a code fence counts
+  function mdBlocks(md) {
+    const blocks = [];
+    let cur = [], fence = false;
+    String(md || '').split('\n').forEach(l => {
+      if (MD_FENCE.test(l)) fence = !fence;
+      if (!fence && MD_BLOCK.test(l) && cur.join('').trim()) { blocks.push(cur); cur = []; }
+      cur.push(l);
+    });
+    if (cur.join('').trim()) blocks.push(cur);
+    return blocks.map(b => b.join('\n').replace(/\s+$/, '').replace(/(?:^|\n)\s*---\s*$/, '').replace(/\s+$/, '')).filter(Boolean);
+  }
+  // what read mode shows: an open answer section first (the box), the blocks newest first (a check card: stored order), ## Links last.
+  // opts: check (a check card), answerable (the person can answer here; the item is open). Nothing here changes what is stored
+  function cardView(md, opts) {
+    const o = opts || {}, lines = String(md || '').split('\n'), a = answerSection(md);
+    let linksAt = -1;
+    lines.forEach((l, i) => { if (l.trimEnd() === LINKS_HEADING) linksAt = i; });
+    if (a && linksAt < a.at) linksAt = -1;
+    const links = linksAt >= 0 ? lines.slice(linksAt).join('\n').trim() : '';
+    const rest = linksAt >= 0 ? lines.slice(0, linksAt) : lines.slice();
+    const answer = !!a && !!o.answerable && !a.text;
+    if (answer) rest.splice(a.at, a.end - a.at);
+    const text = rest.join('\n');
+    const blocks = mdBlocks(text);
+    return { answer, links, blocks: o.check ? (blocks.length ? [blocks.join('\n\n')] : []) : blocks.reverse() };
+  }
+  // the same view as HTML: blocks with a rule between them, then the links
+  function cardViewHtml(view) {
+    return view.blocks.map(renderMd).join('<hr class="md-blockrule">') + (view.links ? (view.blocks.length ? '<hr class="md-blockrule">' : '') + renderMd(view.links) : '');
+  }
+  // the first paragraph of a text: leading headings and rules skipped, up to a blank line, a heading, a rule or a table
+  function firstParagraph(md) {
+    const out = [];
+    for (const l of String(md || '').replace(/\r\n/g, '\n').split('\n')) {
+      const stop = !l.trim() || MD_HEAD.test(l) || MD_RULE.test(l) || MD_FENCE.test(l);
+      if (stop && !out.length) continue;
+      if (stop || (l.includes('|') && MD_ROW_SEP.test(l))) break;
+      out.push(l);
+    }
+    return out.join('\n');
+  }
+  // a board card's description: the first paragraph, cut at n (descClip); more = Show more was pressed, the whole text
+  function cardDesc(md, n, more) {
+    const whole = String(md || '').trim(), head = firstParagraph(whole), clip = descClip(head, n);
+    return { md: more ? whole : clip.clipped ? clip.text + ' …' : head, hasMore: clip.clipped || head.length < whole.length };
+  }
+  // the original task while it waits for its check (card contract 2): the data decides, not the tag
+  const awaitingCheck = t => !!t && t.status === 'waiting' && isPlain(t.ai) && isPlain(t.ai.check) && t.ai.check.settled_n !== t.ai.check.n;
+  // read only (card contract 7): closed, or in an archived list
+  const readOnlyTask = (t, listArchived) => !!t && (CLOSED.includes(t.status) || !!listArchived);
+  const SESSION_ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/, CONTINUE_REF = /^[a-z0-9_-]{1,64}#[0-9]{1,7}$/;
+  // Continue in Claude (card contract 8-10): the latest do session, else the latest plan; null when there is none or its id or ref is not clean
+  function continueLink(t, slug) {
+    const all = t && isPlain(t.ai) && Array.isArray(t.ai.sessions) ? t.ai.sessions.filter(isPlain) : [];
+    const pick = role => { const r = all.filter(s => s.role === role); return r.length ? r[r.length - 1] : null; };
+    const s = pick('do') || pick('plan'), ref = String(slug || '') + '#' + (t ? t.num : '');
+    if (!s || !SESSION_ID.test(String(s.session_id || '')) || !CONTINUE_REF.test(ref)) return null;
+    return { sid: s.session_id, href: 'homeos-claude://continue?sid=' + s.session_id + '&ref=' + encodeURIComponent(ref), command: 'claude --resume ' + s.session_id + ' --fork-session' };
   }
   // the inverse of an action, sent as a new versioned PATCH
   function inverseOf(action, before, fields, nowIso) {
@@ -2708,7 +2870,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
@@ -2733,6 +2895,7 @@ const QN = { A: 'Do', B: 'Plan', C: 'Delegate', D: 'Eliminate' };
 // line icons, 24-unit grid, stroke = currentColor (drawn for this file; no glyphs as icons)
 const svg = p => '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + p + '</svg>';
 const I = {
+  copy: svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>'),
   search: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
   dl: svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
   sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
@@ -2813,20 +2976,9 @@ const tagCan = (id, what) => !!TAG[id] && rightsOf(TAG[id].tag_list_id).has(what
 const personName = id => id === (me && me.id) ? 'you' : NAMES[id] || 'someone';
 const displayName = id => (NAMES[id] || (me && id === me.id ? me.display_name : '') || 'someone') + (me && id === me.id ? ' (you)' : '');
 
-// markdown subset: **bold**, *italic*, "- " bullets, "1. " numbers. Text is escaped first, so no HTML from the database reaches the page.
+// the title's markdown subset: **bold**, *italic*. Text is escaped first, so no HTML from the database reaches the page. A description goes through C.renderMd.
 const plain = s => String(s || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(?!\s)(.+?)\*/g, '$1').replace(/^\s*(?:[-*]|\d+[.)])\s+/gm, '');
 const mdInline = s => esc(String(s || '')).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(?!\s)(.+?)\*/g, '<em>$1</em>');
-const mdToHtml = md => {
-  let out = '', list = null;
-  const close = () => { if (list) { out += '</' + list + '>'; list = null; } };
-  String(md || '').split('\n').forEach(line => {
-    const ul = line.match(/^\s*[-*]\s+(.*)$/), ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
-    if (ul || ol) { const kind = ul ? 'ul' : 'ol'; if (list !== kind) { close(); out += '<' + kind + '>'; list = kind; } out += '<li>' + mdInline((ul || ol)[1]) + '</li>'; }
-    else { close(); out += line.trim() ? '<div>' + mdInline(line) + '</div>' : ''; }
-  });
-  close();
-  return out;
-};
 const htmlToMd = root => {
   const walk = n => {
     if (n.nodeType === 3) return n.textContent.replace(/ /g, ' ');
@@ -3613,7 +3765,7 @@ function cardHtml(t, q, g) {
   const linkBadges = (wt.length ? '<span class="tb wt" title="Waiting for ' + esc(wt.map(x => ref(x) + ' ' + plain(x.title)).join(', ')) + '"><span class="wl">Waiting for&nbsp;</span><span class="ws" aria-hidden="true">Wait&nbsp;</span>' + wt.length + '</span>' : '') +
     (pg ? '<span class="tb pg" title="' + pg.done + ' of ' + pg.total + ' subtasks done">' + pg.done + '/' + pg.total + '<i style="--p:' + Math.round(100 * pg.done / pg.total) + '%"></i></span>' : '');
   const badges = '<span class="tbs">' + linkBadges + (lowConf(t) ? '<span class="tb ai" title="Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '; check it">check</span>' : '') +
-    (t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
+    (C.awaitingCheck(t) ? '<span class="tb check">waits for your check</span>' : t.status !== 'open' && !C.CLOSED.includes(t.status) ? '<span class="tb">' + esc(t.status.replace('_', ' ')) + '</span>' : '') +
     (t.category !== 'task' && C.showSource(L, st.list !== 'all') ? '<span class="tb">' + esc(CATS[t.category] ? CATS[t.category].name : t.category) + '</span>' : '') + '</span>';
   const num = L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>';
   const tagIds = cardTags(t);
@@ -3626,12 +3778,12 @@ function cardHtml(t, q, g) {
   // no "urgent (manual)" badge (Maksym, 2026-10-29: not needed). The pin (urgent_pin) is still set by a drag across the urgency
   // line and still counts for a task without a stored quadrant (deriveQuadrant); the empty cell keeps the card's grid
   const pin = '<span></span>';
-  // round 4, item 4: an open card shows the first autoCollapse characters of the description, then Show more (st.more, this session)
-  const more = st.more.has(t.id), clip = C.descClip(t.notes, L.autoCollapse), cut = clip.clipped && !more;
+  // round 4, item 4: an open card shows the first paragraph of the description, cut at autoCollapse characters, then Show more (st.more, this session)
+  const more = st.more.has(t.id), dsc = C.cardDesc(t.notes, L.autoCollapse, more);
   const body = (facts.length ? '<div class="row">' + facts.map(x => '<span>' + esc(x) + '</span>').join('') + '</div>' : '') +
     (tagIds.length ? '<div class="tags">' + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '') +
-    (L.description && t.notes ? '<div class="md">' + mdToHtml(cut ? clip.text + ' …' : t.notes) + '</div>' +
-      (clip.clipped ? '<button type="button" class="more" data-more="' + t.id + '" aria-expanded="' + more + '">' + (more ? 'Show less' : 'Show more') + '</button>' : '') : '');
+    (L.description && t.notes ? '<div class="md">' + C.renderMd(dsc.md) + '</div>' +
+      (dsc.hasMore ? '<button type="button" class="more" data-more="' + t.id + '" aria-expanded="' + more + '">' + (more ? 'Show less' : 'Show more') + '</button>' : '') : '');
   return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
     (body ? '<div class="details">' + body + '</div>' : '') + '</div>';
 }
@@ -3658,7 +3810,7 @@ function archiveHtml() {
   return '<div class="ar-tools"><label>Sort <select id="ar-sort">' + [['completed', 'Completed'], ['deadline', 'End'], ['title', 'Title']].map(([v, l]) => '<option value="' + v + '"' + (st.arSort === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
     '<span class="n">' + rows.length + (rows.length !== total ? ' of ' + total : '') + '</span><span class="sp"></span>' + (clearable ? '<button id="ar-clear">Clear</button>' : '') + '</div>' +
     (rows.length ? '<table class="ar"><thead><tr><th>Title</th><th>Tags</th><th>Quadrant</th><th>Completed</th><th>End</th><th><span class="sr">Actions</span></th></tr></thead><tbody>' +
-      rows.map(t => '<tr><td><span class="k">' + ref(t) + '</span> ' + mdInline(t.title) + (t.status === 'cancelled' ? ' <span class="tb">cancelled</span>' : '') + '</td><td>' + shownTags(t).map(x => esc(LABEL[x])).join(', ') + '</td><td><span class="ql" data-q="' + t.q + '">' + t.q + '</span> ' + QN[t.q] + '</td><td>' + fmtDay(t.doneAt) + '</td><td>' + (t.deadline ? fmtDay(t.deadline) : '') + '</td>' +
+      rows.map(t => '<tr><td><span class="k">' + ref(t) + '</span> <button type="button" class="ar-open" data-open="' + t.id + '">' + mdInline(t.title) + '</button>' + (t.status === 'cancelled' ? ' <span class="tb">cancelled</span>' : '') + '</td><td>' + shownTags(t).map(x => esc(LABEL[x])).join(', ') + '</td><td><span class="ql" data-q="' + t.q + '">' + t.q + '</span> ' + QN[t.q] + '</td><td>' + fmtDay(t.doneAt) + '</td><td>' + (t.deadline ? fmtDay(t.deadline) : '') + '</td>' +
         '<td class="ar-act">' + (canDo('edit', t) ? '<button data-restore="' + t.id + '" aria-label="Restore ' + esc(plain(t.title)) + '">' + I.undo + '</button> ' : '') + (canDo('delete', t) ? '<button data-del="' + t.id + '" aria-label="Delete ' + esc(plain(t.title)) + '">Delete</button>' : '') + '</td></tr>').join('') + '</tbody></table>'
       : '<div class="empty n">' + (total ? 'No matches' : '0') + '</div>');
 }
@@ -4317,7 +4469,8 @@ function openTask(id, quad, opts) {
   const t = id ? find(id) : null;
   if (id && !t) return;
   const opener = id ? '[data-card="' + id + '"]' : (quad ? '[data-add="' + quad + '"]' : null);
-  const editable = t ? canDo('edit', t) : true;
+  const locked = C.readOnlyTask(t, false); // done or cancelled: read only (card contract 7); an archived list's task opens in openArchivedTask
+  const editable = t ? canDo('edit', t) && !locked : true;
   // task links: Start is a field (planned start); a new task starts blank. selfId is the new task's id before it exists, so
   // links picked in this window can be sent once its insert is through
   const start = dr.start !== undefined ? dr.start : t ? t.start || null : null;
@@ -4346,7 +4499,8 @@ function openTask(id, quad, opts) {
   // edit window, item 2: the number (a chip shaped like the formatting buttons), Created and By on the formatting row; the hidden
   // separators keep the line readable as one sentence for a screen reader
   const wnum = t && cardLayout.number ? refText(t) : '', wrest = t ? C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText) : [];
-  const whoHtml = wnum || wrest.length ? '<p class="fwho" id="fwho">' + (wnum ? ['<span class="fref">' + esc(wnum) + '</span>'] : []).concat(wrest.map(x => '<span>' + esc(x) + '</span>')).join('<span class="sr"> · </span>') + '</p>' : '';
+  const contHtml = t ? continueHtml(t, (LIST[t.list] || {}).slug) : '';
+  const whoHtml = wnum || wrest.length || contHtml ? '<p class="fwho" id="fwho">' + contHtml + (wnum ? ['<span class="fref">' + esc(wnum) + '</span>'] : []).concat(wrest.map(x => '<span>' + esc(x) + '</span>')).join('<span class="sr"> · </span>') + '</p>' : '';
   const fmtHtml = editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '';
   // previous / next task: the neighbours in the board's shown order across the quadrants (C.deckSequence: A, B, C, D), shown by the
   // task deck beside the window (deckOpen). The window is the deck's card: a switch fills the same card again, the modal stays open.
@@ -4365,7 +4519,14 @@ function openTask(id, quad, opts) {
   const decDay = s => { const ms = Date.parse(s || ''); return isNaN(ms) ? '' : longDay(ms); };
   const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
     : dec.answer !== null ? ['Answered “' + (dec.answer ? dec.label_1 : dec.label_0) + '”', decWho(dec.answered_by), decDay(dec.answered_at)].filter(Boolean).join(' · ')
-    : editable ? '' : 'Only an editor of this list can answer';
+    : editable || locked ? '' : 'Only an editor of this list can answer';
+  // the description. Read mode renders it (blocks newest first, an open answer section on top with its box); Edit text shows the raw
+  // text, so a save changes only what the person changed. A new task, an empty one or a draft opens on the raw text
+  const notesBase = dr.notes !== undefined ? dr.notes : t ? t.notes : '';
+  const readFirst = !!t && dr.notes === undefined && (!!notesBase.trim() || !editable);
+  const view = readFirst ? C.cardView(notesBase, { check: C.decisionKind(t) === 'check', answerable: editable }) : null;
+  const ansHtml = view && view.answer ? '<div class="fans"><div class="flabel" id="fans-l">Your answer</div><textarea class="rt fraw" id="fans" rows="3" aria-labelledby="fans-l" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
+  const readHtml = !readFirst ? '' : '<div id="fread">' + ansHtml + (view.blocks.length || view.links ? '<div class="md fmd">' + C.cardViewHtml(view) + '</div>' : ansHtml ? '' : '<p class="n">No description</p>') + '</div>';
   const decHtml = !dec ? '' : '<div class="fdec" role="group" aria-labelledby="fdec-l"><div class="flabel" id="fdec-l">Decision</div><div class="fdec-b">' +
     [1, 0].map(v => '<button type="button" class="' + (v ? 'fdec-yes' : 'quiet') + '" data-dec="' + v + '" aria-pressed="' + (dec.answer === v) + '"' + (decOn ? '' : ' disabled') + '>' +
       (dec.answer === v ? '✓ ' : '') + esc(v ? dec.label_1 : dec.label_0) + '</button>').join('') + '</div>' +
@@ -4373,10 +4534,13 @@ function openTask(id, quad, opts) {
   const formHtml = '<form method="dialog"><div class="tk-head"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
+    (t && C.awaitingCheck(t) ? '<p class="note">Waits for your check: answer its check card.</p>' : '') +
+    (locked ? '<p class="note">' + (t.status === 'done' ? 'Done' : 'Cancelled') + (t.doneAt ? ' ' + fmtDay(t.doneAt) : '') + '. Read only. Restore it from the archive to change it.</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
     decHtml + (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
-    '<div class="flabel" id="fn-l">Description</div><div class="rt" id="fn" contenteditable="' + editable + '" role="textbox" aria-multiline="true" aria-labelledby="fn-l">' + mdToHtml(dr.notes !== undefined ? dr.notes : t ? t.notes : '') + '</div>' +
+    '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div>' + (readFirst && editable ? '<button type="button" id="fedit" class="quiet fedit">Edit text</button>' : '') + '</div>' + readHtml +
+    '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>' +
     // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
     // position in its quadrant (2026-10-29)
     '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
@@ -4387,7 +4551,7 @@ function openTask(id, quad, opts) {
     '<div class="tagbox" role="group" aria-label="Tags"></div></div>' +
     (LINKS_READY ? '<div class="flabel" id="lk-l">Links</div><div class="links" id="lk" role="group" aria-labelledby="lk-l"></div>' : '') +
     (t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
-    '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
+    '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) && !locked ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
     '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
   // the carousel's read-only copy of a neighbour (opts.preview = the panel): the same window, its tags and links as static chips,
   // no ids, nothing wired; the panel itself is inert and aria-hidden (deckOpen)
@@ -4423,28 +4587,43 @@ function openTask(id, quad, opts) {
   });
   const ftEl = dlg.querySelector('#ft'), fnEl = dlg.querySelector('#fn');
   let lastEditor = ftEl;
-  const syncFmt = () => dlg.querySelectorAll('[data-cmd]').forEach(b => { let on = false; try { on = document.queryCommandState(b.dataset.cmd); } catch (e) {} b.setAttribute('aria-pressed', String(on)); b.disabled = lastEditor === ftEl && b.dataset.cmd.startsWith('insert'); });
+  const syncFmt = () => dlg.querySelectorAll('[data-cmd]').forEach(b => { let on = false; try { on = lastEditor !== fnEl && document.queryCommandState(b.dataset.cmd); } catch (e) {} b.setAttribute('aria-pressed', String(on)); b.disabled = lastEditor === ftEl && b.dataset.cmd.startsWith('insert'); });
   [ftEl, fnEl].forEach(el => {
     el.addEventListener('focus', () => { lastEditor = el; syncFmt(); });
     el.addEventListener('keyup', syncFmt); el.addEventListener('mouseup', syncFmt);
-    el.addEventListener('paste', e => { e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, el === ftEl ? txt.replace(/\s*\n\s*/g, ' ') : txt); });
   });
-  ftEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); fnEl.focus(); } });
-  // typing "- " or "1. " at the start of a line turns it into a list
-  fnEl.addEventListener('input', e => {
-    if (e.inputType !== 'insertText' || !/^\s$/.test(e.data || '')) return;
-    const sel = getSelection(); if (!sel.rangeCount || !sel.isCollapsed) return;
-    const caret = sel.getRangeAt(0);
-    let block = caret.startContainer.nodeType === 1 ? caret.startContainer : caret.startContainer.parentElement;
-    while (block && block !== fnEl && !/^(DIV|P|LI)$/.test(block.tagName)) block = block.parentElement;
-    if (!block || block.tagName === 'LI') return;
-    const head = document.createRange(); head.setStart(block, 0); head.setEnd(caret.startContainer, caret.startOffset);
-    const m = head.toString().match(/^(-|\*|\d+\.)\s$/); if (!m) return;
-    sel.removeAllRanges(); sel.addRange(head); document.execCommand('delete');
-    document.execCommand(m[1].endsWith('.') ? 'insertOrderedList' : 'insertUnorderedList');
-    syncFmt();
-  });
-  dlg.querySelectorAll('[data-cmd]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { lastEditor.focus(); document.execCommand(b.dataset.cmd); syncFmt(); }; });
+  ftEl.addEventListener('paste', e => { e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt.replace(/\s*\n\s*/g, ' ')); });
+  ftEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); (fnEl.hidden ? dlg.querySelector('#fedit') : fnEl)?.focus(); } });
+  // the raw text and the answer box. notesNow: the body a save sends. Only a change in the raw text or the box changes it; untouched, it is the stored text byte for byte
+  const ansEl = dlg.querySelector('#fans'), fn0 = fnEl.value;
+  const notesNow = () => {
+    if (fnEl.value !== fn0) return fnEl.value.replace(/\s+$/, '');
+    const a = ansEl ? ansEl.value.trim() : '';
+    return a ? C.setAnswer(notesBase, a) : notesBase;
+  };
+  const fitRaw = () => { fnEl.style.height = ''; fnEl.style.height = Math.min(fnEl.scrollHeight + 2, Math.round(innerHeight * 0.6)) + 'px'; };
+  const fedit = dlg.querySelector('#fedit');
+  if (fedit) fedit.onclick = () => {
+    const a = ansEl ? ansEl.value.trim() : '';
+    if (a) { fnEl.value = C.setAnswer(notesBase, a); ansEl.value = ''; }
+    dlg.querySelector('#fread').hidden = true; fedit.hidden = true; fnEl.hidden = false; fitRaw(); fnEl.focus();
+  };
+  if (!fnEl.hidden && fnEl.value) fitRaw();
+  wireContinue(dlg);
+  // the formatting buttons on the raw text: markers around the selection, or a list marker on each selected line
+  const fmtRaw = cmd => {
+    const a = fnEl.selectionStart, b = fnEl.selectionEnd, v = fnEl.value;
+    if (cmd === 'bold' || cmd === 'italic') {
+      const m = cmd === 'bold' ? '**' : '*';
+      document.execCommand('insertText', false, m + v.slice(a, b) + m);
+      fnEl.setSelectionRange(a + m.length, b + m.length);
+      return;
+    }
+    const from = v.lastIndexOf('\n', a - 1) + 1;
+    fnEl.setSelectionRange(from, b);
+    document.execCommand('insertText', false, v.slice(from, b).split('\n').map((l, i) => (cmd === 'insertOrderedList' ? (i + 1) + '. ' : '- ') + l).join('\n'));
+  };
+  dlg.querySelectorAll('[data-cmd]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { lastEditor.focus(); if (lastEditor === fnEl) fmtRaw(b.dataset.cmd); else document.execCommand(b.dataset.cmd); syncFmt(); }; });
   syncFmt();
   const box = dlg.querySelector('.tagbox'), qEl = dlg.querySelector('#tg-q');
   // tags (round 3 P1): one group per tag list, its name on top (not a button), its chips below (pressed = on the task). The chevron
@@ -4699,7 +4878,7 @@ function openTask(id, quad, opts) {
   dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = nav.next ? 'next' : null; fs.click(); if (saveBad) { decide = null; after = null; } }; }); // an answer moves on to the next task; with none the window closes
   if (fs) fs.onclick = e => {
     saveBad = false;
-    const title = htmlToMd(dlg.querySelector('#ft')).replace(/\n+/g, ' ').trim(), notes = htmlToMd(dlg.querySelector('#fn')).trim(), list = dlg.querySelector('#fl').value;
+    const title = htmlToMd(dlg.querySelector('#ft')).replace(/\n+/g, ' ').trim(), notes = notesNow(), list = dlg.querySelector('#fl').value;
     let bad = false;
     if (!plain(title).trim()) { dlg.querySelector('#fe').textContent = 'Title can\'t be empty'; bad = true; }
     else if (title.length > 300) { dlg.querySelector('#fe').textContent = 'The title is over 300 characters (' + title.length + ')'; bad = true; }
@@ -4762,7 +4941,7 @@ function openTask(id, quad, opts) {
   };
   // leaving this task (a side zone, a ghost or edge tab, Alt+arrows, a swipe: prev / next; a band, an end zone, Esc: close): what
   // the window showed, so leaving asks only when something changed
-  const snap = () => JSON.stringify([htmlToMd(ftEl), htmlToMd(fnEl), dlg.querySelector('#fl').value, dlg.querySelector('#fd').value, dlg.querySelector('#fsd').value, [...chosen].sort(), pend.length]);
+  const snap = () => JSON.stringify([htmlToMd(ftEl), notesNow(), dlg.querySelector('#fl').value, dlg.querySelector('#fd').value, dlg.querySelector('#fsd').value, [...chosen].sort(), pend.length]);
   const snap0 = snap();
   const dirty = () => editable && snap() !== snap0;
   // kind: prev | next | close | jump (a dot; to = its task)
@@ -4825,6 +5004,28 @@ async function restoreTask(t) {
   render();
 }
 
+// Continue in Claude (card contract 9): a link to the per-user handler, so no CSP change; the tooltip says what it needs, the icon copies the command
+const CONTINUE_TIP = 'Opens a copy of this task\'s session in the Claude app. Needs the handler: run tools/continue/install-continue-handler.ps1 once. Without it a click does nothing, so copy the command with the icon beside it.';
+function continueHtml(t, slug) {
+  const c = C.continueLink(t, slug); if (!c) return '';
+  return '<button type="button" class="fref fcopy" data-copy-cmd="' + esc(c.command) + '" aria-label="Copy the command" title="Copy: ' + esc(c.command) + '">' + I.copy + '</button>' +
+    '<a class="fref fcont" href="' + esc(c.href) + '" title="' + esc(CONTINUE_TIP) + '">Continue in Claude</a>';
+}
+function wireContinue(root) {
+  root.querySelectorAll('[data-copy-cmd]').forEach(b => { b.onclick = () => { try { navigator.clipboard.writeText(b.dataset.copyCmd).then(() => toast('Copied the command'), () => toast(b.dataset.copyCmd)); } catch (e) { toast(b.dataset.copyCmd); } }; });
+}
+// a task of an archived list (Lists window): not loaded with the board, read fresh and shown read only (card contract 7); the Continue button stays
+async function openArchivedTask(id, list, opener) {
+  const r = await rest('GET', 'items?select=*&id=eq.' + id);
+  if (!r.ok || !r.json[0]) { toast(r.ok ? 'That task is gone.' : r.err.message); return; }
+  const t = C.rowToTask(r.json[0]), view = C.cardView(t.notes, { check: C.decisionKind(t) === 'check', answerable: false }), cont = continueHtml(t, list && list.slug);
+  const dlg = dialogShell('<form method="dialog" class="ro-task"><h2 class="tk-h">Task</h2><p class="note">In the archived list ' + esc(list ? list.name : '') + '. Read only.</p>' +
+    '<div class="flabel">Title</div><div class="ro-title">' + mdInline(t.title) + '</div>' +
+    '<div class="fbar"><p class="fwho">' + cont + '<span class="fref">' + esc((list ? list.slug + ' ' : '') + '#' + t.num) + '</span></p></div>' +
+    '<div class="flabel">Description</div>' + (view.blocks.length || view.links ? '<div class="md fmd">' + C.cardViewHtml(view) + '</div>' : '<p class="n">No description</p>') +
+    '<div class="actions"><span class="sp"></span><button value="cancel" autofocus>Close</button></div></form>', opener);
+  wireContinue(dlg);
+}
 function dialogShell(html, opener) {
   const dlg = document.createElement('dialog');
   dlg.innerHTML = html;
@@ -5494,8 +5695,8 @@ function openLists(view) {
     const items = {};
     r.json.forEach(l => { items[l.id] = []; });
     if (r.json.length) {
-      const t = await getAll('items?select=list_id,title,num&deleted_at=is.null&order=num.asc&list_id=in.(' + r.json.map(l => l.id).join(',') + ')');
-      if (t.ok) t.json.forEach(x => items[x.list_id].push(plain(x.title)));
+      const t = await getAll('items?select=id,list_id,title,num&deleted_at=is.null&order=num.asc&list_id=in.(' + r.json.map(l => l.id).join(',') + ')');
+      if (t.ok) t.json.forEach(x => items[x.list_id].push({ id: x.id, title: plain(x.title) }));
     }
     lm.arch = { err: null, rows: r.json, items };
   };
@@ -5508,9 +5709,10 @@ function openLists(view) {
         return '<div class="lm-row" data-arow="' + esc(l.id) + '"><span class="lm-name">' + esc(l.name) + '</span><span class="lm-meta">' + C.localStamp(l.archived_at).slice(0, 10) + '</span><span class="lm-acts">' +
           (tasks.length ? '<button type="button" data-lm-tasks="' + esc(l.id) + '" aria-expanded="' + shown + '">' + tasks.length + (tasks.length === 1 ? ' task' : ' tasks') + '</button>' : '<span class="lm-meta">no tasks</span>') +
           (act ? '<button type="button" data-restore-list="' + esc(l.id) + '">Restore</button><button type="button" class="danger" data-delete-list="' + esc(l.id) + '">Delete</button>' : '') + '</span></div>' +
-          (shown ? '<ul class="lm-tasks">' + tasks.slice(0, TASKS_SHOWN).map(t => '<li>' + esc(t) + '</li>').join('') + (tasks.length > TASKS_SHOWN ? '<li>and ' + (tasks.length - TASKS_SHOWN) + ' more</li>' : '') + '</ul>' : '');
+          (shown ? '<ul class="lm-tasks">' + tasks.slice(0, TASKS_SHOWN).map(t => '<li><button type="button" class="lm-open" data-lm-open="' + esc(t.id) + '" data-lm-list="' + esc(l.id) + '">' + esc(t.title) + '</button></li>').join('') + (tasks.length > TASKS_SHOWN ? '<li>and ' + (tasks.length - TASKS_SHOWN) + ' more</li>' : '') + '</ul>' : '');
       }).join('') : (a.err ? '' : '<p class="lm-empty">No archived lists</p>'));
     body.querySelectorAll('[data-lm-tasks]').forEach(b => b.onclick = () => { const i = b.dataset.lmTasks; lm.open.has(i) ? lm.open.delete(i) : lm.open.add(i); drawArchive('[data-lm-tasks="' + i + '"]'); });
+    body.querySelectorAll('[data-lm-open]').forEach(b => b.onclick = () => openArchivedTask(b.dataset.lmOpen, a.rows.find(l => l.id === b.dataset.lmList), b));
     body.querySelectorAll('[data-restore-list]').forEach(b => b.onclick = async () => { b.disabled = true; if (!(await restoreList(b.dataset.restoreList))) b.disabled = false; });
     body.querySelectorAll('[data-delete-list]').forEach(b => b.onclick = () => askDeleteList(a.rows.find(l => l.id === b.dataset.deleteList), (a.items[b.dataset.deleteList] || []).length));
     if (focus) body.querySelector(focus)?.focus();
@@ -6169,7 +6371,7 @@ function bind() {
   nav.ondragleave = e => { if (!nav.contains(e.relatedTarget)) nav.querySelectorAll('.drop-before,.drop-after,.drop').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop')); };
   nav.ondrop = e => { const s = dragId && spot(e); if (!s) return; e.preventDefault(); const id = dragId; dragId = null; moveTask(id, s.q, s.target, s.before); };
   app.querySelectorAll('[data-card]').forEach(c => {
-    c.onclick = e => { if (!e.target.closest('button')) openTask(c.dataset.card); };
+    c.onclick = e => { if (!e.target.closest('button, a')) openTask(c.dataset.card); };
     c.onkeydown = e => { if (e.key === 'Enter' && e.target === c) openTask(c.dataset.card); };
     c.ondragstart = e => { dragId = c.dataset.card; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); c.classList.add('dragging'); };
     c.ondragend = () => { dragId = null; dropMark = null; document.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(x => x.classList.remove('drop-before', 'drop-after', 'dragging')); document.querySelectorAll('.q.drop').forEach(x => x.classList.remove('drop')); };

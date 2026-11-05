@@ -546,7 +546,7 @@ test('list panels: listBar survives a phone write, ids the phone does not know i
 test('archived lists: tasks by list, Delete through the RPC, who else loses it, the backup line', async () => {
   const OLD = 'cccccccc-cccc-4ccc-8ccc-cccccccccc11', SYS = 'cccccccc-cccc-4ccc-8ccc-cccccccccc12', calls = [];
   const f = fakeSupabase([
-    ['GET', /^\/rest\/v1\/items\?select=list_id,title,num/, () => [200, [{ list_id: OLD, title: 'One', num: 1 }, { list_id: OLD, title: 'Two', num: 2 }]]],
+    ['GET', /^\/rest\/v1\/items\?select=id,list_id,title,num/, () => [200, [{ list_id: OLD, title: 'One', num: 1 }, { list_id: OLD, title: 'Two', num: 2 }]]],
     ['POST', /^\/rest\/v1\/rpc\/list_people/, () => [200, [{ state: 'member', profile_id: UID, display_name: 'Me' }, { state: 'member', profile_id: OTHER, display_name: 'Ana' }, { state: 'invited', email: 'x@example.com' }]]],
     ['POST', /^\/rest\/v1\/rpc\/last_backup_at/, () => [200, '2026-11-05T06:14:00Z']],
     ['POST', /^\/rest\/v1\/rpc\/delete_archived_list/, (m, body) => { calls.push(body); return [200, { name: 'Old', items: 2 }]; }],
@@ -555,7 +555,7 @@ test('archived lists: tasks by list, Delete through the RPC, who else loses it, 
   await signIn(d, true);
   assert.equal((await d.loadAll()).ok, true);
   const t = await d.archivedTasks([OLD, SYS]);
-  assert.deepEqual(t.tasks, { [OLD]: ['One', 'Two'], [SYS]: [] });
+  assert.deepEqual({ [OLD]: t.tasks[OLD].map(x => x.title), [SYS]: t.tasks[SYS] }, { [OLD]: ['One', 'Two'], [SYS]: [] });
   const info = await d.deleteInfo(OLD);
   assert.deepEqual(info.others, ['Ana']);
   assert.match(info.backup, /^Last backup 2026-11-05 \d\d:\d4$/);

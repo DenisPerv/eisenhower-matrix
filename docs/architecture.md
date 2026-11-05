@@ -29,7 +29,7 @@ TasksDashboard has no server of its own. A static page talks straight to a Supab
 | Config | `config/tasksdashboard.config.js` | `window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }`: public values only (a `.js` file because a `file://` page can load a script but not read JSON) |
 | Phone app | `app/` | a second page for phones, installable, published at `/app/`; same database, config and core rules (section Phone app) |
 | Sign-in page | `signin.html` | the public sign-in page of the app host (`/signin`; `/request` is a 301 alias): Google, then the access request; a household login or an approved request goes on to `/board/` or `/app/`; no board data ([access-requests.md](access-requests.md)) |
-| Landing page | `site/index.html`, `site/assets/` | the public landing page with a demo that keeps its state in the browser; its own host; one database call, `rpc/request_plan_interest` (`db/026`) from the plan buttons, with no login; business notes in `docs/business/` |
+| Landing page | `site/index.html`, `site/assets/` | the public landing page with a demo that keeps its state in the browser; its own host; one database call, `rpc/request_plan_interest` (`db/026`, `db/030`) from the plan buttons, with an email and no login; business notes in `docs/business/` |
 | Legal pages | `legal/*.html` | static placeholders on the landing host (terms, refund, cookies, legal notice, accessibility, data deletion) |
 | Privacy page | `privacy.html` | static, no script; the Google consent screen's privacy link; public at `/privacy` on both hosts |
 | CLI | `cli/tasks.mjs`, `cli/lib.mjs` | add tasks and reminders, list overdue items and the Do quadrant, restore a list; signs in as a login, never with a secret key |
