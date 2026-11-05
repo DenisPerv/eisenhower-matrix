@@ -1269,16 +1269,14 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 /* the search line can be folded away (prefs.searchRow remembers it); the top bar and what reads --top get shorter */
 .searchrow[hidden]{display:none}
 @media (min-width:701px){:root.search-off{--top:60px}:root.two-panels.search-off{--top:96px}}
-#searchtoggle{position:relative}
-/* the same control centred on the bottom edge of the top bar, so it stays in place when the row is folded */
+/* the control is centred on the bottom edge of the top bar, so it stays in place when the row is folded */
 .search-handle{position:absolute;left:50%;bottom:-14px;margin-left:-26px;z-index:1;display:inline-flex;align-items:center;justify-content:center;gap:2px;width:52px;min-width:0;height:26px;min-height:0;padding:0;border:1px solid var(--hair2);border-radius:999px;background:var(--solid);color:var(--ink2)}
 .search-handle:hover{color:var(--accent-ink);border-color:var(--accent-line)}
 .search-handle svg{width:14px;height:14px}
 .search-handle[aria-expanded="true"] svg:last-child{transform:rotate(180deg)}
 .search-handle.on::after{content:"";position:absolute;top:-2px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 @media (max-width:700px){.search-handle{width:60px;height:32px;margin-left:-30px;bottom:-17px}}
-#searchtoggle[aria-expanded="true"]{color:var(--accent-ink)}
-#searchtoggle.on::after{content:"";position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+
 @media (max-width:700px){.bar .panels{grid-area:lists}.bar .panels .lists{justify-content:flex-start;flex-wrap:wrap}}
 #more.drop-after{box-shadow:0 0 0 2px var(--accent)}
 .actions .sp{flex:1}
@@ -3966,7 +3964,7 @@ function render() {
   const matrix = st.expanded ? '<div class="matrix one">' + quad(st.expanded) + '</div>' : '<div class="matrix">' + quad('B') + quad('A') + quad('D') + quad('C') + '</div>';
   document.getElementById('app').innerHTML =
     '<header class="top"><div class="bar"><button type="button" class="logo' + (logoT0 ? ' play' : '') + '" aria-label="TasksDashboard">' + ADV_LOGO + '</button><div class="panels" id="panels">' + panelsNow + '</div>' +
-    '<div class="who"><button id="searchtoggle" type="button"' + (!searchOpenNow && anyFilter ? ' class="on"' : '') + ' aria-controls="searchrow" aria-expanded="' + searchOpenNow + '" aria-label="' + (searchOpenNow ? 'Hide' : 'Show') + ' search' + (!searchOpenNow && anyFilter ? ', search or filters are on' : '') + '" title="' + (searchOpenNow ? 'Hide search' : anyFilter ? 'Show search. Search or filters are on' : 'Show search') + '">' + I.search + '</button> <button id="profile"' + (welcomeOn ? ' class="beacon"' : '') + ' aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '"' + (INVITES.length ? ' aria-label="' + esc(me.display_name) + ', ' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '"' : '') + '>' + esc(me.display_name) + (INVITES.length ? ' <span class="badge" aria-hidden="true">' + INVITES.length + '</span>' : '') + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
+    '<div class="who"><button id="profile"' + (welcomeOn ? ' class="beacon"' : '') + ' aria-haspopup="menu" aria-expanded="' + (st.pop === 'profile') + '"' + (INVITES.length ? ' aria-label="' + esc(me.display_name) + ', ' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '"' : '') + '>' + esc(me.display_name) + (INVITES.length ? ' <span class="badge" aria-hidden="true">' + INVITES.length + '</span>' : '') + ' ' + I.chevD + '</button> <button id="theme" aria-label="Theme: ' + cap(THEMES[st.theme]) + '">' + [I.sun, I.moon][st.theme] + '</button></div></div>' +
     '<div class="searchrow" id="searchrow"' + (searchOpenNow ? '' : ' hidden') + '><div class="line"><span class="si" aria-hidden="true">' + I.search + '</span><input id="q" placeholder="Search" aria-label="Search tasks" role="combobox" aria-expanded="' + !!st.q.trim() + '" aria-controls="dd" value="' + esc(st.q) + '">' +
     '<button class="f" id="mine" aria-pressed="' + st.mine + '" aria-haspopup="menu" aria-expanded="' + (st.pop === 'minepick') + '" title="' + esc(mineIds().length ? mineIds().map(id => TAG_LISTS[TAG[id].tag_list_id].name + ' / ' + TAG_NAME[id]).join(', ') + '. Right-click to change' : 'Choose the tags that mean a task is yours') + '">' + I.person + 'Mine</button>' +
     barKeys().map(k => {
@@ -6056,7 +6054,7 @@ function bind() {
   app.querySelectorAll('#pop [data-list-to]').forEach(b => b.onclick = e => { e.stopPropagation(); const v = b.dataset.listTo; st.pop = null; barDo(C.listBarMove(LB, LISTS, st.list, v === 'rest' ? 'rest' : +v)); render(); document.getElementById('listmenu')?.focus(); });
   // the theme starts as Auto (follows the system); a click sets Light or Dark
   document.getElementById('theme').onclick = () => { themePref = st.theme ? 'light' : 'dark'; applyTheme(); render(); document.getElementById('theme').focus(); };
-  ['searchtoggle', 'searchhandle'].forEach(id => { document.getElementById(id).onclick = e => { e.stopPropagation(); setSearchOpen(st.searchOpen === false); st.pop = null; st.focusQ = st.searchOpen; render(); if (!st.searchOpen) document.getElementById(id).focus(); }; });
+  document.getElementById('searchhandle').onclick = e => { e.stopPropagation(); setSearchOpen(st.searchOpen === false); st.pop = null; st.focusQ = st.searchOpen; render(); if (!st.searchOpen) document.getElementById('searchhandle').focus(); };
   const qi = document.getElementById('q');
   qi.oninput = () => { st.keep.clear(); st.q = qi.value; st.sel = -1; st.focusQ = true; render(); };
   qi.onkeydown = e => {
