@@ -4490,7 +4490,7 @@ function openTask(id, quad, opts) {
   const fs = dlg.querySelector('#fs');
   let after = null, afterTo = null, saveBad = false; // after: where "Save and go / close" goes once the save is through
   let decide = null; // the decision button clicked (1 or 0): Save sends the answer with the other changes, then the window closes
-  dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = null; fs.click(); if (saveBad) decide = null; }; });
+  dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = nav.next ? 'next' : null; fs.click(); if (saveBad) { decide = null; after = null; } }; }); // an answer moves on to the next task; with none the window closes
   if (fs) fs.onclick = e => {
     saveBad = false;
     const title = htmlToMd(dlg.querySelector('#ft')).replace(/\n+/g, ' ').trim(), notes = htmlToMd(dlg.querySelector('#fn')).trim(), list = dlg.querySelector('#fl').value;

@@ -969,7 +969,7 @@ async function gUi() {
       lowNote += '; after reload: ' + (lowOk ? 'shown' : await T.ev(`(()=>{const c=document.querySelector('[data-card="${low.id}"]');return c?'card '+c.className:'no card'})()`));
     }
     check(G, 'the low-confidence marker shows on the card', lowOk, lowNote);
-    await T.click('#barmenu'); await T.click('[data-bar="low"]'); await T.ev('(document.body.click(),true)');
+    if (!(await T.has('#lowc'))) { await T.click('#barmenu'); await T.click('[data-bar="low"]'); await T.ev('(document.body.click(),true)'); }
     await T.click('#lowc');
     check(G, 'the "To check" filter shows only those items', await T.ev(`[...document.querySelectorAll('[data-card]')].every(c=>c.classList.contains('lowc')) && !!document.querySelector('[data-card="${low.id}"]')`));
     await T.click('#lowc');
@@ -1004,6 +1004,8 @@ async function gDecision(G, T) {
   if (!a || !b) return;
   const W = 'dialog[open]';
   await T.reload(); await T.ready();
+  const decNext = await mkItem('decision next', { quadrant: a.quadrant, sort_key: 99999999 });
+  await T.wait(`!!document.querySelector('[data-card="${decNext.id}"]')`, 15000);
   const opened = await openCard(T, a.id, W + ' .fdec');
   const blk = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('.fdec'),bs=[...f.querySelectorAll('[data-dec]')],desc=d.querySelector('#fn');
     return {labels:bs.map(x=>x.textContent),on:bs.every(x=>!x.disabled),above:!!(f.compareDocumentPosition(desc)&Node.DOCUMENT_POSITION_FOLLOWING),yesLikeSave:getComputedStyle(bs[0]).backgroundImage===getComputedStyle(d.querySelector('#fs')).backgroundImage&&getComputedStyle(bs[0]).backgroundColor===getComputedStyle(d.querySelector('#fs')).backgroundColor}})()`) : null;
@@ -1014,9 +1016,10 @@ async function gDecision(G, T) {
   check(G, 'decision (web): at 390 px the block fits, no horizontal scroll', await T.ev(`(()=>{const f=document.querySelector('${W} .fdec');const r=f&&f.getBoundingClientRect();return !!r&&r.left>=0&&r.right<=innerWidth&&document.documentElement.scrollWidth<=innerWidth})()`));
   await T.shot('decision-web-390x844');
   await T.size(1440, 900); await sleep(300);
-  // Yes with an unsaved description change: one save, then the window closes
+  // Yes with an unsaved description change: one save, then the next task opens
   await T.ev(`(()=>{document.querySelector('${W} #fn').textContent='Checked by e2e';document.querySelector('${W} [data-dec="1"]').click();return true})()`);
-  check(G, 'decision (web): Yes closes the window and says "Answered “Yes”" with Undo', await T.wait(`!document.querySelector('${W}')`, 5000) && /Answered “Yes”/.test(await toastText(T)) && await T.has('.toast button'));
+  const movedOn = await T.wait(`(()=>{const v=document.querySelector('${W} #ft')?.textContent;return !!v&&v!==${JSON.stringify(a.title)}})()`, 5000);
+  check(G, 'decision (web): Yes opens the next task and says "Answered “Yes”" with Undo', movedOn && /Answered “Yes”/.test(await toastText(T)) && await T.has('.toast button'), await T.ev(`document.querySelector('${W} #ft')?.textContent||'window closed'`));
   const yes = await until(async () => { const x = await item(a.id); return x && x.status === 'done' && x.details && x.details.decision && x.details.decision.answer === 1 ? x : null; });
   check(G, 'decision (web): the row has status done, answer 1, answered_by maksym, answered_at, the description saved with it, notify and the other keys kept',
     !!yes && yes.details.decision.answered_by === 'maksym' && !!Date.parse(yes.details.decision.answered_at) && yes.body_md === 'Checked by e2e' && JSON.stringify(yes.details.notify) === '["maksym"]' && yes.details.e2e === RUN && yes.details.decision.problem_key === DEC.problem_key,
@@ -1024,6 +1027,16 @@ async function gDecision(G, T) {
   await undo(T);
   const back = await until(async () => { const x = await item(a.id); return x && x.status === 'open' && x.details.decision.answer === null ? x : null; });
   check(G, 'decision (web): Undo puts status open and answer null back, the other keys still there', !!back && back.details.e2e === RUN && JSON.stringify(back.details.notify) === '["maksym"]');
+  await closeDialogs(T);
+  // the only task shown: an answer closes the window
+  await T.ev(`(()=>{const q=document.getElementById('q');q.value=${JSON.stringify(a.title)};q.dispatchEvent(new Event('input'));return true})()`);
+  const only = await openCard(T, a.id, W + ' .fdec');
+  await T.ev(`(document.querySelector('${W} [data-dec="0"]').click(),true)`);
+  check(G, 'decision (web): an answer on the only task shown closes the window', only && await T.wait(`!document.querySelector('${W}')`, 5000) && /Answered “No”/.test(await toastText(T)));
+  await undo(T);
+  await sleep(2500); // the answer and its undo are both written before the row is read
+  await until(async () => { const x = await item(a.id); return x && x.status === 'open' && x.details.decision.answer === null; });
+  await T.ev('(document.getElementById("clear")?.click(),true)');
   // applied by the routine: the buttons are off and the line says Applied
   await AG.rest('PATCH', 'items?id=eq.' + a.id, { details: Object.assign({}, back.details, { decision: Object.assign({}, DEC, { answer: 1, answered_by: 'maksym', answered_at: new Date().toISOString(), applied_at: new Date().toISOString(), applied_result: 'e2e applied' }) }) });
   await T.reload(); await T.ready();
