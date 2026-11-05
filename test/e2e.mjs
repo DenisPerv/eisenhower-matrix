@@ -588,21 +588,18 @@ async function gArchive() {
 
 // the list panels and the Lists window (2026-11-05): writes only in lists this run makes, and preferences put back by cleanup(); _selftest
 // is only refused. Delete happens only to test lists.
-// the search line folds away (#searchtoggle) and General settings says how it starts (prefs.searchRow); the snapshot puts prefs back
+// the search line folds away (#searchtoggle, #searchhandle) and stays as it was left (prefs.searchRow); the snapshot puts prefs back
 async function gSearchRow() {
   const G = 'searchrow', T = await maksymPage(), errs = T.errors.length;
   const hidden = () => T.ev('document.getElementById("searchrow").hidden');
   const real = () => T.ev('Math.round(document.querySelector(".top").getBoundingClientRect().height)');
   const pref = async () => { const r = (await MK.rest('GET', 'preferences?select=prefs&app=eq.tasksdashboard&profile_id=eq.' + MK.uid)).json[0]; return r && r.prefs && r.prefs.searchRow; };
-  const setPref = async v => {
-    await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=general]")', 4000); await T.click('[data-menu=general]');
-    await T.wait('!!document.getElementById("s-search")', 4000);
-    await T.ev('document.getElementById("s-search").value="' + v + '",true'); await T.click('#s-save'); await sleep(1800);
-  };
   try {
+    check(G, 'it starts as the preference says', (await hidden()) === ((await pref()) === 'collapsed'));
+    if (await hidden()) { await T.click('#searchtoggle'); await sleep(200); } // the person's own setting may be Collapsed
     for (const [w, h] of [[1440, 900], [390, 844]]) {
       await T.size(w, h); await sleep(300);
-      check(G, w + ': expanded by default', (await hidden()) === false);
+      check(G, w + ': open before folding', (await hidden()) === false);
       await T.shot('searchrow-open-' + w + 'x' + h);
       const h0 = await real();
       await T.click('#searchtoggle'); await sleep(200);
@@ -613,6 +610,13 @@ async function gSearchRow() {
       await T.shot('searchrow-closed-' + w + 'x' + h);
       await T.click('#searchtoggle'); await sleep(200);
       check(G, w + ': the button brings it back and focuses search', (await hidden()) === false && await T.ev('document.activeElement.id==="q"'));
+      check(G, w + ': the handle is centred on the bar', await T.ev('(()=>{const r=document.getElementById("searchhandle").getBoundingClientRect(),t=document.querySelector(".top").getBoundingClientRect();return Math.abs(r.left+r.width/2-(t.left+t.width/2))<=2&&r.top<t.bottom&&r.bottom>t.bottom})()'));
+      await T.click('#searchhandle'); await sleep(200);
+      check(G, w + ': the handle folds it and stays on the bar', (await hidden()) === true && await T.ev('(()=>{const r=document.getElementById("searchhandle").getBoundingClientRect(),t=document.querySelector(".top").getBoundingClientRect();return r.height>=24&&r.top<t.bottom&&r.bottom>t.bottom})()'));
+      await T.shot('searchhandle-closed-' + w + 'x' + h);
+      await T.click('#searchhandle'); await sleep(200);
+      check(G, w + ': the handle opens it', (await hidden()) === false);
+      await T.shot('searchhandle-open-' + w + 'x' + h);
     }
     await T.size(1440, 900); await sleep(300);
     await T.ev('document.activeElement.blur(),true');
@@ -624,13 +628,18 @@ async function gSearchRow() {
     check(G, 'folded with search on: the button shows it', await T.ev('document.getElementById("searchtoggle").classList.contains("on")'));
     await T.shot('searchrow-closed-filter-1440x900');
     await T.click('#searchtoggle'); await sleep(100); await T.click('#clear'); await sleep(200);
-    await setPref('collapsed');
-    check(G, 'Save stores searchRow collapsed', (await pref()) === 'collapsed', JSON.stringify(await pref()));
-    check(G, 'Save folds it now', (await hidden()) === true);
+    await sleep(1800);
+    check(G, 'an open row is remembered', (await pref()) === 'expanded', JSON.stringify(await pref()));
+    await T.click('#searchhandle'); await sleep(1800);
+    check(G, 'a folded row is remembered', (await pref()) === 'collapsed', JSON.stringify(await pref()));
     await T.ev('location.reload(),true'); await sleep(1500); await T.wait('!!document.getElementById("searchtoggle")', 15000); await sleep(800);
-    check(G, 'a reload starts collapsed', (await hidden()) === true);
-    await setPref('expanded');
-    check(G, 'back to expanded', (await pref()) === 'expanded' && (await hidden()) === false);
+    check(G, 'a reload stays folded', (await hidden()) === true);
+    await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=general]")', 4000); await T.click('[data-menu=general]');
+    await T.wait('!!document.getElementById("s-name")', 4000);
+    check(G, 'General settings has no search line setting', await T.ev('!document.getElementById("s-search")'));
+    await closeDialogs(T); await sleep(100);
+    await T.click('#searchhandle'); await sleep(1800);
+    check(G, 'opened again is remembered', (await pref()) === 'expanded' && (await hidden()) === false);
     check(G, 'no console errors', T.errors.length === errs, JSON.stringify(T.errors.slice(errs)));
   } finally { await T.size(1440, 900); }
 }

@@ -1266,10 +1266,17 @@ dialog .tgl-h input.tgl-name:hover{border-color:var(--hair2)}
 .panels .lists.p2 .chip button{font-size:14px;min-height:30px}
 .chip input.ren{font:500 15px var(--ui);width:11ch;min-height:32px;padding:0 8px;border:1px solid var(--accent);border-radius:var(--r);background:var(--solid);color:var(--ink)}
 @media (min-width:701px){:root.two-panels{--top:146px}}
-/* the search line can be folded away (prefs.searchRow is how it starts); the top bar and what reads --top get shorter */
+/* the search line can be folded away (prefs.searchRow remembers it); the top bar and what reads --top get shorter */
 .searchrow[hidden]{display:none}
 @media (min-width:701px){:root.search-off{--top:60px}:root.two-panels.search-off{--top:96px}}
 #searchtoggle{position:relative}
+/* the same control centred on the bottom edge of the top bar, so it stays in place when the row is folded */
+.search-handle{position:absolute;left:50%;bottom:-14px;margin-left:-26px;z-index:1;display:inline-flex;align-items:center;justify-content:center;gap:2px;width:52px;min-width:0;height:26px;min-height:0;padding:0;border:1px solid var(--hair2);border-radius:999px;background:var(--solid);color:var(--ink2)}
+.search-handle:hover{color:var(--accent-ink);border-color:var(--accent-line)}
+.search-handle svg{width:14px;height:14px}
+.search-handle[aria-expanded="true"] svg:last-child{transform:rotate(180deg)}
+.search-handle.on::after{content:"";position:absolute;top:-2px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+@media (max-width:700px){.search-handle{width:60px;height:32px;margin-left:-30px;bottom:-17px}}
 #searchtoggle[aria-expanded="true"]{color:var(--accent-ink)}
 #searchtoggle.on::after{content:"";position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 @media (max-width:700px){.bar .panels{grid-area:lists}.bar .panels .lists{justify-content:flex-start;flex-wrap:wrap}}
@@ -2629,7 +2636,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
   // the card stays and its content slides, a dark band with an arrow beside each side that has a neighbour; 'coverflow' = the
   // neighbours are read-only copies of the window beside it (Swiper's coverflow effect), the row turns on a switch, dots below
   const TASK_SWITCHERS = ['standard', 'coverflow'];
-  const SEARCH_ROW_STATES = ['expanded', 'collapsed']; // prefs.searchRow: how the search line starts on the board
+  const SEARCH_ROW_STATES = ['expanded', 'collapsed']; // prefs.searchRow: the search line as the person last left it
   // Swiper's coverflow: rotate 10, stretch 120, depth 200, modifier 1, no slide shadows, centred slides, perspective 1200
   const COVERFLOW = { p: 1200, rotate: 10, stretch: 120, depth: 200, modifier: 1, hoverDepth: 0.75, dur: 280, ease: 'cubic-bezier(.25,.75,.25,1)', dim: 0.9 };
   // a pose is one transform, always the same function list so a move interpolates per function. perspective() sits around the
@@ -2878,7 +2885,8 @@ async function toggleMineTag(id) {
 }
 const hl = (title, q) => { q = q.trim(); if (!q || /^#?\p{L}?\d+$/iu.test(q)) return esc(title); const i = title.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(title) : esc(title.slice(0, i)) + '<mark>' + esc(title.slice(i, i + q.length)) + '</mark>' + esc(title.slice(i + q.length)); };
 let LB = null; // prefs.listBar: the list panels (core listPanels)
-let searchRow = 'expanded'; // prefs.searchRow: how the search line starts (General settings); st.searchOpen is how it is now
+let searchRow = 'expanded'; // prefs.searchRow: the search line as the person last left it; st.searchOpen is how it is now
+const setSearchOpen = open => { st.searchOpen = open; searchRow = open ? 'expanded' : 'collapsed'; };
 let lbOverflow = [], lbFitKey = '', lbRenaming = null, lbRenVal = null, lbMenuXY = null, lbWidth = 0, lbResize = 0;
 let NOT_PEOPLE = new Set(); // the household's bot and agent logins (profiles.kind), left out of "also loses it"
 
@@ -3528,7 +3536,7 @@ function applyPrefs(p) {
   st.view = p.view;
   LISTS.sort((a, b) => (p.listOrder.indexOf(a) + 1 || 1e6) - (p.listOrder.indexOf(b) + 1 || 1e6));
   LB = p.listBar;
-  searchRow = p.searchRow; if (st.searchOpen === undefined) st.searchOpen = searchRow === 'expanded'; // the toggle holds until a reload
+  searchRow = p.searchRow; if (st.searchOpen === undefined) st.searchOpen = searchRow === 'expanded'; // read once: the buttons write it
   if (LB) LISTS = C.listBarOrder(LB, LISTS);
   st.list = p.list === 'all' || LIST[p.list] ? p.list : 'all';
   const known = new Set(Object.keys(TAG)); // tag ids (before multi-user: names, dropped here)
@@ -3972,7 +3980,8 @@ function render() {
     }).join('') +
     '<button class="f" id="barmenu" aria-label="Add or remove filters" title="Add or remove filters" aria-haspopup="menu" aria-expanded="' + (st.pop === 'barmenu') + '">' + I.plus + '</button>' +
     (st.view === 'matrix' && anyFilter ? '<span class="f-count" role="status"><b>' + shown.length + '</b> of ' + open.filter(inList).length + '</span>' : '') +
-    (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop + '</header>' +
+    (anyFilter ? '<button class="f" id="clear" aria-label="Clear search and filters">' + I.x + '</button>' : '') + '</div>' + dd + '</div>' + pop +
+    '<button id="searchhandle" type="button" class="search-handle' + (!searchOpenNow && anyFilter ? ' on' : '') + '" aria-controls="searchrow" aria-expanded="' + searchOpenNow + '" aria-label="' + (searchOpenNow ? 'Hide' : 'Show') + ' search' + (!searchOpenNow && anyFilter ? ', search or filters are on' : '') + '" title="' + (searchOpenNow ? 'Hide search' : anyFilter ? 'Show search. Search or filters are on' : 'Show search') + '">' + I.search + I.chevD + '</button></header>' +
     '<div class="main"><aside class="rail"><div class="views" role="tablist" aria-label="Views">' +
     [['matrix', '▦'], ['archive', '▤'], ['review', '▬']].map(([v, ic]) => '<button role="tab" data-view="' + v + '" aria-selected="' + (st.view === v) + '" tabindex="' + (st.view === v || (v === 'matrix' && st.view === 'timeline') ? 0 : -1) + '"><span class="vi" aria-hidden="true">' + ic + '</span>' + cap(v) + (v === 'archive' ? '<span class="vc">' + archivedIn().length + '</span>' : '') + '</button>').join('') +
     '</div><nav class="groups" aria-label="Items by quadrant">' + menuGroups + '</nav></aside>' +
@@ -5165,7 +5174,6 @@ function openSettings(kind) {
   const dlg = dialogShell('<form method="dialog" class="settings"><strong>' + (general ? 'General settings' : 'Urgency settings') + '</strong>' +
     (general ? '<label>Display name<input id="s-name" maxlength="60" autocomplete="name" value="' + esc(me.display_name) + '"></label><div class="err" id="s-name-e" aria-live="polite"></div>' +
       '<label>Time zone<input id="s-tz" list="s-tzs" autocomplete="off" spellcheck="false" value="' + esc(me.timezone || browserTz) + '"></label><datalist id="s-tzs">' + zones.map(z => '<option value="' + esc(z) + '">').join('') + '</datalist><div class="err" id="s-tz-e" aria-live="polite"></div>' +
-      '<label>Search line on opening<select id="s-search"><option value="expanded"' + (searchRow === 'expanded' ? ' selected' : '') + '>Expanded</option><option value="collapsed"' + (searchRow === 'collapsed' ? ' selected' : '') + '>Collapsed</option></select></label>' +
       '<div class="s-row"><span>Welcome card</span><button type="button" id="s-welcome">Show again</button></div>'
     : urgencyFields('')) +
     '<div class="actions"><button value="cancel">Cancel</button><button id="s-save" value="save">Save</button></div></form>', '#profile');
@@ -5178,8 +5186,6 @@ function openSettings(kind) {
     const name = dlg.querySelector('#s-name').value.replace(/[\u0000-\u001f\u007f]/g, '').trim(), tz = dlg.querySelector('#s-tz').value.trim();
     if (!name) { e.preventDefault(); dlg.querySelector('#s-name-e').textContent = 'Enter a name'; dlg.querySelector('#s-name').focus(); return; }
     if (tz && zones.length && !zones.includes(tz) && tz !== 'UTC') { e.preventDefault(); dlg.querySelector('#s-tz-e').textContent = 'Pick a time zone from the list'; dlg.querySelector('#s-tz').focus(); return; }
-    const sr = dlg.querySelector('#s-search').value;
-    if (sr !== searchRow) { searchRow = sr; st.searchOpen = sr === 'expanded'; savePrefsSoon(); }
     if (name !== me.display_name) patch.display_name = name;
     if (tz && tz !== me.timezone) patch.timezone = tz;
     if (!Object.keys(patch).length) return toast('Settings saved');
@@ -6050,7 +6056,7 @@ function bind() {
   app.querySelectorAll('#pop [data-list-to]').forEach(b => b.onclick = e => { e.stopPropagation(); const v = b.dataset.listTo; st.pop = null; barDo(C.listBarMove(LB, LISTS, st.list, v === 'rest' ? 'rest' : +v)); render(); document.getElementById('listmenu')?.focus(); });
   // the theme starts as Auto (follows the system); a click sets Light or Dark
   document.getElementById('theme').onclick = () => { themePref = st.theme ? 'light' : 'dark'; applyTheme(); render(); document.getElementById('theme').focus(); };
-  document.getElementById('searchtoggle').onclick = e => { e.stopPropagation(); st.searchOpen = st.searchOpen === false; st.pop = null; st.focusQ = st.searchOpen; render(); if (!st.searchOpen) document.getElementById('searchtoggle').focus(); };
+  ['searchtoggle', 'searchhandle'].forEach(id => { document.getElementById(id).onclick = e => { e.stopPropagation(); setSearchOpen(st.searchOpen === false); st.pop = null; st.focusQ = st.searchOpen; render(); if (!st.searchOpen) document.getElementById(id).focus(); }; });
   const qi = document.getElementById('q');
   qi.oninput = () => { st.keep.clear(); st.q = qi.value; st.sel = -1; st.focusQ = true; render(); };
   qi.onkeydown = e => {
@@ -6219,7 +6225,7 @@ function bind() {
 document.addEventListener('keydown', e => {
   if (boot.gate) return;
   const typing = e.target.closest && e.target.closest('input,textarea,select,dialog');
-  if (e.key === '/' && !typing) { e.preventDefault(); st.searchOpen = true; st.focusQ = true; render(); }
+  if (e.key === '/' && !typing) { e.preventDefault(); setSearchOpen(true); st.focusQ = true; render(); }
   else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing && lastUndo) { e.preventDefault(); runUndo(); }
   else if (e.key === 'Escape' && !typing) { if (st.pop) { st.pop = null; render(); } else if (st.expanded) { const q = st.expanded; st.expanded = null; render(); document.querySelector('[data-expand="' + q + '"]')?.focus(); } }
 });

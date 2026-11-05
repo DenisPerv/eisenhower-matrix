@@ -1263,7 +1263,7 @@
   // the card stays and its content slides, a dark band with an arrow beside each side that has a neighbour; 'coverflow' = the
   // neighbours are read-only copies of the window beside it (Swiper's coverflow effect), the row turns on a switch, dots below
   const TASK_SWITCHERS = ['standard', 'coverflow'];
-  const SEARCH_ROW_STATES = ['expanded', 'collapsed']; // prefs.searchRow: how the search line starts on the board
+  const SEARCH_ROW_STATES = ['expanded', 'collapsed']; // prefs.searchRow: the search line as the person last left it
   // Swiper's coverflow: rotate 10, stretch 120, depth 200, modifier 1, no slide shadows, centred slides, perspective 1200
   const COVERFLOW = { p: 1200, rotate: 10, stretch: 120, depth: 200, modifier: 1, hoverDepth: 0.75, dur: 280, ease: 'cubic-bezier(.25,.75,.25,1)', dim: 0.9 };
   // a pose is one transform, always the same function list so a move interpolates per function. perspective() sits around the
