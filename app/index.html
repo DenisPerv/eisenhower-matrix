@@ -2208,13 +2208,7 @@ const DUE = [['any', 'Any'], ['overdue', 'Overdue'], ['today', 'Today'], ['week'
 const dueName = v => (DUE.find(x => x[0] === v) || [, ''])[1];
 function passF(t, q, noDue) {
   if (!matchQ(t, q)) return false;
-  if (!noDue && SF.due) {
-    const end = n => midnight(now()) + n * DAY;
-    if (SF.due === 'overdue' && !overdue(t)) return false;
-    if (SF.due === 'today' && !(t.deadline && t.deadline.getTime() < end(1))) return false;
-    if (SF.due === 'week' && !(t.deadline && t.deadline.getTime() < end(8))) return false;
-    if (SF.due === 'none' && t.deadline) return false;
-  }
+  if (!noDue && SF.due && !C.dueMatch(t, { due: SF.due }, now())) return false; // the board's rule (core)
   if (SF.tag.length && !t.tags.some(id => SF.tag.includes(id))) return false;
   if (SF.cat.length && !SF.cat.includes(t.category)) return false;
   if (SF.check && !lowConf(t)) return false;
@@ -2226,7 +2220,8 @@ function renderFilters() {
   const n = SF.tag.length, k = SF.cat.length, any = SF.due || n || k || SF.check || SF.mine;
   const b = (key, label, on, toggle) => `<button class="chip" data-act="${toggle ? 'f-toggle' : 'f-open'}" data-k="${key}" ${toggle ? `aria-pressed="${!!on}"` : `aria-expanded="${SF.open === key}" aria-pressed="${!!on}"`}>${label}${toggle ? '' : ic('chev')}</button>`;
   $('#filters').innerHTML = b('due', SF.due ? `Due: ${dueName(SF.due)}` : 'Due', SF.due) + b('tag', n ? `Tag: ${n === 1 ? esc(D.labels[SF.tag[0]] || '?') : n}` : 'Tag', n) + b('cat', k ? `Category: ${k === 1 ? esc(catName(SF.cat[0])) : k}` : 'Category', k)
-    + b('check', 'To check', SF.check, 1) + b('mine', 'Mine', SF.mine, 1) + (any ? '<button class="chip ghost" data-act="f-clear">Clear filters</button>' : '');
+    + b('check', 'To check', SF.check, 1) + b('mine', 'Mine', SF.mine, 1) + (any ? '<button class="chip ghost" data-act="f-clear">Clear filters</button>' : '')
+    + (SF.mine && !(me().mine_tag_ids || []).some(id => D.labels[id] !== undefined) ? '<p class="src" style="margin:0;flex-basis:100%">Mine shows tasks with your tags. Open Tags, pick a tag, then Count as Mine.</p>' : '');
   const o = $('#fopts'); if (!SF.open) { o.hidden = true; o.innerHTML = ''; return; } o.hidden = false;
   const opt = (key, v, label, on) => `<button class="chip" data-act="f-set" data-k="${key}" data-v="${esc(v)}" aria-pressed="${!!on}">${esc(label)}</button>`;
   if (SF.open === 'due') o.innerHTML = DUE.map(([v, l]) => opt('due', v, l, v === 'any' ? !SF.due : SF.due === v)).join('');

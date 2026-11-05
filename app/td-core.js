@@ -216,8 +216,29 @@
   // before it: only the shared ones, migrated once by tagListPrefsMigrate); tagListFavs = my favourite (★) tag lists, any number, own
   // or shared: they open in the task window. tagListsOpen (U7) is gone: groups open and close within the window only
   const TAG_LIST_ORDER_V = 2;
+  // the board's filter row. filters: what is on. filterBar: which buttons show after the fixed Mine, in order ('due', 'cat', 'low',
+  // 'tl:<tag list id>'); null follows the starred tag lists (defaultFilterBar). Both are checked for type and shape only: the phone
+  // writes this row without the board's tag ids, so the page drops stale ids when it applies them
+  const DUE_KINDS = ['any', 'overdue', 'today', 'week', 'none', 'range'];
+  const FILTERS_DEFAULTS = { mine: false, due: 'any', from: '', to: '', tags: [], cats: [], low: false };
+  const FILTER_BAR_KEY = /^(due|cat|low|tl:.+)$/;
+  const DAY_TEXT = /^\d{4}-\d{2}-\d{2}$/;
+  function readFilters(raw) {
+    const f = clone(FILTERS_DEFAULTS);
+    if (!isObj(raw)) return f;
+    if (typeof raw.mine === 'boolean') f.mine = raw.mine;
+    if (typeof raw.low === 'boolean') f.low = raw.low;
+    if (DUE_KINDS.includes(raw.due)) f.due = raw.due;
+    if (typeof raw.from === 'string' && DAY_TEXT.test(raw.from)) f.from = raw.from;
+    if (typeof raw.to === 'string' && DAY_TEXT.test(raw.to)) f.to = raw.to;
+    if (strs(raw.tags)) f.tags = [...new Set(raw.tags)];
+    if (strs(raw.cats)) f.cats = [...new Set(raw.cats)];
+    return f;
+  }
+  const readFilterBar = raw => strs(raw) ? [...new Set(raw.filter(k => FILTER_BAR_KEY.test(k)))] : null;
+  const defaultFilterBar = favs => ['due'].concat((favs || []).map(id => 'tl:' + id));
   const PREFS_DEFAULTS = { version: 2, theme: 'auto', view: 'matrix', list: 'all', listOrder: [], tagOrder: [], axes: { fx: 0.5, fy: 0.5 }, menuCollapsed: [], cards: { mode: 'collapsed', flipped: [] }, settings: SETTINGS_DEFAULTS,
-    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard' };
+    cardLayout: CARD_LAYOUT_DEFAULTS, welcomeSeen: false, welcomeVersion: 0, tagListOrder: [], tagListOrderV: 0, tagListFavs: [], taskSwitcher: 'standard', filters: FILTERS_DEFAULTS, filterBar: null };
   // the welcome shows while welcomeVersion < WELCOME_VERSION (2: two panels; 3: one card with the Urgency and Card layout forms, 2026-10-29); closing it sets
   // WELCOME_VERSION. welcomeSeen stays for clients that only know it
   const WELCOME_VERSION = 3;
@@ -259,6 +280,8 @@
     if (strs(raw.tagListOrder)) p.tagListOrder = [...new Set(raw.tagListOrder.filter(tlOk))];
     if (Number.isInteger(raw.tagListOrderV) && raw.tagListOrderV >= 0 && raw.tagListOrderV <= 1000) p.tagListOrderV = raw.tagListOrderV;
     if (strs(raw.tagListFavs)) p.tagListFavs = [...new Set(raw.tagListFavs.filter(tlOk))];
+    p.filters = readFilters(raw.filters);
+    p.filterBar = readFilterBar(raw.filterBar);
     return p;
   }
   function readCardLayout(raw, tagListIds) {
@@ -537,9 +560,16 @@
     });
     return out;
   }
-  // "Mine": the item is for me (owner_id), or carries a tag I can see whose id is in my mine_tag_ids (db/012; with several tag
-  // lists a name can mean different tags, so mine_tags names are no longer read)
-  const isMine = (t, me, tagNames) => !!me && (t.ownerId === me.id || (t.tags || []).some(id => tagNames[id] !== undefined && (me.mine_tag_ids || []).includes(id)));
+  // "Mine": the item carries a tag I can see whose id is in my mine_tag_ids (db/012). The owner does not count: it says who made the
+  // item, not who does it (filter row, 2026-11-05). With several tag lists a name can mean different tags, so mine_tags names are not read
+  const isMine = (t, me, tagNames) => !!me && (t.tags || []).some(id => tagNames[id] !== undefined && (me.mine_tag_ids || []).includes(id));
+  // the tags the Mine picker suggests first: named like me (display name, its first word, or handle), any case
+  function mineSuggestions(ids, nameOf, me) {
+    if (!me) return [];
+    const dn = String(me.display_name || '').trim().toLowerCase();
+    const want = new Set([dn, dn.split(/\s+/)[0], String(me.handle || '').trim().toLowerCase()].filter(Boolean));
+    return (ids || []).filter(id => want.has(String(nameOf[id] || '').trim().toLowerCase()));
+  }
   const tagDiff = (before, after) => ({ add: (after || []).filter(x => !(before || []).includes(x)), remove: (before || []).filter(x => !(after || []).includes(x)) });
   // item_tags rows (load or poll) applied to the tasks; items with writes waiting are skipped; unknown tag ids are reported
   function mergeTagRows(tasks, rows, opts) {
@@ -713,22 +743,31 @@
     const nm = typeof nameOf === 'function' ? nameOf : id => (nameOf || {})[id];
     return (groups || []).map(g => Object.assign({}, g, { tags: g.tags.filter(id => String(nm(id) || '').toLowerCase().includes(q)) })).filter(g => g.tags.length);
   }
-  // the Tag filter: a key is a tag id, or 'name:<lower name>' for "All named X" (an explicit choice); an item passes with any key
-  const tagFilterKey = name => 'name:' + String(name).toLowerCase();
-  const tagFilterHit = (ids, keys, nameOf) => !keys || !keys.size || (ids || []).some(id => keys.has(id) || (nameOf[id] !== undefined && keys.has(tagFilterKey(nameOf[id]))));
-  // the filter menu: one entry per tag id (its chip label), and "All named X" before the tags when several tags share the name
-  function tagFilterOptions(ids, labels, nameOf) {
-    const uniq = [...new Set(ids || [])].filter(id => labels[id] !== undefined && nameOf[id] !== undefined);
-    const count = {};
-    uniq.forEach(id => { const k = tagFilterKey(nameOf[id]); count[k] = (count[k] || 0) + 1; });
-    uniq.sort((a, b) => String(nameOf[a]).localeCompare(String(nameOf[b])) || String(labels[a]).localeCompare(String(labels[b])));
-    const out = [], done = new Set();
-    uniq.forEach(id => {
-      const k = tagFilterKey(nameOf[id]);
-      if (count[k] > 1 && !done.has(k)) { done.add(k); out.push({ key: k, label: 'All named ' + nameOf[id], all: true }); }
-      out.push({ key: id, label: labels[id] });
-    });
-    return out;
+  // the tag filter: keys are tag ids. Any tag inside one tag list passes; every tag list with a selection must pass
+  function tagFilterHit(ids, keys, listOf) {
+    if (!keys || !keys.size) return true;
+    const by = new Map();
+    keys.forEach(k => { const l = (listOf || {})[k]; by.set(l, (by.get(l) || []).concat(k)); });
+    return [...by.values()].every(g => g.some(k => (ids || []).includes(k)));
+  }
+  // the Due filter. f: { due, from, to } (DUE_KINDS). Overdue is the card's overdue mark (before now); the rest are local calendar days.
+  // A range keeps both end days; an empty end is open, both empty pass everything, a from after the to is swapped
+  function dueMatch(t, f, now) {
+    const kind = f && f.due, at = t.deadline ? t.deadline.getTime() : null;
+    const n = new Date(now), day = k => new Date(n.getFullYear(), n.getMonth(), n.getDate() + k).getTime();
+    const parse = (s, k) => { const m = DAY_TEXT.test(s || '') ? s.split('-').map(Number) : null; return m ? new Date(m[0], m[1] - 1, m[2] + k).getTime() : null; };
+    if (kind === 'overdue') return at !== null && at < n.getTime();
+    if (kind === 'today') return at !== null && at >= day(0) && at < day(1);
+    if (kind === 'week') return at !== null && at >= day(0) && at < day(8);
+    if (kind === 'none') return at === null;
+    if (kind === 'range') {
+      let from = f.from || '', to = f.to || '';
+      if (!from && !to) return true;
+      if (from && to && from > to) [from, to] = [to, from];
+      const a = parse(from, 0), b = parse(to, 1);
+      return at !== null && (a === null || at >= a) && (b === null || at < b);
+    }
+    return true;
   }
   // the one-time note of a first share (shared_notices, db/012)
   const ROLE_LABEL = { owner: 'Owner', editor: 'Editor', contributor: 'Contributor', viewer: 'Viewer' };
@@ -1212,7 +1251,7 @@
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     createdList, listNameClash, freeListName, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
-    TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterKey, tagFilterHit, tagFilterOptions, noticeText, canShare, menuMove,
+    TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
     cancelTimes, isTestList, chipSelect, kpiTicks,
