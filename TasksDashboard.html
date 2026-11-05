@@ -5005,7 +5005,7 @@ async function restoreTask(t) {
 }
 
 // Continue in Claude (card contract 9): a link to the per-user handler, so no CSP change; the tooltip says what it needs, the icon copies the command
-const CONTINUE_TIP = 'Opens a copy of this task\'s session in the Claude app. Needs the handler: run install-continue-handler.ps1 once. Without it a click does nothing, so copy the command with the icon beside it.';
+const CONTINUE_TIP = 'Opens a copy of this task\'s session in the Claude app. Needs the handler: run tools/continue/install-continue-handler.ps1 once. Without it a click does nothing, so copy the command with the icon beside it.';
 function continueHtml(t, slug) {
   const c = C.continueLink(t, slug); if (!c) return '';
   return '<button type="button" class="fref fcopy" data-copy-cmd="' + esc(c.command) + '" aria-label="Copy the command" title="Copy: ' + esc(c.command) + '">' + I.copy + '</button>' +
