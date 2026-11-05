@@ -131,7 +131,7 @@ test('continueLink: the latest do, else the latest plan; a bad id or ref gives n
   const c = C.continueLink(t([{ session_id: Z, role: 'do' }, { session_id: A, role: 'do' }, { session_id: B, role: 'plan' }, { session_id: Z, role: 'mother' }]), 'homeos-game_1');
   assert.equal(c.sid, A);
   assert.equal(c.href, `homeos-claude://continue?sid=${A}&ref=homeos-game_1%2315`);
-  assert.equal(c.command, `claude --desktop --resume ${A} --fork-session`);
+  assert.equal(c.command, `claude --resume ${A} --fork-session`);
   assert.equal(C.continueLink(t([{ session_id: B, role: 'plan' }, { session_id: Z, role: 'mother' }]), 's').sid, B);
   assert.equal(C.continueLink(t([{ session_id: Z, role: 'mother' }]), 's'), null);
   assert.equal(C.continueLink(t([]), 's'), null);

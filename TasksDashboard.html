@@ -1727,7 +1727,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
     const pick = role => { const r = all.filter(s => s.role === role); return r.length ? r[r.length - 1] : null; };
     const s = pick('do') || pick('plan'), ref = String(slug || '') + '#' + (t ? t.num : '');
     if (!s || !SESSION_ID.test(String(s.session_id || '')) || !CONTINUE_REF.test(ref)) return null;
-    return { sid: s.session_id, href: 'homeos-claude://continue?sid=' + s.session_id + '&ref=' + encodeURIComponent(ref), command: 'claude --desktop --resume ' + s.session_id + ' --fork-session' };
+    return { sid: s.session_id, href: 'homeos-claude://continue?sid=' + s.session_id + '&ref=' + encodeURIComponent(ref), command: 'claude --resume ' + s.session_id + ' --fork-session' };
   }
   // the inverse of an action, sent as a new versioned PATCH
   function inverseOf(action, before, fields, nowIso) {
