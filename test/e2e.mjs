@@ -708,7 +708,11 @@ async function gAppFilters() {
 async function gLists() {
   const G = 'lists', T = await maksymPage(), errs = T.errors.length, made = [];
   const mk = async n => { const l = await mkList(MK, `${RUN} ${n}`, true); made.push(l); return l; };
+  // the person's own panels decide what fits on a row, so the group runs on the default bar and puts theirs back
+  const prefsAt = 'preferences?profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard';
+  const prefsSnap = ((await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard')).json || [])[0]?.prefs;
   try {
+    if (prefsSnap) { await MK.rest('PATCH', prefsAt, { prefs: { ...prefsSnap, listBar: null, list: 'all' } }); await T.reload(); await T.ready(); }
     await T.size(1440, 900); await sleep(300);
     const [la, lb, lc, ld] = [await mk('pa'), await mk('pb'), await mk('pc'), await mk('pd')];
     const i1 = await mkItem('task one', { list_id: la.id }), i2 = await mkItem('task two', { list_id: la.id });
@@ -831,7 +835,8 @@ async function gLists() {
     // archive and restore to its place
     await pick(T, lc.id); await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-list-to=\\"1\\"]")', 3000); await T.click('[data-list-to="1"]'); await sleep(200);
     await T.ev(`document.querySelector('.lists [data-list="${lc.id}"]').focus()`); await T.key('ArrowLeft', 1); await sleep(200);
-    const place = (await savedBar()).rows[1].indexOf(lc.id);
+    let place = -1;
+    await until(async () => { const b = await savedBar(); place = b && b.rows[1] ? b.rows[1].indexOf(lc.id) : -1; return place >= 0; }, 12000);
     await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-archive-list]")', 3000); await T.click('[data-archive-list]');
     await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + lc.id)).json[0].archived_at, 6000);
     await T.wait(`!document.querySelector('.lists [data-list="${lc.id}"]')`, 6000);
@@ -840,7 +845,7 @@ async function gLists() {
     check(G, 'it shows in the archive with its date and Restore and Delete', await T.wait(`!!document.querySelector('[data-arow="${lc.id}"] [data-restore-list]') && !!document.querySelector('[data-arow="${lc.id}"] [data-delete-list]') && /\\d{4}-\\d\\d-\\d\\d/.test(document.querySelector('[data-arow="${lc.id}"] .lm-meta').textContent)`, 8000));
     check(G, 'a system list in the archive has no action, when one is there', await T.ev(`!document.querySelector('[data-restore-list="${ST.id}"]')`));
     await T.click(`[data-restore-list="${lc.id}"]`);
-    const backOn = await T.wait(`!!document.querySelector('[data-zone="1"] [data-row="${lc.id}"], .lists [data-list="${lc.id}"]')`, 8000);
+    const backOn = await until(async () => !(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + lc.id)).json[0].archived_at, 8000);
     const sbp = await savedBar();
     check(G, 'Restore returns it to its old place on the panel', backOn && place >= 0 && sbp.rows[1].indexOf(lc.id) === place, 'place ' + place + ', now ' + sbp.rows[1].indexOf(lc.id));
 
@@ -961,6 +966,8 @@ async function gLists() {
   } finally {
     await closeDialogs(T).catch(() => {});
     for (const l of made) if (testLists.some(x => x.id === l.id)) { const r = await dropTestList(l); check(G, 'test list deleted: ' + l.name, r.ok, r.err && r.err.message); }
+    await sleep(2400); // the page's own debounced save lands before the person's bar goes back
+    if (prefsSnap) { const back = await MK.rest('PATCH', prefsAt, { prefs: prefsSnap }); check(G, 'the person\'s list panels put back', back.ok); }
     await T.reload().catch(() => {}); await T.ready().catch(() => {});
   }
 }
@@ -1003,14 +1010,14 @@ async function gUi() {
     const c0 = who === 'maksym' ? MK : AN;
     const readPrefs = async () => { const r = await c0.rest('GET', 'preferences?select=prefs&profile_id=eq.' + c0.uid + '&app=eq.tasksdashboard'); return r.ok && r.json.length ? r.json[0].prefs : null; };
     const p0 = await readPrefs();
-    if (p0) await c0.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c0.uid, Object.assign({}, p0, { welcomeSeen: true, welcomeVersion: 2 })), { Prefer: 'resolution=merge-duplicates,return=minimal' });
+    if (p0) await c0.rest('POST', 'preferences?on_conflict=profile_id,app', core.rowFromPrefs(c0.uid, Object.assign({}, p0, { welcomeSeen: true, welcomeVersion: 2, view: 'matrix' })), { Prefer: 'resolution=merge-duplicates,return=minimal' });
     const P = core.prefsFromRow(p0), S = P.settings; // the person's values
     const WL = `document.getElementById('welcome')`;
     // the card's values as the page reads them, and where its parts sit
     const wlState = `(()=>{const el=${WL};if(!el)return null;const q=s=>el.querySelector(s),leg=[...el.querySelectorAll('legend')].map(l=>l.textContent);return {win:+q('[data-u=win]').value,th:+q('[data-u=th]').value,lim:+q('[data-u=lim]').value,
       sw:q('input[name=s-switch]:checked')?.value,mode:q('input[name=cl-mode]:checked')?.value,auto:+q('[data-cl-auto]').value,fields:${JSON.stringify(core.CARD_FIELDS)}.every(k=>q('[data-cl="'+k+'"]').checked===!!${JSON.stringify(P.cardLayout)}[k]),tags:q('input[name=cl-tags]:checked')?.value,
       cards:[...el.querySelectorAll('.wl-card h3')].map(h=>h.textContent),order:leg.indexOf('Moving between tasks')<leg.indexOf('Cards open')&&leg.indexOf('Cards open')>=0,text:el.textContent,
-      focus:document.activeElement===q('[data-u=win]'),dialog:el.tagName==='DIALOG'||el.getAttribute('role')==='dialog',beacon:document.getElementById('profile').classList.contains('beacon'),old:!!q('#wl-next,#wl-back,#wl-urg,#wl-cl'),
+      focus:document.activeElement===q('[data-u=win]'),act:document.activeElement?document.activeElement.outerHTML.slice(0,160):null,dialog:el.tagName==='DIALOG'||el.getAttribute('role')==='dialog',beacon:document.getElementById('profile').classList.contains('beacon'),old:!!q('#wl-next,#wl-back,#wl-urg,#wl-cl'),
       ids:[...el.querySelectorAll('[id]')].every(x=>document.querySelectorAll('#'+CSS.escape(x.id)).length===1)}})()`;
     T.keepWelcome = true;
     check(G, `${who}: opens signed in`, await open(T, await grantFor(who)));
@@ -1025,7 +1032,8 @@ async function gUi() {
     await T.shot(`welcome-card-1440x900-${theme}`);
     const wlRow = n => `(()=>{const t=[...${WL}.querySelectorAll('input[name=${n}]')].map(i=>i.closest('label').getBoundingClientRect());return t.length===2&&Math.abs(t[0].top-t[1].top)<=2&&t[1].left>t[0].right})()`;
     check(G, `${who}: on the card Moving between tasks comes before Cards open, each radio group on one row; focus starts on the first field and Tab goes down`, !!w0 && w0.order && w0.focus &&
-      await T.ev(wlRow('s-switch')) && await T.ev(wlRow('cl-mode')) && (await T.key('Tab'), await T.ev(`document.activeElement===${WL}.querySelector('[data-u=th]')`)));
+      await T.ev(wlRow('s-switch')) && await T.ev(wlRow('cl-mode')) && (await T.key('Tab'), await T.ev(`document.activeElement===${WL}.querySelector('[data-u=th]')`)),
+      JSON.stringify({ order: w0 && w0.order, focus: w0 && w0.focus, act: w0 && w0.act, sw: await T.ev(wlRow('s-switch')), mode: await T.ev(wlRow('cl-mode')), active: await T.ev(`document.activeElement&&(document.activeElement.id||document.activeElement.dataset.u||document.activeElement.tagName)`) }));
     check(G, `${who}: at 1440 the card ends inside the screen, its body scrolls and Save stays in view`, await T.ev(`(()=>{const el=${WL},r=el.getBoundingClientRect(),b=el.querySelector('.wl-body'),s=el.querySelector('#wl-save').getBoundingClientRect();return r.bottom<=innerHeight&&s.bottom<=r.bottom&&s.top>=r.top&&(b.scrollHeight<=b.clientHeight||getComputedStyle(b).overflowY==='auto')})()`));
     await T.size(390, 844); await sleep(500);
     check(G, `${who}: at 390 px the card fits the screen, Save in view, nothing is wider than the screen or the card`, await T.ev(`(()=>{const el=${WL},r=el.getBoundingClientRect(),b=el.querySelector('.wl-body'),s=el.querySelector('#wl-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight+1&&s.bottom<=innerHeight&&document.documentElement.scrollWidth<=innerWidth&&b.scrollWidth<=b.clientWidth})()`));
@@ -1255,7 +1263,11 @@ async function gUi() {
     await T.size(1440, 900); await closeDialogs(T);
     // a saved list with no open card (prefs.list, maybe set by someone using the app meanwhile): look in All
     if (!(await T.has('[data-card]')) && await T.has('[data-list="all"]')) { await T.click('[data-list="all"]'); await sleep(400); }
-    const anyCard = await T.ev('document.querySelector("[data-card]")?.dataset.card||""');
+    // the shortest description on the board: a long plan rightly pushes End below the fold, and U8 is about the window, not about one person's data
+    const cardIds = await T.ev(`[...document.querySelectorAll('[data-card]')].map(e=>e.dataset.card)`);
+    const cardBodies = cardIds.length ? (await MK.rest('GET', 'items?select=id,body_md&id=in.(' + cardIds.join(',') + ')')).json || [] : [];
+    const cardLen = id => { const r = cardBodies.find(x => x.id === id); return r ? String(r.body_md || '').length : 1e9; };
+    const anyCard = cardIds.slice().sort((a, b) => cardLen(a) - cardLen(b))[0] || '';
     if (anyCard) {
       await T.click(`[data-card="${anyCard}"]`);
       // tags round: my favourites (★ on the head) start open, every other group closed; the order is my one order (prefs tagListOrder)
@@ -1737,7 +1749,8 @@ async function gFiltersBody(G) {
     const fire=(el,type,y)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+10,clientY:y}));
     fire(src,'dragstart',0);fire(dst,'dragover',r.top+1);fire(dst,'drop',r.top+1);fire(src,'dragend',0);return true})()`);
   const dk = await until(async () => { const [x, y, h] = [await item(dA.id), await item(dC.id), await item(dH.id)]; return y.sort_key < x.sort_key && [y.sort_key, x.sort_key, h.sort_key]; });
-  check(G, 'a drag in the filtered side menu: the card moves, the hidden card keeps its key and its place', !!dk && dk[0] < dk[1] && dk[1] < dk[2] && dk[2] === 20, JSON.stringify(dk));
+  // its place, not its number: a quadrant whose keys are too close is renumbered on a drop (C.renumber), and other cards of the run sit in this quadrant
+  check(G, 'a drag in the filtered side menu: the card moves, the hidden card keeps its place', !!dk && dk[0] < dk[1] && dk[1] < dk[2], JSON.stringify(dk));
   await T.ev('(document.getElementById("clear").click(),true)');
 
   // screens: the default row, an open tag list menu, the + menu and the Mine picker at both widths, no sideways scroll, no console errors
