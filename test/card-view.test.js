@@ -31,6 +31,41 @@ test('renderMd: no HTML from the database, only http(s) links', () => {
   assert.equal(C.renderMd('a\u00000\u0000b'), '<p>a0b</p>', 'a held-text mark in the data is dropped');
 });
 
+test('renderMd: a numbered list split by text shows the written numbers', () => {
+  assert.equal(C.renderMd('1. a\n\nx\n\n2. b'), '<ol><li>a</li></ol><p>x</p><ol start="2"><li>b</li></ol>');
+  assert.equal(C.renderMd('For later:\n3. c\n4. d'), '<p>For later:</p><ol start="3"><li>c</li><li>d</li></ol>');
+  assert.equal(C.renderMd('1. a\n2. b'), '<ol><li>a</li><li>b</li></ol>', 'a list from 1 carries no attribute');
+});
+
+const LINK = u => '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>';
+test('renderMd: a bare http(s) address is a link; the punctuation after it is not part of it', () => {
+  assert.equal(C.renderMd('see https://a.example/p?x=1&y=2 now'), '<p>see ' + LINK('https://a.example/p?x=1&amp;y=2') + ' now</p>');
+  assert.equal(C.renderMd('https://a.example/c, saved'), '<p>' + LINK('https://a.example/c') + ', saved</p>');
+  assert.equal(C.renderMd('End https://a.example/c.'), '<p>End ' + LINK('https://a.example/c') + '.</p>');
+  assert.equal(C.renderMd('(https://a.example/c)'), '<p>(' + LINK('https://a.example/c') + ')</p>');
+  assert.equal(C.renderMd('https://a.example/w_(x) y'), '<p>' + LINK('https://a.example/w_(x)') + ' y</p>', 'a closing bracket with its opening one stays');
+  assert.equal(C.renderMd('**https://a.example**'), '<p><strong>' + LINK('https://a.example') + '</strong></p>');
+  assert.equal(C.renderMd('- Source: https://a.example/*x*'), '<ul><li>Source: ' + LINK('https://a.example/*x') + '*</li></ul>', 'a star inside an address is no italic');
+});
+
+test('renderMd: no link where there is already one, in code, or without an address', () => {
+  const count = s => (C.renderMd(s).match(/<a /g) || []).length;
+  assert.equal(count('[t](https://a.example)'), 1);
+  assert.equal(count('[https://a.example](https://b.example)'), 1, 'an address as link text');
+  assert.equal(count('[see https://a.example here](https://b.example)'), 1, 'an address inside link text');
+  assert.equal(C.renderMd('[https://a.example](https://b.example)'), '<p><a href="https://b.example" target="_blank" rel="noopener">https://a.example</a></p>');
+  [ '`https://a.example`', '```\nhttps://a.example\n```', 'xhttps://a.example', 'ftp://a.example', 'https://', 'https://.', '[x](https://a b)' ].forEach(s => assert.equal(count(s), 0, s));
+});
+
+test('renderMd: a bare address never carries markup out of the href', () => {
+  ['https://a.example/"onclick="x', "https://a.example/'onclick='x", 'https://a.example/<script>x</script>', 'https://a.example/>y'].forEach(s => {
+    const h = C.renderMd(s);
+    assert.ok(!/<a [^>]*onclick/.test(h), s + ' -> ' + h);
+    assert.ok(!/<script/.test(h), s + ' -> ' + h);
+    assert.ok((h.match(/<a /g) || []).length === 1 && /href="https:\/\/a\.example\/"/.test(h), s + ' -> ' + h);
+  });
+});
+
 test('mdBlocks: split at the fixed headings only, text before the first stays first, a fence hides a heading', () => {
   const b = C.mdBlocks('Task\n\n## Plan\nsteps\n## Context\nstays inside\n\n```\n## Result\n```\n\n## Result of s#1\nr\n\n---\n\n## Delegate · 2026-11-05\nq\n## Answer (read 2026-11-05)\na\n## Planet\nstays');
   assert.deepEqual(b.map(x => x.split('\n')[0]), ['Task', '## Plan', '## Result of s#1', '## Delegate · 2026-11-05', '## Answer (read 2026-11-05)']);

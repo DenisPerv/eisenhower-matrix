@@ -203,12 +203,23 @@
   // ---- the task window's text (card contract 5, 6, 11). Display only: storage stays chronological and carries no markers ----
   const ANSWER_HEADING = '## Your answer', ANSWER_PROMPT = '_Write your answer below this line, then save. Agents read it on the next scan._', LINKS_HEADING = '## Links';
   const escHtml = s => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  // inline: esc first; `code` and links are held out, so a * inside them stays a *; only http(s) links, anything else stays plain text
+  // the part of an escaped bare address that is the link: punctuation at its end, and a closing bracket with no opening one, stay outside
+  function bareUrl(m) {
+    for (let url = m; ;) {
+      const t = url.replace(/(?:&amp;|[.,:;!?*~\]])+$/, ''), open = (t.match(/\(/g) || []).length, close = (t.match(/\)/g) || []).length;
+      const next = t.endsWith(')') && close > open ? t.slice(0, -1) : t;
+      if (next === url) return /^https?:\/\/[^/?#]/i.test(url) ? url : '';
+      url = next;
+    }
+  }
+  // inline: esc first; `code` and links are held out, so a * inside them stays a *; only http(s) links, anything else stays plain text.
+  // A bare address is a link too: an escaped quote or bracket ends it, and one inside a link's text or a failed [text](url) stays text
   function renderInline(s) {
     const held = [], keep = h => { held.push(h); return '\u0000' + (held.length - 1) + '\u0000'; };
     return escHtml(String(s || '').replace(/\u0000/g, ''))
       .replace(/`([^`\n]+)`/g, (m, c) => keep('<code>' + c + '</code>'))
-      .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, text, url) => /^https?:\/\//i.test(url) && !/&(?:quot|#39|lt|gt);/.test(url) ? keep('<a href="' + url + '" target="_blank" rel="noopener">') + text + keep('</a>') : m)
+      .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, text, url) => /^https?:\/\//i.test(url) && !/&(?:quot|#39|lt|gt);/.test(url) ? keep('<a href="' + url + '" target="_blank" rel="noopener">') + text.replace(/https?:\/\//gi, keep) + keep('</a>') : m)
+      .replace(/(?<![\w\u0000]|\]\()https?:\/\/(?:(?!&(?:quot|#39|lt|gt);)[^\s\u0000])+/gi, m => { const url = bareUrl(m); return url ? keep('<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>') + m.slice(url.length) : m; })
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(?!\s)(.+?)\*/g, '<em>$1</em>')
       .replace(/\u0000(\d+)\u0000/g, (m, i) => held[Number(i)]);
   }
@@ -243,12 +254,13 @@
           rows.map(r => '<tr>' + head.map((x, k) => '<td>' + renderInline(r[k] || '') + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
         continue;
       }
-      const ul = line.match(/^(\s*)[-*]\s+(.*)$/), ol = line.match(/^(\s*)\d+[.)]\s+(.*)$/);
+      const ul = line.match(/^(\s*)[-*]\s+(.*)$/), ol = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
       if (ul || ol) {
         closePara();
-        const kind = ul ? 'ul' : 'ol', m = ul || ol;
-        if (list !== kind) { closeList(); out += '<' + kind + '>'; list = kind; }
-        out += '<li' + (m[1].length >= 2 ? ' class="md-sub"' : '') + '>' + renderInline(m[2]) + '</li>';
+        const kind = ul ? 'ul' : 'ol', first = ol ? Number(ol[2]) : 1;
+        // a list that text split in two keeps its numbers: a new <ol> starts at the number written
+        if (list !== kind) { closeList(); out += '<' + kind + (first !== 1 ? ' start="' + first + '"' : '') + '>'; list = kind; }
+        out += '<li' + ((ul || ol)[1].length >= 2 ? ' class="md-sub"' : '') + '>' + renderInline(ul ? ul[2] : ol[3]) + '</li>';
         continue;
       }
       const q = line.match(/^\s*>\s?(.*)$/);
