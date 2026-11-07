@@ -44,6 +44,9 @@ Rules on the card:
   keeps the stored one. The owner is still written: "for Nastia", "for both" (no owner) or "for the agent" in the
   message, else the asker; after a list change, an owner who is not on the new list falls back to the asker (the
   database refuses an owner who is not a member). `owner_options` stays exported for bots that want their own row.
+- A new card in a HomeOS list (name `HomeOS - …` or slug `homeos-…`) starts with the tag HomeOS of the tag list
+  Assignee picked (`homeos_assignee_tag`, as the app's create window, 2026-11-07); it follows a list change until the
+  person taps that tag. A change card never adds it.
 - Buttons `q…` and `o…` on cards sent before the change do nothing when tapped.
 - The leading command's kind holds: "remind me" lands on a reminder list, "add a task" never on one.
 - A change card opens on the stored values and Save sends only what changed, with the version shown.
@@ -77,7 +80,7 @@ and a note here.
 | `keywords` | `parse(text, scope, *, handles=None, words=None) -> Parsed` (`title`, `kind`, `quadrant`, `list_index`, `owner`, `day`, `matched`, `filled`) |
 | `extract` | `build_prompt(*, text, action, scope, requester, now, calendar, handles, items=None, known=None)`, `parse_reply(reply, scope, *, handles, item_count=0) -> Hints | None`, `Hints` |
 | `draft` | `make_draft(parsed, hints, scope, *, today, default_list_slug="othertasks", reminder_list_slug="reminders") -> Draft` |
-| `card` | `Card`, `Draft`, `Origin`, `new_card(draft, scope, **kw)`, `change_card(origin, scope, *, owner_handle, **kw)`, `apply(card, op, scope, today)`, `owner_options`, `pick_due`, `Card.problem`, `Card.changed`, `Card.owner_id`, `Card.quadrant_to_write`; constants `QUADRANTS`, `DUE_PICKS`, `DEFAULT_TIME` |
+| `card` | `Card`, `Draft`, `Origin`, `new_card(draft, scope, **kw)`, `change_card(origin, scope, *, owner_handle, **kw)`, `apply(card, op, scope, today)`, `owner_options`, `pick_due`, `homeos_assignee_tag`, `is_homeos_list`, `ASSIGNEE_DEFAULT`, `Card.problem`, `Card.changed`, `Card.owner_id`, `Card.quadrant_to_write`; constants `QUADRANTS`, `DUE_PICKS`, `DEFAULT_TIME` |
 | `render` | `render(card, scope, *, prefix, token, lang, today, label=..., problem=None) -> (html, rows)`, `keyboard_json(rows)`, `button_count(rows)` |
 | `codec` | `new_token()`, `encode(prefix, token, op)`, `decode(prefix, data) -> (token, op) | None`; ops `l<i> L q<auto|A-D> o<i> d<0-4> t g<i> p<n> b e` handled by `card.apply`, `s` (Save), `x` (Cancel) and `n` (no-op header) handled by the bot |
 | `payload` | `Provenance`, `create_body(card, scope, prov, to_utc)`, `change_patch(card, scope, to_utc)`, `tag_changes(card) -> (add, remove)`, `due_at(day, time, to_utc)` |

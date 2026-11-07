@@ -1320,7 +1320,8 @@ async function commitTags(p, picked) {
 }
 
 /* ---------- S4 quick add: chips Quadrant, List, Due, Start; description; tags; one "Add task"; a new task goes on top ---------- */
-const AD = { q: 'A', list: '', due: null, dueKey: 'none', start: null, startKey: 'none', tags: [], open: null };
+const AD = { q: 'A', list: '', due: null, dueKey: 'none', start: null, startKey: 'none', tags: [], open: null, auto: null, touched: false };
+const assigneeFor = l => C.homeosAssigneeTag({ list: L(l), tagLists: D.tagLists, tags: D.tags, meId: me() && me().id });
 function addListDefault() {
   const cur = curListId();
   if (cur !== 'all' && canAdd(cur)) return cur;
@@ -1332,6 +1333,9 @@ function openAdd(q) {
   if (!AD.list) { toast('You can\'t add tasks to any of your lists.'); return; }
   AD.q = q || (S.tab === 'board' ? S.q : 'A');
   AD.due = null; AD.dueKey = 'none'; AD.start = null; AD.startKey = 'none'; AD.tags = []; AD.open = null; resetPicker('add');
+  /* HomeOS self-improvements #39 (web: openTask): a new task in a HomeOS list starts with Assignee HomeOS picked; the pick follows
+     the List chip until the person taps that tag (AD.touched) */
+  AD.touched = false; { const a = C.assigneeOnListChange([], null, assigneeFor(AD.list)); AD.tags = a.tags; AD.auto = a.auto; }
   renderAddChips(); $('#add-title').value = ''; $('#add-desc').innerHTML = ''; $('#add-descw').classList.remove('open'); $('#add-tagq').value = ''; renderAddTags(); $('#add-save').disabled = true;
   openDlg('dlg-add');
   $('#add-title').focus(); /* focus inside the tap handler so the phone keyboard rises */
@@ -1361,7 +1365,7 @@ function renderAddTags() {
 }
 $('#add-tagq').addEventListener('input', renderAddTags);
 $('#add-tagq').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const b = $('#add-tags [data-act="tp-tag"]'); if (b) b.click(); } });
-const addDirty = () => !!($('#add-title').value.trim() || toMd($('#add-desc')).trim() || AD.tags.length);
+const addDirty = () => !!($('#add-title').value.trim() || toMd($('#add-desc')).trim() || AD.tags.filter(x => x !== AD.auto).length);
 async function tryCloseAdd() {
   if (addDirty()) { const yes = await confirmDlg({ title: 'Discard this task?', body: 'What you typed here will be lost.', yes: 'Discard', no: 'Keep editing' }); if (!yes) { $('#add-title').focus(); return; } }
   resetPicker('add'); closeDlg('dlg-add');
@@ -1872,7 +1876,7 @@ document.addEventListener('click', async e => {
     case 'add': openAdd(b.dataset.q); break;
     case 'add-close': tryCloseAdd(); break;
     case 'tp-grp': { const tl = b.dataset.id, pp = b.dataset.p, open = b.getAttribute('aria-expanded') === 'true'; TPO[pp + ':' + tl] = !open; if (pp === 'add') renderAddTags(); else renderTTags(); const nb = $(`#${pp}-tags [data-act="tp-grp"][data-id="${tl}"]`); if (nb) nb.focus(); break; }
-    case 'tp-tag': { const tg = b.dataset.id, pp = b.dataset.p; if (pp === 'add') { AD.tags = AD.tags.includes(tg) ? AD.tags.filter(x => x !== tg) : [...AD.tags, tg]; renderAddTags(); } else { TS.tags = TS.tags.includes(tg) ? TS.tags.filter(x => x !== tg) : [...TS.tags, tg]; renderTTags(); onTaskInput(); } const nb = $(`#${pp}-tags [data-id="${tg}"]`); if (nb) nb.focus(); break; }
+    case 'tp-tag': { const tg = b.dataset.id, pp = b.dataset.p; if (pp === 'add') { if (tg === AD.auto || tg === assigneeFor(AD.list)) { AD.touched = true; AD.auto = null; } AD.tags = AD.tags.includes(tg) ? AD.tags.filter(x => x !== tg) : [...AD.tags, tg]; renderAddTags(); } else { TS.tags = TS.tags.includes(tg) ? TS.tags.filter(x => x !== tg) : [...TS.tags, tg]; renderTTags(); onTaskInput(); } const nb = $(`#${pp}-tags [data-id="${tg}"]`); if (nb) nb.focus(); break; }
     case 'tp-new': {
       const pp = b.dataset.p, tl = D.tagLists[b.dataset.id]; if (!tl) break;
       const v = await promptDlg({ title: `New tag in ${tl.name}`, label: 'Tag name', yes: 'Add' }); if (!v) break;
@@ -1885,7 +1889,7 @@ document.addEventListener('click', async e => {
     case 'add-opt': AD.open = AD.open === b.dataset.k ? null : b.dataset.k; renderAddChips(); { const f = $('#add-opts .chip'); if (f && AD.open) f.focus(); } break;
     case 'add-set': {
       const k = b.dataset.k, v = b.dataset.v;
-      if (k === 'q') { AD.q = v; AD.open = null; } if (k === 'list') { AD.list = v; AD.open = null; }
+      if (k === 'q') { AD.q = v; AD.open = null; } if (k === 'list') { AD.list = v; AD.open = null; if (!AD.touched) { const a = C.assigneeOnListChange(AD.tags, AD.auto, assigneeFor(v)); AD.tags = a.tags; AD.auto = a.auto; renderAddTags(); } }
       if (k === 'due' || k === 'start') {
         const dk = DATE_KEYS.find(x => x[0] === v), time = k === 'due' ? END_T : START_T;
         AD[k + 'Key'] = v; AD[k] = v === 'none' ? null : v === 'pick' ? AD[k] : atDay(dk[2], time); if (v !== 'pick') AD.open = null;

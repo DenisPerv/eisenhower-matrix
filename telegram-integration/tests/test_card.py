@@ -89,3 +89,48 @@ class CardTaps(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HomeosAssignee(unittest.TestCase):
+    """HomeOS self-improvements #39: a new card in a HomeOS list starts with Assignee HomeOS, as the app's create window."""
+
+    def setUp(self):
+        from fixtures import rpc
+        from tasksboard_telegram.scope import Scope
+        data = rpc()
+        data["lists"].append({"id": "L-hs", "slug": "homeos-selfimprovements", "name": "HomeOS - SelfImprovements",
+                              "default_category": "task", "role": "owner", "members": data["lists"][0]["members"]})
+        data["tag_lists"][1]["tags"].append({"id": "g-hos", "name": "HomeOS"})
+        self.s = Scope.from_rpc(data, MK)
+        self.hos = self.s.list_by_slug("homeos-selfimprovements")
+        self.other = self.s.list_by_slug("othertasks")
+
+    def test_new_card_in_a_homeos_list_picks_homeos(self):
+        c = new_card(Draft(title="x", list_index=self.hos), self.s)
+        self.assertEqual((c.tag_ids, c.auto_tag), (frozenset({"g-hos"}), "g-hos"))
+        c = new_card(Draft(title="x", list_index=self.s.list_by_slug("homeos-tasks")), self.s)  # by slug alone
+        self.assertEqual(c.tag_ids, frozenset({"g-hos"}))
+
+    def test_other_list_and_no_tag(self):
+        self.assertEqual(new_card(Draft(title="x", list_index=self.other), self.s).tag_ids, frozenset())
+        plain = scope()  # its Assignee list has no HomeOS tag
+        self.assertEqual(new_card(Draft(title="x", list_index=plain.list_by_slug("homeos-tasks")), plain).tag_ids, frozenset())
+
+    def test_follows_the_list_until_tapped(self):
+        c = new_card(Draft(title="x", list_index=self.hos), self.s)
+        c = apply(c, f"l{self.other}", self.s, TODAY)
+        self.assertEqual((c.tag_ids, c.auto_tag), (frozenset(), None))
+        c = apply(c, f"l{self.hos}", self.s, TODAY)
+        self.assertEqual(c.tag_ids, frozenset({"g-hos"}))
+        g = self.s.tag_index("g-hos")
+        c = apply(c, f"g{g}", self.s, TODAY)  # untick by hand
+        self.assertEqual((c.tag_ids, c.tag_touched), (frozenset(), True))
+        c = apply(apply(c, f"l{self.other}", self.s, TODAY), f"l{self.hos}", self.s, TODAY)
+        self.assertEqual(c.tag_ids, frozenset())  # never changed again by a list switch
+
+    def test_change_card_never_adds(self):
+        o = Origin(item_id="i", version=1, ref="T1", list_id="L-hs", quadrant=None, owner_id=MK, due_date=None,
+                   due_time=None, title="t", details="")
+        c = change_card(o, self.s, owner_handle="maksym")
+        self.assertEqual(c.tag_ids, frozenset())
+        self.assertEqual(apply(c, f"l{self.other}", self.s, TODAY).tag_ids, frozenset())

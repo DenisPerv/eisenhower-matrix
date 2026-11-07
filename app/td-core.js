@@ -797,6 +797,31 @@
     if (cat && cat.default_list_id && lists.includes(cat.default_list_id) && may(cat.default_list_id)) return cat.default_list_id;
     return lists.find(l => may(l) && byId[l] && byId[l].owner_id === o.meId) || lists.find(may) || '';
   }
+  // HomeOS self-improvements #39 (Maksym 2026-11-07): a new task in a HomeOS list (name "HomeOS - …" or slug "homeos-…") is for
+  // HomeOS, so the create window starts with the tag HomeOS of the tag list Assignee picked, as HomeOS's board.js does (names as
+  // in its scripts/lib/tasksdb.js ASSIGNEE, matched without case). Only a live, visible tag list the caller may see counts; with
+  // several, the one owned by the list's owner, then the caller's own, then the first by id. Returns the tag id, or null
+  const ASSIGNEE_DEFAULT = { tagList: 'Assignee', tag: 'HomeOS' };
+  const isHomeosList = l => !!l && (/^HomeOS - /.test(String(l.name || '')) || /^homeos-/.test(String(l.slug || '')));
+  function homeosAssigneeTag(o) {
+    const p = o || {}, l = p.list, low = s => String(s || '').toLowerCase();
+    if (!isHomeosList(l)) return null;
+    const rank = x => x.owner_id && x.owner_id === l.owner_id ? 0 : x.owner_id && x.owner_id === p.meId ? 1 : 2;
+    const tls = Object.values(p.tagLists || {}).filter(x => x && x.role && !x.archived_at && !x.hidden && low(x.name) === low(ASSIGNEE_DEFAULT.tagList))
+      .sort((a, b) => rank(a) - rank(b) || String(a.id).localeCompare(String(b.id)));
+    for (const tl of tls) {
+      const t = Object.values(p.tags || {}).find(x => x && x.tag_list_id === tl.id && !x.deleted_at && low(x.name) === low(ASSIGNEE_DEFAULT.tag));
+      if (t) return t.id;
+    }
+    return null;
+  }
+  // the create window's list changed: the auto-picked tag (auto; null once the person ticked or unticked it) leaves, and the new
+  // list's tag (next, from homeosAssigneeTag) comes, unless the person picked it already. Returns { tags, auto }
+  function assigneeOnListChange(tags, auto, next) {
+    const out = (tags || []).filter(x => !auto || x !== auto);
+    if (!next || out.includes(next)) return { tags: out, auto: null };
+    return { tags: out.concat(next), auto: next };
+  }
   // round 3, adjustment 2: the list rpc/create_list made, inserted locally at once. The RPC returns a uuid (db/010) or
   // { id, slug, name, sort } (db/012, as an object or a one-row array); what it leaves out comes from the request
   function createdList(json, req) {
@@ -1514,6 +1539,7 @@
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
+    ASSIGNEE_DEFAULT, isHomeosList, homeosAssigneeTag, assigneeOnListChange,
     createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
     CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,

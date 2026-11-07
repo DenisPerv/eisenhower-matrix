@@ -54,6 +54,8 @@ class Card:
     origin: Origin | None = None
     agent_handle: str = "homeos-agent"
     agent_list_slug: str | None = "homeos-tasks"
+    auto_tag: str | None = None  # the Assignee HomeOS tag picked for a HomeOS list, while it follows the list
+    tag_touched: bool = False    # the person tapped that tag: list changes leave the tags alone
 
     def lst(self, scope: Scope) -> ScopeList:
         return scope.lists[self.list_index]
@@ -127,6 +129,40 @@ def _fit_owner(card: Card, scope: Scope) -> Card:
     return card if card.lst(scope).member_by_handle(handle) else replace(card, owner="me")
 
 
+ASSIGNEE_DEFAULT = ("Assignee", "HomeOS")  # tag list, tag: as the app's core ASSIGNEE_DEFAULT
+
+
+def is_homeos_list(lst: ScopeList) -> bool:
+    return lst.name.startswith("HomeOS - ") or lst.slug.startswith("homeos-")
+
+
+def homeos_assignee_tag(lst: ScopeList, scope: Scope) -> str | None:
+    """HomeOS self-improvements #39, twin of the app's core homeosAssigneeTag: a new item in a HomeOS list starts with the
+    tag HomeOS of the tag list Assignee (names without case). With several such tag lists: the list owner's, then the
+    asker's, then the first by id. None when the list is not a HomeOS list or the scope has no such tag."""
+    if not is_homeos_list(lst):
+        return None
+    owner = next((m.handle for m in lst.members if m.role == "owner"), None)
+    rank = lambda t: (0 if owner and t.owner == owner else 1 if t.owner == scope.person else 2, t.id)  # noqa: E731
+    want_list, want_tag = (x.casefold() for x in ASSIGNEE_DEFAULT)
+    for tl in sorted((t for t in scope.tag_lists if t.name.casefold() == want_list), key=rank):
+        hit = next((g.id for g in tl.tags if g.name.casefold() == want_tag), None)
+        if hit:
+            return hit
+    return None
+
+
+def _follow_list(card: Card, scope: Scope) -> Card:
+    """A new card's auto-picked Assignee tag follows its list until the person taps that tag."""
+    if card.mode != "add" or card.tag_touched:
+        return card
+    nxt = homeos_assignee_tag(card.lst(scope), scope)
+    ids = card.tag_ids - {card.auto_tag} if card.auto_tag else card.tag_ids
+    if not nxt or nxt in ids:
+        return replace(card, tag_ids=frozenset(ids), auto_tag=None)
+    return replace(card, tag_ids=frozenset(ids | {nxt}), auto_tag=nxt)
+
+
 def pick_due(pick: str, today: date) -> date | None:
     if pick == "today":
         return today
@@ -147,7 +183,7 @@ def apply(card: Card, op: str, scope: Scope, today: date) -> Card:
     num = int(arg) if arg.isdigit() else None
     clear = card.guessed
     if head == "l" and num is not None and num < len(scope.lists):
-        return _fit_owner(replace(card, list_index=num, view="main", guessed=clear - {"list"}), scope)
+        return _follow_list(_fit_owner(replace(card, list_index=num, view="main", guessed=clear - {"list"}), scope), scope)
     if head == "L":
         return replace(card, view="lists")
     if head == "d" and num is not None and num < len(DUE_PICKS):
@@ -159,6 +195,8 @@ def apply(card: Card, op: str, scope: Scope, today: date) -> Card:
     if head == "g" and num is not None and num < len(scope.all_tags):
         tid = scope.all_tags[num][1].id
         ids = card.tag_ids - {tid} if tid in card.tag_ids else card.tag_ids | {tid}
+        if card.mode == "add" and (tid == card.auto_tag or tid == homeos_assignee_tag(card.lst(scope), scope)):
+            return replace(card, tag_ids=frozenset(ids), auto_tag=None, tag_touched=True)
         return replace(card, tag_ids=frozenset(ids))
     if head == "p" and num is not None and num * TAGS_PER_PAGE < max(len(scope.all_tags), 1):
         return replace(card, page=num)
@@ -187,7 +225,7 @@ def new_card(d: Draft, scope: Scope, **kw: object) -> Card:
     card = Card(mode="add", title=d.title, list_index=d.list_index, quadrant=d.quadrant, auto_pick=d.auto_pick,
                 owner=d.owner, due_date=d.due_date, due_time=d.due_time or (DEFAULT_TIME if d.due_date else None),
                 details=d.details, guessed=d.guessed, **kw)  # type: ignore[arg-type]
-    return _fit_owner(card, scope)
+    return _follow_list(_fit_owner(card, scope), scope)
 
 
 def change_card(o: Origin, scope: Scope, *, owner_handle: str | None, **kw: object) -> Card:
