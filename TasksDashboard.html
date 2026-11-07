@@ -403,7 +403,7 @@ dialog input.tag-new{width:4ch;min-width:4ch;max-width:100%;min-height:28px;bord
 .err{color:var(--danger-ink);font-weight:600;font-size:12px;min-height:16px;margin-top:2px}
 .actions{display:flex;gap:var(--s3);justify-content:flex-end;margin-top:var(--s6)}
 .actions button{min-height:38px;padding:0 18px;border-radius:12px;font:600 14px var(--ui)}
-.fdec-b button{min-height:38px;padding:0 18px;border-radius:12px;font:600 14px var(--ui)}
+.fdec-b>button{min-height:38px;padding:0 18px;border-radius:12px;font:600 14px var(--ui)}
 #fs,#s-save,#g,.fdec-yes{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#FFFFFF;box-shadow:0 10px 26px -10px var(--glow)}
 #fs:hover,#s-save:hover,#g:hover,.fdec-yes:not(:disabled):hover{filter:brightness(1.08);box-shadow:0 12px 30px -8px var(--glow)}
 #cf-ok{background:var(--danger);border-color:transparent;color:#FFFFFF;box-shadow:0 10px 26px -10px var(--danger)}
@@ -755,7 +755,7 @@ dialog input,dialog select,.rt,.welcome input{border-radius:var(--r)}
 .tagchip[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
 .tag-add{border-radius:var(--r-sm)}
 dialog input.tag-new{border-radius:var(--r-sm)}
-.actions button,.fdec-b button{border-radius:var(--r);font:500 15px var(--ui)}
+.actions button,.fdec-b>button{border-radius:var(--r);font:500 15px var(--ui)}
 #fs,#s-save,#g,.fdec-yes{background:var(--accent);box-shadow:0 10px 24px -14px var(--glow)}
 /* the dark accent is light: dark ink on every label set on it keeps it above 4.5:1, as on #si-go */
 :root[data-theme="dark"] :is(#fs,#s-save,#g,.fdec-yes,.toast button,.tagchip[aria-pressed="true"],.fmt [aria-pressed="true"]:not(:hover),.tl-d.td){color:var(--solid)}
@@ -1023,7 +1023,7 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .actions .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
 .actions .danger{color:var(--danger-ink)}
 /* the decision block of a self-improvement card (details.decision): two answers above the description; the chosen one is ringed */
-/* the done checkbox before the title (2026-11-07) */
+/* the done checkbox at the right end of the title row (2026-11-07) */
 .ftrow{display:flex;align-items:center;gap:10px}.ftrow #ft{flex:1;min-width:0}
 .fdone{flex:none;width:22px;height:22px;margin:0;accent-color:var(--accent);cursor:pointer}
 /* the quadrant buttons under the title (2026-11-07): an outline in the quadrant's colour, the current one filled */
@@ -1031,9 +1031,10 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .fquad button{min-height:32px;padding:0 14px;border-radius:999px;border:1.5px solid var(--c);background:transparent;color:var(--ink2);font:500 13.5px var(--ui);cursor:pointer}
 .fquad button[aria-pressed="true"]{background:var(--c);color:var(--c-on);font-weight:600}
 .fquad button:disabled{cursor:default;opacity:.55}.fquad button[aria-pressed="true"]:disabled{opacity:.8}
-.fdec-b{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:6px}
+.fdec-b{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:6px}
+.fdec-b .fquad{margin:0 0 0 auto}
 .fdec-b .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
-.fdec-b [aria-pressed="true"]{box-shadow:0 0 0 2px var(--solid),0 0 0 4px var(--accent)}
+.fdec-b>[aria-pressed="true"]{box-shadow:0 0 0 2px var(--solid),0 0 0 4px var(--accent)}
 .fdec-b .quiet[aria-pressed="true"]{color:var(--ink)}
 .fdec-s{margin:6px 0 0;font-size:13px}
 .actions .danger:hover{background:var(--danger-bg);border-color:var(--danger)}
@@ -4582,28 +4583,29 @@ function openTask(id, quad, opts) {
   const ansHtml = view && view.answer ? '<div class="fans"><div class="flabel" id="fans-l">Your answer</div><div class="md fans-r" id="fans-r"' + (editable ? ' tabindex="0" title="Click to edit"' : '') + ' hidden></div><textarea class="rt fraw" id="fans" rows="3" aria-labelledby="fans-l" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
   const readInner = v => v.blocks.length || v.links ? '<div class="md fmd">' + C.cardViewHtml(v) + '</div>' : '<p class="n">No description</p>';
   const readHtml = ansHtml + (!readFirst && !editable ? '' : '<div id="fread"' + (readFirst ? '' : ' hidden') + (editable ? ' tabindex="0" title="Click to edit" aria-describedby="fn-l"' : '') + '>' + (readFirst ? readInner(view) : '') + '</div>');
+  // the quadrant buttons share the Decision row on a decision card, at its right end (Anastasiia, 2026-11-07, after her local test)
+  const shownQ = t ? t.q : null, q0 = dr.q || shownQ || quad || 'B';
+  const quadHtml = '<div class="fquad" role="group" aria-label="Quadrant">' + QS.map(q => '<button type="button" data-fq="' + q + '" data-q="' + q + '" aria-pressed="' + (q === q0) + '"' + ro + '>' + QN[q] + '</button>').join('') + '</div>';
   const decHtml = !dec ? '' : '<div class="fdec" role="group" aria-labelledby="fdec-l"><div class="flabel" id="fdec-l">Decision</div><div class="fdec-b">' +
     [1, 0].map(v => '<button type="button" class="' + (v ? 'fdec-yes' : 'quiet') + '" data-dec="' + v + '" aria-pressed="' + (dec.answer === v) + '"' + (decOn ? '' : ' disabled') + '>' +
-      (dec.answer === v ? '✓ ' : '') + esc(v ? dec.label_1 : dec.label_0) + '</button>').join('') + '</div>' +
+      (dec.answer === v ? '✓ ' : '') + esc(v ? dec.label_1 : dec.label_0) + '</button>').join('') + quadHtml + '</div>' +
     (decState ? '<p class="n fdec-s" id="fdec-s">' + esc(decState) + '</p>' : '') + '</div>';
   // the quadrant (2026-11-07, Anastasiia): four buttons under the title, the current one pressed. A pick is an unsaved change; Save
   // applies it as a drag does (C.quadPick: stored quadrant, pin; on top of the new quadrant), in the window's one write. A new task
   // starts in the quadrant whose + was clicked
-  // the done checkbox before the title (2026-11-07, Anastasiia): a tick saves the window's edits with status done in one write, toast
+  // the done checkbox at the right end of the title row (2026-11-07, Anastasiia): a tick saves the window's edits with status done in one write, toast
   // "Completed" with Undo, then the next task of the shown order (none: the window closes). Not on a decision card (its answer buttons
   // close it), a task awaiting its check (settle.js would read it as closed by hand), a read-only, done or new task, or a preview
   const doneOn = !!t && editable && !o.preview && !C.decisionOf(t) && t.status !== 'waiting' && !C.awaitingCheck(t) && !C.CLOSED.includes(t.status);
   const doneHtml = doneOn ? '<input type="checkbox" class="fdone" id="fdone" aria-label="Mark done" title="Mark done">' : '';
-  const shownQ = t ? t.q : null, q0 = dr.q || shownQ || quad || 'B';
-  const quadHtml = '<div class="fquad" role="group" aria-label="Quadrant">' + QS.map(q => '<button type="button" data-fq="' + q + '" data-q="' + q + '" aria-pressed="' + (q === q0) + '"' + ro + '>' + QN[q] + '</button>').join('') + '</div>';
   const formHtml = '<form method="dialog"><div class="tk-head"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
     (t && C.awaitingCheck(t) ? '<p class="note">Waits for your check: answer its check card.</p>' : '') +
     (locked ? '<p class="note">' + (t.status === 'done' ? 'Done' : 'Cancelled') + (t.doneAt ? ' ' + fmtDay(t.doneAt) : '') + '. Read only. Restore it from the archive to change it.</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
-    '<div class="flabel" id="ft-l">Title</div><div class="ftrow">' + doneHtml + '<div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div></div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
-    quadHtml + decHtml + (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
+    '<div class="flabel" id="ft-l">Title</div><div class="ftrow"><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
+    (dec ? '' : quadHtml) + decHtml + (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
     '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
     '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>' +
     // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its

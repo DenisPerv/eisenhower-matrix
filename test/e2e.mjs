@@ -1467,7 +1467,7 @@ async function gCard() {
   // the check card: answer first, stored order, links last, the answer writes in its place and the card closes at once
   await T.wait('!!document.querySelector(\'[data-card="' + card.id + '"]\')', 8000);
   await T.click('[data-card="' + card.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fans")', 8000); await sleep(900);
-  const cv = await T.ev('(()=>{const d=document.querySelector("' + W + '"),a=d.querySelector("#fans"),m=d.querySelector(".fmd"),t=m.textContent,b=[...d.querySelectorAll("[data-dec]")];return {first:!!(a.compareDocumentPosition(m)&Node.DOCUMENT_POSITION_FOLLOWING),order:t.indexOf("What was done")<t.indexOf("How to check")&&t.indexOf("How to check")<t.indexOf("Deviations"),links:t.lastIndexOf("a/b.md")>t.indexOf("When it takes effect"),noPrompt:!t.includes("Write your answer below"),labels:b.map(x=>x.textContent),noBadge:!d.querySelector(".tb.check")}})()');
+  const cv = await T.ev('(()=>{const d=document.querySelector("' + W + '"),a=d.querySelector("#fans"),m=d.querySelector(".fmd"),t=m.textContent,b=[...d.querySelectorAll(".tk-card [data-dec]")];return {first:!!(a.compareDocumentPosition(m)&Node.DOCUMENT_POSITION_FOLLOWING),order:t.indexOf("What was done")<t.indexOf("How to check")&&t.indexOf("How to check")<t.indexOf("Deviations"),links:t.lastIndexOf("a/b.md")>t.indexOf("When it takes effect"),noPrompt:!t.includes("Write your answer below"),labels:b.map(x=>x.textContent),noBadge:!d.querySelector(".tb.check")}})()');
   check(G, 'a check card shows its answer box first, its sections in stored order, its links last', cv.first && cv.order && cv.links && cv.noPrompt && cv.noBadge && JSON.stringify(cv.labels) === '["Accept","Needs changes"]', JSON.stringify(cv));
   await T.shot('card-check-1280x800');
   await T.size(375, 812); await sleep(500);
@@ -1527,7 +1527,7 @@ async function gCard() {
   const noTick = async id => { if (!(await T.has('[data-card="' + id + '"]'))) return true; await T.click('[data-card="' + id + '"]'); await T.wait('!!document.querySelector("' + W + ' #ft")', 5000); const n = !(await T.has(W + ' #fdone')); await closeDialogs(T); await sleep(200); return n; };
   check(G, 'done checkbox: none on a check card or a waiting task', await noTick(card.id) && await noTick(wait.id));
   await T.click('[data-card="' + dn1.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fdone")', 5000);
-  check(G, 'done checkbox: before the title, labelled Mark done', await T.ev('(()=>{const d=document.querySelector("' + W + '"),c=d.querySelector("#fdone"),t=d.querySelector("#ft");return c.getAttribute("aria-label")==="Mark done"&&c.getBoundingClientRect().right<=t.getBoundingClientRect().left})()'));
+  check(G, 'done checkbox: at the right end of the title row, labelled Mark done', await T.ev('(()=>{const d=document.querySelector("' + W + '"),c=d.querySelector("#fdone"),t=d.querySelector("#ft");return c.getAttribute("aria-label")==="Mark done"&&c.getBoundingClientRect().left>=t.getBoundingClientRect().right&&Math.abs((c.getBoundingClientRect().top+c.getBoundingClientRect().bottom)-(t.getBoundingClientRect().top+t.getBoundingClientRect().bottom))<24})()'));
   await T.shot('card-done-tick-1280x800');
   await T.ev('(()=>{const d=document.querySelector("' + W + '"),t=d.querySelector("#ft");t.textContent=' + JSON.stringify(RUN + ' card done tick a2') + ';t.dispatchEvent(new Event("input",{bubbles:true}));d.querySelector("#fdone").click();return true})()');
   const dt = await until(async () => { const x = await item(dn1.id); return x && x.status === 'done' ? x : null; });
@@ -1575,7 +1575,7 @@ async function gCard() {
     const pa = await until(async () => { const x = await item(c2.id); return x && x.details.decision.answer === 1 ? x : null; });
     check(G, 'phone: Accept with an answer: the card closed at once (done), the text in its place', !!pa && pa.status === 'done' && pa.body_md === CARD.replace('next scan._\n\n## Links', 'next scan._\nPhone answer\n\n## Links'), pa && JSON.stringify([pa.status, pa.body_md.slice(-80)]));
   } else check(G, 'phone: the check card opens with its answer box', false, P.errors.slice(-2).join(' / '));
-  // phone: the done checkbox before the title marks the task done
+  // phone: the done checkbox at the right end of the title row marks the task done
   const pd = '.card[data-tid="' + dn2.id + '"] .cmain';
   if (await phoneCard(pd, 'B')) {
     await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); await P.click(pd); await P.wait('!!document.querySelector("#dlg-task[open] #t-done")', 8000);
@@ -1613,6 +1613,10 @@ async function gDecision(G, T) {
   const blk = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('.fdec'),bs=[...f.querySelectorAll('[data-dec]')],desc=d.querySelector('#fn');
     return {labels:bs.map(x=>x.textContent),on:bs.every(x=>!x.disabled),above:!!(f.compareDocumentPosition(desc)&Node.DOCUMENT_POSITION_FOLLOWING),yesLikeSave:getComputedStyle(bs[0]).backgroundImage===getComputedStyle(d.querySelector('#fs')).backgroundImage&&getComputedStyle(bs[0]).backgroundColor===getComputedStyle(d.querySelector('#fs')).backgroundColor}})()`) : null;
   check(G, 'decision (web): the block shows Yes and No above the description, both on, Yes styled like Save', !!blk && JSON.stringify(blk.labels) === '["Yes","No"]' && blk.on && blk.above && blk.yesLikeSave, JSON.stringify(blk));
+  // the quadrant buttons share the Decision row, at its right end (2026-11-07, after Anastasiia's local test); none above it
+  const dq = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),row=d.querySelector('.tk-card .fdec .fdec-b'),q=row&&row.querySelector('.fquad'),y=row&&row.querySelector('[data-dec]');if(!q||!y)return null;const r=row.getBoundingClientRect(),a=q.getBoundingClientRect(),b=y.getBoundingClientRect();
+    return {n:q.querySelectorAll('[data-fq]').length,only:d.querySelectorAll('.tk-card .fquad').length,same:Math.abs((a.top+a.bottom)-(b.top+b.bottom))<12,right:Math.abs(r.right-a.right)<2&&a.left>b.right}})()`) : null;
+  check(G, 'decision (web): the quadrant buttons sit on the Decision row at its right end, none above it', !!dq && dq.n === 4 && dq.only === 1 && dq.same && dq.right, JSON.stringify(dq));
   await sleep(900); // the window's open animation ends first
   await T.shot('decision-web-1440x900');
   await T.size(390, 844); await sleep(500);
@@ -1659,6 +1663,7 @@ async function gDecision(G, T) {
   const pb = sheet ? await P.ev(`(()=>{const d=document.querySelector('#dlg-task'),bs=[...d.querySelectorAll('[data-act="t-decide"]')],desc=d.querySelector('#t-desc');
     return {labels:bs.map(x=>x.textContent),on:bs.every(x=>!x.disabled),above:!!(d.querySelector('.fdec').compareDocumentPosition(desc)&Node.DOCUMENT_POSITION_FOLLOWING),primary:bs[0].classList.contains('primary'),wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
   check(G, 'decision (phone): the sheet shows Yes (primary) and No above the description, both on, no horizontal scroll', !!pb && JSON.stringify(pb.labels) === '["Yes","No"]' && pb.on && pb.above && pb.primary && !pb.wide, JSON.stringify(pb) + ' ' + P.errors.slice(-2).join(' / '));
+  check(G, 'decision (phone): the quadrant buttons are in the Decision row (they may wrap below the answers)', sheet && await P.ev('!!document.querySelector("#dlg-task .fdec-b #t-quad")&&document.querySelectorAll("#dlg-task .tquad").length===1'));
   await sleep(900); // the sheet's open animation ends first
   await P.shot('decision-app-390x844');
   await P.size(1440, 900); await sleep(500);

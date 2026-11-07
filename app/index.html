@@ -396,6 +396,7 @@ dialog.alert form .field{margin:0 0 6px}
 .tquad .chip:disabled{opacity:.55}.tquad .chip[aria-pressed="true"]:disabled{opacity:.85}
 .fdec-b{display:flex;gap:10px;flex-wrap:wrap}
 .fdec-b .btn{flex:1 1 0;min-width:120px}
+.fdec-b .tquad{flex:1 1 280px;margin:0 0 0 auto}
 .fdec-b .btn[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
 .fdec-s{margin:8px 0 0;font-size:13px;color:var(--ink2)}
 .src{margin:0 0 16px;font:400 14px/1.45 var(--font);color:var(--ink2)}
@@ -1475,15 +1476,17 @@ function openTask(id, swap, draft) {
   const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
     : dec.answer !== null ? ['Answered “' + (dec.answer ? dec.label_1 : dec.label_0) + '”', decWho(dec.answered_by), decDay(dec.answered_at)].filter(Boolean).join(' · ')
     : ro && !closed && !(L(t.list) && L(t.list).archived_at) ? 'Only an editor of this list can answer' : '';
-  const decHtml = !dec ? '' : `<div class="field fdec" role="group" aria-labelledby="t-dec-l"><span class="flabel" id="t-dec-l">Decision</span><div class="fdec-b">${[1, 0].map(v => `<button type="button" class="btn${v ? ' primary' : ''}" data-act="t-decide" data-v="${v}" aria-pressed="${dec.answer === v}"${decOn ? '' : ' disabled'}>${dec.answer === v ? '✓ ' : ''}${esc(v ? dec.label_1 : dec.label_0)}</button>`).join('')}</div>${decState ? `<p class="fdec-s" id="t-dec-s">${esc(decState)}</p>` : ''}</div>`;
+  // the quadrant buttons share the Decision row on a decision card, at its right end (Anastasiia, 2026-11-07, after her local test)
+  const quadHtml = `<div class="tquad" id="t-quad" role="group" aria-label="Quadrant">${QS.map(q => `<button type="button" class="chip" data-act="t-quad" data-v="${q}" data-q="${q}" aria-pressed="${q === TS.q}"${ro ? ' disabled' : ''}>${QN[q]}</button>`).join('')}</div>`;
+  const decHtml = !dec ? '' : `<div class="field fdec" role="group" aria-labelledby="t-dec-l"><span class="flabel" id="t-dec-l">Decision</span><div class="fdec-b">${[1, 0].map(v => `<button type="button" class="btn${v ? ' primary' : ''}" data-act="t-decide" data-v="${v}" aria-pressed="${dec.answer === v}"${decOn ? '' : ' disabled'}>${dec.answer === v ? '✓ ' : ''}${esc(v ? dec.label_1 : dec.label_0)}</button>`).join('')}${quadHtml}</div>${decState ? `<p class="fdec-s" id="t-dec-s">${esc(decState)}</p>` : ''}</div>`;
   $('#task-body').innerHTML = `
     ${lowConf(t) ? `<p class="note info">Added by an assistant with low confidence${t.aiConfidence !== null ? ` (${t.aiConfidence.toFixed(2)})` : ''}. Check the list and the text.</p>` : ''}
     ${closed ? `<div class="banner">${ic('lock')}<span>${t.status === 'done' ? 'Done' : 'Cancelled'}${t.doneAt ? ' ' + ymd(t.doneAt) : ''}. Restore it from Me, Archive, to change it.</span></div>` : ''}
     ${C.awaitingCheck(t) ? '<p class="note info">Waits for your check: answer its check card.</p>' : ''}
     <div class="note" id="t-conflict" role="alert" hidden></div>
-    <div class="ttrow">${doneOn ? '<input type="checkbox" class="tdone" id="t-done" aria-label="Mark done">' : ''}<label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label></div>
+    <div class="ttrow"><label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label>${doneOn ? '<input type="checkbox" class="tdone" id="t-done" aria-label="Mark done">' : ''}</div>
     <p class="err" id="t-title-err" hidden></p>
-    <div class="tquad" id="t-quad" role="group" aria-label="Quadrant">${QS.map(q => `<button type="button" class="chip" data-act="t-quad" data-v="${q}" data-q="${q}" aria-pressed="${q === TS.q}"${ro ? ' disabled' : ''}>${QN[q]}</button>`).join('')}</div>
+    ${dec ? '' : quadHtml}
     <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>
     ${decHtml}
     <div class="field"><span class="flabel" id="t-desc-l">Description</span>
