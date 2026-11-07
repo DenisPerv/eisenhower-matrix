@@ -45,3 +45,29 @@ test('item 4: the task window (tagGroups without archived) never lists an archiv
   assert.ok(!ids.includes('X') && !ids.includes('Y'));
   assert.ok(ids.includes('D') && ids.includes('A'));
 });
+
+// quadrant buttons (2026-11-07, Anastasiia): a pick in the window is written as a drag writes it (moveTask), and only when it differs
+test('quadPick: the shown quadrant again -> nothing; another one -> stored quadrant, pin only when the urgency side changes', () => {
+  assert.equal(C.quadPick('A', 'A'), null, 'same quadrant: a quadrant changed elsewhere meanwhile is kept');
+  assert.equal(C.quadPick('B', 'x'), null, 'not a quadrant');
+  assert.deepEqual(C.quadPick('A', 'B'), { qStored: 'B', pin: false }, 'urgent to not urgent');
+  assert.deepEqual(C.quadPick('B', 'C'), { qStored: 'C', pin: true });
+  assert.deepEqual(C.quadPick('A', 'C'), { qStored: 'C' }, 'both urgent: the pin stays');
+  assert.deepEqual(C.quadPick('B', 'D'), { qStored: 'D' }, 'both not urgent: the pin stays');
+  // the derived quadrant of a task the drag rule would write the same way
+  for (const from of C.QS) for (const to of C.QS) {
+    const p = C.quadPick(from, to); if (!p) continue;
+    const t = { qStored: p.qStored, category: 'task', pin: p.pin, deadline: null };
+    assert.equal(C.deriveQuadrant(t, null, 0), to);
+  }
+});
+
+test('the task window: four quadrant buttons under the title, wired on Save through C.quadPick, in the one versioned write', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  assert.match(html, /class="fquad" role="group" aria-label="Quadrant"/);
+  assert.match(html, /const qp = t \? C\.quadPick\(shownQ, pickQ\) : null;/);
+  assert.match(html, /if \(qp\) Object\.assign\(x, qp\);/);
+  const app = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'app', 'index.html'), 'utf8');
+  assert.match(app, /id="t-quad" role="group" aria-label="Quadrant"/);
+  assert.match(app, /if \(st\.q !== st\.q0\) f\.q = st\.q;/);
+});

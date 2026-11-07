@@ -512,6 +512,15 @@
     const urgent = t.pin !== undefined && t.pin !== null ? !!t.pin : !!(t.deadline && t.deadline.getTime() - now <= s.windowDays * DAY);
     return important ? (urgent ? 'A' : 'B') : (urgent ? 'C' : 'D');
   }
+  // the quadrant picked in the task window (2026-11-07, Anastasiia), applied as a drag applies it (moveTask): the stored quadrant and,
+  // when the urgency side changes, the pin. null when the pick is the quadrant the window showed, so a quadrant changed elsewhere
+  // meanwhile is kept
+  function quadPick(from, to) {
+    if (!QS.includes(to) || to === from) return null;
+    const r = { qStored: to };
+    if (URGENT[to] !== URGENT[from]) r.pin = URGENT[to];
+    return r;
+  }
   // round 3, adjustment 11: "due soon" = open, not overdue, and less than threshold % of the urgency window left
   function dueSoon(t, settings, now) {
     const s = settings || SETTINGS_DEFAULTS;
@@ -1500,7 +1509,7 @@
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
-    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
+    deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,

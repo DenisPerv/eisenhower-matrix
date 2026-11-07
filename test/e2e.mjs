@@ -416,10 +416,18 @@ async function gData() {
   await undo(T);
   check(G, 'undo edit: the old title is back', await until(async () => (await item(e.id)).title === `${RUN} edit me`));
   await T.wait('!document.querySelector("dialog[open]")');
-  // edit window, item 1: the task window has no Quadrant field; a quadrant is pinned by dragging the card into another quadrant
+  // quadrant buttons (2026-11-07, Anastasiia; replaces edit window item 1): four buttons under the title, the current one pressed;
+  // a pick plus an End change is one versioned write, as a drag writes the quadrant (stored quadrant, pin)
   await T.click(`[data-card="${e.id}"]`); await T.wait('!!document.querySelector("dialog[open] #ft")');
-  check(G, 'the task window has no Quadrant field (edit window, item 1)', await T.ev('!document.querySelector("dialog[open] #fq")'));
-  await closeDialogs(T);
+  const qb = await T.ev('[...document.querySelectorAll("dialog[open] .fquad [data-fq]")].map(b=>b.dataset.fq+(b.getAttribute("aria-pressed")==="true"?"*":"")).join(" ")');
+  check(G, 'the task window shows four quadrant buttons, the current one pressed', qb === 'A B* C D', qb);
+  await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('[data-fq="C"]').click();d.querySelector('#fd').value='2026-12-01T18:00';d.querySelector('#fd').dispatchEvent(new Event('input',{bubbles:true}));d.querySelector('#fs').click();return true})()`);
+  const qm = await until(async () => { const x = await item(e.id); return x.quadrant === 'C' && x.due_at && x; });
+  check(G, 'quadrant buttons: a pick plus a new End in one save (quadrant C, pin set, version +1)', !!qm && qm.urgent_pin === true && qm.version > ed.version, qm && JSON.stringify({ q: qm.quadrant, pin: qm.urgent_pin, v: qm.version }));
+  await undo(T);
+  check(G, 'undo the pick: back to B, End and pin cleared', await until(async () => { const x = await item(e.id); return x.quadrant === 'B' && x.urgent_pin === null && !x.due_at; }));
+  await T.wait('!document.querySelector("dialog[open]")');
+  await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(800);
   await T.ev(`(()=>{const src=document.querySelector('[data-card="${e.id}"]'),dst=document.querySelector('section.q[data-q="A"]');const dt=new DataTransfer();const r=dst.getBoundingClientRect();
     const fire=(el,type)=>el.dispatchEvent(new DragEvent(type,{bubbles:true,cancelable:true,dataTransfer:dt,clientX:r.left+r.width/2,clientY:r.bottom-4}));
     fire(src,'dragstart');fire(dst,'dragover');fire(dst,'drop');fire(src,'dragend');return true})()`);
@@ -1111,14 +1119,15 @@ async function gUi() {
     await T.ev(`(${r4c}.click(),true)`); await T.wait('!!document.querySelector("dialog[open] #ft")', 5000);
     check(G, `${who}: the task window shows the number (Card layout) and no Sources while Source is off (round 4, items 3, 5)`,
       await T.ev(`(document.getElementById('fwho')?.textContent||'')===${r4c}.querySelector('.ref').textContent&&!document.querySelector('dialog[open] #srcs')`), await T.ev(`document.getElementById('fwho')?.textContent`));
-    // edit window, items 1-3: no Quadrant, no For; the number sits on the formatting row (right at 1440, under the buttons at 390)
-    const rowAt = `(()=>{const d=document.querySelector('dialog[open]'),f=d.querySelector('.fbar .fmt'),w=d.querySelector('.fbar #fwho');if(!f||!w)return null;const a=f.getBoundingClientRect(),b=w.getBoundingClientRect();return {same:Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<=4,below:b.top>=a.bottom-1,right:b.left>a.right,fits:d.scrollWidth<=d.clientWidth,fq:!!d.querySelector('#fq'),forText:d.querySelector('#fwho').textContent.split(' ').includes('For')}})()`;
+    // edit window, items 2-3: no For; the number sits on the formatting row (right at 1440, under the buttons at 390); the quadrant
+    // buttons (2026-11-07) are there, four in one row that fits
+    const rowAt = `(()=>{const d=document.querySelector('dialog[open]'),f=d.querySelector('.fbar .fmt'),w=d.querySelector('.fbar #fwho');if(!f||!w)return null;const a=f.getBoundingClientRect(),b=w.getBoundingClientRect();return {same:Math.abs((a.top+a.bottom)/2-(b.top+b.bottom)/2)<=4,below:b.top>=a.bottom-1,right:b.left>a.right,fits:d.scrollWidth<=d.clientWidth,fq:d.querySelectorAll('.fquad [data-fq]').length,fqFits:(()=>{const q=d.querySelector('.fquad');return !!q&&q.scrollWidth<=q.clientWidth+1})(),forText:d.querySelector('#fwho').textContent.split(' ').includes('For')}})()`;
     const wide = await T.ev(rowAt);
-    check(G, `${who}: task window at 1440: no Quadrant, no For, the info line on the formatting row, right of the buttons (edit window, items 1-3)`, !!wide && wide.same && wide.right && !wide.fq && !wide.forText, JSON.stringify(wide));
+    check(G, `${who}: task window at 1440: four quadrant buttons, no For, the info line on the formatting row, right of the buttons (edit window, items 2-3)`, !!wide && wide.same && wide.right && wide.fq === 4 && wide.fqFits && !wide.forText, JSON.stringify(wide));
     await sleep(400); await T.shot(`ui-edit-window-${who}-1440x900-${theme}`);
     await T.size(390, 844); await sleep(400);
     const narrow = await T.ev(rowAt);
-    check(G, `${who}: task window at 390: the info line wraps under the buttons, no horizontal scroll (edit window, item 2)`, !!narrow && narrow.below && narrow.fits, JSON.stringify(narrow));
+    check(G, `${who}: task window at 390: the info line wraps under the buttons, no horizontal scroll (edit window, item 2)`, !!narrow && narrow.below && narrow.fits && narrow.fqFits, JSON.stringify(narrow));
     await T.shot(`ui-edit-window-${who}-390x844-${theme}`);
     await T.size(1440, 900);
     await closeDialogs(T);

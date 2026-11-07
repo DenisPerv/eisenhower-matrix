@@ -32,7 +32,7 @@ Eisenhower matrix task app on the Supabase database TasksDashboardDB. Files:
 
 ## The task card has a twin in Telegram
 
-`telegram-integration/` builds the same card as the app's task window (title, list, end, description, tags; since 2026-10-29 neither has a Quadrant or a For field, but both still write a quadrant and an owner). When the app's create or edit window changes (a field added, removed or renamed, a new rule for a field, the quadrant rule `deriveQuadrant`, the tag picker), change `telegram-integration/` in the same change: its card, its payloads, its tests (`python -m unittest discover telegram-integration/tests`) and its README. `test/telegram-parity.test.js` checks the quadrant names and `deriveQuadrant` against the module's shared cases. Bots that copied the module refresh their copy afterwards.
+`telegram-integration/` builds the same card as the app's task window (title, list, end, description, tags; neither has a For field, but both still write a quadrant and an owner). One known gap, by Anastasiia's choice (2026-11-07): the app's window (web and phone) has four quadrant buttons again, the Telegram card keeps none (its quadrant comes from `deriveQuadrant` and the board). When the app's create or edit window changes (a field added, removed or renamed, a new rule for a field, the quadrant rule `deriveQuadrant`, the tag picker), change `telegram-integration/` in the same change: its card, its payloads, its tests (`python -m unittest discover telegram-integration/tests`) and its README. `test/telegram-parity.test.js` checks the quadrant names and `deriveQuadrant` against the module's shared cases. Bots that copied the module refresh their copy afterwards.
 
 ## The phone app has a twin in the web page
 

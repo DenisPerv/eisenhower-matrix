@@ -775,3 +775,37 @@ test('decision offline: the answer waits in IndexedDB with details intact, a new
   assert.deepEqual(patches[0][1].details.notify, ['me']);
   assert.equal(d2.find(ITEM).details.decision.answer, 1);
 });
+
+// quadrant buttons in the sheet (2026-11-07): saveTask's q goes in the same versioned write as the other fields, as a move writes it
+test('saveTask q: a picked quadrant and a new End in one PATCH (quadrant, pin, on top); the same quadrant writes nothing of it', async () => {
+  let remote = row({ version: 1, quadrant: 'A', sort_key: 50 }); const patches = [];
+  const other = row({ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', num: 2, quadrant: 'B', sort_key: 10, title: 'Other' });
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [remote, other]]],
+    ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => {
+      patches.push(body);
+      if (Number(m[1]) !== remote.version) return [200, []];
+      remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]];
+    }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  await d.loadAll();
+  const end = new Date('2026-11-20T18:00:00Z');
+  const r = d.saveTask(ITEM, { title: 'Buy milk', deadline: end, q: 'B' });
+  assert.equal(r.msg, 'Moved to Plan');
+  await until(() => d.pending === 0);
+  assert.equal(patches.length, 1, 'one write');
+  assert.equal(patches[0].quadrant, 'B');
+  assert.equal(patches[0].urgent_pin, false, 'urgent to not urgent: the pin follows');
+  assert.equal(patches[0].due_at, end.toISOString());
+  assert.ok(patches[0].sort_key < 10, 'on top of Plan');
+  assert.equal(d.find(ITEM).q, 'B');
+  r.undo();
+  await until(() => d.pending === 0 && patches.length === 2);
+  assert.equal(patches[1].quadrant, 'A');
+  const r2 = d.saveTask(ITEM, { title: 'Buy oat milk', q: 'A' });
+  await until(() => d.pending === 0 && patches.length === 3);
+  assert.equal(r2.msg, 'Saved');
+  assert.ok(!('quadrant' in patches[2]) && !('urgent_pin' in patches[2]), 'the shown quadrant again: no quadrant fields');
+});

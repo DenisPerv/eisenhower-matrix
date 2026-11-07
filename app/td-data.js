@@ -768,22 +768,26 @@
       const u = edit(t, x => { x.status = prev; });
       return u && { msg: 'Restored: ' + plain(t.title), undo: undoEdit(t, u) };
     }
-    // fields from a form or a sheet: { title, notes, tags, deadline, start, list, decision }. A list change puts the task on top of its
-    // quadrant. decision (1 or 0): the answer of a card (C.answerDecision: details.decision and status done, every kind: a check or Delegate card closes at once), sent in the
-    // same versioned write as the other fields (web: openTask save with decide)
+    // fields from a form or a sheet: { title, notes, tags, deadline, start, list, q, decision }. A list change puts the task on top of its
+    // quadrant. q: the quadrant picked in the sheet (web: openTask quadrant buttons, C.quadPick), written only when it differs from the
+    // task's quadrant, as a drag writes it (stored quadrant, pin), and on top of that quadrant. decision (1 or 0): the answer of a card
+    // (C.answerDecision: details.decision and status done, every kind: a check or Delegate card closes at once), sent in the same
+    // versioned write as the other fields (web: openTask save with decide)
     function saveTask(id, f, eo) {
       const t = find(id); if (!t) return null;
+      const from = derive(t).q, qp = f.q !== undefined ? C.quadPick(from, f.q) : null;
       const moved = f.list !== undefined && f.list !== t.list;
-      const key = moved ? topKey(f.list, derive(t).q) : t.sortKey;
+      const key = moved || qp ? topKey(moved ? f.list : t.list, qp ? f.q : from) : t.sortKey;
       const dch = f.decision !== undefined ? C.answerDecision(t, f.decision, me && me.handle, nowDate().toISOString()) : null;
       const r = edit(t, x => {
         if (dch) Object.assign(x, dch);
+        if (qp) Object.assign(x, qp);
         ['title', 'notes', 'tags', 'deadline', 'start'].forEach(k => { if (f[k] !== undefined) x[k] = Array.isArray(f[k]) ? f[k].slice() : f[k]; });
         if (moved) x.list = f.list;
         x.sortKey = key;
       }, eo || { origin: 'dialog' });
       if (r && dch) { const d = C.decisionOf(t); return { msg: 'Answered “' + (f.decision ? d.label_1 : d.label_0) + '”: ' + plain(t.title) + (C.decisionKind(t) ? ' · the task moves on the master\x27s next check' : ''), undo: undoEdit(t, r), decided: true }; }
-      return r && { msg: moved ? 'Moved to ' + label(f.list) : 'Saved', undo: undoEdit(t, r) };
+      return r && { msg: moved ? 'Moved to ' + label(f.list) : qp ? 'Moved to ' + QN[f.q] : 'Saved', undo: undoEdit(t, r) };
     }
     function moveToList(id, list) { return saveTask(id, { list }, { origin: null }); }
 

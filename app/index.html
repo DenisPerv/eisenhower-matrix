@@ -386,6 +386,11 @@ dialog.alert form .field{margin:0 0 6px}
 .switch input:checked::after{transform:translateX(20px)}
 .dangerrow{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
 /* the decision block of a self-improvement card (details.decision): two answers above the description; the chosen one is ringed */
+/* the quadrant buttons in the task sheet (2026-11-07): an outline in the quadrant's colour, the current one filled */
+.tquad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 12px}
+.tquad .chip{justify-content:center;padding:0 6px;border:1.5px solid var(--c);background:transparent;font-size:13.5px}
+.tquad .chip[aria-pressed="true"]{background:var(--f);color:var(--f-on);border-color:var(--f);font-weight:600}
+.tquad .chip:disabled{opacity:.55}.tquad .chip[aria-pressed="true"]:disabled{opacity:.85}
 .fdec-b{display:flex;gap:10px;flex-wrap:wrap}
 .fdec-b .btn{flex:1 1 0;min-width:120px}
 .fdec-b .btn[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
@@ -1398,7 +1403,7 @@ if (window.visualViewport) { visualViewport.addEventListener('resize', fitViewpo
 addEventListener('resize', fitViewport); fitViewport();
 document.addEventListener('focusin', e => { const t = e.target; if (t && t.closest && t.closest('dialog.sheet .sbody')) setTimeout(() => { if (document.activeElement === t) t.scrollIntoView({ block: 'nearest' }); }, 60); });
 
-/* ---------- S5 task sheet: no Quadrant control (Save never changes it); Start; info line; Links; previous / next ---------- */
+/* ---------- S5 task sheet: quadrant buttons (applied on Save, as a move; 2026-11-07); Start; info line; Links; previous / next ---------- */
 let TS = null;
 const LKN = { par: ['↑', 'Parent'], sub: ['↓', 'Subtask'], prev: ['←', 'Comes after'], next: ['→', 'Next'] };
 const LK_ROLE = { par: 'parent', sub: 'child', prev: 'pred', next: 'next' };
@@ -1436,7 +1441,7 @@ function setEdge(b, t, label, show) { b.hidden = !show; b.disabled = !t; b.datas
 function openTask(id, swap, draft) {
   const t = task(id); if (!t) return; const ro = roTask(t), CL = D.cardLayout, closed = isClosed(t);
   resetPicker('t');
-  TS = { id: t.id, ro, tags: t.tags.slice(), map: new Map(D.links), mk: [], conflict: false };
+  TS = { id: t.id, ro, tags: t.tags.slice(), map: new Map(D.links), mk: [], conflict: false, q0: t.q, q: (draft && draft.q) || t.q };
   const ids = navIds(t), i = ids.indexOf(t.id);
   $('#task-h').innerHTML = `Task <span class="badge q" data-q="${t.q}" style="vertical-align:middle;font-size:13px"><span class="vh">, quadrant </span>${QN[t.q]}</span>`;
   $('#task-pos').textContent = i >= 0 ? `${i + 1} of ${ids.length} in ${QN[t.q]}` : '';
@@ -1470,6 +1475,7 @@ function openTask(id, swap, draft) {
     <div class="note" id="t-conflict" role="alert" hidden></div>
     <label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label>
     <p class="err" id="t-title-err" hidden></p>
+    <div class="tquad" id="t-quad" role="group" aria-label="Quadrant">${QS.map(q => `<button type="button" class="chip" data-act="t-quad" data-v="${q}" data-q="${q}" aria-pressed="${q === TS.q}"${ro ? ' disabled' : ''}>${QN[q]}</button>`).join('')}</div>
     <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>
     ${decHtml}
     <div class="field"><span class="flabel" id="t-desc-l">Description</span>
@@ -1538,7 +1544,7 @@ function fmtRaw(ed, f) {
   const from = v.lastIndexOf('\n', a - 1) + 1;
   ed.setRangeText(v.slice(from, b).split('\n').map(l => '- ' + l).join('\n'), from, b, 'end');
 }
-function snapTask() { return JSON.stringify([$('#t-title').value, notesNow(), $('#t-list').value, dateInputs(), TS.tags.slice().sort(), linkSig(), TS.mk]); }
+function snapTask() { return JSON.stringify([$('#t-title').value, notesNow(), $('#t-list').value, dateInputs(), TS.tags.slice().sort(), linkSig(), TS.mk, TS.q]); }
 const dirty = () => !!TS && !TS.ro && snapTask() !== TS.snap;
 function validTask() {
   let ok = true; const ti = $('#t-title'), e = $('#t-title-err'), len = ti.value.trim().length;
@@ -1609,6 +1615,7 @@ async function saveTask(decision) {
   try {
     const st = TS, f = { title: $('#t-title').value.trim(), notes: notesNow() };
     if ($('#t-list').value !== t.list) f.list = $('#t-list').value;
+    if (st.q !== st.q0) f.q = st.q; /* a quadrant picked in the sheet: written as a move (TDData.saveTask, C.quadPick) */
     if (dateInputs() !== st.dates) { f.start = fromInputs($('#t-sdate').value, $('#t-stime').value, START_T); f.deadline = fromInputs($('#t-date').value, $('#t-time').value, END_T); }
     f.tags = await commitTags('t', st.tags);
     if (decision === 1 || decision === 0) f.decision = decision;
@@ -1871,6 +1878,7 @@ document.addEventListener('click', async e => {
     case 'move-other': { const t = task(b.dataset.tid); b.setAttribute('aria-expanded', 'true'); $('#move-lists').innerHTML = `<ul class="menu" style="padding:8px 0 0">${addable().filter(l => l !== t.list).map(l => `<li><button type="button" data-act="move-list" data-tid="${t.id}" data-v="${l}">${ic('lists')}${esc(lname(l))}</button></li>`).join('') || '<li><p class="src">No other list you can add to.</p></li>'}</ul>`; const f = $('#move-lists button'); if (f) f.focus(); break; }
     case 'move-list': closeDlg('dlg-move'); moveList(b.dataset.tid, b.dataset.v); break;
     case 'task-close': tryCloseTask(); break;
+    case 't-quad': if (!TS || TS.ro) break; TS.q = b.dataset.v; document.querySelectorAll('#t-quad [data-act="t-quad"]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); onTaskInput(); break;
     case 't-prev': navTask(-1); break;
     case 't-next': navTask(1); break;
     case 'fmt': {
