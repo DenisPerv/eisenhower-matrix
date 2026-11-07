@@ -1023,6 +1023,9 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .actions .quiet{background:transparent;border-color:var(--hair2);color:var(--ink2);font-weight:500}
 .actions .danger{color:var(--danger-ink)}
 /* the decision block of a self-improvement card (details.decision): two answers above the description; the chosen one is ringed */
+/* the done checkbox before the title (2026-11-07) */
+.ftrow{display:flex;align-items:center;gap:10px}.ftrow #ft{flex:1;min-width:0}
+.fdone{flex:none;width:22px;height:22px;margin:0;accent-color:var(--accent);cursor:pointer}
 /* the quadrant buttons under the title (2026-11-07): an outline in the quadrant's colour, the current one filled */
 .fquad{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s2) 0 var(--s3)}
 .fquad button{min-height:32px;padding:0 14px;border-radius:999px;border:1.5px solid var(--c);background:transparent;color:var(--ink2);font:500 13.5px var(--ui);cursor:pointer}
@@ -4586,6 +4589,11 @@ function openTask(id, quad, opts) {
   // the quadrant (2026-11-07, Anastasiia): four buttons under the title, the current one pressed. A pick is an unsaved change; Save
   // applies it as a drag does (C.quadPick: stored quadrant, pin; on top of the new quadrant), in the window's one write. A new task
   // starts in the quadrant whose + was clicked
+  // the done checkbox before the title (2026-11-07, Anastasiia): a tick saves the window's edits with status done in one write, toast
+  // "Completed" with Undo, then the next task of the shown order (none: the window closes). Not on a decision card (its answer buttons
+  // close it), a task awaiting its check (settle.js would read it as closed by hand), a read-only, done or new task, or a preview
+  const doneOn = !!t && editable && !o.preview && !C.decisionOf(t) && t.status !== 'waiting' && !C.awaitingCheck(t) && !C.CLOSED.includes(t.status);
+  const doneHtml = doneOn ? '<input type="checkbox" class="fdone" id="fdone" aria-label="Mark done" title="Mark done">' : '';
   const shownQ = t ? t.q : null, q0 = dr.q || shownQ || quad || 'B';
   const quadHtml = '<div class="fquad" role="group" aria-label="Quadrant">' + QS.map(q => '<button type="button" data-fq="' + q + '" data-q="' + q + '" aria-pressed="' + (q === q0) + '"' + ro + '>' + QN[q] + '</button>').join('') + '</div>';
   const formHtml = '<form method="dialog"><div class="tk-head"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' +
@@ -4594,7 +4602,7 @@ function openTask(id, quad, opts) {
     (t && C.awaitingCheck(t) ? '<p class="note">Waits for your check: answer its check card.</p>' : '') +
     (locked ? '<p class="note">' + (t.status === 'done' ? 'Done' : 'Cancelled') + (t.doneAt ? ' ' + fmtDay(t.doneAt) : '') + '. Read only. Restore it from the archive to change it.</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
-    '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
+    '<div class="flabel" id="ft-l">Title</div><div class="ftrow">' + doneHtml + '<div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div></div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
     quadHtml + decHtml + (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
     '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
     '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>' +
@@ -4967,6 +4975,9 @@ function openTask(id, quad, opts) {
   const fs = dlg.querySelector('#fs');
   let after = null, afterTo = null, saveBad = false; // after: where "Save and go / close" goes once the save is through
   let decide = null; // the decision button clicked (1 or 0): Save sends the answer with the other changes, then the window closes
+  let doneTick = false; // the done checkbox was ticked: Save sends status done with the other changes, then the next task
+  const fdone = dlg.querySelector('#fdone');
+  if (fdone) fdone.onchange = () => { if (!fdone.checked || !fs) return; doneTick = true; after = nav.next ? 'next' : null; fs.click(); if (saveBad) { doneTick = false; after = null; fdone.checked = false; } };
   dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = nav.next ? 'next' : null; fs.click(); if (saveBad) { decide = null; after = null; } }; }); // an answer moves on to the next task; with none the window closes
   if (fs) fs.onclick = e => {
     saveBad = false;
@@ -5004,6 +5015,7 @@ function openTask(id, quad, opts) {
         const r = edit(t, x => {
           if (dch) Object.assign(x, dch);
           if (qp) Object.assign(x, qp);
+          if (doneTick) x.status = 'done';
           if (mine.includes('title')) x.title = title;
           if (mine.includes('notes')) x.notes = notes;
           if (mine.includes('tags')) x.tags = tags;
@@ -5014,7 +5026,8 @@ function openTask(id, quad, opts) {
         }, { origin: 'dialog' });
         st.keep.add(t.id);
         const nl = applyLinks(list, fq);
-        if (r && dch) toast('Answered “' + (decide ? C.decisionOf(t).label_1 : C.decisionOf(t).label_0) + '”: ' + plain(t.title) + (C.decisionKind(t) ? ' · the task moves on the master\x27s next check' : ''), undoEdit(t, r));
+        if (r && doneTick) toast('Completed: ' + plain(t.title), undoEdit(t, r));
+        else if (r && dch) toast('Answered “' + (decide ? C.decisionOf(t).label_1 : C.decisionOf(t).label_0) + '”: ' + plain(t.title) + (C.decisionKind(t) ? ' · the task moves on the master\x27s next check' : ''), undoEdit(t, r));
         else if (r) toast(moved ? 'Moved to ' + label(list) : qp ? 'Moved to ' + QN[pickQ] : 'Saved', undoEdit(t, r));
         else if (nl) toast(nl === 1 ? 'Link saved' : nl + ' links saved');
       } else {

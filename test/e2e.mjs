@@ -1518,6 +1518,21 @@ async function gCard() {
   await T.size(375, 812); await sleep(500); await T.shot('card-done-375x812'); await T.size(1280, 800); await sleep(200);
   await closeDialogs(T);
   await T.ev('(document.querySelector("[data-view=matrix]")?.click(),true)'); await T.wait('!!document.querySelector(".matrix")', 5000);
+  // the done checkbox (2026-11-07): none on a check card or a waiting task; a tick saves the edits with status done in one write and
+  // shows the next task of the shown order
+  const dn1 = await mkItem('card done tick a', { quadrant: 'B', sort_key: 9000011 }), dn2 = await mkItem('card done tick b', { quadrant: 'B', sort_key: 9000012 });
+  await T.reload(); await T.ready(); await pick(T, ST.id);
+  await T.wait('!!document.querySelector(\'[data-card="' + dn1.id + '"]\')', 10000);
+  const noTick = async id => { if (!(await T.has('[data-card="' + id + '"]'))) return true; await T.click('[data-card="' + id + '"]'); await T.wait('!!document.querySelector("' + W + ' #ft")', 5000); const n = !(await T.has(W + ' #fdone')); await closeDialogs(T); await sleep(200); return n; };
+  check(G, 'done checkbox: none on a check card or a waiting task', await noTick(card.id) && await noTick(wait.id));
+  await T.click('[data-card="' + dn1.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fdone")', 5000);
+  check(G, 'done checkbox: before the title, labelled Mark done', await T.ev('(()=>{const d=document.querySelector("' + W + '"),c=d.querySelector("#fdone"),t=d.querySelector("#ft");return c.getAttribute("aria-label")==="Mark done"&&c.getBoundingClientRect().right<=t.getBoundingClientRect().left})()'));
+  await T.shot('card-done-tick-1280x800');
+  await T.ev('(()=>{const d=document.querySelector("' + W + '"),t=d.querySelector("#ft");t.textContent=' + JSON.stringify(RUN + ' card done tick a2') + ';t.dispatchEvent(new Event("input",{bubbles:true}));d.querySelector("#fdone").click();return true})()');
+  const dt = await until(async () => { const x = await item(dn1.id); return x && x.status === 'done' ? x : null; });
+  check(G, 'done checkbox: a tick saves the title edit and status done in one write', !!dt && dt.title === RUN + ' card done tick a2' && dt.version === dn1.version + 1, dt && JSON.stringify([dt.title, dt.version]));
+  check(G, 'done checkbox: the window shows the next task', await T.wait('!!document.querySelector("' + W + ' #ft")&&!document.querySelector("' + W + ' #ft").textContent.includes("card done tick a")', 5000));
+  await closeDialogs(T);
   // an archived list's task, web
   await T.reload(); await T.ready(); await pick(T, AL.id); await T.click('#listmenu'); await T.wait('!!document.querySelector("[data-archive-list]")'); await T.click('[data-archive-list]');
   await until(async () => !!(await MK.rest('GET', 'lists?select=archived_at&id=eq.' + AL.id)).json[0].archived_at);
@@ -1559,6 +1574,14 @@ async function gCard() {
     const pa = await until(async () => { const x = await item(c2.id); return x && x.details.decision.answer === 1 ? x : null; });
     check(G, 'phone: Accept with an answer: the card closed at once (done), the text in its place', !!pa && pa.status === 'done' && pa.body_md === CARD.replace('next scan._\n\n## Links', 'next scan._\nPhone answer\n\n## Links'), pa && JSON.stringify([pa.status, pa.body_md.slice(-80)]));
   } else check(G, 'phone: the check card opens with its answer box', false, P.errors.slice(-2).join(' / '));
+  // phone: the done checkbox before the title marks the task done
+  const pd = '.card[data-tid="' + dn2.id + '"] .cmain';
+  if (await phoneCard(pd, 'B')) {
+    await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); await P.click(pd); await P.wait('!!document.querySelector("#dlg-task[open] #t-done")', 8000);
+    await P.shot('card-phone-done-tick-375x812');
+    await P.ev('(document.querySelector("#t-done").click(),true)');
+    check(G, 'phone: the done checkbox marks the task done', !!(await until(async () => { const x = await item(dn2.id); return x && x.status === 'done'; })));
+  } else check(G, 'phone: the done checkbox task shows on the board', false);
   // phone: an archived list's row opens
   await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
   await P.click('.tab[data-tab=me]'); await P.wait('!!document.querySelector("[data-act=pg-alists]")', 8000); await P.click('[data-act=pg-alists]');

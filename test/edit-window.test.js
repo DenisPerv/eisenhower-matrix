@@ -71,3 +71,16 @@ test('the task window: four quadrant buttons under the title, wired on Save thro
   assert.match(app, /id="t-quad" role="group" aria-label="Quadrant"/);
   assert.match(app, /if \(st\.q !== st\.q0\) f\.q = st\.q;/);
 });
+
+test('the done checkbox: before the title, hidden on decision cards, awaiting checks, waiting, closed, read-only and new tasks; one write', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
+  assert.match(html, /const doneOn = !!t && editable && !o\.preview && !C\.decisionOf\(t\) && t\.status !== 'waiting' && !C\.awaitingCheck\(t\) && !C\.CLOSED\.includes\(t\.status\);/);
+  assert.match(html, /<div class="ftrow">' \+ doneHtml \+ '<div class="rt one" id="ft"/);
+  assert.match(html, /if \(doneTick\) x\.status = 'done';/, 'status done in the window\'s one versioned write');
+  assert.match(html, /doneTick = true; after = nav\.next \? 'next' : null; fs\.click\(\);/, 'then the next task, else the window closes');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
+  assert.match(app, /const doneOn = !ro && !closed && !dec && t\.status !== 'waiting' && !C\.awaitingCheck\(t\);/);
+  assert.match(app, /<div class="ttrow">\$\{doneOn \? '<input type="checkbox" class="tdone" id="t-done" aria-label="Mark done">' : ''\}/);
+  assert.match(app, /ids = navIds\(task\(st\.id\)\)/, 'the next task is read before the save');
+});

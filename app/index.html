@@ -386,6 +386,9 @@ dialog.alert form .field{margin:0 0 6px}
 .switch input:checked::after{transform:translateX(20px)}
 .dangerrow{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
 /* the decision block of a self-improvement card (details.decision): two answers above the description; the chosen one is ringed */
+/* the done checkbox before the title in the task sheet (2026-11-07) */
+.ttrow{display:flex;align-items:flex-end;gap:10px}.ttrow .field{flex:1;min-width:0}
+.tdone{flex:none;width:28px;height:28px;margin:0 0 18px;accent-color:var(--accent)}
 /* the quadrant buttons in the task sheet (2026-11-07): an outline in the quadrant's colour, the current one filled */
 .tquad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 12px}
 .tquad .chip{justify-content:center;padding:0 6px;border:1.5px solid var(--c);background:transparent;font-size:13.5px}
@@ -1465,6 +1468,8 @@ function openTask(id, swap, draft) {
   /* self-improvement cards (web: openTask decHtml): two answers above the description; a tap answers, saves the sheet's other
      changes with it (TDData.saveTask decision), marks the task done and closes the sheet with Undo. Applied, or read only: off */
   const dec = C.decisionOf(t), decOn = !!dec && !ro && !dec.applied_at;
+  /* the done checkbox before the title (web: openTask doneOn): not on a decision card, a task awaiting its check, a read-only or closed task */
+  const doneOn = !ro && !closed && !dec && t.status !== 'waiting' && !C.awaitingCheck(t);
   const decWho = h => !h ? '' : me() && h === me().handle ? 'you' : D.handleNames[h] || h;
   const decDay = s => { const ms = Date.parse(s || ''); return isNaN(ms) ? '' : ymd(new Date(ms)); };
   const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
@@ -1476,7 +1481,7 @@ function openTask(id, swap, draft) {
     ${closed ? `<div class="banner">${ic('lock')}<span>${t.status === 'done' ? 'Done' : 'Cancelled'}${t.doneAt ? ' ' + ymd(t.doneAt) : ''}. Restore it from Me, Archive, to change it.</span></div>` : ''}
     ${C.awaitingCheck(t) ? '<p class="note info">Waits for your check: answer its check card.</p>' : ''}
     <div class="note" id="t-conflict" role="alert" hidden></div>
-    <label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label>
+    <div class="ttrow">${doneOn ? '<input type="checkbox" class="tdone" id="t-done" aria-label="Mark done">' : ''}<label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label></div>
     <p class="err" id="t-title-err" hidden></p>
     <div class="tquad" id="t-quad" role="group" aria-label="Quadrant">${QS.map(q => `<button type="button" class="chip" data-act="t-quad" data-v="${q}" data-q="${q}" aria-pressed="${q === TS.q}"${ro ? ' disabled' : ''}>${QN[q]}</button>`).join('')}</div>
     <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>
@@ -1495,6 +1500,7 @@ function openTask(id, swap, draft) {
     ${ro ? '' : `<div class="dangerrow"><button type="button" class="btn" data-act="t-cancel">Mark cancelled</button>${canDel(t) ? '<button type="button" class="btn danger" data-act="t-delete">Delete</button>' : ''}</div>`}`;
   $('#task-save').hidden = ro; $('#task-save').disabled = true; $('#task-save').textContent = 'Save';
   hideAsk(); renderTTags(); renderLinks();
+  const dn = $('#t-done'); if (dn) dn.onchange = () => { if (dn.checked) doneFromSheet(); };
   TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value; TS.check = C.decisionKind(t) === 'check';
   TS.dates = dateInputs(); TS.snap = draft ? null : snapTask();
   if (draft) onTaskInput();
@@ -1611,7 +1617,7 @@ function afterLink(k) { closeDlg('dlg-link'); renderLinks(); onTaskInput(); cons
 /* Save: fields through TDData.saveTask (a list change puts it on top of its quadrant), links through linkOp, new subtasks / next
    tasks through create (on top of the quadrant). Returns true when written */
 let saving = false;
-async function saveTask(decision) {
+async function saveTask(decision, done) {
   const t = task(TS.id); if (!t || saving) return false;
   if (!validTask()) { const f = $('#t-title[aria-invalid]') || $('#t-sdate[aria-invalid]'); if (f) f.focus(); return false; }
   saving = true;
@@ -1622,8 +1628,10 @@ async function saveTask(decision) {
     if (dateInputs() !== st.dates) { f.start = fromInputs($('#t-sdate').value, $('#t-stime').value, START_T); f.deadline = fromInputs($('#t-date').value, $('#t-time').value, END_T); }
     f.tags = await commitTags('t', st.tags);
     if (decision === 1 || decision === 0) f.decision = decision;
+    if (done) f.done = true;
     const res = D.saveTask(t.id, f);
     if (res && res.decided) st.decided = res;
+    if (res && res.completed) st.completed = res;
     /* links: what differs between the sheet's map and the stored one, for links that touch this task (parent removals first) */
     const touches = l => l.from === t.id || l.to === t.id, cur = D.links;
     const removed = [...cur.values()].filter(l => touches(l) && !st.map.has(lkKey(l))), added = [...st.map.values()].filter(l => touches(l) && !cur.has(lkKey(l)));
@@ -1634,6 +1642,17 @@ async function saveTask(decision) {
     });
     return true;
   } finally { saving = false; }
+}
+/* the done checkbox: the sheet's edits plus status done in one write, "Completed" with Undo, then the next task of the shown order
+   (navIds, read before the save: a done task has none), else the sheet closes */
+async function doneFromSheet() {
+  if (!TS || TS.ro || askRes) return;
+  const st = TS, ids = navIds(task(st.id)), i = ids.indexOf(st.id), nextId = i >= 0 && i < ids.length - 1 ? ids[i + 1] : null;
+  if (!(await saveTask(undefined, true))) { const dn = $('#t-done'); if (dn) dn.checked = false; return; }
+  const nx = nextId && task(nextId);
+  if (nx && !isClosed(nx) && !nx.deleted) openTask(nextId, true); else { resetPicker('t'); TS = null; closeDlg('dlg-task'); }
+  renderAll();
+  if (st.completed) said(st.completed); else toast('Saved.');
 }
 $('#task-form').addEventListener('submit', async e => { e.preventDefault(); if (!TS || TS.ro) return; if (await saveTask()) { TS = null; closeDlg('dlg-task'); renderAll(); toast('Saved.'); } });
 /* unsaved changes: a bar, not a modal; "... and go" on a switch, "... and close" on X, swipe down, backdrop or Esc */

@@ -809,3 +809,32 @@ test('saveTask q: a picked quadrant and a new End in one PATCH (quadrant, pin, o
   assert.equal(r2.msg, 'Saved');
   assert.ok(!('quadrant' in patches[2]) && !('urgent_pin' in patches[2]), 'the shown quadrant again: no quadrant fields');
 });
+
+// done checkbox in the sheet (2026-11-07): saveTask done sends status done with the other edits and a quadrant pick in one write
+test('saveTask done: a title edit, a quadrant pick and done in one PATCH, "Completed" with Undo back to open', async () => {
+  let remote = row({ version: 1, quadrant: 'B' }); const patches = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [remote]]],
+    ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => {
+      patches.push(body);
+      if (Number(m[1]) !== remote.version) return [200, []];
+      remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]];
+    }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  await d.loadAll();
+  const r = d.saveTask(ITEM, { title: 'Buy oat milk', q: 'A', done: true });
+  assert.equal(r.completed, true);
+  assert.equal(r.msg, 'Completed: Buy oat milk');
+  await until(() => d.pending === 0);
+  assert.equal(patches.length, 1, 'one write');
+  assert.equal(patches[0].status, 'done');
+  assert.equal(patches[0].title, 'Buy oat milk');
+  assert.equal(patches[0].quadrant, 'A');
+  assert.equal(patches[0].urgent_pin, true);
+  r.undo();
+  await until(() => d.pending === 0 && patches.length === 2);
+  assert.equal(patches[1].status, 'open');
+  assert.equal(patches[1].quadrant, 'B');
+});

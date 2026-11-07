@@ -768,7 +768,8 @@
       const u = edit(t, x => { x.status = prev; });
       return u && { msg: 'Restored: ' + plain(t.title), undo: undoEdit(t, u) };
     }
-    // fields from a form or a sheet: { title, notes, tags, deadline, start, list, q, decision }. A list change puts the task on top of its
+    // fields from a form or a sheet: { title, notes, tags, deadline, start, list, q, decision, done }. done: the sheet's done checkbox
+    // (web: openTask doneTick): status done in the same write, message "Completed: <title>". A list change puts the task on top of its
     // quadrant. q: the quadrant picked in the sheet (web: openTask quadrant buttons, C.quadPick), written only when it differs from the
     // task's quadrant, as a drag writes it (stored quadrant, pin), and on top of that quadrant. decision (1 or 0): the answer of a card
     // (C.answerDecision: details.decision and status done, every kind: a check or Delegate card closes at once), sent in the same
@@ -782,10 +783,12 @@
       const r = edit(t, x => {
         if (dch) Object.assign(x, dch);
         if (qp) Object.assign(x, qp);
+        if (f.done) x.status = 'done';
         ['title', 'notes', 'tags', 'deadline', 'start'].forEach(k => { if (f[k] !== undefined) x[k] = Array.isArray(f[k]) ? f[k].slice() : f[k]; });
         if (moved) x.list = f.list;
         x.sortKey = key;
       }, eo || { origin: 'dialog' });
+      if (r && f.done) return { msg: 'Completed: ' + plain(t.title), undo: undoEdit(t, r), completed: true };
       if (r && dch) { const d = C.decisionOf(t); return { msg: 'Answered “' + (f.decision ? d.label_1 : d.label_0) + '”: ' + plain(t.title) + (C.decisionKind(t) ? ' · the task moves on the master\x27s next check' : ''), undo: undoEdit(t, r), decided: true }; }
       return r && { msg: moved ? 'Moved to ' + label(f.list) : qp ? 'Moved to ' + QN[f.q] : 'Saved', undo: undoEdit(t, r) };
     }
