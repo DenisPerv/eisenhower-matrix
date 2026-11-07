@@ -631,6 +631,15 @@ async function gSearchRow() {
     await T.click('#searchhandle'); await sleep(100);
     await T.ev('document.body.dispatchEvent(new KeyboardEvent("keydown",{key:"/",bubbles:true})),true'); await sleep(200);
     check(G, 'the / key opens it', (await hidden()) === false && await T.ev('document.activeElement.id==="q"'));
+    // Escape with text clears the search line, every card shows again, the cursor stays; a second Escape changes nothing (2026-11-07)
+    const cards = () => T.ev('document.querySelectorAll("[data-card]").length');
+    const all0 = await cards();
+    await T.ev('(()=>{const q=document.getElementById("q");q.value="zzz-no-such-task";q.dispatchEvent(new Event("input",{bubbles:true}));return true})()'); await sleep(300);
+    const few = await cards();
+    await T.key('Escape'); await sleep(300);
+    check(G, 'Escape clears the search, shows every task again and keeps the cursor in the field', await T.ev('document.getElementById("q").value===""&&document.activeElement.id==="q"') && (await cards()) === all0 && (few < all0 || !all0), JSON.stringify([all0, few, await cards()]));
+    await T.key('Escape'); await sleep(200);
+    check(G, 'a second Escape with an empty line keeps the row open', (await hidden()) === false);
     await T.ev('(()=>{const q=document.getElementById("q");q.value="zzz";q.dispatchEvent(new Event("input",{bubbles:true}));return true})()'); await sleep(200);
     await T.click('#searchhandle'); await sleep(200);
     check(G, 'folded with search on: the button shows it', await T.ev('document.getElementById("searchhandle").classList.contains("on")'));

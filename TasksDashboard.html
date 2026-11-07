@@ -6360,7 +6360,11 @@ function bind() {
     if (e.key === 'ArrowDown' && n) { e.preventDefault(); st.sel = (st.sel + 1) % n; st.focusQ = true; render(); }
     else if (e.key === 'ArrowUp' && n) { e.preventDefault(); st.sel = (st.sel - 1 + n) % n; st.focusQ = true; render(); }
     else if (e.key === 'Enter') { e.preventDefault(); if (st.sel >= 0 && st.rows[st.sel]) { const id = st.rows[st.sel].id; st.sel = -1; openTask(id); } else { qi.blur(); document.getElementById('dd')?.remove(); } }
-    else if (e.key === 'Escape') { document.getElementById('dd')?.remove(); st.sel = -1; }
+    else if (e.key === 'Escape') {
+      document.getElementById('dd')?.remove(); st.sel = -1;
+      // with text: Escape clears the search line, every task shows again, the cursor stays (2026-11-07); empty: as before
+      if (qi.value) { e.preventDefault(); e.stopPropagation(); qi.value = ''; st.keep.clear(); st.q = ''; st.focusQ = true; render(); }
+    }
   };
   // the filter row. A change clears st.keep (cards kept visible by an edit) and keeps the focus where it was, as the row is drawn again
   const fAct = (attr, fn) => app.querySelectorAll('[data-' + attr + ']').forEach(b => b.onclick = e => {

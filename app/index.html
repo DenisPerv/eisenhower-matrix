@@ -478,6 +478,9 @@ hr.rv-sep{border:0;border-top:1px solid var(--hair2);margin:18px 0 12px}
 .search svg.i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--ink2)}
 .search input{width:100%;min-height:52px;padding:0 14px 0 46px;border-radius:999px;border:1px solid var(--hair2);background:var(--glass3);font:500 17px/1 var(--ui);color:var(--ink)}
 .search input:focus{border-color:var(--accent);outline:2px solid var(--accent-line);outline-offset:0}
+/* a visible clear button (2026-11-07) instead of the browser's own, which iOS and some Android browsers hide */
+.search input{padding-right:52px}.search input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.search .qx{position:absolute;right:4px;top:50%;transform:translateY(-50%);border-radius:999px}
 .results{margin-top:8px}
 .rbtn{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:baseline;width:100%;min-height:52px;padding:10px 12px;border:0;border-top:1px solid var(--hair);background:transparent;text-align:left;color:var(--ink);font:500 15px/1.35 var(--ui)}
 .rlist li.rr{display:block;padding:0;min-height:0}
@@ -863,7 +866,7 @@ h2[tabindex="-1"]:focus{outline:none}
   <section class="view" id="v-review" aria-labelledby="rev-h" hidden></section>
   <section class="view" id="v-search" aria-labelledby="srch-h" hidden>
     <div class="phead"><h2 id="srch-h">Search</h2></div>
-    <div class="search"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><label class="vh" for="q">Search tasks</label><input id="q" type="search" placeholder="Search tasks" autocomplete="off" enterkeyhint="search"></div>
+    <div class="search"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><label class="vh" for="q">Search tasks</label><input id="q" type="search" placeholder="Search tasks" autocomplete="off" enterkeyhint="search"><button type="button" class="ib qx" id="q-clear" data-act="q-clear" aria-label="Clear search" hidden><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="chiprow" id="filters" role="group" aria-label="Filters" style="margin-top:4px"></div>
     <div class="opts" id="fopts" hidden></div>
     <div class="results" id="results" aria-live="polite"></div>
@@ -2353,7 +2356,11 @@ function renderSearch() {
     return `<div class="grp" data-q="${qq}"><h3>${QN[qq]}</h3><ul class="rlist">${g.map(t => { const di = dueInfo(t); return `<li class="rr"><button class="rbtn" data-act="open-id" data-tid="${t.id}"><span class="num">${esc(ref(t))}</span><span>${esc(plainT(t.title))}</span><small>${esc(lname(t.list))}${di ? `, ${di.txt}` : ''}</small></button></li>`; }).join('')}</ul></div>`;
   }).join('') + archLink;
 }
-$('#q').addEventListener('input', renderSearch);
+/* the clear button shows while there is text; it and Escape clear the line, show every task again and keep the cursor (2026-11-07) */
+const qClearShow = () => { $('#q-clear').hidden = !$('#q').value; };
+function clearSearch() { $('#q').value = ''; qClearShow(); renderSearch(); $('#q').focus(); }
+$('#q').addEventListener('input', () => { qClearShow(); renderSearch(); });
+$('#q').addEventListener('keydown', e => { if (e.key === 'Escape' && $('#q').value) { e.preventDefault(); e.stopPropagation(); clearSearch(); } });
 
 /* ---------- S9 Me and its pages (web: account menu, openSettings, openCardLayout, openTags, openSharing, archiveHtml, openArchivedLists,
    openHiddenLists, timelineHtml) ---------- */
@@ -2701,6 +2708,7 @@ async function part2Click(a, b) {
     }
     case 'mine-done': SF.mine = mineTagsShown(); SF.open = null; renderSearch(); $('#filters [data-k="mine"]').focus(); break;
     case 'f-toggle': { const k = b.dataset.k; if (k === 'mine' && !SF.mine && !mineTagsShown()) { openMinePick(); break; } SF[k] = !SF[k]; renderSearch(); $(`#filters [data-k="${k}"]`).focus(); break; }
+    case 'q-clear': clearSearch(); break;
     case 'f-clear': Object.assign(SF, { due: null, tag: [], cat: [], check: false, mine: false, open: null }); renderSearch(); $('#q').focus(); break;
     case 'arch-open': AR.q = $('#q').value.trim(); AR.list = curListId() === 'all' ? null : curListId(); openPage('pg-archive'); break;
     case 'me-back': AR.list = null; mePage = null; renderMe(); $('#me-h').focus(); break;
