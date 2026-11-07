@@ -419,7 +419,8 @@ async function gData() {
   // quadrant buttons (2026-11-07, Anastasiia; replaces edit window item 1): four buttons under the title, the current one pressed;
   // a pick plus an End change is one versioned write, as a drag writes the quadrant (stored quadrant, pin)
   await T.click(`[data-card="${e.id}"]`); await T.wait('!!document.querySelector("dialog[open] #ft")');
-  const qb = await T.ev('[...document.querySelectorAll("dialog[open] .fquad [data-fq]")].map(b=>b.dataset.fq+(b.getAttribute("aria-pressed")==="true"?"*":"")).join(" ")');
+  // the live window only: in Coverflow the neighbours' read-only copies (.tk-pv) carry the same buttons
+  const qb = await T.ev('[...document.querySelectorAll("dialog[open] .tk-card .fquad [data-fq]")].map(b=>b.dataset.fq+(b.getAttribute("aria-pressed")==="true"?"*":"")).join(" ")');
   check(G, 'the task window shows four quadrant buttons, the current one pressed', qb === 'A B* C D', qb);
   await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('[data-fq="C"]').click();d.querySelector('#fd').value='2026-12-01T18:00';d.querySelector('#fd').dispatchEvent(new Event('input',{bubbles:true}));d.querySelector('#fs').click();return true})()`);
   const qm = await until(async () => { const x = await item(e.id); return x.quadrant === 'C' && x.due_at && x; });
