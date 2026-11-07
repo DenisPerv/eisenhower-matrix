@@ -1048,6 +1048,9 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .fbar .fmt{margin-top:0}
 .fbar .fwho{margin:0 0 0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:4px 12px;font-variant-numeric:tabular-nums}
 .fbar .fwho:only-child{margin-left:0;justify-content:flex-start}
+/* with the quadrant buttons (2026-11-07): three columns, formatting left, quadrants centred, number right */
+.fbar.has-q{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:var(--s3)}
+.fbar.has-q .fmt{grid-column:1;justify-self:start}.fbar.has-q .fquad{grid-column:2;margin:0;flex-wrap:nowrap}.fbar.has-q .fwho{grid-column:3;justify-self:end;margin:0}
 .fref{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;background:var(--well);border:1px solid var(--hair);border-radius:var(--r);color:var(--ink2);font-weight:600}
 /* Continue in Claude: styled as the number chip beside it, with a small copy icon */
 a.fcont{font-size:inherit;text-decoration:none;white-space:nowrap}a.fcont:hover,button.fcopy:hover{border-color:var(--hair2);color:var(--ink)}
@@ -1062,7 +1065,8 @@ button.fcopy{padding:0 6px;font:inherit;box-shadow:none;cursor:pointer}button.fc
 .tb.check{border-color:var(--accent-line);background:var(--accent-bg);color:var(--accent-ink)}
 button.ar-open,button.lm-open{all:unset;cursor:pointer;text-decoration:underline;text-decoration-color:var(--hair2);text-underline-offset:2px}button.ar-open:hover,button.lm-open:hover{text-decoration-color:currentColor}button.ar-open:focus-visible,button.lm-open:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px}
 .ro-task{min-width:min(640px,calc(100vw - 72px))}.ro-title{font:500 15px/1.35 var(--ui);margin-top:var(--s2)}
-@media (max-width:519px){.fbar .fwho{margin-left:0;justify-content:flex-start;flex-basis:100%}}
+@media (max-width:519px){.fbar .fwho{margin-left:0;justify-content:flex-start;flex-basis:100%}
+  .fbar.has-q{display:flex}.fbar.has-q .fquad{order:1;flex-basis:100%;flex-wrap:wrap}.fbar.has-q .fwho{order:2;justify-self:auto}}
 /* round 3 P1: the task window is wider (U5); List, Quadrant and End share a row; Save stays in view at the bottom */
 .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 var(--s4)}
 /* the task window's tags (U1, U2, U6, U7, U8): a search box, then one group per tag list, its name on top and its chips below; a
@@ -4605,7 +4609,9 @@ function openTask(id, quad, opts) {
     (locked ? '<p class="note">' + (t.status === 'done' ? 'Done' : 'Cancelled') + (t.doneAt ? ' ' + fmtDay(t.doneAt) : '') + '. Read only. Restore it from the archive to change it.</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     '<div class="flabel" id="ft-l">Title</div><div class="ftrow"><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
-    (dec ? '' : quadHtml) + decHtml + (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
+    // one row (Anastasiia, 2026-11-07): formatting on the left, the quadrant buttons centred, the number and facts on the right; on a
+    // decision card the quadrant buttons are on the Decision row instead
+    decHtml + (fmtHtml || whoHtml || !dec ? '<div class="fbar' + (dec ? '' : ' has-q') + '">' + fmtHtml + (dec ? '' : quadHtml) + whoHtml + '</div>' : '') +
     '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
     '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>' +
     // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
@@ -4695,7 +4701,7 @@ function openTask(id, quad, opts) {
   };
   const editAns = () => { if (!ansR || ansR.hidden) return; ansR.hidden = true; ansEl.hidden = false; ansEl.focus(); caretEnd(ansEl); };
   const renderAns = () => { if (!ansR || ansEl.hidden) return; const a = ansEl.value.trim(); if (!a) return; ansR.innerHTML = C.renderMd(a); ansR.hidden = false; ansEl.hidden = true; };
-  const inField = el => !!el && (el === fnEl || el === ansEl || el === freadEl || el === ansR || !!(el.closest && el.closest('.fbar')));
+  const inField = el => !!el && (el === fnEl || el === ansEl || el === freadEl || el === ansR || !!(el.closest && el.closest('.fbar') && !el.closest('.fquad')));
   if (editable) {
     const leave = e => { if (inField(e.relatedTarget)) return; renderDesc(); renderAns(); };
     fnEl.addEventListener('focusout', leave); if (ansEl) ansEl.addEventListener('focusout', leave);
