@@ -332,7 +332,8 @@ textarea.inp[hidden]{display:none}
 .md pre{margin:0 0 8px;padding:8px 10px;overflow-x:auto;border-radius:8px;background:var(--well)}.md pre code{padding:0;background:none}
 .md blockquote{margin:0 0 8px;padding-left:10px;border-left:3px solid var(--hair2);color:var(--ink2)}
 .md-tbl{max-width:100%;overflow-x:auto;margin:0 0 8px}.md-tbl table{border-collapse:collapse;font-size:13px}.md-tbl th,.md-tbl td{padding:4px 8px;border:1px solid var(--hair);text-align:left;vertical-align:top;min-width:64px;overflow-wrap:normal}.md-tbl th{background:var(--well);font-weight:600}
-.fmd{padding:10px 12px;border:1px solid var(--hair);border-radius:var(--r)}.fans{margin:0 0 10px}.fedit{min-height:36px;margin:0 0 8px}
+.fmd,#t-ans-r{padding:10px 12px;border:1px solid var(--hair);border-radius:var(--r)}.fans{margin:0 0 10px}#t-ans-r{margin-top:4px}
+#t-read[tabindex],#t-ans-r[tabindex]{display:block;cursor:text;border-radius:var(--r)}#t-read[hidden],#t-ans-r[hidden]{display:none}#t-read[tabindex]:focus-visible,#t-ans-r[tabindex]:focus-visible{outline:2px solid var(--accent-line, currentColor);outline-offset:2px}
 .rich{min-height:110px;line-height:1.5;overflow-wrap:anywhere}
 .rich ul,.extra ul{margin:4px 0;padding-left:22px}
 .rich:empty::before{content:attr(data-ph);color:var(--ink2)}
@@ -1419,6 +1420,18 @@ function tsSet(k, other, add) {
   else TS.map.delete(lkKey(l));
 }
 function navIds(t) { return !isClosed(t) && inList(t) ? shownIn(t.q).filter(x => !x.ghost).map(x => x.t.id) : []; }
+/* the sheet's previous / next follow the data (web: openTask here.refresh, 2026-11-07): on a change while the sheet is open the edges
+   are computed again (C.deckNav), so a task closed or deleted elsewhere is never the target; the open task itself closed elsewhere gets
+   a notice and keeps the person's edits */
+const navAlive = id => { const x = id && task(id); return !!x && !x.deleted && !isClosed(x); };
+function refreshEdges() {
+  if (!TS || !$('#dlg-task').open) return; const t = task(TS.id); if (!t) return;
+  const ids = navIds(t), i = ids.indexOf(t.id), pb = $('#t-prev'), nb = $('#t-next');
+  const n = C.deckNav(ids, t.id, { prev: pb.dataset.tid || null, next: nb.dataset.tid || null }, navAlive), show = i >= 0 || !pb.hidden;
+  setEdge(pb, n.prev ? task(n.prev) : null, 'Previous task', show); setEdge(nb, n.next ? task(n.next) : null, 'Next task', show);
+  $('#task-pos').textContent = i >= 0 ? `${i + 1} of ${ids.length} in ${QN[t.q]}` : '';
+  if ((t.deleted || isClosed(t)) && !TS.ro && !$('#t-gone')) $('#t-conflict').insertAdjacentHTML('beforebegin', `<p class="note info" id="t-gone" role="status">${t.deleted ? 'Deleted' : 'Marked ' + (t.status === 'cancelled' ? 'cancelled' : 'done')} elsewhere while this task was open. Your edits are still here.</p>`);
+}
 function setEdge(b, t, label, show) { b.hidden = !show; b.disabled = !t; b.dataset.tid = t ? t.id : ''; b.setAttribute('aria-label', t ? `${label}: ${ref(t)} ${t.title}` : `${label}: none`); }
 function openTask(id, swap, draft) {
   const t = task(id); if (!t) return; const ro = roTask(t), CL = D.cardLayout, closed = isClosed(t);
@@ -1430,12 +1443,13 @@ function openTask(id, swap, draft) {
   setEdge($('#t-prev'), i > 0 ? task(ids[i - 1]) : null, 'Previous task', i >= 0);
   setEdge($('#t-next'), i >= 0 && i < ids.length - 1 ? task(ids[i + 1]) : null, 'Next task', i >= 0);
   const info = [CL.number ? `<span class="refc"><span class="vh">Number </span>${esc(ref(t))}</span>` : '', CL.created && t.createdAt ? `<span>Created ${ymd(t.createdAt)}</span>` : '', CL.creator && t.createdBy ? `<span>By ${esc(personName(t.createdBy))}</span>` : ''].join('');
-  /* the description (web: openTask readHtml): read mode renders it, blocks newest first, an open answer section on top with its box; Edit text
-     shows the raw text, so a save changes only what the person changed. An empty task or a draft opens on the raw text */
+  /* the description (web: openTask readHtml): read mode renders it, blocks newest first, an open answer section on top with its box; a tap on
+     the rendered text (not a link) shows the raw text and focus leaving the field renders it again (2026-11-07), so a save changes only what
+     the person changed. An empty task or a draft opens on the raw text. Your answer works the same way once it has text */
   const notesBase = draft ? draft.notes : t.notes, readFirst = !draft && (!!notesBase.trim() || ro);
   const view = readFirst ? C.cardView(notesBase, { check: C.decisionKind(t) === 'check', answerable: !ro }) : null;
-  const ansHtml = view && view.answer ? '<div class="fans"><label class="flabel" for="t-ans">Your answer</label><textarea class="inp" id="t-ans" rows="3" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
-  const readHtml = !readFirst ? '' : `<div id="t-read">${ansHtml}${view.blocks.length || view.links ? `<div class="md fmd">${C.cardViewHtml(view)}</div>` : ansHtml ? '' : '<p class="src">No description.</p>'}</div>`;
+  const ansHtml = view && view.answer ? `<div class="fans"><label class="flabel" for="t-ans">Your answer</label><div class="md" id="t-ans-r"${ro ? '' : ' tabindex="0"'} hidden></div><textarea class="inp" id="t-ans" rows="3" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>` : '';
+  const readHtml = ansHtml + (!readFirst && ro ? '' : `<div id="t-read"${readFirst ? '' : ' hidden'}${ro ? '' : ' tabindex="0" aria-describedby="t-desc-l"'}>${readFirst ? readInnerHtml(view) : ''}</div>`);
   const tb = ro ? '' : `<div class="tb" id="t-tb"${readFirst ? ' hidden' : ''} role="toolbar" aria-label="Text style"><button type="button" class="ib" data-act="fmt" data-f="b" aria-label="Bold">B</button><button type="button" class="ib" data-act="fmt" data-f="i" aria-label="Italic"><i>I</i></button><button type="button" class="ib" data-act="fmt" data-f="l" aria-label="List">${ic('lists')}</button></div>`;
   const dis = ro ? ' readonly' : '';
   const sT = t.start && hm(t.start) !== START_T ? hm(t.start) : '', eT = t.deadline && hm(t.deadline) !== END_T ? hm(t.deadline) : '';
@@ -1460,7 +1474,7 @@ function openTask(id, swap, draft) {
     ${decHtml}
     <div class="field"><span class="flabel" id="t-desc-l">Description</span>
       ${tb || info ? `<div class="fbar">${tb}${info ? `<p class="info">${info}</p>` : ''}</div>` : ''}
-      ${readFirst && !ro ? '<button type="button" class="btn quiet fedit" id="t-edit" data-act="t-edit">Edit text</button>' : ''}${readHtml}
+      ${readHtml}
       <textarea class="inp" id="t-desc" rows="6" aria-labelledby="t-desc-l"${readFirst ? ' hidden' : ''}${ro ? ' readonly' : ''}>${esc(notesBase)}</textarea></div>
     <label class="field"><span>List</span><select class="inp" id="t-list"${ro ? ' disabled' : ''}>${lists.map(l => `<option value="${l}"${l === t.list ? ' selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></label>
     <div class="row2"><label class="field"><span>Start date</span><input class="inp" type="date" id="t-sdate" value="${ymd(t.start)}" aria-describedby="t-start-err"${dis}></label><label class="field"><span>Start time</span><input class="inp" type="time" id="t-stime" value="${sT}"${dis}></label></div>
@@ -1472,7 +1486,7 @@ function openTask(id, swap, draft) {
     ${ro ? '' : `<div class="dangerrow"><button type="button" class="btn" data-act="t-cancel">Mark cancelled</button>${canDel(t) ? '<button type="button" class="btn danger" data-act="t-delete">Delete</button>' : ''}</div>`}`;
   $('#task-save').hidden = ro; $('#task-save').disabled = true; $('#task-save').textContent = 'Save';
   hideAsk(); renderTTags(); renderLinks();
-  TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value;
+  TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value; TS.check = C.decisionKind(t) === 'check';
   TS.dates = dateInputs(); TS.snap = draft ? null : snapTask();
   if (draft) onTaskInput();
   if (showSource()) loadSources(t.id);
@@ -1488,13 +1502,35 @@ async function loadSources(id) {
 }
 const dateInputs = () => [$('#t-sdate').value, $('#t-stime').value, $('#t-date').value, $('#t-time').value].join('|');
 const linkSig = () => { const x = tsLinks(); return JSON.stringify([x.par, x.sub.slice().sort(), x.prev.slice().sort(), x.next.slice().sort()]); };
-/* the body a save sends (web: notesNow): only a change in the raw text or the answer box changes it; untouched, it is the stored text byte for byte */
-function notesNow() {
-  const raw = $('#t-desc').value; if (raw !== TS.fn0) return raw.replace(/\s+$/, '');
-  const b = $('#t-ans'), a = b && !$('#t-read').hidden ? b.value.trim() : '';
-  return a ? C.setAnswer(TS.notes0, a) : TS.notes0;
+/* the body a save sends (web: notesNow): the raw text (the stored text byte for byte while untouched) with the answer box written into its
+   answer section whenever the box has text, so an edit of either field is never lost */
+function descNow() { const raw = $('#t-desc').value; return raw !== TS.fn0 ? raw.replace(/\s+$/, '') : TS.notes0; }
+function notesNow() { const raw = descNow(), b = $('#t-ans'), a = b ? b.value.trim() : ''; return a ? C.setAnswer(raw, a) : raw; }
+const readInnerHtml = v => v.blocks.length || v.links ? `<div class="md fmd">${C.cardViewHtml(v)}</div>` : '<p class="src">No description.</p>';
+/* tap to edit, focus out to render (web: editDesc, renderDesc, editAns, renderAns): leaving the description's field (raw box, answer box,
+   toolbar) renders both from what they hold now; an empty field stays a box */
+const caretEnd = el => { const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) {} };
+function editDesc() { if (!TS || TS.ro || !$('#t-read') || !$('#t-desc').hidden) return; const d = showRaw(); d.focus(); caretEnd(d); }
+function renderDesc() {
+  const r = $('#t-read'), d = $('#t-desc'); if (!TS || TS.ro || !r || d.hidden || !descNow().trim()) return;
+  r.innerHTML = readInnerHtml(C.cardView(descNow(), { check: TS.check, answerable: true })); r.hidden = false; d.hidden = true;
+  const tb = $('#t-tb'); if (tb) tb.hidden = true;
 }
-function showRaw() { const r = $('#t-read'); if (r) r.hidden = true; const e = $('#t-edit'); if (e) e.hidden = true; const tb = $('#t-tb'); if (tb) tb.hidden = false; const d = $('#t-desc'); d.hidden = false; d.style.height = ''; d.style.height = Math.min(d.scrollHeight + 2, Math.round(innerHeight * .6)) + 'px'; return d; }
+function editAns() { const r = $('#t-ans-r'), a = $('#t-ans'); if (!r || r.hidden) return; r.hidden = true; a.hidden = false; a.focus(); caretEnd(a); }
+function renderAns() { const r = $('#t-ans-r'), a = $('#t-ans'); if (!r || a.hidden || !a.value.trim()) return; r.innerHTML = C.renderMd(a.value.trim()); r.hidden = false; a.hidden = true; }
+document.addEventListener('focusout', e => {
+  if (!TS || TS.ro || !['t-desc', 't-ans'].includes(e.target.id)) return;
+  const f = $('#t-desc').parentElement; if (e.relatedTarget && f.contains(e.relatedTarget)) return;
+  renderDesc(); renderAns();
+});
+document.addEventListener('mousedown', e => { if (e.target.closest && e.target.closest('#t-tb button')) e.preventDefault(); }); // the toolbar keeps focus in the box
+document.addEventListener('click', e => {
+  const r = e.target.closest && e.target.closest('#t-read[tabindex], #t-ans-r[tabindex]'); if (!r || e.target.closest('a, button, input, textarea, select')) return;
+  if (String(getSelection() || '').trim()) return;
+  if (r.id === 't-read') editDesc(); else editAns();
+});
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && (e.target.id === 't-read' || e.target.id === 't-ans-r') && e.target.hasAttribute('tabindex')) { e.preventDefault(); if (e.target.id === 't-read') editDesc(); else editAns(); } });
+function showRaw() { const r = $('#t-read'); if (r) r.hidden = true; const tb = $('#t-tb'); if (tb) tb.hidden = false; const d = $('#t-desc'); d.hidden = false; d.style.height = ''; d.style.height = Math.min(d.scrollHeight + 2, Math.round(innerHeight * .6)) + 'px'; return d; }
 /* the toolbar on the raw text: markers around the selection, or a list marker on each selected line */
 function fmtRaw(ed, f) {
   const a = ed.selectionStart, b = ed.selectionEnd, v = ed.value;
@@ -1607,7 +1643,7 @@ async function leaveTask(verb, then) {
   then();
 }
 function tryCloseTask() { if (askRes) { const r = askRes; hideAsk(); r('stay'); return; } leaveTask('close', () => { resetPicker('t'); TS = null; closeDlg('dlg-task'); }); }
-function navTask(dir) { if (!TS || askRes) return; const b = $(dir < 0 ? '#t-prev' : '#t-next'); if (b.hidden || b.disabled) return; const id = b.dataset.tid; leaveTask('go', () => openTask(id, true)); }
+function navTask(dir) { if (!TS || askRes) return; let b = $(dir < 0 ? '#t-prev' : '#t-next'); if (!navAlive(b.dataset.tid)) { refreshEdges(); b = $(dir < 0 ? '#t-prev' : '#t-next'); } if (b.hidden || b.disabled) return; const id = b.dataset.tid; leaveTask('go', () => openTask(id, true)); }
 $('#dlg-task').addEventListener('cancel', e => { e.preventDefault(); tryCloseTask(); });
 $('#dlg-task').addEventListener('keydown', e => { if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); navTask(e.key === 'ArrowLeft' ? -1 : 1); } });
 /* a save that met someone else's change (TDData 'conflict'): their version is kept on the task; the sheet reopens with my text */
@@ -1838,13 +1874,12 @@ document.addEventListener('click', async e => {
     case 't-prev': navTask(-1); break;
     case 't-next': navTask(1); break;
     case 'fmt': {
-      const ed = document.getElementById(b.dataset.ed || 't-desc'), sl = document.getSelection(); ed.focus();
+      const ed = document.getElementById(b.dataset.ed || 't-desc'), sl = document.getSelection(); if (ed.id === 't-desc' && ed.hidden) { editDesc(); break; } ed.focus();
       if (ed.id === 't-desc') { fmtRaw(ed, b.dataset.f); onTaskInput(); break; }
       sl.removeAllRanges();
       if (edRange && ed.contains(edRange.startContainer)) sl.addRange(edRange); else { const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false); sl.addRange(r); }
       document.execCommand(b.dataset.f === 'b' ? 'bold' : b.dataset.f === 'i' ? 'italic' : 'insertUnorderedList'); onTaskInput(); break;
     }
-    case 't-edit': { const a = $('#t-ans'), v = a ? a.value.trim() : ''; const d = showRaw(); if (v) { d.value = C.setAnswer(TS.notes0, v); a.value = ''; } d.focus(); onTaskInput(); break; }
     case 't-theirs': { const x = TS.theirs; $('#t-title').value = x.title; const d = showRaw(); d.value = x.notes; TS.notes0 = x.notes; TS.fn0 = d.value; TS.conflict = false; $('#t-conflict').hidden = true; TS.snap = snapTask(); $('#task-save').textContent = 'Save'; onTaskInput(); toast('Kept their version.'); break; }
     case 't-decide': {
       /* the answer with every other change of the sheet in one versioned write, then close with Undo (web: the [data-dec] click) */
@@ -1985,7 +2020,7 @@ document.addEventListener('click', async e => {
 tablet.addEventListener('change', () => renderBoard());
 
 /* ---------- the data layer's events ---------- */
-D.on('change', renderSoon);
+D.on('change', () => { renderSoon(); refreshEdges(); });
 D.on('sync', setPill);
 D.on('toast', x => toast(x.msg));
 D.on('session', s => {

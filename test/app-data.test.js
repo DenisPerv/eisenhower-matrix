@@ -683,6 +683,31 @@ test('decision: saveTask answers with the other changes in one versioned PATCH (
   assert.equal(patches.length, 2);
 });
 
+test('decision: a check or Delegate card closes at once (status done) and the toast says the task moves on the next check', async () => {
+  for (const kind of ['check', 'delegate']) {
+    let remote = decRow({ version: 1, details: { decision: Object.assign({}, DEC, { kind, label_1: 'Accept', label_0: 'Needs changes' }) } }); const patches = [];
+    const f = fakeSupabase([
+      ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [remote]]],
+      ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => {
+        patches.push(body);
+        if (Number(m[1]) !== remote.version) return [200, []];
+        remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]];
+      }],
+    ]);
+    const d = make(f);
+    await signIn(d, true);
+    await d.loadAll();
+    const r = d.saveTask(ITEM, { decision: 0 });
+    assert.equal(r.msg, 'Answered “Needs changes”: Move x to y? · the task moves on the master\'s next check', kind);
+    await until(() => d.pending === 0);
+    assert.equal(patches.length, 1, kind);
+    assert.equal(patches[0].status, 'done', kind);
+    assert.equal(patches[0].details.decision.answer, 0, kind);
+    assert.equal(patches[0].details.decision.kind, kind);
+    assert.equal(d.find(ITEM).status, 'done', kind);
+  }
+});
+
 test('decision: the routine changed details meanwhile -> merged per key and sent again; both answered differently -> a conflict', async () => {
   let remote = decRow({ version: 1 }); const patches = [];
   const f = fakeSupabase([

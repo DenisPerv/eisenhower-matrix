@@ -120,12 +120,12 @@ test('cardDesc: the first paragraph only, no table on a small card; Show more sh
   assert.equal(C.firstParagraph('| a |\n|---|\n| 1 |'), '| a |');
 });
 
-test('answerDecision: status done only with no kind; a kind leaves the status alone', () => {
+test('answerDecision: status done for every decision card, with no kind and with a kind (check, delegate close at once)', () => {
   const card = kind => ({ status: 'open', details: { other: 1, decision: Object.assign({ v: 1, label_1: 'Accept', label_0: 'Needs changes', answer: null }, kind ? { kind } : {}) } });
   assert.equal(C.answerDecision(card(null), 1, 'm', NOW).status, 'done');
   ['check', 'delegate'].forEach(k => {
     const ch = C.answerDecision(card(k), 0, 'm', NOW);
-    assert.ok(!('status' in ch), k);
+    assert.equal(ch.status, 'done', k);
     assert.equal(ch.details.decision.answer, 0);
     assert.equal(ch.details.decision.kind, k);
     assert.equal(ch.details.other, 1);
@@ -174,4 +174,15 @@ test('continueLink: the latest do, else the latest plan; a bad id or ref gives n
   assert.equal(C.continueLink({ num: 1 }, 's'), null);
   ['x', A + '&x=1', A + ' ', 'rm -rf; ' + A].forEach(id => assert.equal(C.continueLink(t([{ session_id: id, role: 'do' }]), 's'), null, id));
   ['Bad Slug', 'a&b', 'a#b', '', undefined].forEach(sl => assert.equal(C.continueLink(t([{ session_id: A, role: 'do' }]), sl), null, String(sl)));
+});
+
+test('click to edit (2026-11-07): an edited description and a typed answer are both kept (notesNow = setAnswer(raw, answer))', () => {
+  const md = '## What was done\nA thing.\n\n## Your answer\n' + C.ANSWER_PROMPT + '\n\n## Links\n- [a](https://x.y/a)\n';
+  const raw = md.replace('A thing.', 'A thing, edited.').replace(/\s+$/, '');
+  const out = C.setAnswer(raw, 'Please redo it');
+  assert.ok(out.includes('A thing, edited.'), 'the description edit');
+  assert.equal(C.answerSection(out).text, 'Please redo it', 'the answer in its place');
+  assert.ok(out.endsWith('## Links\n- [a](https://x.y/a)'), 'the links stay last');
+  // the rendered description of the edited raw text still keeps the answer box apart (answer section empty there)
+  assert.equal(C.cardView(raw, { check: true, answerable: true }).answer, true);
 });

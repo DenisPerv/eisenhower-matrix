@@ -1044,8 +1044,10 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 a.fcont{font-size:inherit;text-decoration:none;white-space:nowrap}a.fcont:hover,button.fcopy:hover{border-color:var(--hair2);color:var(--ink)}
 button.fcopy{padding:0 6px;font:inherit;box-shadow:none;cursor:pointer}button.fcopy .ic{width:14px;height:14px}
 /* the description: read mode renders, edit mode is the raw text (a save changes only what the person changed) */
-.flabel-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.flabel-row .fedit{min-height:26px;padding:0 10px;font-size:12.5px;margin-top:var(--s2)}
-.fmd{margin-top:var(--s2);padding:9px 12px;border:1px solid var(--hair);border-radius:12px;background:var(--glass2);font-size:14px;overflow-wrap:anywhere}
+.flabel-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#fread[tabindex],.fans-r[tabindex]{cursor:text;border-radius:12px}#fread[tabindex]:hover .fmd,.fans-r[tabindex]:hover{border-color:var(--hair2)}
+#fread[tabindex]:focus-visible,.fans-r[tabindex]:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px}#fread[hidden],.fans-r[hidden]{display:none}.fans .fans-r{margin-top:4px}
+.fmd,.fans-r{margin-top:var(--s2);padding:9px 12px;border:1px solid var(--hair);border-radius:12px;background:var(--glass2);font-size:14px;overflow-wrap:anywhere}
 .rt.fraw{display:block;width:100%;box-sizing:border-box;resize:vertical;font:400 14px/1.5 var(--font);color:var(--ink)}.rt.fraw[hidden]{display:none}
 .fans{margin-top:var(--s2)}.fans .rt.fraw{min-height:72px;margin-top:4px}
 .tb.check{border-color:var(--accent-line);background:var(--accent-bg);color:var(--accent-ink)}
@@ -1085,13 +1087,14 @@ dialog input.tg-q{width:min(260px,100%);min-height:32px;padding:0 10px;font-size
    the bands above and below close. Side zones tint in the neighbour's quadrant colour, close areas in neutral ink */
 dialog.tk-deck{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;border-radius:0;
   background:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;overflow:hidden;color:var(--ink)}
-dialog.tk-deck[open]{display:grid;grid-template-rows:minmax(5vh,1fr) auto minmax(max(5vh,68px),1fr);
+/* the bands above and below the card are equal, at least 68 px each (2026-11-07: a 5vh band above a long card was too thin to hit) */
+dialog.tk-deck[open]{display:grid;grid-template-rows:minmax(max(5vh,68px),1fr) auto minmax(max(5vh,68px),1fr);
   grid-template-columns:minmax(0,1fr) min(720px,94%) minmax(0,1fr);animation:none}
 @media (max-width:999px){dialog.tk-deck[open]{grid-template-columns:minmax(0,1fr) min(720px,calc(100% - 48px)) minmax(0,1fr)}}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) dialog.tk-deck::backdrop{background:rgba(0,0,6,.66)}}
 /* the card: the old task window's look; the scroll container. It lives as long as the deck, so pop runs once. Its top line is the
    task's colour: lists carry no colour, so the quadrant's (--c from data-q on the deck, on each Coverflow copy its own task's) */
-:is(.tk-card,.tk-pv){grid-area:2/2;position:relative;z-index:1;min-width:0;max-height:calc(95vh - max(5vh,68px));max-height:calc(95dvh - max(5vh,68px));overflow:auto;overscroll-behavior:contain;
+:is(.tk-card,.tk-pv){grid-area:2/2;position:relative;z-index:1;min-width:0;max-height:calc(100vh - 2 * max(5vh,68px));max-height:calc(100dvh - 2 * max(5vh,68px));overflow:auto;overscroll-behavior:contain;
   padding:22px 24px;border:1px solid var(--hair2);border-radius:var(--r-xl);color:var(--ink);background-color:var(--solid);
   background-image:linear-gradient(90deg,var(--c,var(--accent)),color-mix(in srgb,var(--c,var(--accent)) 45%,transparent) 60%,transparent);background-size:100% 3px;background-repeat:no-repeat;
   box-shadow:var(--depth),0 40px 90px -40px var(--glow);scrollbar-width:thin;scrollbar-color:var(--hair2) transparent}
@@ -1581,14 +1584,15 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
       answered_by: d.answered_by || null, answered_at: d.answered_at || null, applied_at: d.applied_at || null, applied_result: d.applied_result || null };
   }
   // the answer of a click: the task fields to change (details with every other key kept), or null when the task has no decision, the
-  // value is not 1 or 0, or the answer was already applied (applied_at set: too late to change it). Only a decision with no kind (a
-  // self-improvement card) also sets status done; with a kind (check, delegate) settle.js closes the card, last (card contract 1)
+  // value is not 1 or 0, or the answer was already applied (applied_at set: too late to change it). Every answer also sets status done,
+  // so the card closes at once (2026-11-07); for a check or Delegate card settle.js still moves the original task on its next read: it
+  // reads closed cards with settled_at unset and the answer before the status (card contract 1)
   function answerDecision(t, value, who, nowIso) {
     const d = decisionOf(t);
     if (!d || d.applied_at || (value !== 1 && value !== 0)) return null;
     const details = plainDetails(t.details);
     details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
-    return details.decision.kind ? { details } : { details, status: 'done' };
+    return { details, status: 'done' };
   }
   const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
 
@@ -2788,6 +2792,14 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
     : { title: 'Turn off Tasks Grouping?', text: 'The board will show each quadrant in its stored order, without subtasks under their parent. Orders you changed while grouping was on stay as they are: AI and the scripts keep reading them, and there is no automatic way back.' };
   // previous and next task of the task window: the neighbours in the quadrant's shown order (null at the ends)
   const navNeighbours = (ids, id) => { const i = ids.indexOf(id); return i < 0 ? { prev: null, next: null } : { prev: ids[i - 1] || null, next: ids[i + 1] || null }; };
+  // the neighbours again after a data change while the window is open (2026-11-07: the carousel had a snapshot): from the shown
+  // order while the task is in it; a task closed or deleted meanwhile (out of the order) keeps those of its old neighbours that are
+  // still alive (alive(id): open, not deleted), so it can still move on, and never to a closed one
+  const deckNav = (ids, id, old, alive) => {
+    if (ids.includes(id)) return navNeighbours(ids, id);
+    const ok = x => x && alive(x) ? x : null;
+    return { prev: ok(old && old.prev), next: ok(old && old.next) };
+  };
   // the task deck (edit-nav plan): what a click around the task window does. zone = the zone the click ended in ('prev', 'next',
   // 'close' or null), downZone = the zone it started in; a press that started elsewhere (a text selection dragged out of the
   // window) does nothing. A side with no neighbour (the end of the quadrant, a new task) closes, like the bands above and below.
@@ -2883,7 +2895,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
-    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
+    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,
@@ -3398,7 +3410,7 @@ async function runLinks() {
       }
     }
   } finally { lqBusy = false; }
-  if (!document.querySelector('dialog[open]') && !dragId) renderSoon();
+  redrawSoon();
 }
 
 async function loadAll() {
@@ -3572,7 +3584,7 @@ async function flush(id) {
   }
   if (Q.get(id) && (e.fields.size || e.create)) flush(id);
   settle(id);
-  if (res.ok && !document.querySelector('dialog[open]') && !dragId) renderSoon();
+  if (res.ok) redrawSoon();
 }
 // a PATCH matched 0 rows: someone else saved first, or this login may not edit the item
 async function conflict(t, e, sending) {
@@ -3621,6 +3633,16 @@ function failed(t, e, sending, err) {
 }
 let renderT = 0;
 const renderSoon = () => { clearTimeout(renderT); renderT = setTimeout(() => { if (!boot.gate) { if (document.activeElement && document.activeElement.id === 'q') st.focusQ = true; render(); } }, 50); };
+// a data change (a poll, an own write): the board redraws when no window is open; with a window open it waits, and the task deck
+// computes its neighbours again (deck.cur.refresh: prev / next targets, their copies, the dots, the position line). During a turn of
+// the carousel it tries again a little later
+let deckT = 0;
+const redrawSoon = () => {
+  if (dragId) return;
+  if (!document.querySelector('dialog[open]')) return renderSoon();
+  clearTimeout(deckT);
+  deckT = setTimeout(function again() { const c = DECK && DECK.cur; if (!c || !c.refresh) return; if (DECK.busy()) { deckT = setTimeout(again, 250); return; } c.refresh(); }, 50);
+};
 addEventListener('beforeunload', e => { if (Q.size) { e.preventDefault(); e.returnValue = ''; } });
 addEventListener('online', () => flushAll());
 
@@ -3670,7 +3692,7 @@ async function poll(meta) {
       if (d.ok && d.json.length) defs = (await takeTagDefs(d.json)) || defs;
     }
     const lc = await pollLinks();
-    if (m.changed || tm.changed || tm.unknownTags.length || defs || meta || lc) { if (!document.querySelector('dialog[open]') && !dragId) renderSoon(); }
+    if (m.changed || tm.changed || tm.unknownTags.length || defs || meta || lc) redrawSoon();
   } finally { polling = false; }
 }
 
@@ -4377,6 +4399,7 @@ function deckOpen() {
   };
   const deck = DECK = {
     dlg: d, card, cur: null,
+    busy: () => !!pending, // a turn or a slide is running
     // the sides for the content shown: a neighbour's data-nav button (from 1000 px a dark band with an arrow beside the card in
     // Standard, a cover over the zone with the neighbour's copy under it in Coverflow; an edge tab below 1000 px), else a close
     // hint; the dots below the card (Coverflow)
@@ -4409,7 +4432,7 @@ function deckOpen() {
       const run = () => {
         pending = null;
         if (turn) { anim.forEach(a => a.cancel()); anim = []; d.classList.remove('is-moving'); }
-        minH = Math.max(minH, card.offsetHeight); card.style.minHeight = 'min(' + minH + 'px, calc(95vh - max(5vh, 68px)))'; // grow only: a shorter task does not move the window
+        minH = Math.max(minH, card.offsetHeight); card.style.minHeight = 'min(' + minH + 'px, calc(100vh - 2 * max(5vh, 68px)))'; // grow only: a shorter task does not move the window
         build();
         card.scrollTop = 0;
         if (turn) { // the new neighbour on the far side comes in from beyond
@@ -4517,13 +4540,14 @@ function openTask(id, quad, opts) {
   // previous / next task: the neighbours in the board's shown order across the quadrants (C.deckSequence: A, B, C, D), shown by the
   // task deck beside the window (deckOpen). The window is the deck's card: a switch fills the same card again, the modal stays open.
   // The position line and the dots count within the task's own quadrant
-  const order = t ? quadOrder(t.q) : [];
-  const nav = t ? C.navNeighbours(C.deckSequence({ A: quadOrder('A'), B: quadOrder('B'), C: quadOrder('C'), D: quadOrder('D') }), t.id) : { prev: null, next: null };
+  let order = t ? quadOrder(t.q) : [];
+  let nav = t ? C.navNeighbours(C.deckSequence({ A: quadOrder('A'), B: quadOrder('B'), C: quadOrder('C'), D: quadOrder('D') }), t.id) : { prev: null, next: null };
   const pos = t ? C.deckPos(order, t.id, t.q, QN[t.q]) : null;
   const ROLE_GLYPH = { parent: '↑', child: '↓', pred: '←', next: '→' }, ROLE_KIND = { parent: 'Parent', child: 'Subtask', pred: 'Comes after', next: 'Next' };
   const LK_WAIT_TITLE = 'Not done yet: this task waits for it'; // the title of an open predecessor's chip (.waiting)
   // self-improvement cards (HomeOS routine): the decision block, two answers above the description (C.decisionOf). A click answers,
-  // saves the window's other changes with it, marks the task done and closes the window (Undo in the toast). Once the routine has
+  // saves the window's other changes with it and marks the card done (every kind, also check and Delegate cards: they close at once and
+  // settle.js moves the original task on its next read), then the next task opens, or the window closes (Undo in the toast). Once the routine has
   // applied the answer (applied_at) the buttons are off; a reader of the list sees them off too
   const dec = t ? C.decisionOf(t) : null;
   const decOn = !!dec && editable && !dec.applied_at && !o.preview;
@@ -4532,13 +4556,15 @@ function openTask(id, quad, opts) {
   const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
     : dec.answer !== null ? ['Answered “' + (dec.answer ? dec.label_1 : dec.label_0) + '”', decWho(dec.answered_by), decDay(dec.answered_at)].filter(Boolean).join(' · ')
     : editable || locked ? '' : 'Only an editor of this list can answer';
-  // the description. Read mode renders it (blocks newest first, an open answer section on top with its box); Edit text shows the raw
-  // text, so a save changes only what the person changed. A new task, an empty one or a draft opens on the raw text
+  // the description. Read mode renders it (blocks newest first, an open answer section on top with its box); a click on the rendered text
+  // (not on a link) or Enter shows the raw text, and focus leaving the field renders it again (2026-11-07), so a save changes only what the
+  // person changed. A new task, an empty one or a draft opens on the raw text. Your answer works the same way: rendered once it has text
   const notesBase = dr.notes !== undefined ? dr.notes : t ? t.notes : '';
   const readFirst = !!t && dr.notes === undefined && (!!notesBase.trim() || !editable);
   const view = readFirst ? C.cardView(notesBase, { check: C.decisionKind(t) === 'check', answerable: editable }) : null;
-  const ansHtml = view && view.answer ? '<div class="fans"><div class="flabel" id="fans-l">Your answer</div><textarea class="rt fraw" id="fans" rows="3" aria-labelledby="fans-l" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
-  const readHtml = !readFirst ? '' : '<div id="fread">' + ansHtml + (view.blocks.length || view.links ? '<div class="md fmd">' + C.cardViewHtml(view) + '</div>' : ansHtml ? '' : '<p class="n">No description</p>') + '</div>';
+  const ansHtml = view && view.answer ? '<div class="fans"><div class="flabel" id="fans-l">Your answer</div><div class="md fans-r" id="fans-r"' + (editable ? ' tabindex="0" title="Click to edit"' : '') + ' hidden></div><textarea class="rt fraw" id="fans" rows="3" aria-labelledby="fans-l" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
+  const readInner = v => v.blocks.length || v.links ? '<div class="md fmd">' + C.cardViewHtml(v) + '</div>' : '<p class="n">No description</p>';
+  const readHtml = ansHtml + (!readFirst && !editable ? '' : '<div id="fread"' + (readFirst ? '' : ' hidden') + (editable ? ' tabindex="0" title="Click to edit" aria-describedby="fn-l"' : '') + '>' + (readFirst ? readInner(view) : '') + '</div>');
   const decHtml = !dec ? '' : '<div class="fdec" role="group" aria-labelledby="fdec-l"><div class="flabel" id="fdec-l">Decision</div><div class="fdec-b">' +
     [1, 0].map(v => '<button type="button" class="' + (v ? 'fdec-yes' : 'quiet') + '" data-dec="' + v + '" aria-pressed="' + (dec.answer === v) + '"' + (decOn ? '' : ' disabled') + '>' +
       (dec.answer === v ? '✓ ' : '') + esc(v ? dec.label_1 : dec.label_0) + '</button>').join('') + '</div>' +
@@ -4551,7 +4577,7 @@ function openTask(id, quad, opts) {
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     '<div class="flabel" id="ft-l">Title</div><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
     decHtml + (fmtHtml || whoHtml ? '<div class="fbar">' + fmtHtml + whoHtml + '</div>' : '') +
-    '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div>' + (readFirst && editable ? '<button type="button" id="fedit" class="quiet fedit">Edit text</button>' : '') + '</div>' + readHtml +
+    '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
     '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>' +
     // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
     // position in its quadrant (2026-10-29)
@@ -4587,7 +4613,25 @@ function openTask(id, quad, opts) {
   }
   const deck = deckOpen(), dlg = deck.card, ac = new AbortController(), sig = { signal: ac.signal };
   if (deck.cur) deck.cur.ac.abort();
-  const here = deck.cur = { ac, nav, isNew: !t, q: t ? t.q : null, id: t ? t.id : null, order, leave: () => {}, onClose: null };
+  const here = deck.cur = { ac, nav, isNew: !t, q: t ? t.q : null, id: t ? t.id : null, order, leave: () => {}, onClose: null, refresh: () => {} };
+  // the carousel follows the data (2026-11-07): after a poll or a write while this window is open (redrawSoon) the neighbours are
+  // computed again (C.deckNav), so a task closed or deleted elsewhere is never the previous or next target, copy or dot. This task
+  // itself closed or deleted elsewhere: a notice, and the person's edits stay in the window
+  const alive = id => { const x = find(id); return !!x && !x.deleted && !x.doneAt && !!LIST[x.list]; };
+  here.refresh = () => {
+    if (!t || deck.cur !== here) return;
+    order = here.order = quadOrder(t.q);
+    nav = here.nav = C.deckNav(C.deckSequence({ A: quadOrder('A'), B: quadOrder('B'), C: quadOrder('C'), D: quadOrder('D') }), t.id, nav, alive);
+    const p = order.includes(t.id) ? C.deckPos(order, t.id, t.q, QN[t.q]) : null, pe = dlg.querySelector('#tk-pos');
+    if (pe) { pe.textContent = p || ''; pe.hidden = !p; }
+    const x = find(t.id);
+    if ((!x || x.deleted || x.doneAt) && !dlg.querySelector('#tk-gone')) {
+      const n = document.createElement('p'); n.className = 'note'; n.id = 'tk-gone'; n.setAttribute('role', 'status');
+      n.textContent = !x || x.deleted ? 'Deleted elsewhere while this window was open. Your text is still here.' : 'Marked ' + (x.status === 'cancelled' ? 'cancelled' : 'done') + ' elsewhere while this window was open. Your edits are still here.';
+      dlg.querySelector('.tk-head').after(n);
+    }
+    deck.show(here);
+  };
   dlg.innerHTML = formHtml;
   deck.show(here, t ? ref(t) + ' ' + plain(t.title) + (pos ? ', ' + pos : '') : '');
   if (o.error) dlg.querySelector('#ft').focus();
@@ -4605,21 +4649,36 @@ function openTask(id, quad, opts) {
     el.addEventListener('keyup', syncFmt); el.addEventListener('mouseup', syncFmt);
   });
   ftEl.addEventListener('paste', e => { e.preventDefault(); const txt = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, txt.replace(/\s*\n\s*/g, ' ')); });
-  ftEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); (fnEl.hidden ? dlg.querySelector('#fedit') : fnEl)?.focus(); } });
-  // the raw text and the answer box. notesNow: the body a save sends. Only a change in the raw text or the box changes it; untouched, it is the stored text byte for byte
-  const ansEl = dlg.querySelector('#fans'), fn0 = fnEl.value;
-  const notesNow = () => {
-    if (fnEl.value !== fn0) return fnEl.value.replace(/\s+$/, '');
-    const a = ansEl ? ansEl.value.trim() : '';
-    return a ? C.setAnswer(notesBase, a) : notesBase;
-  };
+  // the raw text and the answer box. notesNow: the body a save sends: the raw text (the stored text byte for byte while untouched) with
+  // the answer box written into its answer section whenever the box has text, so an edit of either field is never lost
+  const ansEl = dlg.querySelector('#fans'), ansR = dlg.querySelector('#fans-r'), freadEl = dlg.querySelector('#fread'), fn0 = fnEl.value;
+  const descNow = () => fnEl.value !== fn0 ? fnEl.value.replace(/\s+$/, '') : notesBase;
+  const notesNow = () => { const raw = descNow(), a = ansEl ? ansEl.value.trim() : ''; return a ? C.setAnswer(raw, a) : raw; };
   const fitRaw = () => { fnEl.style.height = ''; fnEl.style.height = Math.min(fnEl.scrollHeight + 2, Math.round(innerHeight * 0.6)) + 'px'; };
-  const fedit = dlg.querySelector('#fedit');
-  if (fedit) fedit.onclick = () => {
-    const a = ansEl ? ansEl.value.trim() : '';
-    if (a) { fnEl.value = C.setAnswer(notesBase, a); ansEl.value = ''; }
-    dlg.querySelector('#fread').hidden = true; fedit.hidden = true; fnEl.hidden = false; fitRaw(); fnEl.focus();
+  const caretEnd = el => { const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) {} };
+  // click to edit, focus out to render: the raw box replaces the rendered text; leaving the field group (the raw box, the answer box, the
+  // formatting bar) renders both again from what they hold now. An empty field stays a box
+  const editDesc = () => { if (!editable || !freadEl || !fnEl.hidden) return; freadEl.hidden = true; fnEl.hidden = false; fitRaw(); fnEl.focus(); caretEnd(fnEl); };
+  const renderDesc = () => {
+    if (!freadEl || fnEl.hidden || !descNow().trim()) return;
+    freadEl.innerHTML = readInner(C.cardView(descNow(), { check: C.decisionKind(t) === 'check', answerable: editable }));
+    freadEl.hidden = false; fnEl.hidden = true;
   };
+  const editAns = () => { if (!ansR || ansR.hidden) return; ansR.hidden = true; ansEl.hidden = false; ansEl.focus(); caretEnd(ansEl); };
+  const renderAns = () => { if (!ansR || ansEl.hidden) return; const a = ansEl.value.trim(); if (!a) return; ansR.innerHTML = C.renderMd(a); ansR.hidden = false; ansEl.hidden = true; };
+  const inField = el => !!el && (el === fnEl || el === ansEl || el === freadEl || el === ansR || !!(el.closest && el.closest('.fbar')));
+  if (editable) {
+    const leave = e => { if (inField(e.relatedTarget)) return; renderDesc(); renderAns(); };
+    fnEl.addEventListener('focusout', leave); if (ansEl) ansEl.addEventListener('focusout', leave);
+    // a link opens; a selection is left alone; anything else on the rendered text edits it
+    const onRead = (el, go) => {
+      if (!el) return;
+      el.addEventListener('click', e => { if (e.target.closest('a, button, input, textarea, select')) return; if (String(getSelection() || '').trim()) return; go(); });
+      el.addEventListener('keydown', e => { if (e.target === el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(); } });
+    };
+    onRead(freadEl, editDesc); onRead(ansR, editAns);
+  }
+  ftEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (fnEl.hidden) editDesc(); else fnEl.focus(); } });
   if (!fnEl.hidden && fnEl.value) fitRaw();
   wireContinue(dlg);
   // the formatting buttons on the raw text: markers around the selection, or a list marker on each selected line
@@ -4635,7 +4694,7 @@ function openTask(id, quad, opts) {
     fnEl.setSelectionRange(from, b);
     document.execCommand('insertText', false, v.slice(from, b).split('\n').map((l, i) => (cmd === 'insertOrderedList' ? (i + 1) + '. ' : '- ') + l).join('\n'));
   };
-  dlg.querySelectorAll('[data-cmd]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { lastEditor.focus(); if (lastEditor === fnEl) fmtRaw(b.dataset.cmd); else document.execCommand(b.dataset.cmd); syncFmt(); }; });
+  dlg.querySelectorAll('[data-cmd]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { if (lastEditor === fnEl && fnEl.hidden) { editDesc(); syncFmt(); return; } lastEditor.focus(); if (lastEditor === fnEl) fmtRaw(b.dataset.cmd); else document.execCommand(b.dataset.cmd); syncFmt(); }; });
   syncFmt();
   const box = dlg.querySelector('.tagbox'), qEl = dlg.querySelector('#tg-q');
   // tags (round 3 P1): one group per tag list, its name on top (not a button), its chips below (pressed = on the task). The chevron
@@ -4931,7 +4990,7 @@ function openTask(id, quad, opts) {
         }, { origin: 'dialog' });
         st.keep.add(t.id);
         const nl = applyLinks(list, fq);
-        if (r && dch) toast('Answered “' + (decide ? C.decisionOf(t).label_1 : C.decisionOf(t).label_0) + '”: ' + plain(t.title), undoEdit(t, r));
+        if (r && dch) toast('Answered “' + (decide ? C.decisionOf(t).label_1 : C.decisionOf(t).label_0) + '”: ' + plain(t.title) + (C.decisionKind(t) ? ' · the task moves on the master\x27s next check' : ''), undoEdit(t, r));
         else if (r) toast(moved ? 'Moved to ' + label(list) : 'Saved', undoEdit(t, r));
         else if (nl) toast(nl === 1 ? 'Link saved' : nl + ' links saved');
       } else {
@@ -4982,7 +5041,8 @@ function openTask(id, quad, opts) {
   };
   here.leave = (kind, to) => {
     if (deck.dlg.classList.contains('is-asking')) return;
-    if (kind === 'jump') { if (!t || !to || to === t.id || !order.includes(to) || !find(to)) return; }
+    if (kind !== 'close' && !(kind === 'jump' ? alive(to) : nav[kind] && alive(nav[kind]))) here.refresh(); // never to a task closed or deleted meanwhile
+    if (kind === 'jump') { if (!t || !to || to === t.id || !order.includes(to) || !alive(to)) return; }
     else if (kind !== 'close' && !nav[kind]) return;
     if (dirty()) return ask(kind, to);
     leaveNow(kind, to);

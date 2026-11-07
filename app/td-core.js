@@ -189,14 +189,15 @@
       answered_by: d.answered_by || null, answered_at: d.answered_at || null, applied_at: d.applied_at || null, applied_result: d.applied_result || null };
   }
   // the answer of a click: the task fields to change (details with every other key kept), or null when the task has no decision, the
-  // value is not 1 or 0, or the answer was already applied (applied_at set: too late to change it). Only a decision with no kind (a
-  // self-improvement card) also sets status done; with a kind (check, delegate) settle.js closes the card, last (card contract 1)
+  // value is not 1 or 0, or the answer was already applied (applied_at set: too late to change it). Every answer also sets status done,
+  // so the card closes at once (2026-11-07); for a check or Delegate card settle.js still moves the original task on its next read: it
+  // reads closed cards with settled_at unset and the answer before the status (card contract 1)
   function answerDecision(t, value, who, nowIso) {
     const d = decisionOf(t);
     if (!d || d.applied_at || (value !== 1 && value !== 0)) return null;
     const details = plainDetails(t.details);
     details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
-    return details.decision.kind ? { details } : { details, status: 'done' };
+    return { details, status: 'done' };
   }
   const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
 
@@ -1396,6 +1397,14 @@
     : { title: 'Turn off Tasks Grouping?', text: 'The board will show each quadrant in its stored order, without subtasks under their parent. Orders you changed while grouping was on stay as they are: AI and the scripts keep reading them, and there is no automatic way back.' };
   // previous and next task of the task window: the neighbours in the quadrant's shown order (null at the ends)
   const navNeighbours = (ids, id) => { const i = ids.indexOf(id); return i < 0 ? { prev: null, next: null } : { prev: ids[i - 1] || null, next: ids[i + 1] || null }; };
+  // the neighbours again after a data change while the window is open (2026-11-07: the carousel had a snapshot): from the shown
+  // order while the task is in it; a task closed or deleted meanwhile (out of the order) keeps those of its old neighbours that are
+  // still alive (alive(id): open, not deleted), so it can still move on, and never to a closed one
+  const deckNav = (ids, id, old, alive) => {
+    if (ids.includes(id)) return navNeighbours(ids, id);
+    const ok = x => x && alive(x) ? x : null;
+    return { prev: ok(old && old.prev), next: ok(old && old.next) };
+  };
   // the task deck (edit-nav plan): what a click around the task window does. zone = the zone the click ended in ('prev', 'next',
   // 'close' or null), downZone = the zone it started in; a press that started elsewhere (a text selection dragged out of the
   // window) does nothing. A side with no neighbour (the end of the quadrant, a new task) closes, like the bands above and below.
@@ -1491,7 +1500,7 @@
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
-    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
+    deriveQuadrant, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
     ACCOUNTS_MAX, readAccounts, rememberAccount, accountFor,

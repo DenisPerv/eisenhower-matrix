@@ -769,7 +769,7 @@
       return u && { msg: 'Restored: ' + plain(t.title), undo: undoEdit(t, u) };
     }
     // fields from a form or a sheet: { title, notes, tags, deadline, start, list, decision }. A list change puts the task on top of its
-    // quadrant. decision (1 or 0): the answer of a card (C.answerDecision: details.decision; status done only with no kind), sent in the
+    // quadrant. decision (1 or 0): the answer of a card (C.answerDecision: details.decision and status done, every kind: a check or Delegate card closes at once), sent in the
     // same versioned write as the other fields (web: openTask save with decide)
     function saveTask(id, f, eo) {
       const t = find(id); if (!t) return null;
@@ -782,7 +782,7 @@
         if (moved) x.list = f.list;
         x.sortKey = key;
       }, eo || { origin: 'dialog' });
-      if (r && dch) { const d = C.decisionOf(t); return { msg: 'Answered “' + (f.decision ? d.label_1 : d.label_0) + '”: ' + plain(t.title), undo: undoEdit(t, r), decided: true }; }
+      if (r && dch) { const d = C.decisionOf(t); return { msg: 'Answered “' + (f.decision ? d.label_1 : d.label_0) + '”: ' + plain(t.title) + (C.decisionKind(t) ? ' · the task moves on the master\x27s next check' : ''), undo: undoEdit(t, r), decided: true }; }
       return r && { msg: moved ? 'Moved to ' + label(f.list) : 'Saved', undo: undoEdit(t, r) };
     }
     function moveToList(id, list) { return saveTask(id, { list }, { origin: null }); }

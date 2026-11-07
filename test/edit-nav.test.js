@@ -87,3 +87,13 @@ test('deckSequence: the window moves A Do, B Plan, C Delegate, D Eliminate; empt
   assert.deepEqual(C.navNeighbours(C.deckSequence({ A: ['a1', 'a2'], C: ['c1'] }), 'a2'), { prev: 'a1', next: 'c1' });
   assert.deepEqual(C.deckSequence({}), []);
 });
+
+test('deckNav (2026-11-07): the neighbours follow the data; a task out of the order keeps only its live old neighbours', () => {
+  const alive = new Set(['a', 'c', 'd']), ok = id => alive.has(id);
+  // still in the order: plain neighbours of the new order (b was closed elsewhere and left it)
+  assert.deepEqual({ ...C.deckNav(['a', 'c', 'd'], 'c', { prev: 'b', next: 'd' }, ok) }, { prev: 'a', next: 'd' });
+  assert.deepEqual({ ...C.deckNav(['a', 'c'], 'a', { prev: null, next: 'b' }, ok) }, { prev: null, next: 'c' });
+  // the open task itself closed elsewhere: out of the order; its old neighbours that are alive stay, a closed one goes
+  assert.deepEqual({ ...C.deckNav(['a', 'd'], 'c', { prev: 'a', next: 'b' }, ok) }, { prev: 'a', next: null });
+  assert.deepEqual({ ...C.deckNav([], 'c', null, ok) }, { prev: null, next: null });
+});
