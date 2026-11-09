@@ -6,7 +6,7 @@
 --                     (owner_id: Maksym for MDENYSIUK-PERS, Anastasiia for AKhrystina-Lap), and the program's last beat, state
 --                     (running | offline), controls switch and the last time a reader looked. Rows by admin SQL only.
 --   harness_heads     one row per device and run: seq (bumped by every push, compare-and-set), live, the head (run-list row,
---                     session index name -> list_id | 'master' | null, trimmed parts, withheld count).
+--                     trimmed parts, withheld count) and, in a column no API role may select, the session index name -> list_id | 'master' | null.
 --   harness_parts     the run split by the PC (lib/run-snapshot.js): 'household', 'list:<list_id>', 'feed:<name>:<k>'; list_id says
 --                     who may select it (null: the household only).
 --   harness_commands  a button pressed on the web: pending -> taken -> done | refused | unknown, or expired after 2 minutes.
@@ -51,6 +51,9 @@ create table if not exists public.harness_heads (
   updated_at  timestamptz not null default now(),
   primary key (device, run_ts)
 );
+-- the session index (name -> list_id | 'master' | null), taken out of the head by harness_push: only harness_right reads it, no API role
+-- may select it, so a guest of one list does not learn the names of the household's other sessions (critic 2026-11-09)
+alter table public.harness_heads add column if not exists sessions jsonb not null default '{}'::jsonb;
 
 create table if not exists public.harness_parts (
   device      text not null,
@@ -139,7 +142,7 @@ begin
     return case when exists (select 1 from public.list_members m where m.list_id = p_scope_list and m.profile_id = p_who and m.role = 'owner')
                 then null else 'only the owners of this list may change its limits' end;
   end if;
-  select h.head -> 'sessions' ->> p_name into v_idx from public.harness_heads h where h.device = p_device and h.run_ts = p_run_ts;
+  select h.sessions ->> p_name into v_idx from public.harness_heads h where h.device = p_device and h.run_ts = p_run_ts;
   if v_idx is null then return 'no such session in this run'; end if;
   if v_idx = 'master' then
     return case when p_who = v_owner then null else 'only the owner of this PC may control its master' end;
@@ -190,7 +193,8 @@ begin
     on conflict (device, run_ts, part) do update set list_id = excluded.list_id, seq = excluded.seq, hash = excluded.hash, body = excluded.body, bytes = excluded.bytes;
   end loop;
   delete from public.harness_parts where device = p_device and run_ts = p_run_ts and part = any (coalesce(p_del, '{}'));
-  update public.harness_heads set seq = v_new, live = coalesce(p_live, false), head = p_head, updated_at = now()
+  update public.harness_heads set seq = v_new, live = coalesce(p_live, false), head = p_head - 'sessions',
+         sessions = case when jsonb_typeof(p_head -> 'sessions') = 'object' then p_head -> 'sessions' else '{}'::jsonb end, updated_at = now()
    where device = p_device and run_ts = p_run_ts;
   return v_new;
 end $$;
@@ -245,13 +249,15 @@ begin
 end $$;
 
 -- At the program's start, after a crash between take and done (F4, F6): continue and takeover become unknown and never run again;
--- stop and release are returned (still taken) to run once more if the session is still in the state they expected.
+-- stop, release and limits taken in the last 5 minutes are returned (still taken) to run once more if the session is still in the
+-- state they expected; older ones become unknown too, so a stale stop never ends a session the person resumed since (critic 2026-11-09).
 create or replace function public.harness_recover(p_device text) returns setof public.harness_commands
-language plpgsql security definer set search_path = '' as $$
+language plpgsql security definer set search_path = '' as $
 begin
   if not public.harness_is_writer(p_device) then raise exception 'not the writer of this device' using errcode = '42501'; end if;
   update public.harness_commands set state = 'unknown', result = 'the PC stopped while carrying it out: look at the session'
-   where device = p_device and state = 'taken' and action in ('continue', 'takeover');
+   where device = p_device and state = 'taken'
+     and (action in ('continue', 'takeover') or taken_at is null or taken_at <= now() - interval '5 minutes');
   return query select * from public.harness_commands where device = p_device and state = 'taken' and action in ('stop', 'release', 'limits') order by created_at;
 end $$;
 
@@ -304,7 +310,7 @@ begin
   else
     if p_name is null or p_expect_state is null then raise exception 'a session button needs the session and its state' using errcode = '22023'; end if;
     if p_note is not null and p_action <> 'continue' then raise exception 'a note goes with continue only' using errcode = '22023'; end if;
-    select nullif(h.head -> 'sessions' ->> p_name, 'master') into why from public.harness_heads h where h.device = p_device and h.run_ts = p_run_ts;
+    select nullif(h.sessions ->> p_name, 'master') into why from public.harness_heads h where h.device = p_device and h.run_ts = p_run_ts;
     v_scope := case when why ~ '^[0-9a-f-]{36}$' then why::uuid end;
   end if;
   if (p_action = 'limits' or nullif(btrim(coalesce(p_note, '')), '') is not null)
@@ -350,7 +356,8 @@ create policy harness_commands_select on public.harness_commands for select to a
 
 revoke all on public.harness_devices, public.harness_heads, public.harness_parts, public.harness_commands from anon, authenticated, public;
 grant select (device, label, owner_id, beat_at, state, controls, viewed_at) on public.harness_devices to authenticated;
-grant select on public.harness_heads, public.harness_parts, public.harness_commands to authenticated;
+grant select (device, run_ts, seq, live, head, updated_at) on public.harness_heads to authenticated;
+grant select on public.harness_parts, public.harness_commands to authenticated;
 
 revoke all on function public.harness_run_at(text), public.harness_in_window(text), public.harness_is_writer(text), public.harness_signin_age(),
   public.harness_right(uuid, text, text, text, text, uuid),

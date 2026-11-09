@@ -182,6 +182,11 @@ begin
   reset role; perform set_config('request.jwt.claims', '', true);
   perform public._hw_chk('D5 a taken continue becomes unknown', public._hw($q$select state from public.harness_commands where idem_key = 'idem-r14-a'$q$), 'unknown');
   perform public._hw_chk('D5b the done stop keeps its result', public._hw($q$select state || ':' || result from public.harness_commands where idem_key = 'idem-r3-aa'$q$), 'done:stopped');
+  update public.harness_commands set taken_at = now() - interval '10 minutes' where idem_key = 'idem-r19-a';   -- a limits change taken long ago
+  perform public._hw_as(ag);
+  perform public._hw_chk('D4c a stop, release or limits taken over 5 minutes ago is not run again', public._hw($q$select coalesce(string_agg(action, ','), 'none') from public.harness_recover('st-hw-dev1')$q$), 'release');
+  reset role; perform set_config('request.jwt.claims', '', true);
+  perform public._hw_chk('D4d ... it becomes unknown', public._hw($q$select state from public.harness_commands where idem_key = 'idem-r19-a'$q$), 'unknown');
   perform public._hw_as(ag);
   perform public._hw_chk('D6 sweep', public._hw($q$select (public.harness_sweep('st-hw-dev1')) ->> 'runs_deleted'$q$), '0');
   perform public._hw_as(h1);
@@ -205,6 +210,9 @@ begin
      or has_function_privilege('authenticated', 'public.harness_is_writer(text)', 'execute'))::text, 'false');
   perform public._hw_chk('G4 writer and owner ids of a device are not readable as columns',
     has_column_privilege('authenticated', 'public.harness_devices', 'writer_id', 'select')::text, 'false');
+  perform public._hw_chk('G6 the session index of a head is no readable column, the head is',
+    (has_column_privilege('authenticated', 'public.harness_heads', 'sessions', 'select') || '/' || has_column_privilege('authenticated', 'public.harness_heads', 'head', 'select'))::text, 'false/true');
+  perform public._hw_chk('G7 the pushed head keeps no session index; the column has it', (select (head ? 'sessions')::text || '/' || (sessions ->> 'do-l1-1') from public.harness_heads where device = 'st-hw-dev1'), 'false/' || l1::text);
   perform public._hw_chk('G5 definers with an empty search_path',
     (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
       where s.nspname = 'public' and p.proname like 'harness\_%' and p.prosecdef and not coalesce(p.proconfig, '{}') @> array['search_path=""']), '0');
