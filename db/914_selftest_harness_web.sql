@@ -160,21 +160,29 @@ begin
   perform public._hw_as(ag);
   perform public._hw_chk('T3 the writer takes the valid ones', public._hw($q$select string_agg(coalesce(name, 'limits'), ',' order by coalesce(name, 'zzz')) from public.harness_take('st-hw-dev1')$q$), 'do-l1-1,do-l2-1,limits');
   perform public._hw_chk('T4 a second take gets nothing', public._hw($q$select count(*) from public.harness_take('st-hw-dev1')$q$), '0');
+  perform public._hw_chk('T4b the agent selects no command row (household or requester only)', public._hw($q$select count(*) from public.harness_commands$q$), '0');
+  -- the states are read as admin: the select policy hides commands from the agent (T4b)
+  reset role; perform set_config('request.jwt.claims', '', true);
   perform public._hw_chk('T5 rights checked again at take', public._hw(format($q$select state || ':' || left(result, 26) from public.harness_commands where id = %L$q$, c1)), 'refused:refused when taken: on%');
   perform public._hw_chk('T6 an expired command is not taken', public._hw($q$select state from public.harness_commands where idem_key = 'idem-r14-a'$q$), 'expired');
   perform public._hw_chk('T7 the default limits of the old owner refused too', public._hw($q$select state from public.harness_commands where idem_key = 'idem-r8-aa'$q$), 'refused');
 
   -- ---------- D: done, recover, sweep ----------
-  select id into c2 from public.harness_commands where idem_key = 'idem-r3-aa';
+  select id into c2 from public.harness_commands where idem_key = 'idem-r3-aa';   -- as admin (the agent cannot select it)
+  select id into c1 from public.harness_commands where idem_key = 'idem-r18-a';
+  perform public._hw_as(ag);
   perform public._hw_chk('D1 done', public._hw(format($q$select public.harness_done(%L, 'done', 'stopped')::text$q$, c2)), '');
   perform public._hw_chk('D2 done twice is refused', public._hw(format($q$select public.harness_done(%L, 'done', 'stopped')::text$q$, c2)), 'ERR 22023%');
   perform public._hw_as(ag2);
-  perform public._hw_chk('D3 another writer cannot finish it', public._hw(format($q$select public.harness_done(%L, 'done', 'x')::text$q$, (select id from public.harness_commands where idem_key = 'idem-r18-a'))), 'ERR 42501%');
+  perform public._hw_chk('D3 another writer cannot finish it', public._hw(format($q$select public.harness_done(%L, 'done', 'x')::text$q$, c1)), 'ERR 42501%');
   reset role; perform set_config('request.jwt.claims', '', true);
   update public.harness_commands set state = 'taken' where idem_key = 'idem-r14-a';   -- as if the PC took a continue and crashed
   perform public._hw_as(ag);
   perform public._hw_chk('D4 recover returns the stop/release/limits still taken', public._hw($q$select string_agg(action, ',' order by action desc) from public.harness_recover('st-hw-dev1')$q$), 'release,limits');
+  reset role; perform set_config('request.jwt.claims', '', true);
   perform public._hw_chk('D5 a taken continue becomes unknown', public._hw($q$select state from public.harness_commands where idem_key = 'idem-r14-a'$q$), 'unknown');
+  perform public._hw_chk('D5b the done stop keeps its result', public._hw($q$select state || ':' || result from public.harness_commands where idem_key = 'idem-r3-aa'$q$), 'done:stopped');
+  perform public._hw_as(ag);
   perform public._hw_chk('D6 sweep', public._hw($q$select (public.harness_sweep('st-hw-dev1')) ->> 'runs_deleted'$q$), '0');
   perform public._hw_as(h1);
   perform public._hw_chk('D7 a reader marks the page viewed', public._hw($q$select public.harness_view('st-hw-dev1')::text$q$), '');
