@@ -252,7 +252,7 @@ end $$;
 -- stop, release and limits taken in the last 5 minutes are returned (still taken) to run once more if the session is still in the
 -- state they expected; older ones become unknown too, so a stale stop never ends a session the person resumed since (critic 2026-11-09).
 create or replace function public.harness_recover(p_device text) returns setof public.harness_commands
-language plpgsql security definer set search_path = '' as $
+language plpgsql security definer set search_path = '' as $$
 begin
   if not public.harness_is_writer(p_device) then raise exception 'not the writer of this device' using errcode = '42501'; end if;
   update public.harness_commands set state = 'unknown', result = 'the PC stopped while carrying it out: look at the session'

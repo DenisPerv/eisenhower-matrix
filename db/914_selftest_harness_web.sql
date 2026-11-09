@@ -212,7 +212,7 @@ begin
     has_column_privilege('authenticated', 'public.harness_devices', 'writer_id', 'select')::text, 'false');
   perform public._hw_chk('G6 the session index of a head is no readable column, the head is',
     (has_column_privilege('authenticated', 'public.harness_heads', 'sessions', 'select') || '/' || has_column_privilege('authenticated', 'public.harness_heads', 'head', 'select'))::text, 'false/true');
-  perform public._hw_chk('G7 the pushed head keeps no session index; the column has it', (select (head ? 'sessions')::text || '/' || (sessions ->> 'do-l1-1') from public.harness_heads where device = 'st-hw-dev1'), 'false/' || l1::text);
+  perform public._hw_chk('G7 the pushed head keeps no session index; the column has it', (select (hh.head ? 'sessions')::text || '/' || (hh.sessions ->> 'do-l1-1') from public.harness_heads hh where hh.device = 'st-hw-dev1'), 'false/' || l1::text);
   perform public._hw_chk('G5 definers with an empty search_path',
     (select count(*)::text from pg_proc p join pg_namespace s on s.oid = p.pronamespace
       where s.nspname = 'public' and p.proname like 'harness\_%' and p.prosecdef and not coalesce(p.proconfig, '{}') @> array['search_path=""']), '0');
