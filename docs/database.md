@@ -17,7 +17,8 @@ Run the files in the SQL editor (or with an admin tool), each file whole, in thi
 | 7 | `003`, `011`, the 012 policy block | again |
 | 7a | `021_drop_priority.sql` | drops `items.priority`, only once every client runs a page without priority (the hosted copy, both household machines, the Telegram bot); then 7 and 8 again |
 | 7b | `029_delete_lists.sql` | `delete_archived_list(p_list)` (owner, archived, not a system or category default list; deletes the list with its tasks), `members_keep_owner` honouring `td.deleting_list`, `last_backup_at()`, `ops.record_backup()` (the one write the backup role makes); re-run it after `010`; then 7 and 8 again |
-| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` (`913_selftest_delete_lists.sql` for 029) | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
+| 7c | `031_harness_web.sql` | the Eisenhower Harness page on the web: `harness_devices`, `harness_heads`, `harness_parts`, `harness_commands` and their RPCs (README "Harness page on the web"); re-run it after `003`, which revokes its table grants; rollback `031_down_harness_web.sql` |
+| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` (`913_selftest_delete_lists.sql` for 029, `914_selftest_harness_web.sql` for 031) | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
 
 Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`. `010` also replaces `items_tags_compat_after`, which `023` replaces again: re-running `010` means re-running `023` after it.
 
