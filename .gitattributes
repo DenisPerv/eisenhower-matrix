@@ -1,0 +1,2 @@
+# The Eisenhower Harness page is a byte-equal copy of HomeOS-TasksBoardHarness/viewer/ (HomeOS #45): keep LF on every checkout
+harness/* text eol=lf
