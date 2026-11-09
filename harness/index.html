@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eisenhower Harness</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20d%3D%22M16%201.5%2028.6%208.75v14.5L16%2030.5%203.4%2023.25V8.75z%22%20fill%3D%22%230b1324%22%20stroke%3D%22%23c4b5ff%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M16%2016V7.5M16%2016l-7.4%204.3M16%2016l7.4%204.3%22%20stroke%3D%22%23c4b5ff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%227.5%22%20r%3D%222.4%22%20fill%3D%22%2386a9ff%22%2F%3E%3Ccircle%20cx%3D%228.6%22%20cy%3D%2220.3%22%20r%3D%222.4%22%20fill%3D%22%2386a9ff%22%2F%3E%3Ccircle%20cx%3D%2223.4%22%20cy%3D%2220.3%22%20r%3D%222.4%22%20fill%3D%22%2386a9ff%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2216%22%20r%3D%224.2%22%20fill%3D%22%23ffd9a0%22%2F%3E%3C%2Fsvg%3E">
+<meta name="description" content="Live view and replay of Eisenhower runs: how each agent session worked, what it decided and what it cost at API prices.">
+<link rel="stylesheet" href="harness.css">
+</head>
+<body>
+<a class="skip" href="#c-sessions" id="skip">Skip to the list of sessions</a>
+<canvas id="core" aria-hidden="true"></canvas>
+<header class="top">
+  <h1 class="brand"><svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1.5 28.6 8.75v14.5L16 30.5 3.4 23.25V8.75z" fill="#0b1324" stroke="#c4b5ff" stroke-width="1.5"/><path d="M16 16V7.5M16 16l-7.4 4.3M16 16l7.4 4.3" stroke="#c4b5ff" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="7.5" r="2.4" fill="#86a9ff"/><circle cx="8.6" cy="20.3" r="2.4" fill="#86a9ff"/><circle cx="23.4" cy="20.3" r="2.4" fill="#86a9ff"/><circle cx="16" cy="16" r="4.2" fill="#ffd9a0"/></svg><span>Eisenhower Harness</span></h1>
+  <nav aria-label="Pages"><ul>
+    <li><button class="nv" aria-expanded="false" data-v="report">Day report</button></li>
+    <li><button class="nv" aria-expanded="false" data-v="flow">How it works</button></li>
+    <li><button class="nv" aria-expanded="false" data-v="decisions">Decisions</button></li>
+    <li><button class="nv" aria-expanded="false" data-v="limits">Limits</button></li>
+  </ul></nav>
+  <button class="prof" id="prof" type="button" aria-label="Your profile" aria-haspopup="menu" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="7" r="3.4"/><path d="M3.5 17c.9-3.2 3.4-4.8 6.5-4.8s5.6 1.6 6.5 4.8"/></svg></button>
+</header>
+<div class="pmenu" id="pmenu" role="menu" aria-label="Profile"><button type="button" role="menuitem" id="pm-prefs">Preferences</button><button type="button" role="menuitem" id="pm-view"></button></div>
+<section id="prefs" role="dialog" aria-labelledby="pf-title"></section>
+<main id="stage" aria-label="The day: master in the centre, its lists around it. Each task and session keeps its place."></main>
+<div class="dock" id="dockL" role="region" aria-label="Left menu"></div>
+<div class="dock" id="dockR" role="region" aria-label="Right menu"></div>
+<div class="hud closed" id="hud">
+    
+  <div class="transport" id="transport" role="group" aria-label="Replay"><button class="ph" id="ph" type="button" aria-controls="transport"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l4-4 4 4"/></svg></button>
+    <button class="btn primary" id="play">Pause</button>
+    <div class="clock" id="clock"></div>
+    <button class="btn" id="replay" type="button">Replay the Day</button>
+    <div class="scrubw"><label class="vh" for="scrub">Replay position</label><input type="range" id="scrub" min="0" max="1000" value="0"></div>
+    <button class="btn" id="speed" aria-label="Replay speed">1x</button>
+    <div class="pair"><button class="btn" id="prev" aria-label="Previous event">Back</button><button class="btn" id="next" aria-label="Next event">Next</button></div>
+  </div>
+</div>
+<p class="vh" role="status" id="sr"></p>
+<div id="tree"></div>
+<aside class="panel" id="panel" aria-labelledby="p-title"><div id="rz" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Session details width. Arrow keys resize, Home narrow, End full." aria-valuemin="340" aria-valuemax="2000" aria-valuenow="440"></div><button class="x" id="px" aria-label="Close">&times;</button><div id="pc"></div></aside>
+<div id="lg" hidden></div>
+
+<div id="tip"></div>
+
+
+<script src="harness-remote.js" defer></script>
+<script src="harness-data.js" defer></script>
+<script src="harness.js" defer></script>
+</body>
+</html>

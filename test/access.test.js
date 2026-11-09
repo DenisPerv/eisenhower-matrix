@@ -276,9 +276,9 @@ test('process: an approval over the seat limit changes nothing', async () => {
 
 test('gateApps: the gate on the app host paths, one previews app per host; host names only', () => {
   const apps = A.gateApps('App.Example.pages.dev', 'land.example.pages.dev');
-  assert.deepEqual(A.GATED_PATHS, ['/board', '/board/*', '/app', '/app/*']);
+  assert.deepEqual(A.GATED_PATHS, ['/board', '/board/*', '/app', '/app/*', '/harness', '/harness/*']);
   assert.deepEqual(apps.map(x => x.name), [A.GATE_APP, A.PREVIEWS_APP.app, A.PREVIEWS_APP.landing]);
-  assert.deepEqual(apps[0].destinations, ['app.example.pages.dev/board', 'app.example.pages.dev/board/*', 'app.example.pages.dev/app', 'app.example.pages.dev/app/*']);
+  assert.deepEqual(apps[0].destinations, ['app.example.pages.dev/board', 'app.example.pages.dev/board/*', 'app.example.pages.dev/app', 'app.example.pages.dev/app/*', 'app.example.pages.dev/harness', 'app.example.pages.dev/harness/*']);
   assert.equal(apps[0].domain, 'app.example.pages.dev/board');
   assert.deepEqual(apps[1].destinations, ['*.app.example.pages.dev']);
   assert.deepEqual(apps[2].destinations, ['*.land.example.pages.dev']);
@@ -352,7 +352,7 @@ test('setup --gate: apps made elsewhere (phase 0) are found by name; only a miss
   const args = ['setup', '--gate', '--host', 'app.example.pages.dev'];
   let r = await runCmd(args, { env: ENV, fetch: cf.fetch });
   assert.equal(r.code, 0, r.err && r.err.message);
-  assert.match(r.out, /app "Eisenhower gate": present \(g1\)\n {2}would add paths: app\.example\.pages\.dev\/app\/\*\n {2}would add policies: TasksDashboard guests/);
+  assert.match(r.out, /app "Eisenhower gate": present \(g1\)\n {2}would add paths: app\.example\.pages\.dev\/app\/\*, app\.example\.pages\.dev\/harness, app\.example\.pages\.dev\/harness\/\*\n {2}would add policies: TasksDashboard guests/);
   assert.match(r.out, /app "Eisenhower previews \(app\)": present \(p1\)\n1 app\(s\) to set up/);
   assert.ok(!/previews \(landing\)/.test(r.out));
   assert.ok(cf.calls.every(c => c.startsWith('GET ')));
@@ -386,6 +386,6 @@ test('list --app: the gate app\'s paths and policies; CF_ACCESS_PROD_APP_ID is t
   assert.equal(r.code, 0, r.err && r.err.message);
   assert.match(r.out, /Eisenhower gate \(app\.example\.pages\.dev\): Household, TasksDashboard guests\n {2}paths: app\.example\.pages\.dev\/board, app\.example\.pages\.dev\/board\/\*, app\.example\.pages\.dev\/app, app\.example\.pages\.dev\/app\/\*/);
   const j = await runCmd(['list', '--app', 'g1', '--json'], { env, fetch: cf.fetch });
-  assert.equal(JSON.parse(j.out.split('\n').pop()).paths.length, 4);
+  assert.equal(JSON.parse(j.out.split('\n').pop()).paths.length, 6);
   assert.equal((await runCmd(['list'], { env, fetch: cf.fetch })).err.exit, 2);
 });

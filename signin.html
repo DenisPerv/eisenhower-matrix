@@ -159,7 +159,7 @@ form .primary{margin-top:2px}
   // back to exactly <origin>/signin, no query, so it matches the exact Redirect URL in Supabase; the address loses the code at once
   const backUrl = () => location.origin + '/signin';
   // where a let-in login goes: only these two pages of this host; anything else (another host, //host, another path) is /board/
-  const NEXT_PAGES = ['/board/', '/app/'];
+  const NEXT_PAGES = ['/board/', '/app/', '/harness/'];   // /harness/: the Eisenhower Harness page (db/031)
   const safeNext = v => (typeof v === 'string' && NEXT_PAGES.includes(v) ? v : '/board/');
   // ?next= is read on arrival and kept in this tab, because the way back from Google carries no query
   function keepNext(href) {

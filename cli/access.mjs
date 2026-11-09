@@ -14,10 +14,11 @@ export const REQUEST_PATHS = ['/request', '/config/tasksdashboard.config.js'];
 // the phone app (app/, published at /app/) is public at the edge and gates itself (docs/hosting.md "The phone app")
 export const PHONE_APP = 'TasksDashboard phone app';
 export const PHONE_PATHS = ['/app', '/app/*'];
-// the two-host layout (docs/hosting.md): on the app host Access gates only the board and the phone app; everything else
+// the two-host layout (docs/hosting.md): on the app host Access gates only the board, the phone app and the Eisenhower Harness
+// page (/harness, HomeOS #45); everything else
 // (/signin, /privacy, the config, version.json) is public. One previews app per host covers every preview deployment.
 export const GATE_APP = 'Eisenhower gate';
-export const GATED_PATHS = ['/board', '/board/*', '/app', '/app/*'];
+export const GATED_PATHS = ['/board', '/board/*', '/app', '/app/*', '/harness', '/harness/*'];
 export const PREVIEWS_APP = { app: 'Eisenhower previews (app)', landing: 'Eisenhower previews (landing)' };
 // a reusable policy needs one include rule; this address can never sign in (.invalid), and list/add/remove hide it
 export const PLACEHOLDER = 'no-guests-yet@example.invalid';

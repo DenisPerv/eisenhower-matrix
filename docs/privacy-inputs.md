@@ -15,6 +15,7 @@ Facts for whoever writes the privacy policy, the cookie list, the terms and the 
 | Sign-in `/signin` (`signin.html`) | app | Google sign-in returns email, name and profile picture (scopes `openid`, `email`, `profile`); an access request keeps email, first and last name and the request time (`users_pending_for_decision`); a consulting-call request (`?intent=consult`, `db/025`) keeps the email, the Telegram username and WhatsApp number if given, a note if given and the time, as a task in the household list "Consultancy Request" (read by Maksym, `homeos-agent` and the household Telegram bot) | Supabase (Auth and four RPCs); Google (the sign-in screen); the task appears in Maksym's Telegram digest |
 | Board `/board/` (`TasksDashboard.html`) | app | the account (email, display name), the lists, items, tags, sharing and preferences a person creates | Supabase only |
 | Phone app `/app/` | app | the same as the board; changes made offline wait on the device until they are sent | Supabase only |
+| Eisenhower Harness `/harness/` (`harness/*`, `db/031`) | app | nothing new from the reader: it uses the board's session. A reader's button press keeps who pressed, when, the session, the action, an optional note (up to 1000 characters) or a limits change, and the PC's answer, for 30 days. The PCs that publish upload their agent runs (session tree, goals, states, costs, reports, decisions, the last 400 steps of each session, redacted: secrets and ID-like strings withheld, paths outside the repo cut to a file name), kept 30 days | Supabase only |
 | Cloudflare Access login (before `/board/` and `/app/`) | app | the email Google returns to Access | Cloudflare (Access), Google |
 | Access decision email | (outside this repository) | the requester's email address, to send one email with the decision | the mail sender the host runs |
 
@@ -57,3 +58,11 @@ The board and the phone app tell people to ask for deletion at the contact above
 - Whether the preference keys (`td.theme`, `td.rail`, `td.app.theme`, `td.app.list`, `td.app.installHint`, `td.app.hint`, `ec.demo.v5`, `ec.interest.v1`) count as strictly necessary.
 - Legal basis, retention periods, transfers, rights and the supervisory authority: not in the code, to be decided.
 - Business details for a legal notice (entity, address, tax number): not in this repository.
+
+## Draft for the privacy page: the Eisenhower Harness page (for review, not published)
+
+Draft paragraph for `privacy.html`, written for HomeOS #45 (2026-11-09). A person reviews it before it goes into the page; nothing here is legal advice.
+
+> **Eisenhower Harness page (`/harness/`).** If you have access to the board, you can open a page that shows the AI agent runs started from the lists you can see. The computers that run the agents upload a summary of each run to our database: which sessions ran, their goals, states, costs, reports and decisions, and the last 400 steps of each session. Secrets, ID-like numbers and file paths outside the project are removed before upload. You see only the runs of lists shared with you; household members see all of them. Owners of a list can press Stop, Continue, Take over, Release or change that list's limits. Each press is stored with who pressed it, when, the session, any note you typed and the computer's answer. Run data and presses are deleted after 30 days. They are stored with Supabase, like the rest of the board, and are not shared with anyone else.
+
+Open: whether 30 days needs a stated legal basis per run type, and the EU and Portuguese checks (GDPR art. 5(1)(e) storage limitation, Lei 58/2019). The basic-product-compliance skill was not run for this.

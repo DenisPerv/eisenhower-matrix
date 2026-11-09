@@ -26,6 +26,7 @@ Every path on both hosts is noindex (`X-Robots-Tag: noindex`).
 | app | `/` | a 302 to `/board/` (the app host has no index page) |
 | app | `/board/` | `TasksDashboard.html`; the deploy makes the config's address absolute (`/config/tasksdashboard.config.js`); the source keeps it relative so `file://` works |
 | app | `/app/` | `app/*` (the phone app; manifest `id` and `scope` stay `/app/`) |
+| app | `/harness/` | `harness/*`: the Eisenhower Harness page (HomeOS #45). `index.html`, `harness.css`, `harness.js`, `harness-data.js` are byte-equal copies of HomeOS `HomeOS-TasksBoardHarness/viewer/` (its `tools/copy-viewer-to-app.js`); `harness-remote.js` is the only app file: it reads `db/031` with the board's session (`td.auth`) and queues button presses for the PC that owns the run. Shipped only when the release has `harness/index.html` |
 | app | `/signin` | `signin.html`: Google only; a household login or an approved request goes on to `/board/`, or to `next` when it is `/app/`; everyone else stays on the request screens ([access-requests.md](access-requests.md)) |
 | app | `/request` | a 301 to `/signin`, so links in sent emails keep working |
 | app | `/config/tasksdashboard.config.js` | the config: public values only (`supabaseUrl`, `publishableKey`, `pollMs`) |
@@ -92,6 +93,7 @@ With the bypass off, the app host gates only the signed-in pages; the landing ho
 | app | `/board`, `/board/`, `/board/*` | `'self'` (the config) plus the board's inline scripts | the Supabase URL |
 | app | `/app/`, `/app/*` | `'self'` plus the app's inline scripts; also `manifest-src 'self'`, `worker-src 'self'` | `'self'` and the Supabase URL |
 | app | `/signin` | `'self'` (the config) plus its one inline script | the Supabase URL |
+| app | `/harness/`, `/harness/*` | `'self'` only (the page has no inline script; `deploy-pages.js` refuses one); `style-src 'self' 'unsafe-inline'`; no-cache | the Supabase URL |
 | app | everything else (`/*`) | `'none'` (a strict default) | `'none'` |
 
 - `Access-Control-Allow-Origin` is removed (`! Access-Control-Allow-Origin`) on `/board*` and `/app/*`.

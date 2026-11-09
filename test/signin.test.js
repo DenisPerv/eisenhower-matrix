@@ -53,9 +53,10 @@ test('signin.html has exactly one inline script, the config as its only external
   assert.ok(!/type\s*=\s*["']?password/i.test(HTML));
 });
 
-test('next: only /board/ and /app/; anything else, another host included, is /board/', () => {
+test('next: only /board/, /app/ and /harness/; anything else, another host included, is /board/', () => {
   const { safeNext, NEXT_PAGES } = load(ORIGIN + '/signin').ctx.TDSignin;
-  assert.deepEqual([...NEXT_PAGES], ['/board/', '/app/']);
+  assert.deepEqual([...NEXT_PAGES], ['/board/', '/app/', '/harness/']);
+  assert.equal(safeNext('/harness/'), '/harness/');
   assert.equal(safeNext('/board/'), '/board/');
   assert.equal(safeNext('/app/'), '/app/');
   for (const bad of ['//evil.example', '//evil.example/app/', 'https://evil.example/app/', `${ORIGIN}/app/`, '/app', '/board', '/app/x', '/board/../x',
