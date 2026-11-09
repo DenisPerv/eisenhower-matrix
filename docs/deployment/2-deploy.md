@@ -115,6 +115,11 @@ Run from the HomeOS root on the machine with the tokens. `--project` picks the f
      ! Content-Security-Policy
      ! Access-Control-Allow-Origin
      Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-<each inline script of app/index.html>'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' <supabaseUrl>; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
+   /harness/  (and /harness/*; only when the release has harness/index.html)
+     ! Content-Security-Policy
+     ! Access-Control-Allow-Origin
+     Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src <supabaseUrl>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
+     Cache-Control: no-cache
    /signin
      ! Content-Security-Policy
      Content-Security-Policy: default-src 'none'; script-src 'self' 'sha256-<the inline script of signin.html>'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src <supabaseUrl>; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'
