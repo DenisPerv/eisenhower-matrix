@@ -1180,6 +1180,7 @@ dialog label.fdone-l{display:inline-flex;align-items:center;gap:6px;margin:0;min
 .fref{display:inline-flex;align-items:center;min-height:28px;padding:0 9px;background:var(--well);border:1px solid var(--hair);border-radius:var(--r);color:var(--ink2);font-weight:600}
 /* Continue in Claude (2026-11-08): the one button, right of the window's title, styled as the number chip */
 .tk-tl{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s2) var(--s3);min-width:0}
+.tk-tl .note.tk-wait{margin:0;padding:4px 10px;flex:0 1 auto}
 a.fcont{font:600 13px/1 var(--ui);text-decoration:none;white-space:nowrap}a.fcont:hover{border-color:var(--hair2);color:var(--ink)}
 /* the description: read mode renders, edit mode is the raw text (a save changes only what the person changed) */
 .flabel-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -5366,10 +5367,11 @@ function openTask(id, quad, opts) {
   // Card layout v3 (2026-11-11): the window's blocks in the person's sections and columns; one tag picker per tag list ('tl:<id>')
   const TV = C.taskLayoutView(cardLayout, taskTagLists(), tagListFavs, tagListOrder, t ? 'edit' : 'create');
   const tlAny = TV.sections.some(s => s.cells.some(c => c.some(b => /^tl:/.test(b) && TAG_LISTS[b.slice(3)]))); // Find a tag shows only with a tag list block to filter
-  let formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h sr" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml + '</div>' +
+  let formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h sr" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml +
+    // Max 2026-11-11: the check note sits on the same line as Continue in Claude
+    (t && C.awaitingCheck(t) ? '<p class="note tk-wait">Waits for your check: answer its check card.</p>' : '') + '</div>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
-    (t && C.awaitingCheck(t) ? '<p class="note">Waits for your check: answer its check card.</p>' : '') +
     (locked ? '<p class="note">' + (t.status === 'done' ? 'Done' : 'Cancelled') + (t.doneAt ? ' ' + fmtDay(t.doneAt) : '') + '. Read only. Restore it from the archive to change it.</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
     TV.sections.map(tsec).join('') +
