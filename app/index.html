@@ -237,7 +237,17 @@ body.toasting main{padding-bottom:calc(var(--tab-h) + 200px + var(--sab))}
 .extra{grid-area:extra;padding:0 6px 8px 2px;font:400 14px/1.5 var(--font);color:var(--ink2)}
 .extra p,.extra .d{margin:0 0 8px}
 .extra .tags{display:flex;flex-wrap:wrap;gap:6px}
-.card.readonly .chk,.card.readonly .grip{visibility:hidden}
+.card.readonly .grip{visibility:hidden}
+.chk[aria-disabled="true"] .box{opacity:.45;border-style:dashed}
+#t-dq fieldset.dq{border:0;margin:0 0 12px;padding:0;min-width:0}
+#t-dq legend{font-weight:600;padding:0;margin-bottom:6px}
+#t-dq .dq-chips,#t-dq .dq-own{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#t-dq .dq-chip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 12px;border:1px solid var(--ink3);border-radius:22px;max-width:100%}
+#t-dq .dq-chip span{overflow-wrap:anywhere}
+#t-dq .dq-chip:has(input:checked){border-color:var(--fb);font-weight:600}
+#t-dq .rec{font-size:12px;opacity:.8;margin-left:4px}
+#t-dq .dq-own .inp{flex:1 1 200px;min-width:0}
+#t-dq .dq-facts{margin:0 0 12px}
 .empty{padding:28px 18px;border-radius:var(--r-lg);border:1.5px dashed var(--hair2);text-align:left}
 .empty p{margin:0 0 14px;font:500 22px/1.25 var(--serif);color:var(--ink)}
 .skel{height:96px;border-radius:var(--r-lg);background:linear-gradient(100deg,var(--glass2) 30%,var(--glass3) 50%,var(--glass2) 70%);background-size:300% 100%;animation:shimmer 1.2s linear infinite}
@@ -1208,12 +1218,13 @@ function cardHTML(t, i, ro, row) {
   if (CL.created && t.createdAt) meta += `<span class="badge">created ${dayLabel(t.createdAt)}</span>`;
   if (CL.creator && t.createdBy) meta += `<span class="badge">by ${esc(personName(t.createdBy))}</span>`;
   const tids = shownTagIds(t), more = S.more.has(t.id), dsc = C.cardDesc(t.notes, CL.autoCollapse, more);
+  const dw = C.doneBlock(t, { editable: !ro });   // web: the board card's Done button (shown on every card, off with the reason)
   const hasExtra = (CL.description && t.notes) || tids.length;
   const extra = ex ? `<div class="extra">${CL.description && t.notes ? `<div class="d md">${C.renderMd(dsc.md)}</div>${dsc.hasMore ? `<button type="button" class="morebtn" data-act="desc-more" aria-expanded="${more}">${more ? 'Show less' : 'Show more'}<span class="vh">: ${esc(t.title)}</span></button>` : ''}` : ''}${tids.length ? `<div class="tags">${tids.map(g => `<span class="badge tag${mineTag(g) ? ' mine' : ''}">${esc(D.labels[g])}${mineTag(g) ? '<span class="vh">, counts as Mine</span>' : ''}</span>`).join('')}</div>` : ''}${!hasExtra ? '<p>No description or tags.</p>' : ''}</div>` : '';
   return `<li class="card${ro ? ' readonly' : ''}${depth ? ' kid' : ''}" data-q="${t.q}" data-tid="${t.id}" style="--i:${i}${depth ? `;--d:${depth}` : ''}">
     <div class="swbg" aria-hidden="true"><span class="l">Done</span><span class="r">Move</span></div>
     <div class="cin">
-      <button class="ib chk" role="checkbox" aria-checked="false" data-act="done" aria-label="Mark done: ${esc(t.title)}"${ro ? ' tabindex="-1" aria-hidden="true"' : ''}><span class="box">${ic('check', '')}</span></button>
+      <button class="ib chk" role="checkbox" aria-checked="${t.status === 'done'}" data-act="done"${dw ? ` aria-disabled="true" title="${esc(dw)}" aria-label="Done, off: ${esc(t.title)}. ${esc(dw)}"` : ` aria-label="Mark done: ${esc(t.title)}"`}><span class="box">${ic('check', '')}</span></button>
       <button class="cmain" data-act="open" aria-haspopup="dialog">${CL.number ? `<span class="num">${esc(ref(t))}</span>` : ''}<span class="ttl">${esc(t.title)}</span></button>
       <button class="ib more" data-act="more" aria-haspopup="dialog" aria-label="More actions: ${esc(t.title)}">${ic('more')}</button>
       <button class="ib grip" data-act="grip" aria-label="Reorder: ${esc(t.title)}. Hold and drag, or use the arrow keys"${ro ? ' tabindex="-1" aria-hidden="true"' : ''}>${ic('grip')}</button>
@@ -1260,8 +1271,12 @@ function renderAll() {
 
 /* ---------- actions on tasks ---------- */
 const task = id => D.find(id);
+/* card checkbox, swipe right and the menu's Mark done (web: the board card's Done button): C.doneBlock decides; refused -> a toast with the
+   reason and the card back in place. TDData.markDone checks the same rule again */
 function markDone(id) {
-  const t = task(id); if (!t || isClosed(t)) return;
+  const t = task(id); if (!t) return;
+  const why = C.doneBlock(t, { editable: !roTask(t) });
+  if (why) { toast(why); renderBoard(); return; }
   const li = document.querySelector(`.card[data-tid="${id}"]`);
   const fin = () => said(D.markDone(id), 'Done.');
   if (li && !reduce.matches) { const b = li.querySelector('.chk'); b.setAttribute('aria-checked', 'true'); li.classList.add('leaving'); setTimeout(fin, 220); } else fin();
@@ -1500,7 +1515,9 @@ function openTask(id, swap, draft) {
      the person changed. An empty task or a draft opens on the raw text. Your answer works the same way once it has text */
   const notesBase = draft ? draft.notes : t.notes, readFirst = !draft && (!!notesBase.trim() || ro);
   const view = readFirst ? C.cardView(notesBase, { check: C.decisionKind(t) === 'check', answerable: !ro }) : null;
-  const ansHtml = view && view.answer ? `<div class="fans"><label class="flabel" for="t-ans">Your answer</label><div class="md" id="t-ans-r"${ro ? '' : ' tabindex="0"'} hidden></div><textarea class="inp" id="t-ans" rows="3" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>` : '';
+  /* a Delegate card with questions (C.delegateQuestions, web: openTask dqOn): the Decision section asks them and the free answer box is hidden */
+  const dq = C.delegateQuestions(t, notesBase);
+  const ansHtml = view && view.answer && !dq ? `<div class="fans"><label class="flabel" for="t-ans">Your answer</label><div class="md" id="t-ans-r"${ro ? '' : ' tabindex="0"'} hidden></div><textarea class="inp" id="t-ans" rows="3" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>` : '';
   const readHtml = ansHtml + (!readFirst && ro ? '' : `<div id="t-read"${readFirst ? '' : ' hidden'}${ro ? '' : ' tabindex="0" aria-describedby="t-desc-l"'}>${readFirst ? readInnerHtml(view) : ''}</div>`);
   const tb = ro ? '' : `<div class="tb" id="t-tb"${readFirst ? ' hidden' : ''} role="toolbar" aria-label="Text style"><button type="button" class="ib" data-act="fmt" data-f="b" aria-label="Bold">B</button><button type="button" class="ib" data-act="fmt" data-f="i" aria-label="Italic"><i>I</i></button><button type="button" class="ib" data-act="fmt" data-f="l" aria-label="List">${ic('lists')}</button></div>`;
   const dis = ro ? ' readonly' : '';
@@ -1518,7 +1535,13 @@ function openTask(id, swap, draft) {
     : ro && !closed && !(L(t.list) && L(t.list).archived_at) ? 'Only an editor of this list can answer' : '';
   // the quadrant buttons share the Decision row on a decision card, at its right end (Anastasiia, 2026-11-07, after her local test)
   const quadHtml = `<div class="tquad" id="t-quad" role="group" aria-label="Quadrant">${QS.map(q => `<button type="button" class="chip" data-act="t-quad" data-v="${q}" data-q="${q}" aria-pressed="${q === TS.q}"${ro ? ' disabled' : ''}>${QN[q]}</button>`).join('')}</div>`;
-  const decHtml = !dec ? '' : `<div class="field fdec" role="group" aria-labelledby="t-dec-l"><span class="flabel" id="t-dec-l">Decision</span><div class="fdec-b">${[1, 0].map(v => `<button type="button" class="btn${v ? ' primary' : ''}" data-act="t-decide" data-v="${v}" aria-pressed="${dec.answer === v}"${decOn ? '' : ' disabled'}>${dec.answer === v ? '✓ ' : ''}${esc(v ? dec.label_1 : dec.label_0)}</button>`).join('')}${quadHtml}</div>${decState ? `<p class="fdec-s" id="t-dec-s">${esc(decState)}</p>` : ''}</div>`;
+  /* web: openTask T16 Decision section. With Delegate questions (TS.dq, drawn by drawDq) Accept waits until every question has an answer and
+     Decline asks for a reason first; the answers go under ## Your answer (C.decisionAnswerText, C.setAnswer: every other byte kept) */
+  const ansOpen = C.answerSection(notesBase);
+  TS.dq = dq ? { card: dq, qs: dq.questions, dec, ans: [], own: [], ownOpen: [], declining: false, reason: '', can: dec ? decOn : !ro && !closed, answered: dec ? dec.answer !== null : !!(ansOpen && ansOpen.text) } : null;
+  const dqCls = dq && dq.cls ? ` <span class="badge" title="Class ${esc(dq.cls)}${dq.clsWord ? ': ' + esc(dq.clsWord) : ''}">${esc(dq.cls + (dq.clsWord ? ' · ' + dq.clsWord : ''))}</span>` : '';
+  const decBtns = !dec || dq ? '' : [1, 0].map(v => `<button type="button" class="btn${v ? ' primary' : ''}" data-act="t-decide" data-v="${v}" aria-pressed="${dec.answer === v}"${decOn ? '' : ' disabled'}>${dec.answer === v ? '✓ ' : ''}${esc(v ? dec.label_1 : dec.label_0)}</button>`).join('');
+  const decHtml = !dec && !dq ? '' : `<div class="field fdec" role="group" aria-labelledby="t-dec-l"><span class="flabel" id="t-dec-l">${dq ? 'Decision needed' : 'Decision'}${dqCls}</span>${dq ? '<div id="t-dq"></div>' : ''}${dec ? `<div class="fdec-b">${decBtns}${quadHtml}</div>` : ''}${decState ? `<p class="fdec-s" id="t-dec-s">${esc(decState)}</p>` : ''}</div>`;
   /* the sheet draws cardLayout.zones.task (web: the task window's sections): C.taskLayoutView gives the sections in order, each section's
      cells stacked into one column here. A block this page has no field for (format) is skipped; a hidden block, or a field the layout does not
      place, is still rendered inside a hidden box, so Save keeps its value. Tags: one block per tag list (tl:<id>), starred lists first */
@@ -1527,7 +1550,7 @@ function openTask(id, swap, draft) {
     <p class="err" id="t-title-err" hidden></p>
     ${dec ? '' : quadHtml}
     <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>`,
-    close: '<label class="fclose' + (doneOn ? '' : ' off') + '"' + (doneOn ? '' : ' title="' + esc(doneWhy) + '"') + '><input type="checkbox" class="tdone" id="t-done" style="margin:0"' + (doneOn ? '' : ' disabled aria-describedby="t-done-why"' + (t.status === 'done' ? ' checked' : '')) + '><span>Mark done</span>' + (doneOn ? '' : '<small class="why" id="t-done-why">' + esc(doneWhy) + '</small>') + '</label>',
+    close: '<label class="fclose' + (doneOn ? '' : ' off') + '"' + (doneOn ? '' : ' title="' + esc(doneWhy) + '"') + '><input type="checkbox" class="tdone" id="t-done" style="margin:0"' + (doneOn ? '' : ' disabled aria-describedby="t-done-why"' + (t.status === 'done' ? ' checked' : '')) + '><span>Done</span>' + (doneOn ? '' : '<small class="why" id="t-done-why">' + esc(doneWhy) + '</small>') + '</label>',
     id: info ? `<p class="info fid">${info}</p>` : '',
     autonomy: `${autoRowHtml(t)}`,
     decision: `${decHtml}`,
@@ -1543,11 +1566,12 @@ function openTask(id, swap, draft) {
     sources: `${showSource() ? `<div class="field"><span class="flabel">Sources</span><div id="t-srcs"><p class="src">Loading…</p></div></div>` : ''}`
   };
   const tlIds = groupsNow().map(x => x.list.id), tview = C.taskLayoutView(D.cardLayout, tlIds, D.prefs.tagListFavs, D.prefs.tagListOrder, 'edit'), placed = new Set();
-  let findDone = false;
+  /* Find a tag is its own block (web: the 'tagsearch' block): placed and hidden by Card layout, shown only with a tag list block to filter */
+  const tlShown = !ro && tview.sections.some(x => x.cells.some(c => c.some(b => b.startsWith('tl:') && D.tagLists[b.slice(3)])));
+  BL.tagsearch = tlShown ? '<div class="field tagsrch"><label class="vh" for="t-tagq">Find a tag</label><input class="inp" id="t-tagq" type="search" placeholder="Find a tag" autocomplete="off" enterkeyhint="search"></div>' : '';
   const tlBlock = id => {
     const l = D.tagLists[id]; if (!l || ro) return '';
-    const find = findDone ? '' : '<label class="vh" for="t-tagq">Find a tag</label><input class="inp" id="t-tagq" placeholder="Find a tag" autocomplete="off" enterkeyhint="search" style="margin-bottom:6px">'; findDone = true;
-    return `<div class="field tagsw" role="group" aria-label="${esc(l.name)}"><span class="flabel">${esc(l.name)}</span>${find}<div class="tlbox" data-tl="${id}"></div></div>`;
+    return `<div class="field tagsw" role="group" aria-label="${esc(l.name)}"><span class="flabel">${esc(l.name)}</span><div class="tlbox" data-tl="${id}"></div></div>`;
   };
   const blockHtml = b => { placed.add(b); return b.startsWith('tl:') ? tlBlock(b.slice(3)) : BL[b] || ''; };
   const DEF_SEC = ['Header', 'Top', 'Main', 'Bottom'];
@@ -1569,7 +1593,7 @@ function openTask(id, swap, draft) {
   hideAsk(); renderTTags(); renderLinks(); drawAutoRow();
   const au = $('#t-au'); if (au) au.onchange = () => changeAutonomy(au.value);
   const dn = $('#t-done'); if (dn && !dn.disabled) dn.onchange = () => { if (dn.checked) doneFromSheet(); };
-  TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value; TS.check = C.decisionKind(t) === 'check';
+  TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value; TS.check = C.decisionKind(t) === 'check'; drawDq();
   TS.dates = dateInputs(); TS.snap = draft ? null : snapTask();
   if (draft) onTaskInput();
   if (showSource()) loadSources(t.id);
@@ -1588,7 +1612,45 @@ const linkSig = () => { const x = tsLinks(); return JSON.stringify([x.par, x.sub
 /* the body a save sends (web: notesNow): the raw text (the stored text byte for byte while untouched) with the answer box written into its
    answer section whenever the box has text, so an edit of either field is never lost */
 function descNow() { const raw = $('#t-desc').value; return raw !== TS.fn0 ? raw.replace(/\s+$/, '') : TS.notes0; }
-function notesNow() { const raw = descNow(), b = $('#t-ans'), a = b ? b.value.trim() : ''; return a ? C.setAnswer(raw, a) : raw; }
+function notesNow() { const raw = descNow(), b = $('#t-ans'), a = TS && typeof TS.decAnswer === 'string' ? TS.decAnswer : b ? b.value.trim() : ''; return a ? C.setAnswer(raw, a) : raw; }
+/* ---- the Decision section's Delegate questions (web: openTask drawDec, sendDec) ---- */
+const dqAnswer = (Q, i) => Q.ownOpen[i] ? String(Q.own[i] || '').trim() : Q.ans[i] || '';
+const dqComplete = Q => Q.qs.every((x, i) => !!dqAnswer(Q, i));
+function drawDq(focus) {
+  const box = $('#t-dq'), Q = TS && TS.dq; if (!box || !Q) return;
+  const card = Q.card, qs = Q.qs, done = dqComplete(Q);
+  const strip = [card.onAnswer.length ? `<b>Per answer</b> ${esc(card.onAnswer.join('; '))}` : '', card.ifNoAnswer ? `<b>If no answer</b> ${esc(card.ifNoAnswer)}` : ''].filter(Boolean);
+  let h = (strip.length ? `<p class="hint dq-strip">${strip.join('<br>')}</p>` : '') + (card.preamble ? `<p class="hint">${esc(card.preamble)}</p>` : '');
+  if (!Q.answered && Q.can) {
+    h += qs.map((x, i) => `<fieldset class="dq"><legend>${qs.length > 1 ? (i + 1) + '. ' : ''}${esc(x.q)}</legend>${x.more.map(m => `<p class="hint">${esc(m)}</p>`).join('')}${Q.ownOpen[i] || !x.options.length
+      ? `<div class="dq-own"><label class="vh" for="t-dqo-${i}">Own answer to question ${i + 1}</label><input class="inp" id="t-dqo-${i}" data-dqo="${i}" value="${esc(Q.own[i] || '')}" placeholder="Write your answer" maxlength="500" autocomplete="off" enterkeyhint="done">${x.options.length ? `<button type="button" class="linkbtn" data-act="t-dq-opts" data-i="${i}">Use the options</button>` : ''}</div>`
+      : `<div class="dq-chips">${x.options.map((op, k) => `<label class="dq-chip"><input type="radio" name="t-dq-${i}" value="${k}"${Q.ans[i] === op ? ' checked' : ''}><span>${esc(op)}${k === x.recIndex ? ' <small class="rec">Recommended</small>' : ''}</span></label>`).join('')}<button type="button" class="linkbtn" data-act="t-dq-own" data-i="${i}">Own answer</button></div>`}</fieldset>`).join('');
+    if (card.facts.length) h += `<details class="dq-facts"><summary>Facts</summary><ul>${card.facts.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>`;
+    h += Q.declining
+      ? `<div class="dq-decl"><label class="field"><span>Reason (optional)</span><textarea class="inp" id="t-dq-why" rows="2" maxlength="500">${esc(Q.reason)}</textarea></label><div class="fdec-b"><button type="button" class="btn" data-act="t-dq-keep">Keep the card</button><button type="button" class="btn danger" data-act="t-dq-go">${Q.dec ? 'Decline card' : 'Send decline'}</button></div></div>`
+      : `<div class="fdec-b"><button type="button" class="btn" data-act="t-dq-decline">Decline</button><button type="button" class="btn primary" data-act="t-dq-send" aria-describedby="t-dq-hint"${done ? '' : ' disabled'}>${esc(Q.dec ? Q.dec.label_1 : 'Send answer')}</button></div><p class="hint" id="t-dq-hint" aria-live="polite">${esc(C.decisionHint(qs.length, done))}</p>`;
+  } else if (Q.answered) {
+    const a = C.answerSection(TS.notes0);
+    h += (Q.dec ? '' : '<p class="fdec-s">Answered.</p>') + (a && a.text ? `<div class="md">${C.renderMd(a.text)}</div>` : '');
+  }
+  box.innerHTML = h;
+  if (focus) { const el = box.querySelector(focus); if (el) el.focus(); }
+}
+function dqReady() { const Q = TS && TS.dq, b = $('#t-dq [data-act="t-dq-send"]'), hn = $('#t-dq-hint'); if (!Q || !b) return; const ok = dqComplete(Q); b.disabled = !ok; if (hn) hn.textContent = C.decisionHint(Q.qs.length, ok); }
+/* an answer (1) or a decline (0): the text under ## Your answer with every other change of the sheet in one write; on a card with two answers
+   also the answer as the buttons give it (TDData.saveTask decision). Then the sheet closes with Undo */
+async function sendDq(v) {
+  const Q = TS && TS.dq; if (!Q || TS.ro) return;
+  if (v === 1 && !dqComplete(Q)) return;
+  const st = TS;
+  st.decAnswer = v === 0 ? C.decisionAnswerText(Q.qs, [], { reason: Q.reason }) : C.decisionAnswerText(Q.qs, Q.qs.map((x, i) => dqAnswer(Q, i)));
+  if (!(await saveTask(Q.dec ? v : undefined))) { st.decAnswer = null; return; }
+  resetPicker('t'); TS = null; closeDlg('dlg-task'); renderAll();
+  if (st.decided) said(st.decided); else toast('Answer saved. Agents read it on the next scan.');
+}
+$('#task-body').addEventListener('change', e => { const x = e.target, Q = TS && TS.dq; if (!Q || !x.name || !x.name.startsWith('t-dq-')) return; const i = Number(x.name.slice(5)); Q.ans[i] = Q.qs[i].options[Number(x.value)]; dqReady(); });
+$('#task-body').addEventListener('input', e => { const x = e.target, Q = TS && TS.dq; if (!Q) return; if (x.dataset.dqo !== undefined) { Q.own[Number(x.dataset.dqo)] = x.value; dqReady(); } if (x.id === 't-dq-why') Q.reason = x.value; });
+$('#task-body').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.dqo !== undefined) e.preventDefault(); });
 const readInnerHtml = v => v.blocks.length || v.links ? `<div class="md fmd">${C.cardViewHtml(v)}</div>` : '<p class="src">No description.</p>';
 /* tap to edit, focus out to render (web: editDesc, renderDesc, editAns, renderAns): leaving the description's field (raw box, answer box,
    toolbar) renders both from what they hold now; an empty field stays a box */
@@ -1780,7 +1842,8 @@ function openMenu(title, items) {
 function copyRef(t) { const r = ref(t); try { if (navigator.clipboard) navigator.clipboard.writeText(r).catch(() => {}); } catch (e) {} toast(`Copied ${r}`); }
 function cardMenu(id) {
   const t = task(id); if (!t) return; const ro = roTask(t), items = [];
-  if (!ro) items.push({ label: 'Mark done', icon: 'check', run: () => markDone(id) }, { label: 'Move to…', icon: 'board', run: () => openMove(id) });
+  items.push({ label: 'Mark done', icon: 'check', run: () => markDone(id) });   // refused with the reason when C.doneBlock says so
+  if (!ro) items.push({ label: 'Move to…', icon: 'board', run: () => openMove(id) });
   items.push({ label: 'Open', icon: 'next', run: () => openTask(id) }, { label: `Copy number ${ref(t)}`, icon: 'copy', run: () => copyRef(t) });
   if (!ro) {
     items.push({ label: 'Move up', icon: 'up', run: () => { if (reorder(id, -1)) toast('Moved up.', lastReorderUndo); else toast('Already at the top.'); } });
@@ -1860,7 +1923,7 @@ async function openListSettings(id) {
   $('#lset-body').innerHTML = `<h3 class="lset-h3">Autonomy</h3><p class="hint">How much agents decide on their own in this list. Each task can narrow or widen it.</p>
     <div class="amtrack" aria-hidden="true">${C.AUTONOMY_PICK.map(m => `<span data-tr="${m}"></span>`).join('')}</div>
     <fieldset class="amodes"><legend class="vh">Autonomy mode</legend>${modes}</fieldset>
-    <p class="note info" id="lset-brain" hidden>E0 still always comes to you: paid services, public publishing, protected harness files and the plan-gate pass-up are never decided by an agent.</p>
+    <p class="note info" id="lset-brain" hidden>E0 still always comes to you. Never decided by an agent: ${C.E0_ITEMS.map(esc).join('; ')}.</p>
     <p class="hint">${row.autonomy_set_at ? `Set by ${esc(personName(row.autonomy_set_by))} · ${ymd(new Date(row.autonomy_set_at))}` : 'Not set yet: Mixed is the default.'}</p>
     <h3 class="lset-h3">Intake defaults</h3><p class="hint">Asked once for the list, not for every task.</p>${hh ? '' : `<p class="note info">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
     <label class="cbline"><input type="checkbox" id="lset-e2e"${base.e2e ? ' checked' : ''}${dis}> Agent runs end-to-end tests</label>
@@ -1869,7 +1932,7 @@ async function openListSettings(id) {
     <label class="cbline"><input type="checkbox" id="lset-tg"${base.tg ? ' checked' : ''}${dis}> Notify on Telegram</label><p class="hint">Off by default. Telegram only notifies. Answers come from the board.</p>
     <label class="cbline"><input type="checkbox" id="lset-stage"${base.stage ? ' checked' : ''}${dis}> Stage report</label>
     <h3 class="lset-h3">Budget</h3>${hh ? `<label class="field"><span>Monthly budget ($)</span><input class="inp" id="lset-cap" type="number" min="0" max="100000" step="1" inputmode="decimal" value="${esc(base.cap)}" aria-describedby="lset-cap-h"></label>
-    <p class="hint" id="lset-cap-h">Dollars at API prices. Leave empty for no list budget. ${r.spent !== null ? `Spent $${r.spent.toFixed(2)} this month.` : r.budgetErr ? esc(r.budgetErr) : ''}</p><p class="err" id="lset-cap-e" hidden></p>` : `<p class="hint">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
+    <p class="hint" id="lset-cap-h">Dollars at API prices. Leave empty for no list budget. ${r.overall ? esc(r.overall) + '. ' : ''}${r.spent !== null ? `Spent $${r.spent.toFixed(2)} this month.` : r.budgetErr ? esc(r.budgetErr) : ''}</p><p class="err" id="lset-cap-e" hidden></p>` : `<p class="hint">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
     <h3 class="lset-h3">List brief</h3><p class="hint">What agents read before they work in this list. Read as data: it never lowers what must come to you.</p>${hh ? '' : `<p class="note info">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
     <p class="flabel" id="lset-dec-l">Decisions</p><p class="hint">Accepted precedents and conventions, one line each, with date and who.</p><ul class="lsdecs" id="lset-decs" aria-labelledby="lset-dec-l"></ul>
     ${hh ? '<div class="lsdecadd"><input class="inp" id="lset-dec-new" maxlength="500" autocomplete="off" aria-label="New decision" placeholder="Add a decision"><button type="button" class="btn" data-act="lset-dec-add">Add</button></div>' : ''}
@@ -1898,6 +1961,7 @@ function lsetSync() {
 }
 async function saveListSettings() {
   const c = lsetCur(), b = LSET.base, ch = {};
+  { const ce = $('#lset-cap-e'); if (ce) ce.hidden = true; }
   const capN = c.cap === '' ? null : Number(c.cap);
   if (c.cap !== '' && (!isFinite(capN) || capN < 0 || capN > 100000)) { const e = $('#lset-cap-e'); e.textContent = 'A budget is 0 to 100000 dollars, or empty.'; e.hidden = false; $('#lset-cap').focus(); return; }
   if (c.mode !== b.mode) Object.assign(ch, { mode: c.mode, expected: LSET.expected });
@@ -1909,7 +1973,7 @@ async function saveListSettings() {
   LSET.saving = false;
   const st = $('#lset-status');
   if (r.ok) { LSET.base = c; LSET.expected = c.mode; st.dataset.done = 'Saved'; st.dataset.kind = ' ok'; toast(`List settings saved: ${lname(LSET.id)}`); }
-  else { const lm = L(LSET.id); if (lm && lm.autonomy) LSET.expected = lm.autonomy; st.dataset.done = r.errs.join(' '); st.dataset.kind = ' bad'; }
+  else { const lm = L(LSET.id); if (lm && lm.autonomy) LSET.expected = lm.autonomy; st.dataset.done = r.errs.join(' '); st.dataset.kind = ' bad'; if (r.capErr && $('#lset-cap-e')) { $('#lset-cap-e').textContent = r.capErr; $('#lset-cap-e').hidden = false; } }
   lsetSync(); renderAll();
 }
 // the task's Autonomy row: what it inherits (parent chain, then list), a warning when wider, Reset to inherit
@@ -1917,15 +1981,18 @@ function autoRowHtml(t) {
   const r = role(t.list);
   if (!me() || me().kind !== 'human' || (r !== 'owner' && r !== 'editor') || isClosed(t)) return '';
   const cur = C.itemModeOf(t);
-  return `<div class="field fauto" role="group" aria-labelledby="t-au-l"><label class="flabel" id="t-au-l" for="t-au">Autonomy</label><select class="inp" id="t-au" aria-describedby="t-au-cap">${C.autonomyChoices(!!me().is_household, true, cur).map(c => `<option value="${c.mode}"${c.mode === cur ? ' selected' : ''}${c.off ? ' disabled' : ''}>${C.AUTONOMY_NAME[c.mode]}${c.off && !c.legacy ? ' (household only)' : ''}</option>`).join('')}</select><p class="hint" id="t-au-cap" aria-live="polite"></p><button type="button" class="linkbtn" data-act="t-au-reset" hidden>Reset to inherit</button><p class="note info" id="t-au-w" hidden></p></div>`;
+  return `<div class="field fauto" role="group" aria-labelledby="t-au-l"><label class="flabel" id="t-au-l" for="t-au">Autonomy</label><select class="inp" id="t-au" aria-describedby="t-au-w">${C.autonomyChoices(!!me().is_household, true, cur).map(c => `<option value="${c.mode}"${c.mode === cur ? ' selected' : ''}${c.off ? ' disabled' : ''}>${C.AUTONOMY_NAME[c.mode]}${c.off && !c.legacy ? ' (household only)' : ''}</option>`).join('')}</select><button type="button" class="linkbtn" data-act="t-au-reset" hidden>Reset to inherit</button><p class="note info" id="t-au-w" hidden></p></div>`;
 }
 function autoCtx(t) { const by = {}; D.tasks.forEach(x => { by[x.id] = x; }); return { byId: by, parentOf: C.linkIndex(new Map(D.links), by).parentOf, list: L(t.list) }; }
 function drawAutoRow() {
   const sel = $('#t-au'); if (!sel || !TS) return;
   const t = task(TS.id); if (!t) return;
   const v = sel.value, inh = C.autonomyInherited(t, autoCtx(t));
-  $('#t-au-cap').innerHTML = v === 'inherit' ? esc(inh.from === 'parent' ? `from parent ${ref(inh.parent)}: ${C.AUTONOMY_NAME[inh.mode]}` : `from list: ${C.AUTONOMY_NAME[inh.mode]}`)
-    : `<b>${esc(C.AUTONOMY_NAME[v])}</b>${t.autonomySetAt ? ` · set here by ${esc(personName(t.autonomySetBy))} · ${ymd(t.autonomySetAt)}` : ' · set here'}${D.pendingAutonomy().some(x => x.id === t.id) ? ' · waits to be sent' : ''}`;
+  /* web: drawAuto (round 3): no caption line; the inherited mode is in the Inherit option ("Inherit (AI Brain)"), where it comes from and
+     who set a mode in the select's title */
+  const io = sel.querySelector('option[value=inherit]'); if (io) io.textContent = `Inherit (${C.AUTONOMY_NAME[inh.mode]})`;
+  sel.title = (v === 'inherit' ? 'Inherit ' + (inh.from === 'parent' ? `from parent ${ref(inh.parent)}: ${C.AUTONOMY_NAME[inh.mode]}` : `from list: ${C.AUTONOMY_NAME[inh.mode]}`)
+    : C.AUTONOMY_NAME[v] + (t.autonomySetAt ? ` · set here by ${personName(t.autonomySetBy)} · ${ymd(t.autonomySetAt)}` : ' · set here')) + (D.pendingAutonomy().some(x => x.id === t.id) ? ' · waits to be sent' : '');
   document.querySelector('[data-act="t-au-reset"]').hidden = v === 'inherit';
   const w = C.autonomyWarning(v, inh, C.listModeOf(L(t.list))); $('#t-au-w').textContent = w; $('#t-au-w').hidden = !w;
 }
@@ -2080,7 +2147,7 @@ document.addEventListener('click', async e => {
       }
       renderAddChips(); const back = AD.open ? $(`#add-opts [data-v="${v}"]`) : $(`#add-chips [data-k="${k}"]`); if (back) back.focus(); if (v === 'pick') { const d = $('#add-date'); if (d) d.focus(); } break;
     }
-    case 'done': if (id && !(card && card.classList.contains('readonly'))) markDone(id); break;
+    case 'done': if (id) markDone(id); break;
     case 'open': case 'open-id': openTask(id); break;
     case 'more': cardMenu(id); break;
     case 'expand': { S.flip.has(id) ? S.flip.delete(id) : S.flip.add(id); D.setPrefs({ cards: { mode: cardMode(), flipped: [...S.flip] } }); renderBoard(); const c = document.querySelector(`.card[data-tid="${id}"] .chev`); if (c) c.focus(); break; }
@@ -2106,6 +2173,12 @@ document.addEventListener('click', async e => {
     case 'lset-dec-add': lsetDecAdd(); break;
     case 'lset-dec-x': LSET.decs.splice(Number(b.dataset.i), 1); lsetDecs(); lsetSync(); { const n = document.querySelector('#lset-decs [data-act=lset-dec-x]'); (n || $('#lset-dec-new') || $('#lset-b-naming')).focus(); } break;
     case 't-au-reset': { const s = $('#t-au'); if (s) { s.value = 'inherit'; changeAutonomy('inherit'); } break; }
+    case 't-dq-own': if (TS && TS.dq) { const i = Number(b.dataset.i); TS.dq.ownOpen[i] = true; drawDq('#t-dqo-' + i); } break;
+    case 't-dq-opts': if (TS && TS.dq) { const i = Number(b.dataset.i); TS.dq.ownOpen[i] = false; drawDq(`[name="t-dq-${i}"]`); } break;
+    case 't-dq-decline': if (TS && TS.dq) { TS.dq.declining = true; drawDq('#t-dq-why'); } break;
+    case 't-dq-keep': if (TS && TS.dq) { TS.dq.declining = false; drawDq('[data-act="t-dq-decline"]'); } break;
+    case 't-dq-go': sendDq(0); break;
+    case 't-dq-send': sendDq(1); break;
     case 't-decide': {
       /* the answer with every other change of the sheet in one versioned write, then close with Undo (web: the [data-dec] click) */
       if (!TS || TS.ro) break; const st = TS;
@@ -2729,6 +2802,7 @@ const PAGES = {
       <h3 class="flabel" style="margin:16px 0 6px 4px">A card shows</h3>
       <ul class="rows">${C.CARD_FIELDS.map(k => `<li><label class="rowb switch" style="padding:0 14px">${names[k]}<input type="checkbox" data-cl="${k}"${CL[k] ? ' checked' : ''}></label></li>`).join('')}</ul>
       <fieldset class="setting" style="margin-top:16px"><legend class="flabel">Tags</legend><div class="radios">${radio('cl-tags', 'all', 'All tags', CL.tags === 'all')}${radio('cl-tags', 'lists', 'Only from these tag lists', CL.tags === 'lists')}<div class="cl-lists">${tls.map(l => `<label class="cbrow"><input type="checkbox" data-cltl="${l.id}"${CL.tagLists.includes(l.id) ? ' checked' : ''}${CL.tags === 'lists' ? '' : ' disabled'}><span>${esc(l.name)}${l.owner_id !== me().id ? `, ${esc(D.names[l.owner_id] || '')}` : ''}</span></label>`).join('') || '<p class="src">No tag lists yet.</p>'}</div>${radio('cl-tags', 'off', 'No tags', CL.tags === 'off')}</div></fieldset>
+      <p class="src" id="cl-task-note">The task window layout is edited on the board.</p>
       <button class="btn block" data-act="cl-reset">Reset</button>`;
     drawPreview();
     el.onchange = async e => {

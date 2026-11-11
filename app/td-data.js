@@ -765,7 +765,12 @@
     const undoEdit = (t, r) => () => { if (r) edit(t, x => r.fields.forEach(f => { x[f] = Array.isArray(r.before[f]) ? r.before[f].slice() : r.before[f]; })); };
 
     // ---- actions with undo (web: the [data-done] handler, #fcancel, removeTask, restoreTask) ----
-    function markDone(id) { const t = find(id); if (!t) return null; const r = edit(t, x => { x.status = 'done'; }); return r && { msg: 'Completed: ' + plain(t.title), undo: undoEdit(t, r) }; }
+    // refused (ok false, the reason as err.message) when C.doneBlock says the task may not be completed by hand (web: the board's Done button)
+    function markDone(id) {
+      const t = find(id); if (!t) return null;
+      const why = C.doneBlock(t, { editable: canDo('edit', t) });
+      if (why) return { ok: false, refused: true, err: { message: why } };
+      const r = edit(t, x => { x.status = 'done'; }); return r && { msg: 'Completed: ' + plain(t.title), undo: undoEdit(t, r) }; }
     function cancelTask(id) { const t = find(id); if (!t) return null; const r = edit(t, x => { x.status = 'cancelled'; }); return r && { msg: 'Cancelled: ' + plain(t.title), undo: undoEdit(t, r) }; }
     function removeTask(id) { const t = find(id); if (!t) return null; const r = edit(t, x => { x.deleted = true; }); return r && { msg: 'Deleted: ' + plain(t.title), undo: () => edit(t, x => { x.deleted = false; }) }; }
     async function restoreTask(id) {
@@ -1187,7 +1192,8 @@
       if (!row.ok) return row;
       if (!row.json.length) return { ok: false, err: { message: 'This list is gone.' } };
       const cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
-      return { ok: true, row: row.json[0], targets: targets.ok ? targets.json : [], cap: cap ? Number(cap.cap_usd) : null, spent: cap ? Number(cap.spent_usd || 0) : null, budgetErr: bud.ok ? null : bud.err.message };
+      return { ok: true, row: row.json[0], targets: targets.ok ? targets.json : [], cap: cap ? Number(cap.cap_usd) : null, spent: cap ? Number(cap.spent_usd || 0) : null, budgetErr: bud.ok ? null : bud.err.message,
+        overall: C.overallCapLine(bud.ok ? bud.json : []) };
     }
     // saves only what changed: { mode, expected, intake: { e2e, deploy, tg, stage }, cap (number or null), brief: { decisions, naming,
     // instruction, concept } (T23, set_list_brief, household people) }; returns the errors in order. New list uses it too (expected guided)
@@ -1195,9 +1201,11 @@
       const errs = [];
       if (ch.mode) { const r = await setAutonomy('list', id, ch.mode, ch.expected); if (!r.ok) errs.push(r.now ? 'Someone set the mode to ' + C.AUTONOMY_NAME[r.now] + ' meanwhile. Save again to replace it.' : r.err.message); }
       if (ch.intake) { const i = ch.intake, r = await rpc('set_intake', { p_kind: 'list', p_id: id, p_e2e_self: i.e2e, p_deploy_target: i.deploy || null, p_notify_telegram: i.tg, p_stage_report: i.stage }); if (!r.ok) errs.push(r.err.message); }
-      if (ch.cap !== undefined) { const r = await rpc('set_budget', { p_list: id, p_period: 'month', p_cap: ch.cap }); if (!r.ok) errs.push(r.err.message); }
+      // db/033: a list cap above the overall cap is refused; the database's text comes back as capErr (and in errs)
+      let capErr = null;
+      if (ch.cap !== undefined) { const r = await rpc('set_budget', { p_list: id, p_period: 'month', p_cap: ch.cap }); if (!r.ok) { errs.push(r.err.message); capErr = r.err.message; } }
       if (ch.brief) { const b = ch.brief, r = await rpc('set_list_brief', { p_list: id, p_decisions: b.decisions || '', p_naming: b.naming || '', p_instruction: b.instruction || '', p_concept: b.concept || '' }); if (!r.ok) errs.push(r.err.message); }
-      return { ok: !errs.length, errs };
+      return { ok: !errs.length, errs, capErr };
     }
     const api = {
       setAutonomy, flushSettings, pendingAutonomy, listSettings, saveListSettings,

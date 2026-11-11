@@ -704,6 +704,64 @@ test('decision: saveTask answers with the other changes in one versioned PATCH (
   assert.equal(patches.length, 2);
 });
 
+test('markDone follows C.doneBlock like the board: a decision card or a waiting task is refused with the reason, nothing sent', async () => {
+  for (const [o, why] of [[{}, /decision card/], [{ details: {}, status: 'waiting' }, /^Waiting/]]) {
+    let remote = decRow(Object.assign({ version: 1 }, o)); const patches = [];
+    const f = fakeSupabase([
+      ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [remote]]],
+      ['PATCH', /^\/rest\/v1\/items/, (m, body) => { patches.push(body); remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]]; }],
+    ]);
+    const d = make(f);
+    await signIn(d, true);
+    await d.loadAll();
+    const r = d.markDone(ITEM);
+    assert.equal(r.ok, false);
+    assert.equal(r.refused, true);
+    assert.match(r.err.message, why);
+    assert.equal(r.err.message, C.doneBlock(d.find(ITEM), { editable: true }), 'the same text as the board');
+    assert.equal(d.find(ITEM).status, o.status || 'open');
+    assert.equal(d.pending, 0);
+    assert.equal(patches.length, 0, 'nothing sent');
+  }
+});
+
+// the phone's Decision section on a Delegate card (web: openTask T16): the questions from C.delegateQuestions, Accept only when every question
+// has an answer (C.decisionHint), the answers under ## Your answer (C.decisionAnswerText, C.setAnswer) in the same write as the answer 1
+const DCARD = ['Original task text', '', '---', '', '## Delegate · 2026-11-11 10:00', 'Session: **do-142 · e2e**', '', '### Questions', '**1. Keep how many remote backups?**', 'A) 2', 'B) 4', 'Recommended: A) 2', '',
+  '**2. Delete local exports older than 30 days?**', 'A) Yes', 'B) No', '', 'Class: E3 · data organisation and structure', '', '---', '', '## Your answer', C.ANSWER_PROMPT].join('\n');
+test('decision (phone): Delegate questions, Accept rule and the answer under ## Your answer with every byte above kept (V2b)', async () => {
+  const card = C.delegateQuestions({ details: { decision: { kind: 'delegate' } } }, DCARD);
+  assert.equal(card.questions.length, 2);
+  assert.equal(card.questions[0].recIndex, 0, 'A) 2 is Recommended');
+  assert.equal(C.delegateQuestions({ details: { decision: { kind: 'check' } } }, DCARD), null, 'never on a check card');
+  assert.equal(C.delegateQuestions({}, DCARD.replace('## Your answer', '## Other')), null, 'only with an open answer section');
+  assert.equal(C.decisionHint(2, false), 'Answer every question to accept.');
+  assert.equal(C.decisionHint(1, false), 'Pick an answer to accept.');
+  assert.equal(C.decisionHint(2, true), 'Ready to send.');
+  assert.equal(C.decisionHint(0, false), '');
+  let remote = decRow({ version: 1, body_md: DCARD, details: { decision: Object.assign({}, DEC, { kind: 'delegate', label_1: 'Accept', label_0: 'Decline' }) } }); const patches = [];
+  const f = fakeSupabase([
+    ['GET', /^\/rest\/v1\/items\?select=\*&deleted_at/, () => [200, [remote]]],
+    ['PATCH', /^\/rest\/v1\/items\?id=eq\.[^&]+&version=eq\.(\d+)/, (m, body) => { patches.push(body); remote = Object.assign({}, remote, body, { version: remote.version + 1 }); return [200, [remote]]; }],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  await d.loadAll();
+  const t = d.find(ITEM);
+  assert.ok(C.delegateQuestions(t, t.notes), 'the loaded task asks its questions');
+  const text = C.decisionAnswerText(card.questions, ['A) 2', 'e2e own answer']);
+  const r = d.saveTask(ITEM, { title: t.title, notes: C.setAnswer(t.notes, text), decision: 1 });
+  assert.equal(r.decided, true);
+  await until(() => d.pending === 0);
+  assert.equal(patches.length, 1, 'one write');
+  assert.equal(patches[0].details.decision.answer, 1);
+  assert.equal(patches[0].status, 'done');
+  const sec = C.answerSection(patches[0].body_md);
+  assert.equal(sec.text, '1. A) 2\n2. e2e own answer');
+  assert.ok(patches[0].body_md.startsWith(DCARD.slice(0, DCARD.indexOf('## Your answer'))), 'every byte above the answer kept');
+  assert.equal(C.decisionAnswerText(card.questions, [], { reason: 'not now' }), 'Declined: not now', 'Decline with a reason');
+});
+
 test('decision: a check or Delegate card closes at once (status done) and the toast says the task moves on the next check', async () => {
   for (const kind of ['check', 'delegate']) {
     let remote = decRow({ version: 1, details: { decision: Object.assign({}, DEC, { kind, label_1: 'Accept', label_0: 'Needs changes' }) } }); const patches = [];
@@ -900,9 +958,30 @@ test('T23: saveListSettings sends the list brief through set_list_brief with all
   await signIn(d);
   await d.loadAll();
   const b = { decisions: '2026-11-11 · Max · Keep 2 backups', naming: 'kebab-case', instruction: '', concept: 'Ask before deploys' };
-  assert.deepEqual(await d.saveListSettings(LIST, { brief: b }), { ok: true, errs: [] });
+  assert.deepEqual(await d.saveListSettings(LIST, { brief: b }), { ok: true, errs: [], capErr: null });
   assert.deepEqual(sent.pop(), { p_list: LIST, p_decisions: b.decisions, p_naming: 'kebab-case', p_instruction: '', p_concept: 'Ask before deploys' });
   reply = () => [403, { code: '42501', message: 'the list brief is written by household people' }];
   const r = await d.saveListSettings(LIST, { brief: b });
   assert.equal(r.ok, false); assert.equal(r.errs.length, 1, 'the refusal is told');
+});
+
+test('db/033: a list cap above the overall cap comes back with the database text as capErr; listSettings gives the overall cap line', async () => {
+  const f = fakeSupabase([
+    ['POST', /^\/rest\/v1\/rpc\/set_budget/, () => [400, { code: '22023', message: 'a list cap may not be above the overall cap ($100)' }]],
+    ['POST', /^\/rest\/v1\/rpc\/budget_status/, () => [200, [{ scope: 'overall', list_id: null, period: 'month', cap_usd: 100, spent_usd: 3, reserved_usd: 0 }, { scope: 'list', list_id: LIST, period: 'month', cap_usd: 40, spent_usd: 1.5, reserved_usd: 0 }]]],
+    ['GET', /^\/rest\/v1\/lists\?select=id,name,owner_id,autonomy/, () => [200, [{ id: LIST, name: 'L', owner_id: UID, autonomy: 'guided' }]]],
+    ['GET', /^\/rest\/v1\/deploy_targets/, () => [200, []]],
+  ]);
+  const d = make(f);
+  await signIn(d, true);
+  await d.loadAll();
+  const r = await d.saveListSettings(LIST, { cap: 150 });
+  assert.equal(r.ok, false);
+  assert.equal(r.capErr, 'A list cap may not be above the overall cap ($100).');
+  assert.deepEqual(r.errs, [r.capErr]);
+  const ls = await d.listSettings(LIST);
+  assert.equal(ls.cap, 40);
+  assert.equal(ls.overall, 'Overall cap: $100 a month');
+  assert.equal(C.overallCapLine([{ scope: 'overall', period: 'month', cap_usd: '12.50' }]), 'Overall cap: $12.50 a month');
+  assert.equal(C.overallCapLine([{ scope: 'overall', period: 'day', cap_usd: 5 }]), '', 'a day cap is not the monthly line');
 });

@@ -248,6 +248,8 @@
     ai_brain: { does: 'Agents decide on their own and log every decision.', you: 'Only E0 comes to you.' },
   };
   const AUTONOMY_HOUSEHOLD = 'Only household members can set this.';
+  // E0: what never goes to an agent, whatever the mode (one list for the board's "What is E0?" box and the phone's sentence; parity fix 6)
+  const E0_ITEMS = ['Gate 7 and the plan-gate pass-up', 'D49 level 3', 'Anything on the "Still forbidden" list', 'Paid services', 'Public publishing', 'Protected harness files'];
   // harness configurations T23: the list brief (db/032 lists.brief_*, written only through set_list_brief by household people; homeos-agent
   // reads it). Decisions: one line each, "yyyy-mm-dd · who · text", the newest last; a precedent becomes a line only through an ask-first card
   const BRIEF_FIELDS = [
@@ -343,6 +345,20 @@
       x.recIndex = r ? x.options.findIndex(o => o === r || o.startsWith(r) || (/^[A-Z][).:]$/.test(head(r)) && head(o) === head(r))) : -1;
     });
     return out;
+  }
+  // the Delegate card whose questions the Decision section asks (board and phone): a card with questions and an open ## Your answer, never a
+  // check card; null otherwise. While it is on, the free Your answer box is hidden: the answers go there through setAnswer
+  function delegateQuestions(t, md) {
+    if (decisionKind(t) === 'check') return null;
+    const c = delegateCard(md);
+    return c && c.questions.length && answerSection(md) ? c : null;
+  }
+  // the hint beside Accept: every question needs an answer first
+  const decisionHint = (n, complete) => !n ? '' : complete ? 'Ready to send.' : n > 1 ? 'Answer every question to accept.' : 'Pick an answer to accept.';
+  // the overall monthly cap under a list's budget (budget_status rows; db/033 keeps a list cap at or below it); '' when none is set
+  function overallCapLine(rows) {
+    const o = (rows || []).find(b => b && b.scope === 'overall' && b.period === 'month');
+    return o && o.cap_usd !== null && o.cap_usd !== undefined ? 'Overall cap: $' + String(Number(o.cap_usd).toFixed(2)).replace(/\.00$/, '') + ' a month' : '';
   }
   // earlier rounds on the same body: the "## Answer (read <date>)" blocks, newest first, with their first line
   function answerRounds(md) {
@@ -1983,7 +1999,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, E0_ITEMS, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, delegateQuestions, decisionHint, overallCapLine, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,

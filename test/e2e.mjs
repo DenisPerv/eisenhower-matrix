@@ -1884,8 +1884,8 @@ async function gHarness() {
       const kidCard = `.card[data-tid="${kid.id}"] .cmain`;
       let ps = await P.wait(`!!document.querySelector('${kidCard}')`, 20000);
       if (ps) { await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); await P.click(kidCard); ps = await P.wait('!!document.querySelector("#dlg-task[open] #t-au")', 8000); }
-      const pa = ps ? await P.ev(`(()=>{const d=document.querySelector('#dlg-task');return {v:d.querySelector('#t-au').value,cap:d.querySelector('#t-au-cap').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
-      check(G, 'phone: the task sheet shows the Autonomy row with the mode set on the web, no horizontal scroll', !!pa && pa.v === 'guided' && /^Mixed/.test(pa.cap) && !pa.wide, JSON.stringify(pa) + ' ' + P.errors.slice(-2).join(' / '));
+      const pa = ps ? await P.ev(`(()=>{const d=document.querySelector('#dlg-task');return {v:d.querySelector('#t-au').value,cap:d.querySelector('#t-au').title,noCap:!d.querySelector('#t-au-cap'),inh:d.querySelector('#t-au option[value=inherit]').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
+      check(G, 'phone: the task sheet shows the Autonomy row with the mode set on the web (in the title, no caption; Inherit names its mode), no horizontal scroll', !!pa && pa.v === 'guided' && /^Mixed/.test(pa.cap) && pa.noCap && /^Inherit \(/.test(pa.inh) && !pa.wide, JSON.stringify(pa) + ' ' + P.errors.slice(-2).join(' / '));
       if (ps) { await sleep(700); await P.shot('task-autonomy-app-375x812'); await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); }
       const lsOk = await P.ev(`(()=>{if(typeof openListSettings!=='function')return false;openListSettings(${JSON.stringify(ST.id)});return true})()`) && await P.wait('!!document.querySelector("#dlg-lset[open] [name=lset-am]")', 8000);
       const pl = lsOk ? await P.ev(`(()=>{const d=document.querySelector('#dlg-lset');return {modes:d.querySelectorAll('[name=lset-am]').length,save:d.querySelector('#lset-save').disabled,status:d.querySelector('#lset-status').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
@@ -1917,6 +1917,30 @@ async function gHarness() {
         !!a && !!sec && sec.text === '1. A) 2\n2. e2e own answer' && a.body_md.startsWith(CARDTXT.slice(0, CARDTXT.indexOf('## Your answer'))) && a.body_md.includes('\n## Your answer\n'), a ? JSON.stringify({ text: sec && sec.text }) : 'not answered');
       await closeDialogs(T);
     }
+    // the same Decision section on the phone (parity fix 4): numbered questions with chips, Recommended, no free answer box, Accept only when
+    // every question has an answer; the answers under ## Your answer, every byte above kept
+    const dc2 = await mkItem('delegate card phone', { body_md: CARDTXT, quadrant: 'C', sort_key: 9100004, details: { decision: { v: 1, kind: 'delegate', label_1: 'Accept', label_0: 'Decline', answer: null }, e2e: RUN } });
+    const P2 = await tab(B, await ctx(B), { width: 375, height: 812 });
+    try {
+      await seed(P2, await grantFor('maksym'));
+      await P2.ev(`localStorage.setItem('td.app.list',${JSON.stringify(ST.id)}),true`);
+      await P2.go(pathToFileURL(path.join(path.dirname(PAGE), 'app', 'index.html')).href);
+      let pq = await P2.wait(`!!document.querySelector('.card[data-tid="${dc2.id}"]')`, 20000);
+      if (pq) { await P2.ev(`(document.querySelectorAll("dialog[open]").forEach(d=>d.close()),openTask(${JSON.stringify(dc2.id)}),true)`); pq = await P2.wait('!!document.querySelector("#dlg-task[open] #t-dq fieldset.dq")', 8000); }
+      const pd = pq ? await P2.ev(`(()=>{const d=document.querySelector('#dlg-task'),f=d.querySelector('#t-dq');return {qs:f.querySelectorAll('fieldset.dq').length,chips:f.querySelectorAll('fieldset.dq')[0].querySelectorAll('.dq-chip').length,rec:(f.querySelector('.rec')||{}).parentNode?.textContent||'',acc:f.querySelector('[data-act="t-dq-send"]').disabled,ans:!!d.querySelector('#t-ans'),done:d.querySelector('#t-done')?.disabled,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
+      check(G, 'phone Decision section: two numbered questions with chips, A) 2 Recommended, Accept off, no free answer box, Done off, no horizontal scroll',
+        !!pd && pd.qs === 2 && pd.chips === 3 && /A\) 2/.test(pd.rec) && pd.acc && !pd.ans && pd.done !== false && !pd.wide, JSON.stringify(pd) + ' ' + P2.errors.slice(-2).join(' / '));
+      if (pq) {
+        await sleep(500); await P2.shot('decision-section-app-375x812');
+        await P2.ev(`(()=>{const f=document.querySelector('#t-dq');f.querySelector('input[name="t-dq-0"]').click();f.querySelector('[data-act="t-dq-own"][data-i="1"]').click();const o=f.querySelector('#t-dqo-1');o.value='e2e phone answer';o.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+        check(G, 'phone Decision section: an option plus an own answer turn Accept on', await P2.ev(`!document.querySelector('#t-dq [data-act="t-dq-send"]').disabled`));
+        await P2.click('#t-dq [data-act="t-dq-send"]');
+        const a2 = await until(async () => { const x = await item(dc2.id); return x && x.status === 'done' && x.details.decision.answer === 1 ? x : null; });
+        const sec2 = a2 ? core.answerSection(a2.body_md) : null;
+        check(G, 'phone V2b: Accept stores answer 1, status done, the answers under ## Your answer; every byte above kept',
+          !!a2 && !!sec2 && sec2.text === '1. A) 2\n2. e2e phone answer' && a2.body_md.startsWith(CARDTXT.slice(0, CARDTXT.indexOf('## Your answer'))), a2 ? JSON.stringify({ text: sec2 && sec2.text }) : 'not answered');
+      }
+    } finally { await P2.close().catch(() => {}); }
   } finally {
     const cur = (await MK.rest('GET', 'lists?select=autonomy&id=eq.' + ST.id)).json[0];
     if (cur && cur.autonomy !== list0.autonomy) await MK.rest('POST', 'rpc/set_autonomy', { p_kind: 'list', p_id: ST.id, p_mode: list0.autonomy, p_expected: cur.autonomy });
