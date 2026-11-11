@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // End-to-end test of TasksDashboard.html against the live TasksDashboardDB, through a headless Chrome / Edge DevTools connection.
-// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|appfilters|links|card|guests|request|smoke] [--page <html>]
+// node test/e2e.mjs --env <file> --out <dir> [--smoke] [--group auth|data|sync|archive|errors|ui|filters|lists|searchrow|appfilters|links|card|harness|guests|request|smoke] [--page <html>]
 //   [--url <https origin or page> [--access-env <file>]]
 // Without --url the page is the local file (file://). With --url it is <origin>/ or the page path given (https://host/board/, a
 // directory path ending in /), and sessions are seeded on <origin>/version.json
@@ -22,7 +22,7 @@ import { readEnv, missingEnv, connect, loadCore, APP_HTML, e2eArgs, hostedOrigin
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = e2eArgs(process.argv.slice(2));
 let ORIGIN = null, PAGE_PATH = '/', ACCESS = null; // --url (origin, page path) and --access-env, set in main
-const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'card', 'guests', 'request'];
+const GROUPS = ['auth', 'data', 'sync', 'archive', 'errors', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'card', 'harness', 'guests', 'request'];
 const want = args.smoke ? ['smoke'] : args.group ? String(args.group).split(',') : GROUPS;
 // the request group alone needs no login and no live database: every auth and RPC call is answered in the browser
 const OFFLINE = want.every(g => g === 'request');
@@ -1469,7 +1469,7 @@ async function gCard() {
   // the check card: answer first, stored order, links last, the answer writes in its place and the card closes at once
   await T.wait('!!document.querySelector(\'[data-card="' + card.id + '"]\')', 8000);
   await T.click('[data-card="' + card.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fans")', 8000); await sleep(900);
-  const cv = await T.ev('(()=>{const d=document.querySelector("' + W + '"),a=d.querySelector("#fans"),m=d.querySelector(".fmd"),t=m.textContent,b=[...d.querySelectorAll(".tk-card [data-dec]")];return {first:!!(a.compareDocumentPosition(m)&Node.DOCUMENT_POSITION_FOLLOWING),order:t.indexOf("What was done")<t.indexOf("How to check")&&t.indexOf("How to check")<t.indexOf("Deviations"),links:t.lastIndexOf("a/b.md")>t.indexOf("When it takes effect"),noPrompt:!t.includes("Write your answer below"),labels:b.map(x=>x.textContent),noBadge:!d.querySelector(".tb.check")}})()');
+  const cv = await T.ev('(()=>{const d=document.querySelector("' + W + '"),a=d.querySelector("#fans"),m=d.querySelector(".fmd"),t=m.textContent,b=[...d.querySelectorAll(".tk-card [data-dec]")].sort((x,y)=>y.dataset.dec-x.dataset.dec);return {first:!!(a.compareDocumentPosition(m)&Node.DOCUMENT_POSITION_FOLLOWING),order:t.indexOf("What was done")<t.indexOf("How to check")&&t.indexOf("How to check")<t.indexOf("Deviations"),links:t.lastIndexOf("a/b.md")>t.indexOf("When it takes effect"),noPrompt:!t.includes("Write your answer below"),labels:b.map(x=>x.textContent),noBadge:!d.querySelector(".tb.check")}})()');
   check(G, 'a check card shows its answer box first, its sections in stored order, its links last', cv.first && cv.order && cv.links && cv.noPrompt && cv.noBadge && JSON.stringify(cv.labels) === '["Accept","Needs changes"]', JSON.stringify(cv));
   await T.shot('card-check-1280x800');
   await T.size(375, 812); await sleep(500);
@@ -1612,13 +1612,13 @@ async function gDecision(G, T) {
   const decNext = await mkItem('decision next', { quadrant: a.quadrant, sort_key: 99999999 });
   await T.wait(`!!document.querySelector('[data-card="${decNext.id}"]')`, 15000);
   const opened = await openCard(T, a.id, W + ' .fdec');
-  const blk = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('.fdec'),bs=[...f.querySelectorAll('[data-dec]')],desc=d.querySelector('#fn');
+  const blk = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('.fdec'),bs=[...f.querySelectorAll('[data-dec]')].sort((x,y)=>y.dataset.dec-x.dataset.dec),desc=d.querySelector('#fn');
     return {labels:bs.map(x=>x.textContent),on:bs.every(x=>!x.disabled),above:!!(f.compareDocumentPosition(desc)&Node.DOCUMENT_POSITION_FOLLOWING),yesLikeSave:getComputedStyle(bs[0]).backgroundImage===getComputedStyle(d.querySelector('#fs')).backgroundImage&&getComputedStyle(bs[0]).backgroundColor===getComputedStyle(d.querySelector('#fs')).backgroundColor}})()`) : null;
   check(G, 'decision (web): the block shows Yes and No above the description, both on, Yes styled like Save', !!blk && JSON.stringify(blk.labels) === '["Yes","No"]' && blk.on && blk.above && blk.yesLikeSave, JSON.stringify(blk));
-  // the quadrant buttons share the Decision row, at its right end (2026-11-07, after Anastasiia's local test); none above it
-  const dq = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),row=d.querySelector('.tk-card .fdec .fdec-b'),q=row&&row.querySelector('.fquad'),y=row&&row.querySelector('[data-dec]');if(!q||!y)return null;const r=row.getBoundingClientRect(),a=q.getBoundingClientRect(),b=y.getBoundingClientRect();
-    return {n:q.querySelectorAll('[data-fq]').length,only:d.querySelectorAll('.tk-card .fquad').length,same:Math.abs((a.top+a.bottom)-(b.top+b.bottom))<12,right:Math.abs(r.right-a.right)<2&&a.left>b.right}})()`) : null;
-  check(G, 'decision (web): the quadrant buttons sit on the Decision row at its right end, none above it', !!dq && dq.n === 4 && dq.only === 1 && dq.same && dq.right, JSON.stringify(dq));
+  // T16 (harness configurations): one Decision section; the quadrant buttons stay on the bar under it, once
+  const dq = opened ? await T.ev(`(()=>{const d=document.querySelector('${W}'),q=d.querySelector('.tk-card .fbar .fquad'),f=d.querySelector('.tk-card .fdec');if(!q||!f)return null;
+    return {n:q.querySelectorAll('[data-fq]').length,only:d.querySelectorAll('.tk-card .fquad').length,after:!!(f.compareDocumentPosition(q)&Node.DOCUMENT_POSITION_FOLLOWING),last:f.querySelector('.dec-actions button:last-child').dataset.dec}})()`) : null;
+  check(G, 'decision (web): the Decision section has Accept last; the quadrant buttons sit once on the bar under it', !!dq && dq.n === 4 && dq.only === 1 && dq.after && dq.last === '1', JSON.stringify(dq));
   await sleep(900); // the window's open animation ends first
   await T.shot('decision-web-1440x900');
   await T.size(390, 844); await sleep(500);
@@ -1686,6 +1686,106 @@ async function gDecision(G, T) {
 // tree, arrows (one late) and fold; 200 rows drawn in under 100 ms; screenshots at both widths, light and dark.
 // the filter row (README Features): Mine by my tags, tags by list, the person's buttons, Due, saved in preferences. Items stay in _selftest;
 // preferences go back in cleanup; Maksym's mine_tag_ids are cleared for the group and put back in its finally
+// harness configurations (HomeOS plan T14-T16, db/032): list settings (Autonomy saved through set_autonomy), the task's Autonomy row
+// (inherits from its parent, warns when wider, saved with Save), and the Decision section on a Delegate card (questions, Recommended,
+// own answer, Accept; V2b: the stored body keeps ## Delegate and ## Your answer and holds the answer). Screenshots at 1440 and 390 px
+async function gHarness() {
+  const G = 'harness', W = 'dialog[open]';
+  const T = await maksymPage();
+  await closeDialogs(T); await T.size(1440, 900); await T.reload(); await T.ready();
+  const list0 = (await MK.rest('GET', 'lists?select=autonomy&id=eq.' + ST.id)).json[0];
+  check(G, 'db/032: lists.autonomy is readable', !!list0 && typeof list0.autonomy === 'string', JSON.stringify(list0));
+  if (!list0) return;
+  try {
+    await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=lists]")'); await T.click('[data-menu=lists]');
+    const sel = `[data-lm-set="${ST.id}"]`;
+    const opened = await T.wait(`!!document.querySelector('${sel}')`, 6000) && (await T.click(sel), await T.wait('!!document.querySelector("dialog.lsd [name=am]")', 8000));
+    check(G, 'list settings: opens from the Lists window with four Autonomy modes', opened);
+    if (opened) {
+      const st = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd');return {modes:d.querySelectorAll('[name=am]').length,checked:(d.querySelector('[name=am]:checked')||{}).value,nav:d.querySelectorAll('.ls-nav a').length,save:d.querySelector('#ls-save').disabled,status:d.querySelector('#ls-status').textContent,budget:!!d.querySelector('#ls-cap'),intake:!d.querySelector('#ls-e2e').disabled}})()`);
+      check(G, 'list settings: the stored mode is checked, four sections in the nav, Save off with "No changes", intake and budget on for the household', st.modes === 4 && st.checked === list0.autonomy && st.nav === 4 && st.save && st.status === 'No changes' && st.budget && st.intake, JSON.stringify(st));
+      await sleep(600); await T.shot('list-settings-1440x900');
+      await T.size(390, 844); await sleep(400);
+      const ph = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd'),r=d.getBoundingClientRect(),f=d.querySelector('#ls-foot').getBoundingClientRect();return {nav:getComputedStyle(d.querySelector('.ls-nav')).display,fits:r.left>=0&&r.right<=innerWidth+1&&d.scrollWidth<=d.clientWidth+1,foot:f.bottom<=innerHeight+1}})()`);
+      check(G, 'list settings (390 px): a full-width sheet, the nav hidden, the footer in view, no horizontal scroll', ph.nav === 'none' && ph.fits && ph.foot, JSON.stringify(ph));
+      await T.shot('list-settings-390x844');
+      await T.size(1440, 900); await sleep(300);
+      const next = list0.autonomy === 'manual' ? 'guided' : 'manual';
+      await T.ev(`(()=>{const x=document.querySelector('dialog.lsd [name=am][value=${next}]');x.click();return true})()`);
+      const dirty = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd');return {save:!d.querySelector('#ls-save').disabled,status:d.querySelector('#ls-status').textContent}})()`);
+      check(G, 'list settings: a new mode shows "Unsaved changes" and turns Save on', dirty.save && dirty.status === 'Unsaved changes', JSON.stringify(dirty));
+      await T.click('dialog.lsd #ls-save');
+      const saved = await until(async () => { const r = (await MK.rest('GET', 'lists?select=autonomy,autonomy_set_by&id=eq.' + ST.id)).json[0]; return r && r.autonomy === next ? r : null; });
+      check(G, 'list settings: Save writes the mode through set_autonomy (set_by Maksym), status "Saved"', !!saved && saved.autonomy_set_by === MK.uid && await T.wait(`document.querySelector('dialog.lsd #ls-status')?.textContent==='Saved'`, 5000), JSON.stringify(saved));
+      await closeDialogs(T);
+    }
+    // the task's Autonomy row: the child inherits Manual from its parent, Guided is wider than the parent
+    const par = await mkItem('autonomy parent', { sort_key: 9100001 }), kid = await mkItem('autonomy child', { sort_key: 9100002 });
+    await MK.rest('POST', 'item_links', { from_item: kid.id, to_item: par.id, kind: 'parent' }, { Prefer: 'return=minimal' });
+    const sa = await MK.rest('POST', 'rpc/set_autonomy', { p_kind: 'item', p_id: par.id, p_mode: 'manual', p_expected: 'inherit' });
+    check(G, 'set_autonomy on a task by REST (household person)', sa.ok, sa.ok ? '' : sa.err.message);
+    await T.reload(); await T.ready();
+    const ao = await openCard(T, kid.id, W + ' #fau');
+    const cap = ao ? await T.ev(`(()=>{const d=document.querySelector('${W}');return {v:d.querySelector('#fau').value,cap:d.querySelector('#fau-cap').textContent,reset:d.querySelector('#fau-reset').hidden}})()`) : null;
+    check(G, 'task window: Autonomy Inherit says "from parent #… : Manual", no Reset', !!cap && cap.v === 'inherit' && /^from parent .+: Manual$/.test(cap.cap) && cap.reset, JSON.stringify(cap));
+    if (ao) {
+      await T.ev(`(()=>{const s=document.querySelector('${W} #fau');s.value='guided';s.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
+      const w = await T.ev(`(()=>{const d=document.querySelector('${W}'),n=d.querySelector('#fau-w');return {warn:!n.hidden&&/parent is Manual|This list is Manual/.test(n.textContent),reset:!d.querySelector('#fau-reset').hidden}})()`);
+      check(G, 'task window: Guided under a Manual parent (or list) warns and offers Reset to inherit', w.warn && w.reset, JSON.stringify(w));
+      await sleep(600); await T.shot('task-autonomy-1440x900');
+      await T.click(W + ' #fs');
+      const k = await until(async () => { const x = await item(kid.id); return x && x.autonomy === 'guided' ? x : null; });
+      check(G, 'task window: Save sets the task to Guided through set_autonomy (items.version unchanged by it)', !!k && k.version === kid.version, k ? 'version ' + k.version + ' was ' + kid.version : 'not set');
+      await closeDialogs(T);
+    }
+    // phone (T15): list settings from the list menu and the task sheet's Autonomy row, at 375 px
+    const P = await tab(B, await ctx(B), { width: 375, height: 812 });
+    try {
+      await seed(P, await grantFor('maksym'));
+      await P.ev(`localStorage.setItem('td.app.list',${JSON.stringify(ST.id)}),true`);
+      await P.go(pathToFileURL(path.join(path.dirname(PAGE), 'app', 'index.html')).href);
+      const kidCard = `.card[data-tid="${kid.id}"] .cmain`;
+      let ps = await P.wait(`!!document.querySelector('${kidCard}')`, 20000);
+      if (ps) { await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); await P.click(kidCard); ps = await P.wait('!!document.querySelector("#dlg-task[open] #t-au")', 8000); }
+      const pa = ps ? await P.ev(`(()=>{const d=document.querySelector('#dlg-task');return {v:d.querySelector('#t-au').value,cap:d.querySelector('#t-au-cap').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
+      check(G, 'phone: the task sheet shows the Autonomy row with the mode set on the web, no horizontal scroll', !!pa && pa.v === 'guided' && /^Guided/.test(pa.cap) && !pa.wide, JSON.stringify(pa) + ' ' + P.errors.slice(-2).join(' / '));
+      if (ps) { await sleep(700); await P.shot('task-autonomy-app-375x812'); await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); }
+      const lsOk = await P.ev(`(()=>{if(typeof openListSettings!=='function')return false;openListSettings(${JSON.stringify(ST.id)});return true})()`) && await P.wait('!!document.querySelector("#dlg-lset[open] [name=lset-am]")', 8000);
+      const pl = lsOk ? await P.ev(`(()=>{const d=document.querySelector('#dlg-lset');return {modes:d.querySelectorAll('[name=lset-am]').length,save:d.querySelector('#lset-save').disabled,status:d.querySelector('#lset-status').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
+      check(G, 'phone: list settings sheet with four modes, Save off with "No changes", no horizontal scroll', !!pl && pl.modes === 4 && pl.save && pl.status === 'No changes' && !pl.wide, JSON.stringify(pl));
+      if (lsOk) { await sleep(700); await P.shot('list-settings-app-375x812'); }
+    } finally { await P.close().catch(() => {}); }
+    // the Decision section on a Delegate card (the text HomeOS claim.js cardText writes)
+    const CARDTXT = ['Original task text', '', '---', '', '## Delegate · 2026-11-11 10:00', 'Session: **do-142 · e2e**', '', '### Questions', '**1. Keep how many remote backups?**', 'A) 2', 'B) 4', 'C) 8', 'Recommended: A) 2', '',
+      '**2. Delete local exports older than 30 days?**', 'A) Yes', 'B) No', '', 'Class: E3 · data organisation and structure', '', '### Facts', '- Backups run every 6 h', '', '### On each answer', '- A) nothing changes', '',
+      'If no answer: nothing changes, the card stays open', '', 'Comes back to: plan', '', '---', '', '## Your answer', core.ANSWER_PROMPT].join('\n');
+    const dc = await mkItem('delegate card', { body_md: CARDTXT, quadrant: 'C', sort_key: 9100003, details: { decision: { v: 1, kind: 'delegate', label_1: 'Accept', label_0: 'Decline', answer: null }, e2e: RUN } });
+    await T.reload(); await T.ready();
+    const dOpen = await openCard(T, dc.id, W + ' #fdx .dq');
+    const ds = dOpen ? await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('#fdx');return {qs:f.querySelectorAll('fieldset.dq').length,chips:f.querySelectorAll('fieldset.dq')[0].querySelectorAll('label.chip').length,rec:(f.querySelector('.rec')||{}).parentNode?.textContent||'',cls:(f.querySelector('.dbadge.cls')||{}).textContent,wait:!!f.querySelector('.dbadge.wait'),acc:f.querySelector('[data-dec="1"]').disabled,fans:!!d.querySelector('#fans'),strip:(f.querySelector('.dec-strip')||{}).textContent||'',above:!!(f.compareDocumentPosition(d.querySelector('#fn'))&Node.DOCUMENT_POSITION_FOLLOWING)}})()`) : null;
+    check(G, 'Decision section: two numbered questions with chips, A) 2 Recommended, class E3, Waiting, Accept off, the strip, no separate answer box, above the description',
+      !!ds && ds.qs === 2 && ds.chips === 3 && /A\) 2/.test(ds.rec) && /^E3/.test(ds.cls) && ds.wait && ds.acc && !ds.fans && /If no answer/.test(ds.strip) && ds.above, JSON.stringify(ds) + ' ' + T.errors.slice(-2).join(' / '));
+    if (dOpen) {
+      await sleep(600); await T.shot('decision-section-1440x900');
+      await T.size(390, 844); await sleep(400);
+      check(G, 'Decision section (390 px): fits, no horizontal scroll', await T.ev(`(()=>{const f=document.querySelector('${W} #fdx').getBoundingClientRect();return f.left>=0&&f.right<=innerWidth+1&&document.documentElement.scrollWidth<=innerWidth})()`));
+      await T.shot('decision-section-390x844');
+      await T.size(1440, 900); await sleep(300);
+      await T.ev(`(()=>{const f=document.querySelector('${W} #fdx');f.querySelector('input[name="dq-0"]').click();f.querySelector('[data-dqn="1"]').click();const o=f.querySelector('#dqo-1');o.value='e2e own answer';o.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+      check(G, 'Decision section: an option plus an own answer turn Accept on', await T.ev(`!document.querySelector('${W} #fdx [data-dec="1"]').disabled`));
+      await T.click(W + ' #fdx [data-dec="1"]');
+      const a = await until(async () => { const x = await item(dc.id); return x && x.status === 'done' && x.details.decision.answer === 1 ? x : null; });
+      const sec = a ? core.answerSection(a.body_md) : null;
+      check(G, 'V2b: Accept stores answer 1, status done, and the answers under ## Your answer; ## Delegate and every byte above the answer kept',
+        !!a && !!sec && sec.text === '1. A) 2\n2. e2e own answer' && a.body_md.startsWith(CARDTXT.slice(0, CARDTXT.indexOf('## Your answer'))) && a.body_md.includes('\n## Your answer\n'), a ? JSON.stringify({ text: sec && sec.text }) : 'not answered');
+      await closeDialogs(T);
+    }
+  } finally {
+    const cur = (await MK.rest('GET', 'lists?select=autonomy&id=eq.' + ST.id)).json[0];
+    if (cur && cur.autonomy !== list0.autonomy) await MK.rest('POST', 'rpc/set_autonomy', { p_kind: 'list', p_id: ST.id, p_mode: list0.autonomy, p_expected: cur.autonomy });
+    await T.size(1440, 900).catch(() => {});
+  }
+}
 async function gFilters() {
   const G = 'filters';
   const mineSnap = ((await MK.rest('GET', 'profiles?select=mine_tag_ids&id=eq.' + MK.uid)).json[0] || {}).mine_tag_ids || [];
@@ -2927,9 +3027,9 @@ const t0 = Date.now();
 try {
   await setup();
   B = await launch();
-  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, appfilters: gAppFilters, links: gLinks, card: gCard, guests: gGuests, request: gRequest, smoke: gSmoke };
+  const run = { auth: gAuth, data: gData, sync: gSync, archive: gArchive, errors: gErrors, ui: gUi, filters: gFilters, lists: gLists, searchrow: gSearchRow, appfilters: gAppFilters, links: gLinks, card: gCard, harness: gHarness, guests: gGuests, request: gRequest, smoke: gSmoke };
   // errors creates the Cyrillic list that data moves an item into, so errors runs before data when both are asked for
-  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'card', 'guests', 'request'].filter(g => want.includes(g));
+  const order = ['smoke', 'auth', 'errors', 'data', 'sync', 'archive', 'ui', 'filters', 'lists', 'searchrow', 'appfilters', 'links', 'card', 'harness', 'guests', 'request'].filter(g => want.includes(g));
   for (const g of order) {
     try { await run[g](); } catch (e) { check(g, 'group ran to the end', false, e.message); }
   }

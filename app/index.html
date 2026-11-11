@@ -818,6 +818,27 @@ h2[tabindex="-1"]:focus{outline:none}
 /* real data: long words and links in titles and descriptions wrap, never scroll a quadrant sideways */
 .card .ttl,.card .d,.card .meta,.card .tags{overflow-wrap:anywhere;min-width:0}
 .quad .cards{overflow-x:hidden}
+/* harness configurations T15: list settings and the task's Autonomy (web: UI spec p3) */
+:root{--warn-ink:#7A5800;--ok-ink:#0E7A43}
+:root[data-theme="dark"]{--warn-ink:#FFD84D;--ok-ink:#3DD68C}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--warn-ink:#FFD84D;--ok-ink:#3DD68C}}
+.lset-h3{margin:18px 0 4px;font:600 17px var(--ui)}
+.lset-h3:first-child{margin-top:4px}
+.amtrack{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:12px 0}
+.amtrack span{height:4px;background:var(--hair2)}.amtrack span.on{background:var(--accent)}
+fieldset.amodes{border:0;padding:0;margin:0 0 8px;display:grid;gap:6px}
+label.amode{display:grid;grid-template-columns:18px 1fr;column-gap:10px;padding:10px 12px;border:1px solid var(--hair2);border-radius:var(--r);font:400 14px/1.45 var(--ui);color:var(--ink)}
+label.amode input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--accent);grid-row:span 4}
+label.amode .nm{font:600 15px var(--ui)}label.amode small{color:var(--ink3);font-weight:500}
+label.amode .ln{color:var(--ink2)}label.amode .why{color:var(--warn-ink);font:500 13px var(--ui)}
+label.amode:has(input:checked){background:var(--accent-bg);border-color:var(--accent-line);box-shadow:inset 3px 0 0 var(--accent)}
+label.amode:has(input:disabled){opacity:.7}
+label.cbline{display:flex;gap:10px;align-items:center;min-height:44px;font:500 15px var(--ui);color:var(--ink)}
+label.cbline input{width:20px;height:20px;accent-color:var(--accent)}
+.lset-st{flex:1;align-self:center;font:500 13px var(--ui);color:var(--ink3)}
+.lset-st.dirty{color:var(--warn-ink)}.lset-st.ok{color:var(--ok-ink)}.lset-st.bad{color:var(--danger-ink,var(--danger))}
+.fauto .linkbtn,.linkbtn{background:none;border:0;padding:0;min-height:44px;color:var(--accent-ink,var(--accent));font:500 14px var(--ui);text-decoration:underline}
+#dlg-lset .sfoot .btn{flex:none}
 </style>
 </head>
 <body>
@@ -951,6 +972,11 @@ h2[tabindex="-1"]:focus{outline:none}
 <dialog class="sheet" id="dlg-lists" aria-labelledby="lists-h">
   <div class="shead"><h2 id="lists-h">Lists</h2><button type="button" class="ib" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
   <div class="sbody" id="lists-body"></div>
+</dialog>
+<dialog class="sheet full" id="dlg-lset" aria-labelledby="lset-h">
+  <div class="shead"><div class="hgrp"><h2 id="lset-h">List settings</h2><p class="pos" id="lset-sub"></p></div><button type="button" class="ib" data-close aria-label="Close list settings"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  <div class="sbody" id="lset-body"></div>
+  <div class="sfoot"><span class="lset-st" id="lset-status" role="status"></span><button type="button" class="btn" data-close>Close</button><button type="button" class="btn primary" id="lset-save" data-act="lset-save" disabled>Save</button></div>
 </dialog>
 <dialog class="sheet" id="dlg-share" aria-labelledby="share-h">
   <div class="shead"><h2 id="share-h">Share</h2><button type="button" class="ib" data-close aria-label="Close"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
@@ -1490,6 +1516,7 @@ function openTask(id, swap, draft) {
     <div class="note" id="t-conflict" role="alert" hidden></div>
     <div class="ttrow"><label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label>${doneOn ? '<input type="checkbox" class="tdone" id="t-done" aria-label="Mark done">' : ''}</div>
     <p class="err" id="t-title-err" hidden></p>
+    ${autoRowHtml(t)}
     ${dec ? '' : quadHtml}
     <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>
     ${decHtml}
@@ -1506,7 +1533,8 @@ function openTask(id, swap, draft) {
     ${showSource() ? `<div class="field"><span class="flabel">Sources</span><div id="t-srcs"><p class="src">Loading…</p></div></div>` : ''}
     ${ro ? '' : `<div class="dangerrow"><button type="button" class="btn" data-act="t-cancel">Mark cancelled</button>${canDel(t) ? '<button type="button" class="btn danger" data-act="t-delete">Delete</button>' : ''}</div>`}`;
   $('#task-save').hidden = ro; $('#task-save').disabled = true; $('#task-save').textContent = 'Save';
-  hideAsk(); renderTTags(); renderLinks();
+  hideAsk(); renderTTags(); renderLinks(); drawAutoRow();
+  const au = $('#t-au'); if (au) au.onchange = () => changeAutonomy(au.value);
   const dn = $('#t-done'); if (dn) dn.onchange = () => { if (dn.checked) doneFromSheet(); };
   TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value; TS.check = C.decisionKind(t) === 'check';
   TS.dates = dateInputs(); TS.snap = draft ? null : snapTask();
@@ -1756,9 +1784,94 @@ async function createList(v) {
 function moveListPos(id, dir) { const ids = D.lists.slice(), i = ids.indexOf(id), j = i + dir; if (i < 0 || j < 0 || j >= ids.length) return false; ids.splice(i, 1); ids.splice(j, 0, id); D.reorderLists(ids); return true; }
 const reopenLists = () => { openDlg('dlg-lists'); renderLists(); };
 const openShareSheet = id => openShare('list', id);
+/* ---------- harness configurations T15 (web: openListSettings, the task window's Autonomy row) ----------
+   List settings: Autonomy, Intake defaults, Budget, read fresh on open; Save sends only what changed (TDData.saveListSettings). A task's
+   Autonomy applies at once through TDData.setAutonomy with the mode the sheet showed; offline it waits and goes with the queue */
+const canSetList = id => { const r = role(id), l = L(id); return !!me() && me().kind === 'human' && (r === 'owner' || r === 'editor') && !!l; };
+let LSET = null;
+async function openListSettings(id) {
+  if (!canSetList(id)) return;
+  const hh = !!me().is_household;
+  $('#lset-h').textContent = 'List settings'; $('#lset-sub').textContent = lname(id);
+  $('#lset-body').innerHTML = '<p class="hint">Loading…</p>'; $('#lset-save').disabled = true; $('#lset-status').textContent = '';
+  openDlg('dlg-lset');
+  const r = await D.listSettings(id);
+  if (!$('#dlg-lset').open) return;
+  if (!r.ok) { $('#lset-body').innerHTML = `<p class="note" role="alert">${esc(r.err.message)}</p>`; return; }
+  const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, deploy: row.deploy_target || '', tg: !!row.notify_telegram, stage: row.stage_report !== false, cap: r.cap === null ? '' : String(r.cap) };
+  LSET = { id, hh, base, expected: base.mode };
+  const modes = C.autonomyChoices(hh, false).map(c => `<label class="amode"><input type="radio" name="lset-am" value="${c.mode}"${c.mode === base.mode ? ' checked' : ''}${c.off ? ` disabled aria-describedby="lset-why-${c.mode}"` : ''}><span class="nm">${C.AUTONOMY_NAME[c.mode]}${c.mode === 'guided' ? ' <small>Default</small>' : ''}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].does)}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].you)}</span>${c.off ? `<span class="why" id="lset-why-${c.mode}">${esc(c.why)}</span>` : ''}</label>`).join('');
+  const dis = hh ? '' : ' disabled';
+  $('#lset-body').innerHTML = `<h3 class="lset-h3">Autonomy</h3><p class="hint">How much agents decide on their own in this list. Each task can narrow or widen it.</p>
+    <div class="amtrack" aria-hidden="true">${C.AUTONOMY_MODES.map(m => `<span data-tr="${m}"></span>`).join('')}</div>
+    <fieldset class="amodes"><legend class="vh">Autonomy mode</legend>${modes}</fieldset>
+    <p class="note info" id="lset-brain" hidden>E0 still always comes to you: paid services, public publishing, protected harness files and the plan-gate pass-up are never decided by an agent.</p>
+    <p class="hint">${row.autonomy_set_at ? `Set by ${esc(personName(row.autonomy_set_by))} · ${ymd(new Date(row.autonomy_set_at))}` : 'Not set yet: Guided is the default.'}</p>
+    <h3 class="lset-h3">Intake defaults</h3><p class="hint">Asked once for the list, not for every task.</p>${hh ? '' : `<p class="note info">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
+    <label class="cbline"><input type="checkbox" id="lset-e2e"${base.e2e ? ' checked' : ''}${dis}> Agent runs end-to-end tests</label>
+    <label class="field"><span>Deploy target</span><select class="inp" id="lset-deploy"${dis}><option value="">No deploy</option>${r.targets.map(x => `<option value="${esc(x.key)}"${x.key === base.deploy ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
+    <p class="hint">TasksDashboard always stops at local test.</p>
+    <label class="cbline"><input type="checkbox" id="lset-tg"${base.tg ? ' checked' : ''}${dis}> Notify on Telegram</label><p class="hint">Off by default. Telegram only notifies. Answers come from the board.</p>
+    <label class="cbline"><input type="checkbox" id="lset-stage"${base.stage ? ' checked' : ''}${dis}> Stage report</label>
+    <h3 class="lset-h3">Budget</h3>${hh ? `<label class="field"><span>Monthly budget ($)</span><input class="inp" id="lset-cap" type="number" min="0" max="100000" step="1" inputmode="decimal" value="${esc(base.cap)}" aria-describedby="lset-cap-h"></label>
+    <p class="hint" id="lset-cap-h">Dollars at API prices. Leave empty for no list budget. ${r.spent !== null ? `Spent $${r.spent.toFixed(2)} this month.` : r.budgetErr ? esc(r.budgetErr) : ''}</p><p class="err" id="lset-cap-e" hidden></p>` : `<p class="hint">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}`;
+  lsetSync();
+}
+const lsetCur = () => ({ mode: (document.querySelector('[name="lset-am"]:checked') || {}).value || LSET.base.mode, e2e: $('#lset-e2e').checked, deploy: $('#lset-deploy').value, tg: $('#lset-tg').checked, stage: $('#lset-stage').checked, cap: $('#lset-cap') ? $('#lset-cap').value.trim() : LSET.base.cap });
+function lsetSync() {
+  if (!LSET || !$('#lset-e2e')) return;
+  const c = lsetCur(), dirty = JSON.stringify(c) !== JSON.stringify(LSET.base);
+  $('#lset-brain').hidden = c.mode !== 'ai_brain';
+  document.querySelectorAll('#lset-body [data-tr]').forEach(x => x.classList.toggle('on', C.AUTONOMY_RANK[x.dataset.tr] <= C.AUTONOMY_RANK[c.mode]));
+  $('#lset-save').disabled = !dirty;
+  if (!LSET.saving) { $('#lset-status').textContent = dirty ? 'Unsaved changes' : $('#lset-status').dataset.done || 'No changes'; $('#lset-status').className = 'lset-st' + (dirty ? ' dirty' : $('#lset-status').dataset.kind || ''); }
+}
+async function saveListSettings() {
+  const c = lsetCur(), b = LSET.base, ch = {};
+  const capN = c.cap === '' ? null : Number(c.cap);
+  if (c.cap !== '' && (!isFinite(capN) || capN < 0 || capN > 100000)) { const e = $('#lset-cap-e'); e.textContent = 'A budget is 0 to 100000 dollars, or empty.'; e.hidden = false; $('#lset-cap').focus(); return; }
+  if (c.mode !== b.mode) Object.assign(ch, { mode: c.mode, expected: LSET.expected });
+  if (LSET.hh && (c.e2e !== b.e2e || c.deploy !== b.deploy || c.tg !== b.tg || c.stage !== b.stage)) ch.intake = { e2e: c.e2e, deploy: c.deploy, tg: c.tg, stage: c.stage };
+  if (LSET.hh && c.cap !== b.cap) ch.cap = capN;
+  LSET.saving = true; $('#lset-save').disabled = true; $('#lset-status').textContent = 'Saving…';
+  const r = await D.saveListSettings(LSET.id, ch);
+  LSET.saving = false;
+  const st = $('#lset-status');
+  if (r.ok) { LSET.base = c; LSET.expected = c.mode; st.dataset.done = 'Saved'; st.dataset.kind = ' ok'; toast(`List settings saved: ${lname(LSET.id)}`); }
+  else { const lm = L(LSET.id); if (lm && lm.autonomy) LSET.expected = lm.autonomy; st.dataset.done = r.errs.join(' '); st.dataset.kind = ' bad'; }
+  lsetSync(); renderAll();
+}
+// the task's Autonomy row: what it inherits (parent chain, then list), a warning when wider, Reset to inherit
+function autoRowHtml(t) {
+  const r = role(t.list);
+  if (!me() || me().kind !== 'human' || (r !== 'owner' && r !== 'editor') || isClosed(t)) return '';
+  const cur = C.itemModeOf(t);
+  return `<div class="field fauto" role="group" aria-labelledby="t-au-l"><label class="flabel" id="t-au-l" for="t-au">Autonomy</label><select class="inp" id="t-au" aria-describedby="t-au-cap">${C.autonomyChoices(!!me().is_household, true).map(c => `<option value="${c.mode}"${c.mode === cur ? ' selected' : ''}${c.off ? ' disabled' : ''}>${C.AUTONOMY_NAME[c.mode]}${c.off ? ' (household only)' : ''}</option>`).join('')}</select><p class="hint" id="t-au-cap" aria-live="polite"></p><button type="button" class="linkbtn" data-act="t-au-reset" hidden>Reset to inherit</button><p class="note info" id="t-au-w" hidden></p></div>`;
+}
+function autoCtx(t) { const by = {}; D.tasks.forEach(x => { by[x.id] = x; }); return { byId: by, parentOf: C.linkIndex(new Map(D.links), by).parentOf, list: L(t.list) }; }
+function drawAutoRow() {
+  const sel = $('#t-au'); if (!sel || !TS) return;
+  const t = task(TS.id); if (!t) return;
+  const v = sel.value, inh = C.autonomyInherited(t, autoCtx(t));
+  $('#t-au-cap').innerHTML = v === 'inherit' ? esc(inh.from === 'parent' ? `from parent ${ref(inh.parent)}: ${C.AUTONOMY_NAME[inh.mode]}` : `from list: ${C.AUTONOMY_NAME[inh.mode]}`)
+    : `<b>${esc(C.AUTONOMY_NAME[v])}</b>${t.autonomySetAt ? ` · set here by ${esc(personName(t.autonomySetBy))} · ${ymd(t.autonomySetAt)}` : ' · set here'}${D.pendingAutonomy().some(x => x.id === t.id) ? ' · waits to be sent' : ''}`;
+  document.querySelector('[data-act="t-au-reset"]').hidden = v === 'inherit';
+  const w = C.autonomyWarning(v, inh, C.listModeOf(L(t.list))); $('#t-au-w').textContent = w; $('#t-au-w').hidden = !w;
+}
+async function changeAutonomy(mode) {
+  const t = task(TS && TS.id); if (!t) return;
+  const was = C.itemModeOf(t);
+  if (mode === was) return drawAutoRow();
+  const r = await D.setAutonomy('item', t.id, mode, was);
+  if (r.ok) toast(r.queued ? `Autonomy ${C.AUTONOMY_NAME[mode]}: sent when you are back online.` : `Autonomy: ${C.AUTONOMY_NAME[mode]}`);
+  else { toast(r.now ? `Autonomy not saved: someone set it to ${C.AUTONOMY_NAME[r.now]} meanwhile.` : `Autonomy not saved: ${r.err.message}`); const s = $('#t-au'); if (s) s.value = C.itemModeOf(task(t.id)); }
+  drawAutoRow();
+}
+['input', 'change'].forEach(n => document.addEventListener(n, e => { if (e.target.closest && e.target.closest('#lset-body')) { const s = $('#lset-status'); if (s) { delete s.dataset.done; delete s.dataset.kind; } lsetSync(); } }));
 function listMenu(id) {
   const l = L(id); if (!l) return; const mine = me() && l.owner_id === me().id, i = D.lists.indexOf(id), items = [];
   items.push(mine ? { label: 'Share', icon: 'share', run: () => openShareSheet(id) } : { label: 'People', icon: 'people', run: () => openShareSheet(id) });
+  if (canSetList(id)) items.push({ label: 'Settings', icon: 'lists', run: () => openListSettings(id) });
   if (mine) items.push({ label: 'Rename', icon: 'lists', run: async () => { const v = await promptDlg({ title: `Rename ${l.name}`, label: 'List name', value: l.name }); if (v && v !== l.name) said(await D.renameList(id, v)); } });
   if (i > 0) items.push({ label: 'Move up', icon: 'up', run: () => { moveListPos(id, -1); reopenLists(); } });
   if (i < D.lists.length - 1) items.push({ label: 'Move down', icon: 'down', run: () => { moveListPos(id, 1); reopenLists(); } });
@@ -1918,6 +2031,8 @@ document.addEventListener('click', async e => {
       document.execCommand(b.dataset.f === 'b' ? 'bold' : b.dataset.f === 'i' ? 'italic' : 'insertUnorderedList'); onTaskInput(); break;
     }
     case 't-theirs': { const x = TS.theirs; $('#t-title').value = x.title; const d = showRaw(); d.value = x.notes; TS.notes0 = x.notes; TS.fn0 = d.value; TS.conflict = false; $('#t-conflict').hidden = true; TS.snap = snapTask(); $('#task-save').textContent = 'Save'; onTaskInput(); toast('Kept their version.'); break; }
+    case 'lset-save': saveListSettings(); break;
+    case 't-au-reset': { const s = $('#t-au'); if (s) { s.value = 'inherit'; changeAutonomy('inherit'); } break; }
     case 't-decide': {
       /* the answer with every other change of the sheet in one versioned write, then close with Undo (web: the [data-dec] click) */
       if (!TS || TS.ro) break; const st = TS;

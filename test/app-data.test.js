@@ -838,3 +838,35 @@ test('saveTask done: a title edit, a quadrant pick and done in one PATCH, "Compl
   assert.equal(patches[1].status, 'open');
   assert.equal(patches[1].quadrant, 'B');
 });
+
+test('T15: Autonomy goes through set_autonomy with the shown mode; offline it waits in td.app.settingsq and is sent with the queue; 40001 is told', async () => {
+  // the pure queue step: a newer change keeps the oldest expected; a change back to it drops the entry
+  const e1 = { uid: UID, kind: 'item', id: ITEM, mode: 'manual', expected: 'inherit' };
+  let q = D.settingsEnqueue([], e1);
+  q = D.settingsEnqueue(q, Object.assign({}, e1, { mode: 'guided', expected: 'manual' }));
+  assert.deepEqual(q.map(x => [x.mode, x.expected]), [['guided', 'inherit']]);
+  assert.deepEqual(D.settingsEnqueue(q, Object.assign({}, e1, { mode: 'inherit', expected: 'guided' })), []);
+
+  const sent = [];
+  let reply = () => [200, 'manual'];
+  const f = fakeSupabase([['POST', /^\/rest\/v1\/rpc\/set_autonomy/, (m, body) => { sent.push(body); return reply(); }]]);
+  const d = make(f);
+  await signIn(d);
+  await d.loadAll();
+  assert.equal(d.find ? d.find(ITEM).autonomy : 'inherit', 'inherit');
+  assert.deepEqual(await d.setAutonomy('item', ITEM, 'manual', 'inherit'), { ok: true });
+  assert.deepEqual(sent.pop(), { p_kind: 'item', p_id: ITEM, p_mode: 'manual', p_expected: 'inherit' });
+
+  f.offline = true;
+  const r = await d.setAutonomy('list', LIST, 'ai_brain', 'guided');
+  assert.equal(r.queued, true);
+  assert.equal(JSON.parse(d.opts.storage.local.getItem(D.SETTINGS_KEY)).length, 1);
+  assert.equal(d.pendingAutonomy().length, 1);
+  f.offline = false;
+  reply = () => [409, { code: '40001', message: 'the mode changed meanwhile (now manual)' }];
+  const toasts = []; d.on('toast', x => toasts.push(x.msg));
+  await d.flushAll();
+  assert.deepEqual(sent.pop(), { p_kind: 'list', p_id: LIST, p_mode: 'ai_brain', p_expected: 'guided' }, 'the queued change carries its expected mode');
+  assert.equal(d.opts.storage.local.getItem(D.SETTINGS_KEY), null, 'refused: out of the queue');
+  assert.ok(toasts.some(m => /someone set it to Manual/.test(m)), toasts.join(' | '));
+});

@@ -15,6 +15,7 @@
   const IDB_NAME = 'td-app', IDB_STORE = 'queue';
   // the app's localStorage keys that belong to the signed-in person (list ids, a Google sign-in in flight): gone on sign-out
   const USER_KEYS = ['td.app.list', 'td.app.lastList', PKCE_KEY];
+  const SETTINGS_KEY = 'td.app.settingsq'; // app only, localStorage: Autonomy changes made offline, sent with the queue (T15)
   const PREFS_DELAY_MS = 1000;         // web: PREFS_DELAY_MS
   const LINK_RETRY_MS = 3000;          // web: runLinks retry pause
   const VIA = { 'x-homeos-via': 'app' };
@@ -53,6 +54,13 @@
   }
   // a record back onto the loaded task (or a new one for a create). The persisted version is kept, so a versioned PATCH misses when
   // someone else saved meanwhile and conflict() merges field by field. existing: the task loadAll read, or null
+  // one Autonomy change into the offline settings queue: a newer change of the same list or task replaces the older one but keeps the
+  // oldest expected mode (what the database held when the first change was made), so a change made elsewhere meanwhile still shows (40001)
+  function settingsEnqueue(q, e) {
+    const old = (q || []).find(x => x.uid === e.uid && x.kind === e.kind && x.id === e.id);
+    const rest = (q || []).filter(x => x !== old);
+    return old && old.expected === e.mode ? rest : rest.concat([Object.assign({}, e, { expected: old ? old.expected : e.expected })]);
+  }
   function queueRestore(rec, existing) {
     if (!rec || typeof rec.id !== 'string' || !Array.isArray(rec.fields)) return null;
     const fields = rec.fields.filter(f => FIELDS.includes(f));
@@ -415,7 +423,7 @@
     async function loadMeta() {
       const uid = session.user.id;
       const [lists, members, cats, profs, vis, tls, tlm, tags, inv, ntc] = await Promise.all([
-        getAll('lists?select=id,slug,name,default_category,sort,owner_id&archived_at=is.null'),
+        getAll('lists?select=id,slug,name,default_category,sort,owner_id,autonomy&archived_at=is.null'),
         rest('GET', 'list_members?select=list_id,role,hidden_at&profile_id=eq.' + uid),
         rest('GET', 'categories?select=slug,name,default_list_id&archived_at=is.null'),
         rest('GET', 'profiles?select=' + C.PROFILE_COLUMNS + ',is_household'),
@@ -646,7 +654,7 @@
       return { ok: true };
     }
     // the queue under the Web Lock (start, online, visible, every poll)
-    function flushAll() { return withLock(LOCK_QUEUE, flushQueued); }
+    function flushAll() { return withLock(LOCK_QUEUE, async () => { await flushQueued(); await flushSettings(); }); }
     async function flushQueued() { await Promise.all([...Q.keys()].map(flush)); runLinks(); }
     function settle(id) {
       const e = Q.get(id);
@@ -1134,7 +1142,63 @@
       if (doc && doc.addEventListener) doc.addEventListener('visibilitychange', () => { if (session && visible()) { flushAll(); if (loaded) poll(false); } else writePrefs(); });
     }
 
+    // ---- harness configurations (HomeOS plan T15, db/032; web: openListSettings, saveAutonomy) ----
+    // Autonomy goes through set_autonomy with the mode the app showed (p_expected). Offline, or when the database can't be reached, the
+    // change waits in localStorage td.app.settingsq (per person) and is sent with the queue (flushAll); the database refuses it with
+    // 40001 when the mode changed meanwhile, and the person is told. Intake and budget are online only (household, list settings)
+    const settingsQ = () => { try { const v = JSON.parse(ls.get(SETTINGS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+    const settingsSave = q => { if (q.length) ls.set(SETTINGS_KEY, JSON.stringify(q)); else ls.del(SETTINGS_KEY); };
+    const modeLocal = (kind, id, mode) => {
+      if (kind === 'list') { if (LIST[id]) LIST[id] = Object.assign({}, LIST[id], { autonomy: mode }); }
+      else { const t = find(id); if (t) Object.assign(t, { autonomy: mode, autonomySetBy: me && me.id, autonomySetAt: nowDate() }); }
+    };
+    async function sendAutonomy(e) {
+      const r = await rpc('set_autonomy', { p_kind: e.kind, p_id: e.id, p_mode: e.mode, p_expected: e.expected });
+      if (r.ok) return { ok: true };
+      const now = r.err.code === '40001' ? (String(r.err.message).match(/now (\w+)/) || [])[1] || null : null;
+      return { ok: false, err: r.err, now, network: r.err.kind === 'network' };
+    }
+    async function setAutonomy(kind, id, mode, expected) {
+      const e = { uid: me && me.id, kind, id, mode, expected, at: nowDate().toISOString() };
+      const r = offline ? { ok: false, network: true } : await sendAutonomy(e);
+      if (r.ok) { modeLocal(kind, id, mode); changed('autonomy'); return { ok: true }; }
+      if (r.network) { settingsSave(settingsEnqueue(settingsQ(), e)); modeLocal(kind, id, mode); changed('autonomy'); return { ok: true, queued: true }; }
+      if (r.now) modeLocal(kind, id, r.now);
+      return { ok: false, now: r.now, err: r.err };
+    }
+    async function flushSettings() {
+      const uid = me && me.id; if (!uid || offline) return;
+      for (const e of settingsQ().filter(x => x.uid === uid)) {
+        const r = await sendAutonomy(e);
+        if (r.network) return;
+        settingsSave(settingsQ().filter(x => !(x.uid === e.uid && x.kind === e.kind && x.id === e.id)));
+        if (!r.ok) { if (r.now) modeLocal(e.kind, e.id, r.now); toast(r.now ? 'Autonomy not saved: someone set it to ' + C.AUTONOMY_NAME[r.now] + ' meanwhile.' : 'Autonomy not saved: ' + r.err.message, { kind: 'error' }); changed('autonomy'); }
+      }
+    }
+    const pendingAutonomy = () => settingsQ().filter(x => me && x.uid === me.id);
+    // the list's settings, read fresh (web: openListSettings): the row, deploy targets and this month's budget (household only)
+    async function listSettings(id) {
+      const hh = !!(me && me.is_household);
+      const [row, targets, bud] = await Promise.all([
+        rest('GET', 'lists?select=id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report&id=eq.' + id),
+        hh ? rest('GET', 'deploy_targets?select=key,label&order=label') : Promise.resolve({ ok: true, json: [] }),
+        hh ? rpc('budget_status', { p_list: id }) : Promise.resolve({ ok: true, json: [] }),
+      ]);
+      if (!row.ok) return row;
+      if (!row.json.length) return { ok: false, err: { message: 'This list is gone.' } };
+      const cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
+      return { ok: true, row: row.json[0], targets: targets.ok ? targets.json : [], cap: cap ? Number(cap.cap_usd) : null, spent: cap ? Number(cap.spent_usd || 0) : null, budgetErr: bud.ok ? null : bud.err.message };
+    }
+    // saves only what changed: { mode, expected, intake: { e2e, deploy, tg, stage }, cap (number or null) }; returns the errors in order
+    async function saveListSettings(id, ch) {
+      const errs = [];
+      if (ch.mode) { const r = await setAutonomy('list', id, ch.mode, ch.expected); if (!r.ok) errs.push(r.now ? 'Someone set the mode to ' + C.AUTONOMY_NAME[r.now] + ' meanwhile. Save again to replace it.' : r.err.message); }
+      if (ch.intake) { const i = ch.intake, r = await rpc('set_intake', { p_kind: 'list', p_id: id, p_e2e_self: i.e2e, p_deploy_target: i.deploy || null, p_notify_telegram: i.tg, p_stage_report: i.stage }); if (!r.ok) errs.push(r.err.message); }
+      if (ch.cap !== undefined) { const r = await rpc('set_budget', { p_list: id, p_period: 'month', p_cap: ch.cap }); if (!r.ok) errs.push(r.err.message); }
+      return { ok: !errs.length, errs };
+    }
     const api = {
+      setAutonomy, flushSettings, pendingAutonomy, listSettings, saveListSettings,
       on, attach, syncState, config: CFG, configErrors: cfgRead.errors, core: C,
       // session
       start, startGoogle, finishGoogle, goSignin, signinPage, signOut, gate, requestAccess, accessRequest,
@@ -1159,5 +1223,5 @@
 
   function safe(fn) { try { return fn(); } catch (e) { return null; } }
 
-  return { create, queueRecord, queueRestore, idbQueueStore, gateFrom, accessScreen, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS, USER_KEYS };
+  return { create, settingsEnqueue, SETTINGS_KEY, queueRecord, queueRestore, idbQueueStore, gateFrom, accessScreen, syncStateOf, encTask, decTask, PKCE_KEY, PKCE_TTL_MS, AUTH_KEY, IDB_NAME, IDB_STORE, FIELDS, USER_KEYS };
 });

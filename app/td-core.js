@@ -136,6 +136,7 @@
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
       createdAt: date(r.created_at), details: plainDetails(r.details),
+      autonomy: typeof r.autonomy === 'string' ? r.autonomy : 'inherit', autonomySetBy: r.autonomy_set_by || null, autonomySetAt: date(r.autonomy_set_at), // read only: set_autonomy writes them (db/032)
       ai: isPlain(r.ai) ? JSON.parse(JSON.stringify(r.ai)) : null, // read only here: the harness writes it (ai.check, ai.sessions)
     };
   }
@@ -200,6 +201,116 @@
     return { details, status: 'done' };
   }
   const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
+
+  // ---- harness configurations (HomeOS plan T14-T16, db/032): Autonomy modes and the Decision section ----
+  // a list's mode is never inherit (default guided); a task's is inherit unless a person set it (set_autonomy). A task that inherits
+  // takes its parent's chain first, then its list's. The list is the ceiling: wider on a task only counts when the household owner set it
+  const AUTONOMY_MODES = ['manual', 'project_rules', 'guided', 'ai_brain'];
+  const AUTONOMY_NAME = { inherit: 'Inherit', manual: 'Manual', project_rules: 'Project rules', guided: 'Guided', ai_brain: 'AI Brain' };
+  const AUTONOMY_RANK = { manual: 0, project_rules: 1, guided: 2, ai_brain: 3 };
+  const AUTONOMY_INFO = {
+    manual: { does: 'Agents ask before every step.', you: 'You answer each question on the board.' },
+    project_rules: { does: 'Agents follow the list brief and decide inside it.', you: 'Anything the brief does not cover comes to you.' },
+    guided: { does: 'Agents decide small things and ask about the rest.', you: 'Data, security and side tasks come to you.' },
+    ai_brain: { does: 'Agents decide on their own and log every decision.', you: 'Only E0 comes to you.' },
+  };
+  const AUTONOMY_HOUSEHOLD = 'Only household members can set this.';
+  const listModeOf = l => l && AUTONOMY_MODES.includes(l.autonomy) ? l.autonomy : 'guided';
+  const itemModeOf = t => t && AUTONOMY_MODES.includes(t.autonomy) ? t.autonomy : 'inherit';
+  // what a task inherits: { mode, from: 'parent' | 'list', parent (the task it comes from) }. ctx: { parentOf: id -> parent id,
+  // byId: id -> task, list: the task's list row }
+  function autonomyInherited(t, ctx) {
+    const c = ctx || {}, seen = new Set([t.id]);
+    for (let id = c.parentOf && c.parentOf[t.id]; id && !seen.has(id) && seen.size < 64; id = c.parentOf[id]) {
+      seen.add(id);
+      const p = c.byId && c.byId[id];
+      if (!p) break;
+      if (itemModeOf(p) !== 'inherit') return { mode: itemModeOf(p), from: 'parent', parent: p };
+    }
+    return { mode: listModeOf(c.list), from: 'list', parent: null };
+  }
+  // the mode agents use for a task, and where it comes from: 'here' when set on the task
+  function autonomyOf(t, ctx) {
+    const own = itemModeOf(t);
+    return own !== 'inherit' ? { mode: own, from: 'here', parent: null } : autonomyInherited(t, ctx);
+  }
+  // the modes a person may pick (set_autonomy): guests only Manual and Guided (and Inherit on a task)
+  const autonomyChoices = (household, onTask) => (onTask ? ['inherit'] : []).concat(AUTONOMY_MODES).map(m => {
+    const off = !household && !['inherit', 'manual', 'guided'].includes(m);
+    return { mode: m, off, why: off ? AUTONOMY_HOUSEHOLD : '' };
+  });
+  // the warning under a task's choice: wider than its list (the ceiling) or than the parent it would inherit from; '' when none
+  function autonomyWarning(choice, inherited, listMode) {
+    if (!choice || choice === 'inherit' || !(choice in AUTONOMY_RANK)) return '';
+    const lm = listMode in AUTONOMY_RANK ? listMode : 'guided';
+    if (AUTONOMY_RANK[choice] > AUTONOMY_RANK[lm])
+      return 'This list is ' + AUTONOMY_NAME[lm] + '. Agents take this task at ' + AUTONOMY_NAME[choice] + ' only if the household list owner set it.';
+    if (inherited && inherited.from === 'parent' && AUTONOMY_RANK[choice] > AUTONOMY_RANK[inherited.mode])
+      return 'The parent is ' + AUTONOMY_NAME[inherited.mode] + '. This task is wider than its parent.';
+    return '';
+  }
+
+  // the Delegate card's text (HomeOS claim.js cardText, card contract 5): the last "## Delegate · <date>" block up to its "---" line or
+  // the next level-2 heading. Display only: the stored text is never rewritten, the answer goes under ## Your answer (setAnswer)
+  const OPTION_LINE = /^(?:[A-Z][).:]|[-*])\s+\S/;
+  function delegateCard(md) {
+    const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
+    let at = -1;
+    lines.forEach((l, i) => { if (/^## Delegate · /.test(l)) at = i; });
+    if (at < 0) return null;
+    let end = lines.length;
+    for (let i = at + 1; i < lines.length; i++) if (/^## /.test(lines[i]) || MD_RULE.test(lines[i])) { end = i; break; }
+    const out = { date: lines[at].replace(/^## Delegate · /, '').trim(), session: '', cls: '', clsWord: '', facts: [], onAnswer: [], ifNoAnswer: '', comesBack: '', preamble: '', questions: [] };
+    let sec = 'head', q = null;
+    const unbold = s => s.replace(/^\*\*(.*)\*\*$/, '$1').trim();
+    const startQ = text => { q = { q: unbold(text).replace(/^\d+[.)]\s+/, ''), more: [], options: [], recommend: '' }; out.questions.push(q); };
+    lines.slice(at + 1, end).forEach(raw => {
+      const l = raw.trim();
+      let m;
+      if (!l) { if (sec === 'q') q = null; return; }
+      if (l === '### Questions') { sec = 'q'; q = null; return; }
+      if (l === '### Facts') { sec = 'facts'; return; }
+      if (l === '### On each answer') { sec = 'on'; return; }
+      if ((m = l.match(/^Session: (.*)$/))) { out.session = m[1].replace(/\*\*/g, '').trim(); return; }
+      if (/^Continue it: /.test(l)) return;
+      if ((m = l.match(/^Class: (E\d)(?: · (.*))?$/))) { out.cls = m[1]; out.clsWord = (m[2] || '').trim(); sec = 'tail'; return; }
+      if ((m = l.match(/^If no answer: (.*)$/))) { out.ifNoAnswer = m[1].trim(); sec = 'tail'; return; }
+      if ((m = l.match(/^Comes back to: (.*)$/))) { out.comesBack = m[1].trim(); sec = 'tail'; return; }
+      if ((m = l.match(/^Question: (.*)$/))) { sec = 'q'; startQ(m[1]); return; }
+      if (sec === 'facts' || sec === 'on') { (sec === 'facts' ? out.facts : out.onAnswer).push(l.replace(/^[-*]\s+/, '')); return; }
+      if (sec !== 'q') return;
+      if (!q && /^\*\*.+\*\*$/.test(l)) { startQ(l); return; }
+      if (!q) { out.preamble = (out.preamble ? out.preamble + ' ' : '') + l; return; }
+      if ((m = l.match(/^Recommended: (.*)$/))) { q.recommend = m[1].trim(); return; }
+      if (/^Options for question \d+:$/.test(l)) return;
+      (OPTION_LINE.test(l) ? q.options : q.more).push(l.replace(/^[-*]\s+/, ''));
+    });
+    // a question whose options were written without letters: its short lines after a question mark are the options
+    out.questions.forEach(x => {
+      if (!x.options.length && /\?$/.test(x.q) && x.more.length > 1 && x.more.every(s => s.length <= 80)) { x.options = x.more; x.more = []; }
+      const r = x.recommend, head = s => s.split(/\s/)[0];
+      x.recIndex = r ? x.options.findIndex(o => o === r || o.startsWith(r) || (/^[A-Z][).:]$/.test(head(r)) && head(o) === head(r))) : -1;
+    });
+    return out;
+  }
+  // earlier rounds on the same body: the "## Answer (read <date>)" blocks, newest first, with their first line
+  function answerRounds(md) {
+    const out = [];
+    mdBlocks(md).forEach(b => {
+      const m = b.match(/^## Answer \(read ([^)]*)\)[^\n]*\n?([\s\S]*)$/);
+      if (m) out.push({ date: m[1].trim(), text: (m[2].split('\n').find(l => l.trim()) || '').trim() });
+    });
+    return out.reverse();
+  }
+  // the text the Decision section writes under ## Your answer: one question its answer, several "1. <answer>" one per line;
+  // a decline "Declined" with the reason. Each answer is one line, so settle.js reads it as written
+  function decisionAnswerText(questions, answers, decline) {
+    const one = s => String(s || '').replace(/\s+/g, ' ').trim();
+    if (decline) return one(decline.reason) ? 'Declined: ' + one(decline.reason) : 'Declined';
+    const qs = questions || [], a = answers || [];
+    if (qs.length <= 1) return one(a[0]);
+    return qs.map((x, i) => (i + 1) + '. ' + one(a[i])).join('\n');
+  }
 
   // ---- the task window's text (card contract 5, 6, 11). Display only: storage stays chronological and carries no markers ----
   const ANSWER_HEADING = '## Your answer', ANSWER_PROMPT = '_Write your answer below this line, then save. Agents read it on the next scan._', LINKS_HEADING = '## Links';
@@ -1533,7 +1644,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,

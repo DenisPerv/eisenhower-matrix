@@ -1401,6 +1401,109 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
 .f-dates{display:flex;flex-wrap:wrap;gap:6px;padding:4px 8px 6px}
 .f-dates label{display:flex;flex-direction:column;gap:2px;font:500 12px var(--ui);color:var(--ink2);flex:1 1 110px}
 .f-dates input{min-height:30px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--glass2);padding:0 6px;font-size:13px;color:var(--ink);width:100%}
+/* harness configurations (HomeOS plan T14-T16, UI spec p3): list settings, the task's Autonomy row, the Decision section */
+:root{--warn-ink:#7A5800;--ok-ink:#0E7A43}
+:root[data-theme="dark"]{--warn-ink:#FFD84D;--ok-ink:#3DD68C}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--warn-ink:#FFD84D;--ok-ink:#3DD68C}}
+dialog.lsd{width:min(920px,100%);max-height:calc(100vh - 48px);padding:0;display:flex;flex-direction:column}
+dialog.lsd[open]{display:flex}
+.lsd form{display:flex;flex-direction:column;min-height:0;flex:1}
+.lsd .ls-head{padding:22px 24px 12px;border-bottom:1px solid var(--hair)}
+.lsd .ls-head h2{margin:0;font:500 28px/1.1 var(--serif)}
+.lsd .ls-head p{margin:4px 0 0;color:var(--ink3);font:400 13px var(--font)}
+.lsd .ls-body{display:grid;grid-template-columns:188px 1fr;min-height:0;flex:1}
+.lsd .ls-nav{border-right:1px solid var(--hair);padding:var(--s3) 0;overflow:auto}
+.lsd .ls-nav a{display:flex;flex-direction:column;justify-content:center;min-height:36px;padding:4px 16px;color:var(--ink2);text-decoration:none;font:500 14px var(--ui);border-left:3px solid transparent}
+.lsd .ls-nav a small{color:var(--ink3);font:400 12px var(--font)}
+.lsd .ls-nav a[aria-current="true"]{color:var(--ink);border-left-color:var(--accent);background:var(--accent-bg)}
+.lsd .ls-scroll{overflow:auto;padding:0 24px 24px}
+.lsd .ls-sec{padding-top:var(--s5)}
+.lsd .ls-sec h3{margin:0 0 4px;font:600 18px var(--ui)}
+.lsd .help{margin:4px 0 0;color:var(--ink3);font:400 13px/1.45 var(--font)}
+.lsd .ls-foot{display:flex;align-items:center;gap:var(--s3);padding:12px 24px;border-top:1px solid var(--hair)}
+.lsd .ls-foot .sp{flex:1}
+.lsd .ls-foot button{min-height:38px;padding:0 18px}
+.lsd .ls-status{font:500 13px var(--ui);color:var(--ink3)}
+.ls-status.dirty{color:var(--warn-ink)}.ls-status.ok{color:var(--ok-ink)}.ls-status.bad{color:var(--danger-ink)}
+.lsd .ls-save{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.lsd .ls-save:disabled{opacity:.5}
+.am-track{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:var(--s4) 0 var(--s3)}
+.am-track span{height:4px;background:var(--hair2)}
+.am-track span.on{background:var(--accent)}
+.am-track-l{display:flex;justify-content:space-between;color:var(--ink3);font:400 12px var(--font);margin-bottom:var(--s3)}
+dialog fieldset.am-modes{border:0;padding:0;margin:0;gap:6px}
+dialog label.am-mode{display:grid;grid-template-columns:16px 1fr;column-gap:10px;margin:0;padding:10px 12px;border:1px solid var(--hair2);border-radius:var(--r);cursor:pointer;color:var(--ink);font:400 13px/1.45 var(--font)}
+dialog label.am-mode input{width:16px;min-height:16px;margin:2px 0 0;accent-color:var(--accent);grid-row:span 4}
+dialog label.am-mode .nm{font:600 15px var(--ui)}
+dialog label.am-mode .def{margin-left:6px;color:var(--ink3);font:500 12px var(--ui)}
+dialog label.am-mode .ln{color:var(--ink2)}
+dialog label.am-mode .why{color:var(--warn-ink);font:500 12px var(--ui)}
+dialog label.am-mode:has(input:checked){background:var(--accent-bg);border-color:var(--accent-line);box-shadow:inset 3px 0 0 var(--accent)}
+dialog label.am-mode:has(input:disabled){cursor:not-allowed;opacity:.7}
+.lsd .money{display:flex;align-items:center;gap:6px;max-width:200px}
+.lsd .money input{flex:1}
+.lsd textarea{width:100%;min-height:76px;padding:8px 12px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--solid);color:var(--ink);font:400 14px var(--font)}
+.lsd .ls-err{color:var(--danger-ink);font:500 12px var(--ui);min-height:0;margin-top:4px}
+.lsd .linkbtn,.fauto .linkbtn,.dec .linkbtn{background:none;border:0;padding:0;min-height:0;color:var(--accent-ink);font:500 13px var(--ui);text-decoration:underline;cursor:pointer}
+.lsd .e0box{margin-top:var(--s3);padding:var(--s3) var(--s4);border:1px solid var(--hair2);background:var(--well)}
+.lsd .e0box ul{margin:4px 0 0;padding-left:18px;font:400 13px/1.5 var(--font)}
+.lm-acts button[data-lm-set]{font-weight:600}
+.fauto{margin-top:var(--s4);padding:12px;background:var(--well);border:1px solid var(--hair)}
+.fauto .row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3)}
+.fauto label{margin:0;display:flex;align-items:center;gap:var(--s3)}
+dialog .fauto select{width:auto;min-width:200px;margin:0}
+.fauto .cap{color:var(--ink2);font:400 13px var(--font)}
+.dec{margin-top:var(--s4);border:1px solid var(--hair2);border-radius:var(--r-lg);box-shadow:inset 3px 0 0 var(--qc)}
+.dec-h{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);padding:12px 14px;background:color-mix(in srgb,var(--qc) 16%,transparent);border-bottom:1px solid var(--hair)}
+.dec-h h3{margin:0;font:600 18px var(--ui);margin-right:auto}
+.dec .dbadge{display:inline-flex;align-items:center;min-height:24px;padding:0 8px;border:1px solid var(--hair2);border-radius:var(--r-sm);font:600 12px var(--ui)}
+.dec .dbadge.cls{color:var(--accent-ink)}.dec .dbadge.wait{color:var(--warn-ink)}.dec .dbadge.done{color:var(--ok-ink)}.dec .dbadge.decl{color:var(--danger-ink)}
+.dec-b{padding:4px 14px 14px}
+.dec-strip{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:var(--s3);padding:8px 10px;background:var(--well);font:400 13px/1.45 var(--font);color:var(--ink2)}
+.dec-strip b{color:var(--ink);font-weight:600}
+dialog fieldset.dq{border:0;padding:0;margin:var(--s4) 0 0;display:block}
+dialog fieldset.dq legend{padding:0;font:600 15px/1.4 var(--font);color:var(--ink)}
+.dq .more{margin:2px 0 0;color:var(--ink2);font:400 13px var(--font)}
+.dq .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:var(--s3)}
+dialog .dq label.chip{display:inline-flex;align-items:center;gap:6px;margin:0;min-height:32px;padding:0 12px;border:1px solid var(--hair2);border-radius:var(--r);cursor:pointer;color:var(--ink);font:500 14px var(--font)}
+dialog .dq label.chip input{position:absolute;opacity:0;width:1px;min-height:1px;pointer-events:none}
+dialog .dq label.chip:has(input:checked){background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+dialog .dq label.chip:has(input:checked)::before{content:"✓"}
+dialog .dq label.chip:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
+.dq .rec{font:500 12px var(--ui);color:var(--accent-ink)}
+.dq label.chip:has(input:checked) .rec{color:inherit}
+.dq .own{display:flex;gap:var(--s3);align-items:center;margin-top:var(--s3)}
+dialog .dq .own input{flex:1;margin:0}
+.dec details{margin-top:var(--s3);font:400 13px/1.45 var(--font)}
+.dec details summary{cursor:pointer;font:500 13px var(--ui);color:var(--ink2)}
+.dec details ul{margin:4px 0 0;padding-left:18px}
+.dec .dec-done{margin:6px 0 0;padding-left:18px;font:400 14px/1.5 var(--font)}
+.dec-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s4)}
+.dec-actions .hint{margin-right:auto;color:var(--ink3);font:400 13px var(--font)}
+.dec-actions button{min-height:38px;padding:0 18px;border-radius:var(--r);font:500 15px var(--ui)}
+.dec-actions .dec-yes{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.dec-actions .dec-yes:disabled{opacity:.5}
+.dec-decl{margin-top:var(--s4)}
+dialog .dec-decl textarea{width:100%;min-height:56px;padding:8px 12px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--solid);color:var(--ink);font:400 14px var(--font)}
+.dec-hist{margin-top:var(--s4);border-top:1px solid var(--hair);padding-top:var(--s3)}
+.dec-hist h4{margin:0;font:600 13px var(--ui);color:var(--ink2)}
+.dec-hist ol{list-style:none;margin:4px 0;padding:0}
+.dec-hist li{display:flex;gap:var(--s3);padding:4px 0;border-bottom:1px solid var(--hair);font:400 13px var(--font)}
+.dec-hist li .k{color:var(--ink3);min-width:72px}
+.dec .cbrow{display:flex;gap:var(--s3);align-items:center;margin-top:var(--s3);font:400 13px var(--font);color:var(--ink)}
+dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--accent)}
+.dec .dec-wd{margin-top:var(--s3);font:400 14px/1.5 var(--font)}
+@media (max-width:700px){
+  dialog.lsd{width:100%;max-width:100%;max-height:100%;height:100%;border-radius:0;margin:0}
+  .lsd .ls-body{grid-template-columns:1fr}.lsd .ls-nav{display:none}
+  .lsd .ls-foot{position:sticky;bottom:0;background:var(--solid);padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+  .lsd .ls-foot button,.dec-actions button{min-height:44px}
+  .lsd input,.lsd select{min-height:44px}
+  .fauto label{flex:1 1 100%;flex-wrap:wrap}dialog .fauto select{width:100%;min-width:0}
+  dialog .dq label.chip{min-height:44px}
+}
+.fmt.off{visibility:hidden}
+.fauto [hidden],.dec [hidden],.lsd [hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -1544,6 +1647,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
       aiConfidence: r.ai_confidence === null || r.ai_confidence === undefined ? null : Number(r.ai_confidence),
       createdBy: r.created_by || null, version: r.version || 1, deleted: !!r.deleted_at, updatedAt: date(r.updated_at),
       createdAt: date(r.created_at), details: plainDetails(r.details),
+      autonomy: typeof r.autonomy === 'string' ? r.autonomy : 'inherit', autonomySetBy: r.autonomy_set_by || null, autonomySetAt: date(r.autonomy_set_at), // read only: set_autonomy writes them (db/032)
       ai: isPlain(r.ai) ? JSON.parse(JSON.stringify(r.ai)) : null, // read only here: the harness writes it (ai.check, ai.sessions)
     };
   }
@@ -1608,6 +1712,116 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
     return { details, status: 'done' };
   }
   const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
+
+  // ---- harness configurations (HomeOS plan T14-T16, db/032): Autonomy modes and the Decision section ----
+  // a list's mode is never inherit (default guided); a task's is inherit unless a person set it (set_autonomy). A task that inherits
+  // takes its parent's chain first, then its list's. The list is the ceiling: wider on a task only counts when the household owner set it
+  const AUTONOMY_MODES = ['manual', 'project_rules', 'guided', 'ai_brain'];
+  const AUTONOMY_NAME = { inherit: 'Inherit', manual: 'Manual', project_rules: 'Project rules', guided: 'Guided', ai_brain: 'AI Brain' };
+  const AUTONOMY_RANK = { manual: 0, project_rules: 1, guided: 2, ai_brain: 3 };
+  const AUTONOMY_INFO = {
+    manual: { does: 'Agents ask before every step.', you: 'You answer each question on the board.' },
+    project_rules: { does: 'Agents follow the list brief and decide inside it.', you: 'Anything the brief does not cover comes to you.' },
+    guided: { does: 'Agents decide small things and ask about the rest.', you: 'Data, security and side tasks come to you.' },
+    ai_brain: { does: 'Agents decide on their own and log every decision.', you: 'Only E0 comes to you.' },
+  };
+  const AUTONOMY_HOUSEHOLD = 'Only household members can set this.';
+  const listModeOf = l => l && AUTONOMY_MODES.includes(l.autonomy) ? l.autonomy : 'guided';
+  const itemModeOf = t => t && AUTONOMY_MODES.includes(t.autonomy) ? t.autonomy : 'inherit';
+  // what a task inherits: { mode, from: 'parent' | 'list', parent (the task it comes from) }. ctx: { parentOf: id -> parent id,
+  // byId: id -> task, list: the task's list row }
+  function autonomyInherited(t, ctx) {
+    const c = ctx || {}, seen = new Set([t.id]);
+    for (let id = c.parentOf && c.parentOf[t.id]; id && !seen.has(id) && seen.size < 64; id = c.parentOf[id]) {
+      seen.add(id);
+      const p = c.byId && c.byId[id];
+      if (!p) break;
+      if (itemModeOf(p) !== 'inherit') return { mode: itemModeOf(p), from: 'parent', parent: p };
+    }
+    return { mode: listModeOf(c.list), from: 'list', parent: null };
+  }
+  // the mode agents use for a task, and where it comes from: 'here' when set on the task
+  function autonomyOf(t, ctx) {
+    const own = itemModeOf(t);
+    return own !== 'inherit' ? { mode: own, from: 'here', parent: null } : autonomyInherited(t, ctx);
+  }
+  // the modes a person may pick (set_autonomy): guests only Manual and Guided (and Inherit on a task)
+  const autonomyChoices = (household, onTask) => (onTask ? ['inherit'] : []).concat(AUTONOMY_MODES).map(m => {
+    const off = !household && !['inherit', 'manual', 'guided'].includes(m);
+    return { mode: m, off, why: off ? AUTONOMY_HOUSEHOLD : '' };
+  });
+  // the warning under a task's choice: wider than its list (the ceiling) or than the parent it would inherit from; '' when none
+  function autonomyWarning(choice, inherited, listMode) {
+    if (!choice || choice === 'inherit' || !(choice in AUTONOMY_RANK)) return '';
+    const lm = listMode in AUTONOMY_RANK ? listMode : 'guided';
+    if (AUTONOMY_RANK[choice] > AUTONOMY_RANK[lm])
+      return 'This list is ' + AUTONOMY_NAME[lm] + '. Agents take this task at ' + AUTONOMY_NAME[choice] + ' only if the household list owner set it.';
+    if (inherited && inherited.from === 'parent' && AUTONOMY_RANK[choice] > AUTONOMY_RANK[inherited.mode])
+      return 'The parent is ' + AUTONOMY_NAME[inherited.mode] + '. This task is wider than its parent.';
+    return '';
+  }
+
+  // the Delegate card's text (HomeOS claim.js cardText, card contract 5): the last "## Delegate · <date>" block up to its "---" line or
+  // the next level-2 heading. Display only: the stored text is never rewritten, the answer goes under ## Your answer (setAnswer)
+  const OPTION_LINE = /^(?:[A-Z][).:]|[-*])\s+\S/;
+  function delegateCard(md) {
+    const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
+    let at = -1;
+    lines.forEach((l, i) => { if (/^## Delegate · /.test(l)) at = i; });
+    if (at < 0) return null;
+    let end = lines.length;
+    for (let i = at + 1; i < lines.length; i++) if (/^## /.test(lines[i]) || MD_RULE.test(lines[i])) { end = i; break; }
+    const out = { date: lines[at].replace(/^## Delegate · /, '').trim(), session: '', cls: '', clsWord: '', facts: [], onAnswer: [], ifNoAnswer: '', comesBack: '', preamble: '', questions: [] };
+    let sec = 'head', q = null;
+    const unbold = s => s.replace(/^\*\*(.*)\*\*$/, '$1').trim();
+    const startQ = text => { q = { q: unbold(text).replace(/^\d+[.)]\s+/, ''), more: [], options: [], recommend: '' }; out.questions.push(q); };
+    lines.slice(at + 1, end).forEach(raw => {
+      const l = raw.trim();
+      let m;
+      if (!l) { if (sec === 'q') q = null; return; }
+      if (l === '### Questions') { sec = 'q'; q = null; return; }
+      if (l === '### Facts') { sec = 'facts'; return; }
+      if (l === '### On each answer') { sec = 'on'; return; }
+      if ((m = l.match(/^Session: (.*)$/))) { out.session = m[1].replace(/\*\*/g, '').trim(); return; }
+      if (/^Continue it: /.test(l)) return;
+      if ((m = l.match(/^Class: (E\d)(?: · (.*))?$/))) { out.cls = m[1]; out.clsWord = (m[2] || '').trim(); sec = 'tail'; return; }
+      if ((m = l.match(/^If no answer: (.*)$/))) { out.ifNoAnswer = m[1].trim(); sec = 'tail'; return; }
+      if ((m = l.match(/^Comes back to: (.*)$/))) { out.comesBack = m[1].trim(); sec = 'tail'; return; }
+      if ((m = l.match(/^Question: (.*)$/))) { sec = 'q'; startQ(m[1]); return; }
+      if (sec === 'facts' || sec === 'on') { (sec === 'facts' ? out.facts : out.onAnswer).push(l.replace(/^[-*]\s+/, '')); return; }
+      if (sec !== 'q') return;
+      if (!q && /^\*\*.+\*\*$/.test(l)) { startQ(l); return; }
+      if (!q) { out.preamble = (out.preamble ? out.preamble + ' ' : '') + l; return; }
+      if ((m = l.match(/^Recommended: (.*)$/))) { q.recommend = m[1].trim(); return; }
+      if (/^Options for question \d+:$/.test(l)) return;
+      (OPTION_LINE.test(l) ? q.options : q.more).push(l.replace(/^[-*]\s+/, ''));
+    });
+    // a question whose options were written without letters: its short lines after a question mark are the options
+    out.questions.forEach(x => {
+      if (!x.options.length && /\?$/.test(x.q) && x.more.length > 1 && x.more.every(s => s.length <= 80)) { x.options = x.more; x.more = []; }
+      const r = x.recommend, head = s => s.split(/\s/)[0];
+      x.recIndex = r ? x.options.findIndex(o => o === r || o.startsWith(r) || (/^[A-Z][).:]$/.test(head(r)) && head(o) === head(r))) : -1;
+    });
+    return out;
+  }
+  // earlier rounds on the same body: the "## Answer (read <date>)" blocks, newest first, with their first line
+  function answerRounds(md) {
+    const out = [];
+    mdBlocks(md).forEach(b => {
+      const m = b.match(/^## Answer \(read ([^)]*)\)[^\n]*\n?([\s\S]*)$/);
+      if (m) out.push({ date: m[1].trim(), text: (m[2].split('\n').find(l => l.trim()) || '').trim() });
+    });
+    return out.reverse();
+  }
+  // the text the Decision section writes under ## Your answer: one question its answer, several "1. <answer>" one per line;
+  // a decline "Declined" with the reason. Each answer is one line, so settle.js reads it as written
+  function decisionAnswerText(questions, answers, decline) {
+    const one = s => String(s || '').replace(/\s+/g, ' ').trim();
+    if (decline) return one(decline.reason) ? 'Declined: ' + one(decline.reason) : 'Declined';
+    const qs = questions || [], a = answers || [];
+    if (qs.length <= 1) return one(a[0]);
+    return qs.map((x, i) => (i + 1) + '. ' + one(a[i])).join('\n');
+  }
 
   // ---- the task window's text (card contract 5, 6, 11). Display only: storage stays chronological and carries no markers ----
   const ANSWER_HEADING = '## Your answer', ANSWER_PROMPT = '_Write your answer below this line, then save. Agents read it on the next scan._', LINKS_HEADING = '## Links';
@@ -2941,7 +3155,7 @@ button.lm-name{display:block;text-align:left;justify-content:flex-start}
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
@@ -3328,7 +3542,7 @@ async function loadMeta() {
   const uid = session.user.id;
   // profiles: my own row and, for the household, the household's rows (RLS); other names only through visible_profiles
   const [lists, members, cats, profs, vis, tls, tlm, tags, inv, ntc] = await Promise.all([
-    getAll('lists?select=id,slug,name,default_category,sort,owner_id&archived_at=is.null'),
+    getAll('lists?select=id,slug,name,default_category,sort,owner_id,autonomy&archived_at=is.null'),
     rest('GET', 'list_members?select=list_id,role,hidden_at&profile_id=eq.' + uid),
     rest('GET', 'categories?select=slug,name,default_list_id&archived_at=is.null'),
     rest('GET', 'profiles?select=' + C.PROFILE_COLUMNS + ',is_household'),
@@ -4547,6 +4761,19 @@ function deckOpen() {
   d.addEventListener('close', () => { const t0 = d.querySelector('.toast'); if (t0) document.body.append(t0); /* a toast shown in the window outlives it */ const c = deck.cur; pending = null; anim.forEach(a => a.cancel()); dac.abort(); if (c) c.ac.abort(); d.remove(); DECK = null; if (c && c.onClose) c.onClose(); });
   return deck;
 }
+// the task's Autonomy (T14): set_autonomy with the mode the window showed; the row's columns come back on the next poll, so the local
+// task takes the mode at once. 40001: someone changed it meanwhile, the toast says to what
+async function saveAutonomy(t, mode, expected) {
+  const r = await rest('POST', 'rpc/set_autonomy', { p_kind: 'item', p_id: t.id, p_mode: mode, p_expected: expected });
+  if (r.ok) {
+    const x = find(t.id); if (x) Object.assign(x, { autonomy: mode, autonomySetBy: me.id, autonomySetAt: new Date() });
+    toast('Autonomy: ' + C.AUTONOMY_NAME[mode] + ' · ' + plain(t.title)); render(); return true;
+  }
+  const now = r.err.code === '40001' && (String(r.err.message).match(/now (\w+)/) || [])[1];
+  if (now) { const x = find(t.id); if (x) x.autonomy = now; }
+  toast(now ? 'Autonomy not saved: someone set it to ' + C.AUTONOMY_NAME[now] + ' meanwhile.' : 'Autonomy not saved: ' + r.err.message);
+  return false;
+}
 function openTask(id, quad, opts) {
   const o = opts || {}, dr = o.draft || {};
   const t = id ? find(id) : null;
@@ -4615,16 +4842,28 @@ function openTask(id, quad, opts) {
   const notesBase = dr.notes !== undefined ? dr.notes : t ? t.notes : '';
   const readFirst = !!t && dr.notes === undefined && (!!notesBase.trim() || !editable);
   const view = readFirst ? C.cardView(notesBase, { check: C.decisionKind(t) === 'check', answerable: editable }) : null;
-  const ansHtml = view && view.answer ? '<div class="fans"><div class="flabel" id="fans-l">Your answer</div><div class="md fans-r" id="fans-r"' + (editable ? ' tabindex="0" title="Click to edit"' : '') + ' hidden></div><textarea class="rt fraw" id="fans" rows="3" aria-labelledby="fans-l" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
+  const ansHtml = view && view.answer && !(C.decisionKind(t) !== 'check' && ((C.delegateCard(notesBase) || {}).questions || []).length) ? '<div class="fans"><div class="flabel" id="fans-l">Your answer</div><div class="md fans-r" id="fans-r"' + (editable ? ' tabindex="0" title="Click to edit"' : '') + ' hidden></div><textarea class="rt fraw" id="fans" rows="3" aria-labelledby="fans-l" placeholder="Write your answer. Agents read it on the next scan."></textarea></div>' : '';
   const readInner = v => v.blocks.length || v.links ? '<div class="md fmd">' + C.cardViewHtml(v) + '</div>' : '<p class="n">No description</p>';
   const readHtml = ansHtml + (!readFirst && !editable ? '' : '<div id="fread"' + (readFirst ? '' : ' hidden') + (editable ? ' tabindex="0" title="Click to edit" aria-describedby="fn-l"' : '') + '>' + (readFirst ? readInner(view) : '') + '</div>');
   // the quadrant buttons share the Decision row on a decision card, at its right end (Anastasiia, 2026-11-07, after her local test)
   const shownQ = t ? t.q : null, q0 = dr.q || shownQ || quad || 'B';
   const quadHtml = '<div class="fquad" role="group" aria-label="Quadrant">' + QS.map(q => '<button type="button" data-fq="' + q + '" data-q="' + q + '" aria-pressed="' + (q === q0) + '"' + ro + '>' + QN[q] + '</button>').join('') + '</div>';
-  const decHtml = !dec ? '' : '<div class="fdec" role="group" aria-labelledby="fdec-l"><div class="flabel" id="fdec-l">Decision</div><div class="fdec-b">' +
-    [1, 0].map(v => '<button type="button" class="' + (v ? 'fdec-yes' : 'quiet') + '" data-dec="' + v + '" aria-pressed="' + (dec.answer === v) + '"' + (decOn ? '' : ' disabled') + '>' +
-      (dec.answer === v ? '✓ ' : '') + esc(v ? dec.label_1 : dec.label_0) + '</button>').join('') + quadHtml + '</div>' +
-    (decState ? '<p class="n fdec-s" id="fdec-s">' + esc(decState) + '</p>' : '') + '</div>';
+  // harness configurations T14: the task's Autonomy (people who edit its list; an existing task). Inherit shows where it comes from;
+  // a pick is saved with Save through set_autonomy with the mode the window showed (40001: changed meanwhile)
+  const autoOn = !!t && editable && !o.preview && me && me.kind === 'human' && (ROLE[t.list] === 'owner' || ROLE[t.list] === 'editor');
+  const autoCtx = () => { const by = {}; all().forEach(x => { by[x.id] = x; }); return { byId: by, parentOf: C.linkIndex(new Map(LINKS), by).parentOf, list: LIST[t.list] }; };
+  const autoShown = t ? C.itemModeOf(t) : 'inherit';
+  const autoHtml = !autoOn ? '' : '<div class="fauto" role="group" aria-labelledby="fau-l"><div class="row"><label id="fau-l" for="fau">Autonomy<select id="fau" aria-describedby="fau-cap">' +
+    C.autonomyChoices(!!me.is_household, true).map(c => '<option value="' + c.mode + '"' + (c.mode === autoShown ? ' selected' : '') + (c.off ? ' disabled' : '') + '>' + C.AUTONOMY_NAME[c.mode] + (c.off ? ' (household only)' : '') + '</option>').join('') +
+    '</select></label><span class="cap" id="fau-cap" aria-live="polite"></span><button type="button" class="linkbtn" id="fau-reset" hidden>Reset to inherit</button></div><p class="note" id="fau-w" hidden></p></div>';
+  // harness configurations T16: one Decision section. A Delegate card (C.delegateCard: questions, options, class, facts) is answered here:
+  // the answers go under ## Your answer (C.setAnswer, every other byte kept; settle.js reads them as before) and, on a card with two
+  // answers (details.decision), Accept or Decline also answers it as the buttons always did. A check card keeps its answer box
+  const dqCard = t && !o.preview ? C.delegateCard(notesBase) : null;
+  const ansOpen = t ? C.answerSection(notesBase) : null;
+  const dqOn = !!dqCard && dqCard.questions.length > 0 && !!ansOpen && C.decisionKind(t) !== 'check';
+  const isCheck = !!dec && C.decisionKind(t) === 'check';
+  const decHtml = dec || dqOn ? '<section class="dec fdec" id="fdx" aria-labelledby="fdx-h"></section>' : '';
   // the quadrant (2026-11-07, Anastasiia): four buttons under the title, the current one pressed. A pick is an unsaved change; Save
   // applies it as a drag does (C.quadPick: stored quadrant, pin; on top of the new quadrant), in the window's one write. A new task
   // starts in the quadrant whose + was clicked
@@ -4642,7 +4881,7 @@ function openTask(id, quad, opts) {
     '<div class="flabel" id="ft-l">Title</div><div class="ftrow"><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
     // one row (Anastasiia, 2026-11-07): formatting on the left, the quadrant buttons centred, the number and facts on the right; on a
     // decision card the quadrant buttons are on the Decision row instead
-    decHtml + (fmtHtml || whoHtml || !dec ? '<div class="fbar' + (dec ? '' : ' has-q') + '">' + fmtHtml + (dec ? '' : quadHtml) + whoHtml + '</div>' : '') +
+    autoHtml + decHtml + '<div class="fbar has-q">' + fmtHtml + quadHtml + whoHtml + '</div>' +
     '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
     '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>' +
     // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
@@ -4719,7 +4958,8 @@ function openTask(id, quad, opts) {
   // the answer box written into its answer section whenever the box has text, so an edit of either field is never lost
   const ansEl = dlg.querySelector('#fans'), ansR = dlg.querySelector('#fans-r'), freadEl = dlg.querySelector('#fread'), fn0 = fnEl.value;
   const descNow = () => fnEl.value !== fn0 ? fnEl.value.replace(/\s+$/, '') : notesBase;
-  const notesNow = () => { const raw = descNow(), a = ansEl ? ansEl.value.trim() : ''; return a ? C.setAnswer(raw, a) : raw; };
+  let decAnswer = null, decPrec = false; // the Decision section's answer text (Accept or Decline) and its precedent tick
+  const notesNow = () => { const raw = descNow(), a = decAnswer !== null ? decAnswer : ansEl ? ansEl.value.trim() : ''; return a ? C.setAnswer(raw, a) : raw; };
   const fitRaw = () => { fnEl.style.height = ''; fnEl.style.height = Math.min(fnEl.scrollHeight + 2, Math.round(innerHeight * 0.6)) + 'px'; };
   const caretEnd = el => { const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) {} };
   // click to edit, focus out to render: the raw box replaces the rendered text; leaving the field group (the raw box, the answer box, the
@@ -5018,6 +5258,127 @@ function openTask(id, quad, opts) {
   const fdone = dlg.querySelector('#fdone');
   if (fdone) fdone.onchange = () => { if (!fdone.checked || !fs) return; doneTick = true; after = nav.next ? 'next' : null; fs.click(); if (saveBad) { doneTick = false; after = null; fdone.checked = false; } };
   dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = nav.next ? 'next' : null; fs.click(); if (saveBad) { decide = null; after = null; } }; }); // an answer moves on to the next task; with none the window closes
+  // ---- T14: the Autonomy row ----
+  const autoEl = dlg.querySelector('#fau');
+  const drawAuto = () => {
+    if (!autoEl) return;
+    const v = autoEl.value, ctx = autoCtx(), inh = C.autonomyInherited(t, ctx), cap = dlg.querySelector('#fau-cap'), w = dlg.querySelector('#fau-w');
+    const from = inh.from === 'parent' ? 'from parent ' + ref(inh.parent) + ': ' + C.AUTONOMY_NAME[inh.mode] : 'from list: ' + C.AUTONOMY_NAME[inh.mode];
+    if (v === 'inherit') cap.textContent = from;
+    else if (v === autoShown && t.autonomySetAt) cap.innerHTML = '<b>' + esc(C.AUTONOMY_NAME[v]) + '</b> · set here by ' + esc(personName(t.autonomySetBy)) + ' · ' + esc(fmtDay(t.autonomySetAt));
+    else cap.innerHTML = '<b>' + esc(C.AUTONOMY_NAME[v]) + '</b> · set here when you save';
+    dlg.querySelector('#fau-reset').hidden = v === 'inherit';
+    const warn = C.autonomyWarning(v, inh, C.listModeOf(LIST[t.list]));
+    w.textContent = warn; w.hidden = !warn;
+  };
+  if (autoEl) {
+    autoEl.addEventListener('change', drawAuto, sig);
+    dlg.querySelector('#fau-reset').addEventListener('click', () => { autoEl.value = 'inherit'; drawAuto(); autoEl.focus(); }, sig);
+    drawAuto();
+  }
+  // formatting only while the title or the description has focus (T16; the bar keeps its place, so nothing jumps)
+  const fmtEl = dlg.querySelector('.fmt');
+  if (fmtEl) {
+    fmtEl.classList.add('off');
+    dlg.addEventListener('focusin', e => { if (e.target === ftEl || e.target === fnEl || fmtEl.contains(e.target)) fmtEl.classList.remove('off'); }, sig);
+    dlg.addEventListener('focusout', e => { const n = e.relatedTarget; if (!n || !(n === ftEl || n === fnEl || fmtEl.contains(n))) fmtEl.classList.add('off'); }, sig);
+  }
+  // ---- T16: the Decision section ----
+  const fdx = dlg.querySelector('#fdx');
+  const DS = { ans: [], own: [], ownOpen: [], declining: false, reason: '', histAll: false };
+  const qs = dqOn ? dqCard.questions : [];
+  const answerOf = i => DS.ownOpen[i] ? String(DS.own[i] || '').trim() : DS.ans[i] || '';
+  const complete = () => qs.every((x, i) => !!answerOf(i));
+  const answered = dec ? dec.answer !== null : dqOn && !!(ansOpen && ansOpen.text);
+  const canAnswer = dec ? decOn : dqOn && editable;
+  const drawDec = focus => {
+    if (!fdx) return;
+    const rounds = C.answerRounds(notesBase), shown = DS.histAll ? rounds : rounds.slice(0, 2);
+    const stateBadge = !dec ? (answered ? '<span class="dbadge done">Answered</span>' : '<span class="dbadge wait">Waiting for you</span>')
+      : dec.answer === 1 ? '<span class="dbadge done">' + esc(dec.label_1) + '</span>' : dec.answer === 0 ? '<span class="dbadge decl">' + esc(dec.label_0) + '</span>' : '<span class="dbadge wait">Waiting for you</span>';
+    const cls = dqCard && dqCard.cls ? '<span class="dbadge cls" title="Class ' + esc(dqCard.cls) + (dqCard.clsWord ? ': ' + esc(dqCard.clsWord) : '') + '">' + esc(dqCard.cls) + (dqCard.clsWord ? ' · ' + esc(dqCard.clsWord) : '') + '</span>' : '';
+    let body = '';
+    if (isCheck) {
+      const wd = (notesBase.match(/(?:^|\n)## What was done[^\n]*\n([\s\S]*?)(?=\n## |$)/) || [])[1];
+      body += wd && wd.trim() ? '<div class="md dec-wd">' + C.renderMd(wd.trim()) + '</div>' : '';
+      body += '<p class="help">' + (canAnswer ? 'Write what to change in Your answer below, then press ' + esc(dec.label_0) + '. ' + esc(dec.label_1) + ' needs no text.' : '') + '</p>';
+    }
+    if (dqOn) {
+      const strip = [dqCard.cls ? '<span><b>Class</b> ' + esc(dqCard.cls + (dqCard.clsWord ? ' · ' + dqCard.clsWord : '')) + '</span>' : '',
+        dqCard.onAnswer.length ? '<span><b>Per answer</b> ' + esc(dqCard.onAnswer.join('; ')) + '</span>' : '',
+        dqCard.ifNoAnswer ? '<span><b>If no answer</b> ' + esc(dqCard.ifNoAnswer) + '</span>' : ''].filter(Boolean).join('');
+      body += (strip ? '<div class="dec-strip">' + strip + '</div>' : '') + (dqCard.preamble ? '<p class="help">' + esc(dqCard.preamble) + '</p>' : '');
+      if (!answered && canAnswer) {
+        body += qs.map((x, i) => '<fieldset class="dq"><legend>' + (qs.length > 1 ? (i + 1) + '. ' : '') + esc(x.q) + '</legend>' + x.more.map(m => '<p class="more">' + esc(m) + '</p>').join('') +
+          (DS.ownOpen[i] || !x.options.length
+            ? '<div class="own"><label class="sr" for="dqo-' + i + '">Own answer to question ' + (i + 1) + '</label><input id="dqo-' + i + '" data-dqo="' + i + '" value="' + esc(DS.own[i] || '') + '" placeholder="Write your answer" maxlength="500" autocomplete="off">' +
+              (x.options.length ? '<button type="button" class="quiet" data-dqc="' + i + '">Use the options</button>' : '') + '</div>'
+            : '<div class="chips">' + x.options.map((op, k) => '<label class="chip"><input type="radio" name="dq-' + i + '" value="' + k + '"' + (DS.ans[i] === op ? ' checked' : '') + '><span>' + esc(op) + (k === x.recIndex ? ' <span class="rec">Recommended</span>' : '') + '</span></label>').join('') +
+              '<button type="button" class="linkbtn" data-dqn="' + i + '">Own answer</button></div>') + '</fieldset>').join('');
+        if (dqCard.facts.length) body += '<details><summary>Facts</summary><ul>' + dqCard.facts.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></details>';
+        if (dec && me && me.is_household && C.decisionKind(t) === 'delegate') body += '<label class="cbrow"><input type="checkbox" id="dq-prec"' + (decPrec ? ' checked' : '') + '> Use as precedent for similar questions</label>';
+      } else if (answered) {
+        const txt = ansOpen && ansOpen.text ? ansOpen.text : '';
+        body += txt ? '<div class="md dec-done">' + C.renderMd(txt) + '</div>' : '';
+      }
+    }
+    if (dec && decState) body += '<p class="help" id="fdec-s">' + esc(decState) + '</p>';
+    // a card with two answers keeps both buttons (Decline first, Accept filled on the right; on until the routine applied the answer, pressed
+    // when chosen). Only a Delegate card with questions asks for a reason first; Accept waits until every question has an answer
+    const declineFirst = dqOn && !answered;
+    if (canAnswer && DS.declining) {
+      body += '<div class="dec-decl"><label for="dq-why">Reason (optional)</label><textarea id="dq-why" rows="2" maxlength="500">' + esc(DS.reason) + '</textarea>' +
+        '<div class="dec-actions"><span class="hint"></span><button type="button" class="quiet" id="dq-keep">Keep the card</button><button type="button" class="danger" data-dec="0" id="dq-go">' + esc(dec ? 'Decline card' : 'Send decline') + '</button></div></div>';
+    } else if (dec || (canAnswer && !answered)) {
+      const ready = answered || !qs.length || complete(), on = canAnswer && !(dqOn && answered);
+      const hint = !on || !qs.length ? '' : ready ? 'Ready to send.' : qs.length > 1 ? 'Answer every question to accept.' : 'Pick an answer to accept.';
+      const btn = (v, text, cls, extra) => '<button type="button" class="' + cls + '" ' + extra + (dec ? ' aria-pressed="' + (dec.answer === v) + '"' : '') + (on && (v === 0 || ready) ? '' : ' disabled') + '>' + (dec && dec.answer === v ? '✓ ' : '') + esc(text) + '</button>';
+      body += '<div class="dec-actions"><span class="hint" id="dq-hint">' + esc(hint) + '</span>' +
+        (declineFirst ? btn(0, 'Decline', 'quiet', 'id="dq-decline"') : dec ? btn(0, dec.label_0, 'quiet', 'data-dec="0"') : '') +
+        btn(1, dec ? dec.label_1 : 'Send answer', 'dec-yes', (dec ? 'data-dec="1"' : 'id="dq-send"') + ' aria-describedby="dq-hint"') + '</div>';
+    }
+    if (rounds.length) body += '<div class="dec-hist"><h4 id="dq-hh">Earlier rounds</h4><ol aria-labelledby="dq-hh">' + shown.map(h => '<li><span class="k">' + esc(h.date) + '</span><span>' + esc(h.text) + '</span></li>').join('') + '</ol>' +
+      (rounds.length > 2 ? '<button type="button" class="linkbtn" id="dq-all" aria-expanded="' + DS.histAll + '">' + (DS.histAll ? 'Show last 2' : 'Show all (' + rounds.length + ')') + '</button>' : '') + '</div>';
+    fdx.innerHTML = '<div class="dec-h"><h3 id="fdx-h">' + (isCheck ? 'Check needed' : 'Decision needed') + '</h3>' + cls + stateBadge + '</div><div class="dec-b">' + body + '</div>';
+    if (focus) { const el = fdx.querySelector(focus); if (el) el.focus(); }
+  };
+  const refreshReady = () => {
+    const b = fdx && fdx.querySelector('.dec-yes'), h = fdx && fdx.querySelector('#dq-hint'); if (!b || !qs.length) return;
+    b.disabled = !complete(); if (h) h.textContent = complete() ? 'Ready to send.' : qs.length > 1 ? 'Answer every question to accept.' : 'Pick an answer to accept.';
+  };
+  // an answer: the text under ## Your answer, then Save with it (and, on a card with two answers, the answer as the buttons gave it)
+  const sendDec = value => {
+    if (!fs) return;
+    decAnswer = !dqOn ? null : value === 0 ? C.decisionAnswerText(qs, [], { reason: DS.reason }) : C.decisionAnswerText(qs, qs.map((x, i) => answerOf(i)));
+    if (dec) { decide = value; after = nav.next ? 'next' : null; }
+    fs.click();
+    if (saveBad) { decide = null; after = null; decAnswer = null; }
+  };
+  if (fdx) {
+    drawDec();
+    fdx.addEventListener('change', e => {
+      const x = e.target;
+      if (x.name && x.name.startsWith('dq-')) { const i = Number(x.name.slice(3)); DS.ans[i] = qs[i].options[Number(x.value)]; refreshReady(); }
+      if (x.id === 'dq-prec') decPrec = x.checked;
+    }, sig);
+    fdx.addEventListener('input', e => {
+      const x = e.target;
+      if (x.dataset.dqo !== undefined) { DS.own[Number(x.dataset.dqo)] = x.value; refreshReady(); }
+      if (x.id === 'dq-why') DS.reason = x.value;
+    }, sig);
+    fdx.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b || b.disabled) return;
+      if (b.dataset.dqn !== undefined) { const i = Number(b.dataset.dqn); DS.ownOpen[i] = true; drawDec('#dqo-' + i); }
+      else if (b.dataset.dqc !== undefined) { const i = Number(b.dataset.dqc); DS.ownOpen[i] = false; drawDec('[name="dq-' + i + '"]'); }
+      else if (b.id === 'dq-decline') { DS.declining = true; drawDec('#dq-why'); }
+      else if (b.id === 'dq-keep') { DS.declining = false; drawDec('#dq-decline'); }
+      else if (b.id === 'dq-all') { DS.histAll = !DS.histAll; drawDec('#dq-all'); }
+      else if (b.id === 'dq-send') sendDec(1);
+      else if (b.dataset.dec !== undefined) sendDec(Number(b.dataset.dec));
+    }, sig);
+    // Enter in an own answer does not submit the window
+    fdx.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.dqo !== undefined) e.preventDefault(); }, sig);
+  }
   if (fs) fs.onclick = e => {
     saveBad = false;
     const title = htmlToMd(dlg.querySelector('#ft')).replace(/\n+/g, ' ').trim(), notes = notesNow(), list = dlg.querySelector('#fl').value;
@@ -5028,6 +5389,7 @@ function openTask(id, quad, opts) {
     const endV = dlg.querySelector('#fd').value, startV = dlg.querySelector('#fsd').value, startD = startV ? new Date(startV) : null;
     if (endV && startD && new Date(endV) < startD) { dlg.querySelector('#fsde').textContent = 'Start is after End.'; bad = true; }
     if (bad) { e.preventDefault(); saveBad = true; (title ? dlg.querySelector('#fl') : dlg.querySelector('#ft')).focus(); return; }
+    if (autoEl && autoEl.value !== autoShown) saveAutonomy(t, autoEl.value, autoShown);
     // the quadrant buttons (2026-11-07): the picked quadrant; for a task only a pick other than the shown quadrant is written (qp)
     const fq = pickQ;
     const qp = t ? C.quadPick(shownQ, pickQ) : null;
@@ -5051,6 +5413,7 @@ function openTask(id, quad, opts) {
         // a new list or a new quadrant: on top of the quadrant there (a drag puts it where it is dropped)
         const key = moved || qp ? topKey(list, qp ? pickQ : t.q) : t.sortKey;
         const dch = decide !== null ? C.answerDecision(t, decide, me && me.handle, new Date().toISOString()) : null;
+        if (dch && decPrec && decide === 1) dch.details.decision.use_as_precedent = true;
         const r = edit(t, x => {
           if (dch) Object.assign(x, dch);
           if (qp) Object.assign(x, qp);
@@ -5088,7 +5451,7 @@ function openTask(id, quad, opts) {
   };
   // leaving this task (a side zone, a ghost or edge tab, Alt+arrows, a swipe: prev / next; a band, an end zone, Esc: close): what
   // the window showed, so leaving asks only when something changed
-  const snap = () => JSON.stringify([htmlToMd(ftEl), notesNow(), dlg.querySelector('#fl').value, dlg.querySelector('#fd').value, dlg.querySelector('#fsd').value, [...chosen].sort(), pend.length, pickQ]);
+  const snap = () => JSON.stringify([autoEl ? autoEl.value : '', htmlToMd(ftEl), notesNow(), dlg.querySelector('#fl').value, dlg.querySelector('#fd').value, dlg.querySelector('#fsd').value, [...chosen].sort(), pend.length, pickQ]);
   const snap0 = snap();
   const dirty = () => editable && snap() !== snap0;
   // kind: prev | next | close | jump (a dot; to = its task)
@@ -5749,6 +6112,140 @@ async function restoreList(id) {
 }
 // Account menu → Lists: panels One or Two, the zones Panel 1, Panel 2 and Under +N (drag a row, Alt+Up or Down, − and +), rename in place, new
 // list, Hidden for me, and the archive. Changes apply as you go, like Tags.
+
+// ---- List settings (HomeOS harness configurations T14, UI spec p3 (a)): General (name), Autonomy, Intake defaults, Budget. Opened from
+// the Lists window (owner or editor, people only). Reads the list's settings fresh on open (db/032 columns and budget_status) and saves
+// only what changed, each through its RPC: rename (PATCH, owners), set_autonomy with the mode it showed (40001: changed meanwhile),
+// set_intake and set_budget (household only). A guest sees AI Brain and Project rules off with the reason, intake off, no budget.
+// The list brief is task T23 (a later section in this window)
+const LS_COLS = 'id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report';
+const canSetList = id => !!me && me.kind === 'human' && (ROLE[id] === 'owner' || ROLE[id] === 'editor') && !!LIST[id]; // system lists too: the harness runs in them
+async function openListSettings(id, opener) {
+  if (!LIST[id] || !canSetList(id)) return;
+  const hh = !!me.is_household, owner = canEditList(id);
+  const dlg = dialogShell('<form method="dialog" novalidate><div class="ls-head"><h2 id="ls-h">List settings</h2><p id="ls-sub">' + esc(label(id)) + '</p></div>' +
+    '<div class="ls-body"><nav class="ls-nav" aria-label="Sections" id="ls-nav"></nav><div class="ls-scroll" id="ls-scroll"><p class="help">Loading…</p></div></div>' +
+    '<div class="ls-foot" id="ls-foot"></div></form>', opener || '#profile');
+  dlg.classList.add('lsd'); dlg.setAttribute('aria-labelledby', 'ls-h');
+  const scroll = dlg.querySelector('#ls-scroll'), nav = dlg.querySelector('#ls-nav'), foot = dlg.querySelector('#ls-foot');
+  const [row, targets, bud] = await Promise.all([
+    rest('GET', 'lists?select=' + LS_COLS + '&id=eq.' + id),
+    hh ? rest('GET', 'deploy_targets?select=key,label&order=label') : Promise.resolve({ ok: true, json: [] }),
+    hh ? rest('POST', 'rpc/budget_status', { p_list: id }) : Promise.resolve({ ok: true, json: [] }),
+  ]);
+  if (!dlg.isConnected) return;
+  if (!row.ok || !row.json.length) { scroll.innerHTML = '<p class="note">' + esc(row.ok ? 'This list is gone.' : row.err.message) + '</p>'; foot.innerHTML = '<span class="sp"></span><button value="close">Close</button>'; return; }
+  const r = row.json[0], cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
+  const saved = { name: r.name, mode: C.listModeOf(r), e2e: !!r.e2e_self, deploy: r.deploy_target || '', tg: !!r.notify_telegram, stage: r.stage_report !== false,
+    cap: cap ? String(Number(cap.cap_usd)) : '' };
+  let expected = saved.mode, base = Object.assign({}, saved), saving = false, status = '', kind = '', confirm = false;
+  const spent = cap ? Number(cap.spent_usd || 0) : null, money = n => '$' + Number(n).toFixed(2);
+  const choices = C.autonomyChoices(hh, false);
+  const modeRow = c => '<label class="am-mode"><input type="radio" name="am" value="' + c.mode + '"' + (c.off ? ' disabled aria-describedby="why-' + c.mode + '"' : '') + '>' +
+    '<span class="nm">' + C.AUTONOMY_NAME[c.mode] + (c.mode === 'guided' ? '<span class="def">Default</span>' : '') + '</span><span class="ln">' + esc(C.AUTONOMY_INFO[c.mode].does) + '</span><span class="ln">' + esc(C.AUTONOMY_INFO[c.mode].you) + '</span>' +
+    (c.off ? '<span class="why" id="why-' + c.mode + '">' + esc(c.why) + '</span>' : '') + '</label>';
+  const tgOpts = (targets.ok ? targets.json : []).map(x => '<option value="' + esc(x.key) + '">' + esc(x.label) + '</option>').join('');
+  scroll.innerHTML =
+    '<section class="ls-sec" id="ls-general" aria-labelledby="ls-hg"><h3 id="ls-hg">General</h3><label for="ls-name">Name<input id="ls-name" maxlength="60" autocomplete="off"' + (owner ? '' : ' disabled aria-describedby="ls-name-h"') + '></label>' +
+      (owner ? '' : '<p class="help" id="ls-name-h">' + (C.isSystemList(LIST[id]) ? 'A system list: scripts use it, so its name stays.' : 'Only the owner renames it.') + '</p>') + '<div class="ls-err" id="ls-name-e" aria-live="polite"></div></section>' +
+    '<section class="ls-sec" id="ls-autonomy" aria-labelledby="ls-ha"><h3 id="ls-ha">Autonomy</h3><p class="help">How much agents decide on their own in this list. Each task can narrow or widen it.</p>' +
+      '<div class="am-track" aria-hidden="true">' + C.AUTONOMY_MODES.map(m => '<span data-tr="' + m + '"></span>').join('') + '</div><div class="am-track-l" aria-hidden="true"><span>Asks more</span><span>Decides more</span></div>' +
+      '<fieldset class="am-modes"><legend class="sr">Autonomy mode</legend>' + choices.map(modeRow).join('') + '</fieldset>' +
+      '<div id="ls-brain" hidden><p class="note">E0 still always comes to you. <button type="button" class="linkbtn" id="ls-e0" aria-expanded="false" aria-controls="ls-e0box">What is E0?</button></p>' +
+      '<div class="e0box" id="ls-e0box" hidden><strong>Never decided by an agent</strong><ul><li>Gate 7 and the plan-gate pass-up</li><li>D49 level 3</li><li>Anything on the "Still forbidden" list</li><li>Paid services</li><li>Public publishing</li><li>Protected harness files</li></ul></div></div>' +
+      '<p class="help" id="ls-set-by"></p></section>' +
+    '<section class="ls-sec" id="ls-intake" aria-labelledby="ls-hi"><h3 id="ls-hi">Intake defaults</h3><p class="help">Asked once for the list, not for every task.</p>' +
+      (hh ? '' : '<p class="note">' + esc(C.AUTONOMY_HOUSEHOLD) + '</p>') +
+      '<label class="cb"><input type="checkbox" id="ls-e2e"> Agent runs end-to-end tests</label>' +
+      '<label for="ls-deploy">Deploy target<select id="ls-deploy" aria-describedby="ls-deploy-h"><option value="">No deploy</option>' + tgOpts + '</select></label><p class="help" id="ls-deploy-h">TasksDashboard always stops at local test.</p>' +
+      '<label class="cb"><input type="checkbox" id="ls-tg"> Notify on Telegram</label><p class="help">Off by default. Telegram only notifies. Answers come from the board.</p>' +
+      '<label class="cb"><input type="checkbox" id="ls-stage"> Stage report</label></section>' +
+    '<section class="ls-sec" id="ls-budget" aria-labelledby="ls-hb"><h3 id="ls-hb">Budget</h3>' +
+      (hh ? '<label for="ls-cap">Monthly budget</label><div class="money"><span aria-hidden="true">$</span><input id="ls-cap" type="number" min="0" max="100000" step="1" inputmode="decimal" aria-describedby="ls-cap-h"></div>' +
+        '<p class="help" id="ls-cap-h">Dollars at API prices. Leave empty for no list budget.</p><p class="help">' + (spent !== null ? 'Spent ' + money(spent) + ' this month.' : bud.ok ? 'No list budget yet.' : esc(bud.err.message)) + '</p><div class="ls-err" id="ls-cap-e" aria-live="polite"></div>'
+        : '<p class="help">' + esc(C.AUTONOMY_HOUSEHOLD) + '</p>') + '</section>';
+  const $ = s => dlg.querySelector(s);
+  const navItems = [['ls-general', 'General', () => cur().name], ['ls-autonomy', 'Autonomy', () => C.AUTONOMY_NAME[cur().mode]], ['ls-intake', 'Intake defaults', () => cur().deploy ? 'Deploy set' : 'No deploy'],
+    ['ls-budget', 'Budget', () => !hh ? 'Household' : cur().cap ? (spent !== null ? money(spent) + ' of ' : '') + '$' + cur().cap : 'No cap']];
+  const drawNav = () => { nav.innerHTML = navItems.map(([s, n, v], i) => '<a href="#' + s + '" data-sec="' + s + '"' + (i === 0 ? ' aria-current="true"' : '') + '>' + n + '<small>' + esc(v()) + '</small></a>').join(''); };
+  const fill = v => {
+    $('#ls-name').value = v.name;
+    dlg.querySelectorAll('[name="am"]').forEach(x => { x.checked = x.value === v.mode; });
+    ['#ls-e2e', '#ls-tg', '#ls-stage'].forEach((s, i) => { $(s).checked = [v.e2e, v.tg, v.stage][i]; $(s).disabled = !hh; });
+    $('#ls-deploy').value = v.deploy; $('#ls-deploy').disabled = !hh;
+    if ($('#ls-cap')) $('#ls-cap').value = v.cap;
+  };
+  const cur = () => ({ name: $('#ls-name').value.trim(), mode: (dlg.querySelector('[name="am"]:checked') || {}).value || base.mode, e2e: $('#ls-e2e').checked,
+    deploy: $('#ls-deploy').value, tg: $('#ls-tg').checked, stage: $('#ls-stage').checked, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap });
+  const dirty = () => JSON.stringify(cur()) !== JSON.stringify(base);
+  const setBy = () => { $('#ls-set-by').textContent = r.autonomy_set_at ? 'Set by ' + personName(r.autonomy_set_by) + ' · ' + longDay(Date.parse(r.autonomy_set_at)) : 'Not set yet: Guided is the default.'; };
+  const sync = () => {
+    const c = cur();
+    $('#ls-brain').hidden = c.mode !== 'ai_brain';
+    dlg.querySelectorAll('[data-tr]').forEach(x => x.classList.toggle('on', C.AUTONOMY_RANK[x.dataset.tr] <= C.AUTONOMY_RANK[c.mode]));
+    nav.querySelectorAll('a small').forEach((x, i) => { x.textContent = navItems[i][2](); });
+    drawFoot();
+  };
+  const drawFoot = () => {
+    if (confirm) {
+      foot.innerHTML = '<strong id="ls-cq">Discard changes?</strong><span class="sp"></span><button type="button" id="ls-keep">Keep editing</button><button type="button" class="danger" id="ls-discard">Discard</button>';
+      $('#ls-keep').onclick = () => { confirm = false; drawFoot(); };
+      $('#ls-discard').onclick = () => { confirm = false; dlg.close(); };
+      $('#ls-keep').focus();
+      return;
+    }
+    const d = dirty(), text = saving ? 'Saving…' : status || (d ? 'Unsaved changes' : 'No changes'), k = saving ? '' : status ? kind : d ? 'dirty' : '';
+    foot.innerHTML = '<span class="ls-status ' + k + '" id="ls-status" role="status">' + esc(text) + '</span><span class="sp"></span>' +
+      '<button type="button" id="ls-close"' + (saving ? ' disabled' : '') + '>' + (d ? 'Cancel' : 'Close') + '</button><button type="button" class="ls-save" id="ls-save"' + (d && !saving ? '' : ' disabled') + '>Save</button>';
+    $('#ls-close').onclick = () => { if (dirty()) { confirm = true; drawFoot(); } else dlg.close(); };
+    $('#ls-save').onclick = save;
+  };
+  const save = async () => {
+    const c = cur(), errs = [];
+    $('#ls-name-e').textContent = ''; if ($('#ls-cap-e')) $('#ls-cap-e').textContent = '';
+    if (!c.name) { $('#ls-name-e').textContent = 'A list needs a name.'; $('#ls-name').focus(); return; }
+    const capN = c.cap === '' ? null : Number(c.cap);
+    if (c.cap !== '' && (!isFinite(capN) || capN < 0 || capN > 100000)) { $('#ls-cap-e').textContent = 'A budget is 0 to 100000 dollars, or empty.'; $('#ls-cap').focus(); return; }
+    saving = true; status = ''; drawFoot();
+    if (c.name !== base.name && owner) { if (await renameList(id, c.name)) base.name = c.name; else errs.push('name'); }
+    if (c.mode !== base.mode) {
+      const a = await rest('POST', 'rpc/set_autonomy', { p_kind: 'list', p_id: id, p_mode: c.mode, p_expected: expected });
+      if (a.ok) { base.mode = expected = c.mode; LIST[id] = Object.assign({}, LIST[id], { autonomy: c.mode }); r.autonomy_set_by = me.id; r.autonomy_set_at = new Date().toISOString(); setBy(); }
+      else if (a.err.code === '40001') {
+        const m = (String(a.err.message).match(/now (\w+)/) || [])[1];
+        if (m) { expected = m; LIST[id] = Object.assign({}, LIST[id], { autonomy: m }); }
+        errs.push('Someone changed the mode meanwhile' + (m ? ' to ' + C.AUTONOMY_NAME[m] : '') + '. Your choice is kept: save again to replace it.');
+      } else errs.push(a.err.message);
+    }
+    if (hh && (c.e2e !== base.e2e || c.deploy !== base.deploy || c.tg !== base.tg || c.stage !== base.stage)) {
+      const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: c.e2e, p_deploy_target: c.deploy || null, p_notify_telegram: c.tg, p_stage_report: c.stage });
+      if (a.ok) Object.assign(base, { e2e: c.e2e, deploy: c.deploy, tg: c.tg, stage: c.stage }); else errs.push(a.err.message);
+    }
+    if (hh && c.cap !== base.cap) {
+      const a = await rest('POST', 'rpc/set_budget', { p_list: id, p_period: 'month', p_cap: capN });
+      if (a.ok) base.cap = c.cap; else errs.push(a.err.message);
+    }
+    saving = false;
+    if (!dlg.isConnected) return;
+    const msgs = errs.filter(x => x !== 'name');
+    status = msgs.length ? msgs.join(' ') : errs.length ? 'The name was not saved.' : 'Saved';
+    kind = errs.length ? 'bad' : 'ok';
+    if (!errs.length) toast('List settings saved: ' + label(id));
+    render(); sync();
+  };
+  fill(saved); drawNav(); setBy(); sync();
+  dlg.addEventListener('input', () => { status = ''; sync(); });
+  dlg.addEventListener('change', () => { status = ''; sync(); });
+  $('#ls-e0').onclick = () => { const b = $('#ls-e0box'), o = b.hidden; b.hidden = !o; $('#ls-e0').setAttribute('aria-expanded', String(o)); };
+  nav.addEventListener('click', e => {
+    const a = e.target.closest('a[data-sec]'); if (!a) return;
+    e.preventDefault(); nav.querySelectorAll('a').forEach(x => x.setAttribute('aria-current', String(x === a)));
+    $('#' + a.dataset.sec).scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+  // Escape and the backdrop: a dirty window asks first (the inline "Discard changes?" in the footer)
+  dlg.addEventListener('cancel', e => { if (dirty() && !saving) { e.preventDefault(); confirm = true; drawFoot(); } });
+  $('#ls-name').focus();
+}
 let LM = null; // the open Lists window: { dlg, view, arch, refresh, draw }
 function openLists(view) {
   const dlg = dialogShell('<form method="dialog" class="tgm"><strong id="lm-t">Lists</strong><div id="lm-body" class="tgm-body"></div><div class="actions"><button type="button" id="lm-sw" class="quiet"></button><span class="sp"></span><button value="close">Close</button></div></form>', '#profile');
@@ -5763,7 +6260,7 @@ function openLists(view) {
       (canEdit ? '<input class="lm-name" data-name="' + esc(id) + '" value="' + nameOf(id) + '" maxlength="60" aria-label="Name of ' + nameOf(id) + '" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown">'
         : '<button type="button" class="lm-name" data-keys="' + esc(id) + '" title="' + (C.isSystemList(l) ? 'A system list: scripts use it, so it stays' : 'Only the owner renames it') + '">' + nameOf(id) + '</button>') +
       (!mine ? '<span class="lm-meta">' + esc(personName(l.owner_id)) + '</span>' : C.isSystemList(l) ? '<span class="lm-meta">System</span>' : '') +
-      '<span class="lm-n" title="Open tasks">' + n + '</span><span class="lm-acts">' +
+      '<span class="lm-n" title="Open tasks">' + n + '</span><span class="lm-acts">' + (canSetList(id) ? '<button type="button" data-lm-set="' + esc(id) + '" aria-label="Settings of ' + nameOf(id) + '">Settings</button>' : '') +
       (canEdit ? '<button type="button" data-lm-arch="' + esc(id) + '">Archive</button>' : '') +
       (!mine ? '<button type="button" data-lm-hide="' + esc(id) + '">Hide</button><button type="button" class="danger" data-lm-leave="' + esc(id) + '">Leave</button>' : '') + '</span></div>';
   };
@@ -5790,6 +6287,7 @@ function openLists(view) {
     on('[data-lm-two]', x => x.onclick = () => change(C.listBarSetTwo(LB, LISTS, x.dataset.lmTwo === '1'), '[data-lm-two="' + x.dataset.lmTwo + '"]'));
     on('[data-lm-less]', x => x.onclick = () => change(C.listBarCount(LB, LISTS, +x.dataset.lmLess, -1), '[data-lm-less="' + x.dataset.lmLess + '"]'));
     on('[data-lm-more]', x => x.onclick = () => change(C.listBarCount(LB, LISTS, +x.dataset.lmMore, 1), '[data-lm-more="' + x.dataset.lmMore + '"]'));
+    on('[data-lm-set]', x => x.onclick = () => openListSettings(x.dataset.lmSet, '[data-lm-set="' + x.dataset.lmSet + '"]'));
     on('[data-name]', i => {
       const id = i.dataset.name;
       i.onchange = async () => { if (!(await renameList(id, i.value)) && LIST[id]) i.value = LIST[id].name; };
