@@ -14,7 +14,7 @@ const NEXT_KEY = 'td.signin.next', AUTH_KEY = 'td.request.auth', INTENT_KEY = 't
 const SESSION = () => ({ access_token: 'acc', refresh_token: 'ref', expires_at: Date.now() + 3600e3, email: 'p@example.invalid' });
 
 // answers: { mine, request, consultMine, consult: [status, body] }; bodies: the JSON body of each rpc call by path
-function load(href, { stored = {}, answers = {} } = {}) {
+function load(href, { stored = {}, answers = {}, inputs = {}, config = {} } = {}) {
   const store = new Map(Object.entries(stored).map(([k, v]) => [k, JSON.stringify(v)]));
   const u = new URL(href);
   const loc = { href, origin: u.origin, pathname: u.pathname, search: u.search, hash: u.hash, assigned: null, replaced: null,
@@ -28,13 +28,14 @@ function load(href, { stored = {}, answers = {} } = {}) {
     calls.push(p);
     try { bodies[p] = JSON.parse((init && init.body) || 'null'); } catch (e) {}
     const [status, body] = (p.endsWith('/my_access_request') ? answers.mine : p.endsWith('/request_access') ? answers.request
-      : p.endsWith('/my_consultation_request') ? answers.consultMine : p.endsWith('/request_consultation') ? answers.consult : null) || [204];
+      : p.endsWith('/my_consultation_request') ? answers.consultMine : p.endsWith('/request_consultation') ? answers.consult
+      : p.endsWith('/my_telegram_link') ? answers.tgMine : p.endsWith('/telegram_link_token') ? answers.tgToken : p.endsWith('/set_telegram_claim') ? answers.tgClaim : null) || [204];
     return { status, text: async () => (body === undefined ? '' : JSON.stringify(body)) };
   };
   const ctx = {
-    TD_CONFIG: { supabaseUrl: 'https://abc.supabase.co', publishableKey: 'sb_publishable_test' },
+    TD_CONFIG: Object.assign({ supabaseUrl: 'https://abc.supabase.co', publishableKey: 'sb_publishable_test' }, config),
     location: loc, history, fetch, crypto: globalThis.crypto, btoa, TextEncoder, URL, URLSearchParams, console, setTimeout,
-    document: { readyState: 'loading', addEventListener(t, f) { listeners[t] = f; }, getElementById: id => (id === 'app' ? app : null), documentElement: { dataset: {} } },
+    document: { readyState: 'loading', addEventListener(t, f) { listeners[t] = f; }, getElementById: id => (id === 'app' ? app : inputs[id] || null), documentElement: { dataset: {} } },
     sessionStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
     localStorage: { getItem: () => null },
   };
@@ -225,4 +226,93 @@ test('consult: the cap (54000) says try later', async () => {
   submit(s, {});
   await settle(s);
   assert.equal(s.app.dataset.state, 'cap');
+});
+
+// ---- Telegram link (db/032) ----
+const TG_TOKEN = 'ab'.repeat(20);
+const press = (s, act) => s.app.onclick({ target: { closest: () => ({ dataset: { act }, disabled: false }) } });
+
+test('telegram: telegramClaim has the rules of set_telegram_claim; telegramDeepLink needs a bot and a 40-hex token', () => {
+  const { telegramClaim, telegramDeepLink } = load(ORIGIN + '/signin').ctx.TDSignin;
+  const ok = (v, want) => assert.deepEqual([telegramClaim(v).ok, telegramClaim(v).value], [true, want], String(v));
+  ok('', null); ok('  ', null); ok(null, null);
+  ok('@ada_lovelace', '@ada_lovelace'); ok(' ada_lovelace ', '@ada_lovelace'); ok('https://t.me/ada_lovelace', '@ada_lovelace'); ok('t.me/ada_lovelace', '@ada_lovelace');
+  ok('123456789', '123456789');
+  for (const bad of ['@abc', 'ada lovelace', '1234', '_ada_l', '@' + 'a'.repeat(33), 'ada-l', '+351912345678'])
+    assert.equal(telegramClaim(bad).ok, false, bad);
+  assert.equal(telegramDeepLink('MD_support_line_bot', TG_TOKEN), 'https://t.me/MD_support_line_bot?start=' + TG_TOKEN);
+  assert.equal(telegramDeepLink('', TG_TOKEN), '');
+  assert.equal(telegramDeepLink('bad bot', TG_TOKEN), '');
+  assert.equal(telegramDeepLink('MD_support_line_bot', 'xyz'), '');
+  assert.equal(telegramDeepLink('MD_support_line_bot', TG_TOKEN.toUpperCase()), '');
+});
+
+test('telegram: the sign-in screen has the optional field; a valid claim is kept in this tab before Google opens', async () => {
+  const s = load(ORIGIN + '/signin', { inputs: { 'tg-claim': { value: ' ada_lovelace ' } } }); s.start();
+  assert.match(s.app.innerHTML, /<label class="tgfield"><span>Telegram <span class="opt">\(optional\)<\/span><\/span><input type="text" name="telegram" id="tg-claim"/);
+  assert.match(s.app.innerHTML, /one-time link/);
+  press(s, 'google');
+  for (let i = 0; i < 200 && !s.loc.assigned; i++) await new Promise(r => setTimeout(r, 5));
+  assert.equal(stored(s, 'td.signin.telegram'), '@ada_lovelace');
+  assert.ok(s.loc.assigned);
+});
+
+test('telegram: a bad claim stops before Google with the reason; an empty one clears what was kept', () => {
+  const s = load(ORIGIN + '/signin', { inputs: { 'tg-claim': { value: 'ada lovelace' } } }); s.start();
+  press(s, 'google');
+  assert.equal(s.loc.assigned, null);
+  assert.match(s.app.innerHTML, /role="alert">Telegram: a username of 5 to 32/);
+  const t = load(ORIGIN + '/signin', { stored: { 'td.signin.telegram': '@old_name' }, inputs: { 'tg-claim': { value: '' } } }); t.start();
+  press(t, 'google');
+  assert.equal(stored(t, 'td.signin.telegram'), null);
+});
+
+test('telegram: the kept claim is sent with set_telegram_claim before request_access, then forgotten', async () => {
+  const s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION(), 'td.signin.telegram': '@ada_lovelace' },
+    answers: { mine: [200, null], request: [200, { status: 'pending' }], tgClaim: [200, { claim: '@ada_lovelace' }], tgMine: [200, { linked: false, claim: '@ada_lovelace' }] } });
+  s.start(); await settle(s);
+  assert.deepEqual(s.calls.slice(0, 3), ['/rest/v1/rpc/my_access_request', '/rest/v1/rpc/set_telegram_claim', '/rest/v1/rpc/request_access']);
+  assert.deepEqual(s.bodies['/rest/v1/rpc/set_telegram_claim'], { p_claim: '@ada_lovelace' });
+  assert.equal(stored(s, 'td.signin.telegram'), null);
+  assert.equal(s.app.dataset.state, 'sent');
+  assert.match(s.app.innerHTML, /@ada_lovelace <span class="opt">\(not confirmed yet\)<\/span>/);
+});
+
+test('telegram: no claim, no set_telegram_claim call; a household login still goes on', async () => {
+  const s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION() },
+    answers: { mine: [200, null], request: [400, { code: '22023', message: 'household members already have access' }] } });
+  s.start(); await settle(s);
+  assert.ok(!s.calls.includes('/rest/v1/rpc/set_telegram_claim'));
+  assert.equal(s.loc.replaced, '/board/');
+});
+
+test('telegram: Link Telegram on the request screen asks for a token and shows the deep link', async () => {
+  const s = load(ORIGIN + '/signin', { config: { telegramBot: '@MD_support_line_bot' }, stored: { [AUTH_KEY]: SESSION() },
+    answers: { mine: [200, [{ status: 'pending', requested_at: '2026-11-11T10:00:00Z' }]], tgMine: [200, { linked: false, claim: null }],
+      tgToken: [200, { token: TG_TOKEN, expires_at: '2026-11-11T10:15:00Z' }] } });
+  s.start(); await settle(s);
+  assert.match(s.app.innerHTML, /<button type="button" class="secondary" data-act="tglink">Link Telegram<\/button>/);
+  press(s, 'tglink');
+  for (let i = 0; i < 200 && !/Open Telegram/.test(s.app.innerHTML); i++) await new Promise(r => setTimeout(r, 5));
+  assert.ok(s.app.innerHTML.includes('href="https://t.me/MD_support_line_bot?start=' + TG_TOKEN + '" target="_blank" rel="noopener noreferrer"'));
+  assert.match(s.app.innerHTML, /Link valid until/);
+  assert.match(s.app.innerHTML, /Works once, for 15 minutes/);
+});
+
+test('telegram: linked shows the username and no button; no bot in the config says so; a database without db/032 says so', async () => {
+  let s = load(ORIGIN + '/signin', { config: { telegramBot: 'MD_support_line_bot' }, stored: { [AUTH_KEY]: SESSION() },
+    answers: { mine: [200, [{ status: 'pending' }]], tgMine: [200, { linked: true, tg_username: 'ada_lovelace' }] } });
+  s.start(); await settle(s);
+  assert.match(s.app.innerHTML, /Linked as @ada_lovelace/);
+  assert.ok(!/data-act="tglink"/.test(s.app.innerHTML));
+  s = load(ORIGIN + '/signin', { stored: { [AUTH_KEY]: SESSION() }, answers: { mine: [200, [{ status: 'pending' }]] } });
+  s.start(); await settle(s);
+  assert.match(s.app.innerHTML, /Telegram linking is not set up on this site yet/);
+  s = load(ORIGIN + '/signin', { config: { telegramBot: 'MD_support_line_bot' }, stored: { [AUTH_KEY]: SESSION() },
+    answers: { mine: [200, [{ status: 'pending' }]], tgMine: [404, { code: 'PGRST202' }], tgToken: [404, { code: 'PGRST202', message: 'no function' }] } });
+  s.start(); await settle(s);
+  assert.equal(s.app.dataset.state, 'sent');
+  press(s, 'tglink');
+  for (let i = 0; i < 200 && !/role="alert"/.test(s.app.innerHTML); i++) await new Promise(r => setTimeout(r, 5));
+  assert.match(s.app.innerHTML, /not set up on the database yet/);
 });

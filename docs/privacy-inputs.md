@@ -17,6 +17,7 @@ Facts for whoever writes the privacy policy, the cookie list, the terms and the 
 | Phone app `/app/` | app | the same as the board; changes made offline wait on the device until they are sent | Supabase only |
 | Eisenhower Harness `/harness/` (`harness/*`, `db/031`) | app | nothing new from the reader: it uses the board's session. A reader's button press keeps who pressed, when, the session, the action, an optional note (up to 1000 characters) or a limits change, and the PC's answer, for 30 days. The PCs that publish upload their agent runs (session tree, goals, states, costs, reports, decisions, the last 400 steps of each session, redacted: secrets and ID-like strings withheld, paths outside the repo cut to a file name), kept 30 days | Supabase only |
 | Cloudflare Access login (before `/board/` and `/app/`) | app | the email Google returns to Access | Cloudflare (Access), Google |
+| Telegram link (`/signin`, board account menu, `db/032`) | app | optional: the Telegram username or id a person types (a claim, shown on their access-request task); after **Link Telegram** and Start in the bot, the numeric Telegram id and username, linked to the account; single-use link tokens as a hash, 15 minutes | Supabase only; the household Telegram bot reads the link through `telegram_member` (no email) |
 | Access decision email | (outside this repository) | the requester's email address, to send one email with the decision | the mail sender the host runs |
 
 ## Storage on the device
@@ -34,6 +35,7 @@ Facts for whoever writes the privacy policy, the cookie list, the terms and the 
 | IndexedDB `td-app` | IndexedDB | phone app | the offline copy and the queue of changes not yet sent | until sent or signed out |
 | cache `td-app-<release sha>` | Cache Storage (service worker) | phone app | the app's own files for offline start; never Supabase answers | replaced on the next release |
 | `td.request.pkce`, `td.request.auth` | `sessionStorage` | sign-in | the PKCE verifier; the sign-in page's own session | this tab only |
+| `td.signin.telegram` | `sessionStorage` | sign-in | the Telegram typed before Google sign-in (`db/032`) | until the request is sent, this tab only |
 | `td.signin.next` | `sessionStorage` | sign-in | `/board/` or `/app/`, where a let-in login goes next | removed when it goes |
 | `ec.demo.v5` | `localStorage` | landing page demo | the demo's cards | until the browser's site data is cleared |
 | `ec.interest.v1` | `localStorage` | landing page plan buttons | the plans already filed from this browser, and that the demo's dialog was shown; never a contact | until the browser's site data is cleared |

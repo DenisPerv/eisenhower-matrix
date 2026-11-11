@@ -380,6 +380,12 @@ dialog[open]{animation:pop .28s cubic-bezier(.2,.8,.2,1)}
 dialog::backdrop{background:rgba(24,20,70,.28);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 :root[data-theme="dark"] dialog::backdrop{background:rgba(2,2,12,.55)}
 dialog form > strong:first-child{display:block;font:600 26px/1.1 var(--serif);margin-bottom:var(--s3)}
+/* Link Telegram (db/032): the one-time deep link as the one accent action of the dialog */
+.tg-dlg p{margin:0 0 var(--s3)}.tg-dlg .n{color:var(--ink3);font-size:13px}
+.tg-out:empty{display:none}.tg-out{margin:var(--s3) 0}
+.tg-open{display:inline-flex;align-items:center;min-height:40px;padding:0 18px;margin-bottom:var(--s2);border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:var(--on-accent);font:600 14px var(--ui);text-decoration:none;box-shadow:0 6px 18px -6px var(--glow)}
+.tg-open:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tg-err{color:var(--danger-ink,#C62A31);font-weight:600}
 dialog label,.welcome label{display:block;margin-top:var(--s4);color:var(--ink2);font:600 12px var(--ui);letter-spacing:.01em}
 dialog label > select,dialog label > input,.welcome label > input{margin-top:var(--s2)}
 dialog input,dialog select,.welcome input{width:100%;min-height:38px;padding:0 12px;border:1px solid var(--hair2);border-radius:12px;background-color:var(--glass2);font:400 14px var(--font);color:var(--ink)}
@@ -1599,7 +1605,8 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
   const strs = a => Array.isArray(a) && a.every(x => typeof x === 'string');
 
-  // config/tasksdashboard.config.js: window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }. Public values only.
+  // config/tasksdashboard.config.js: window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs, telegramBot }. Public values only.
+  // telegramBot is optional: a valid bot username is kept as config.telegramBot, anything else is left out (no error).
   function readAppConfig(raw) {
     const name = 'config/tasksdashboard.config.js';
     if (!isObj(raw)) return { config: null, errors: [name + ' is missing or does not set window.TD_CONFIG'] };
@@ -1611,8 +1618,26 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     else if (/^sb_secret_/.test(key) || /service_role/.test(jwtPayloadText(key))) errors.push('publishableKey: this is a secret key; use the publishable one and rotate the secret');
     const pollMs = raw.pollMs === undefined ? 30000 : raw.pollMs;
     if (typeof pollMs !== 'number' || !(pollMs >= 5000 && pollMs <= 600000)) errors.push('pollMs: milliseconds between 5000 and 600000');
-    return errors.length ? { config: null, errors } : { config: { supabaseUrl: url, publishableKey: key, pollMs }, errors: [] };
+    if (errors.length) return { config: null, errors };
+    const config = { supabaseUrl: url, publishableKey: key, pollMs };
+    const bot = typeof raw.telegramBot === 'string' ? raw.telegramBot.trim().replace(/^@/, '') : '';
+    if (TG_BOT_RE.test(bot)) config.telegramBot = bot;
+    return { config, errors: [] };
   }
+
+  // Telegram link (db/032). telegramClaim: the rules of set_telegram_claim (a username of 5-32 letters, digits or _, with or
+  // without @ or a t.me/ link, stored as '@name'; or a numeric id of 5-15 digits; empty = no claim). telegramDeepLink: the
+  // one-time link the bot redeems, or '' without a valid bot and a 40-hex token. signin.html has a copy of both.
+  const TG_BOT_RE = /^[A-Za-z][A-Za-z0-9_]{4,31}$/;
+  function telegramClaim(v) {
+    let s = String(v == null ? '' : v).trim();
+    if (!s) return { ok: true, value: null };
+    s = s.replace(/^(https?:\/\/)?(t\.me\/|telegram\.me\/)/i, '');
+    if (/^[0-9]{5,15}$/.test(s)) return { ok: true, value: s };
+    if (/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(s)) return { ok: true, value: '@' + s.replace(/^@/, '') };
+    return { ok: false, value: null, message: 'Telegram: a username of 5 to 32 letters, digits or _, or your numeric id.' };
+  }
+  const telegramDeepLink = (bot, token) => (TG_BOT_RE.test(String(bot || '')) && /^[0-9a-f]{40}$/.test(String(token || '')) ? 'https://t.me/' + bot + '?start=' + token : '');
   function jwtPayloadText(k) {
     const p = String(k).split('.');
     if (p.length !== 3) return '';
@@ -3310,7 +3335,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     return { rows, edges };
   }
 
-  return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
+  return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
@@ -4544,6 +4569,7 @@ function render() {
     profile: () => '<div class="who-am" role="none"><strong>' + esc(me.display_name) + '</strong>' + (session.user.email ? '<span>' + esc(session.user.email) + '</span>' : '') + '</div>' +
       (human ? '<button data-menu="tags">Tags</button><button data-menu="sharing">Sharing' + (INVITES.length ? ' <span class="badge" aria-label="' + INVITES.length + (INVITES.length === 1 ? ' invitation' : ' invitations') + '">' + INVITES.length + '</span>' : '') + '</button>' : '') +
       (human ? '<button data-menu="general">General settings</button>' : '') + '<button data-menu="urgency">Urgency settings</button>' +
+      (human ? '<button data-menu="telegram">Link Telegram</button>' : '') +
       '<hr><button data-menu="timeline">Timeline</button><button data-menu="cardlayout">Card layout</button><button data-menu="lists">Lists</button>' +
       '<hr>' + (C.versionSwitchUrl(location.origin, 'app') ? '<button data-switch="app">Switch to mobile version</button>' : '') + '<button data-signout>Sign out</button>',
     more: () => P.more.map(l => '<button data-list="' + esc(l) + '">' + esc(label(l)) + ' ' + count(l) + '</button>').join(''),
@@ -6872,6 +6898,43 @@ function openShare(kind, id, opener) {
   }
 }
 
+// Account menu, Link Telegram (db/032): the household Telegram bot knows who writes to it only through this link. State from
+// rpc/my_telegram_link; "Get a link" asks rpc/telegram_link_token for a one-time token (15 minutes) and shows the deep link
+// t.me/<TD_CONFIG.telegramBot>?start=<token>; the bot redeems it. Unlink takes the bot out of "My tasks" too.
+async function openTelegram() {
+  const bot = (cfgRead.config && cfgRead.config.telegramBot) || '';
+  const r = await rpc('my_telegram_link');
+  const missing = !r.ok && (r.status === 404 || (r.err && /PGRST202|could not find the function/i.test(String(r.err.code || '') + ' ' + String(r.err.message || ''))));
+  const d = r.ok && r.json && typeof r.json === "object" ? (Array.isArray(r.json) ? r.json[0] : r.json) : null;
+  const linked = !!(d && d.linked);
+  const body = missing ? '<p>Telegram linking is not set up on the database yet (db/032).</p>'
+    : !r.ok ? '<p>' + esc(r.err ? r.err.message : 'The link state did not load.') + '</p>'
+    : !bot ? '<p>Telegram linking is not set up on this site yet (no bot in the config).</p>'
+    : linked ? '<p>Linked' + (d.tg_username ? ' as <strong>@' + esc(d.tg_username) + '</strong>' : '') + (d.linked_at ? ', since ' + esc(longDay(Date.parse(d.linked_at))) : '') + '. The household bot knows your messages are yours and can add tasks to My tasks.</p>'
+    : '<p>The household Telegram bot answers only people it knows. Get a one-time link, open it in Telegram and press Start: the bot then knows this Telegram account is yours.</p>' + (d && d.claim ? '<p class="n">You said your Telegram is ' + esc(d.claim) + '. It counts once you open the link from that account.</p>' : '');
+  const acts = missing || !r.ok || !bot ? '' : (linked ? '<button type="button" class="quiet danger" data-tg-unlink>Unlink</button><button type="button" data-tg-get>Link another account</button>' : '<button type="button" data-tg-get>Get a link</button>');
+  const dlg = dialogShell('<form method="dialog" class="tg-dlg"><strong>Link Telegram</strong>' + body + '<div class="tg-out" aria-live="polite"></div>' +
+    '<div class="actions">' + acts + '<button value="close" autofocus>Close</button></div></form>', '#profile');
+  const out = dlg.querySelector('.tg-out');
+  const get = dlg.querySelector('[data-tg-get]');
+  if (get) get.onclick = async () => {
+    get.disabled = true;
+    const t = await rpc('telegram_link_token');
+    const td = t.ok && t.json ? (Array.isArray(t.json) ? t.json[0] : t.json) : null;
+    const link = td ? C.telegramDeepLink(bot, td.token) : '';
+    if (!link) { get.disabled = false; out.innerHTML = '<p class="tg-err" role="alert">' + esc(t.ok ? 'The link did not work. Try again.' : t.err.message) + '</p>'; return; }
+    out.innerHTML = '<a class="tg-open" href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">Open Telegram</a>' +
+      '<p class="n">Works once, until ' + esc(new Date(td.expires_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) + '. Press Start in the bot.</p>';
+    get.textContent = 'Get a new link'; get.disabled = false;
+  };
+  const un = dlg.querySelector('[data-tg-unlink]');
+  if (un) un.onclick = async () => {
+    const x = await rpc('telegram_unlink');
+    if (!x.ok) return toast(x.err.message);
+    dlg.close(); toast('Telegram unlinked');
+  };
+}
+
 // Account menu, Sharing: invitations to me (Accept, Decline, Decline and block), my lists (Share), lists shared with me (Hide, Leave)
 function openSharing() {
   const mine = Object.values(LIST).concat(HIDDEN_LISTS).filter(l => ROLE[l.id] === 'owner').sort((a, b) => a.name.localeCompare(b.name));
@@ -7282,7 +7345,7 @@ function bind() {
     pq.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); const f = st.pop; st.pop = null; render(); document.getElementById(f)?.focus(); } };
   }
   const lc = document.getElementById('lowc'); if (lc) lc.onclick = e => { e.stopPropagation(); st.lowc = !st.lowc; st.keep.clear(); render(); document.getElementById('lowc')?.focus(); };
-  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ timeline: () => { st.view = 'timeline'; st.expanded = null; render(); }, general: () => openSettings('general'), urgency: () => openSettings('urgency'), cardlayout: openCardLayout, lists: () => openLists(), tags: openTags, sharing: openSharing })[b.dataset.menu](); });
+  app.querySelectorAll('[data-menu]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); ({ timeline: () => { st.view = 'timeline'; st.expanded = null; render(); }, general: () => openSettings('general'), urgency: () => openSettings('urgency'), cardlayout: openCardLayout, lists: () => openLists(), tags: openTags, sharing: openSharing, telegram: openTelegram })[b.dataset.menu](); });
   // the list chip menu: Share or People, Hide for me, Leave
   app.querySelectorAll('#pop [data-share-list], #pop [data-people-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); openShare('list', b.dataset.shareList || b.dataset.peopleList, '#listmenu'); });
   app.querySelectorAll('#pop [data-hide-list]').forEach(b => b.onclick = e => { e.stopPropagation(); st.pop = null; render(); hideList(b.dataset.hideList, true); });

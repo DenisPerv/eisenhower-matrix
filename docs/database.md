@@ -18,7 +18,8 @@ Run the files in the SQL editor (or with an admin tool), each file whole, in thi
 | 7a | `021_drop_priority.sql` | drops `items.priority`, only once every client runs a page without priority (the hosted copy, both household machines, the Telegram bot); then 7 and 8 again |
 | 7b | `029_delete_lists.sql` | `delete_archived_list(p_list)` (owner, archived, not a system or category default list; deletes the list with its tasks), `members_keep_owner` honouring `td.deleting_list`, `last_backup_at()`, `ops.record_backup()` (the one write the backup role makes); re-run it after `010`; then 7 and 8 again |
 | 7c | `031_harness_web.sql` | the Eisenhower Harness page on the web: `harness_devices`, `harness_heads`, `harness_parts`, `harness_commands` and their RPCs (README "Harness page on the web"); re-run it after `003`, which revokes its table grants; rollback `031_down_harness_web.sql` |
-| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` (`913_selftest_delete_lists.sql` for 029, `914_selftest_harness_web.sql` for 031) | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
+| 7d | `032_telegram_link.sql` | the Telegram link for the household Telegram server (links, claims, single-use tokens in `ops`; `telegram_member` for the telegram login), the private bucket `workorder-material`, the list HomeOS - Global (README "Telegram link"); then 7 again. Not applied live until the person's local test |
+| 8 | `900_selftest.sql` … `908_selftest_agent_tag_home.sql` (`913_selftest_delete_lists.sql` for 029, `914_selftest_harness_web.sql` for 031, `915_selftest_telegram_link.sql` for 032) | each rolls back and ends with an error whose text reads `SELFTEST n of n passed (rolled back). Failures: none`; 901 reads 71 of 73 since 012 (G34a, G35a describe a rule 012 replaced) |
 
 Every file is re-runnable. The trigger function `items_before_write` is replaced by `002`, then `006`, then `010`: re-running `002` means re-running `006` and `010`. `010` also replaces `items_tags_compat_after`, which `023` replaces again: re-running `010` means re-running `023` after it.
 
@@ -60,6 +61,8 @@ Callable by `authenticated` (every one is `security definer` with `search_path =
 | task links | `link_items(p_from, p_to, p_kind)`, `unlink_items(p_from, p_to, p_kind)`; the trigger `item_links_guard` and its helper `link_would_loop` (no execute for anyone) | 018 |
 | reports | `kpi_events(p_lists)` (invoker), `review_report(p_weeks, p_lists, p_now)` (invoker), its pure helper `review_quadrant` | 013/016/020 |
 | access requests | `request_access`, `my_access_request`, `access_requests`, `access_request_decided` | 015 |
+| Telegram link, people | `set_telegram_claim`, `telegram_link_token`, `my_telegram_link`, `telegram_unlink` | 032 |
+| Telegram link, the telegram login only | `telegram_redeem_link(p_token, p_tg_id, p_username)`, `telegram_member(p_tg_id)` (42501 for anyone else); storage policy helpers `is_telegram_login`, `is_homeos_agent` | 032 |
 | keep-alive | `keepalive`, `keepalive_status` | 002/010 |
 | helpers not callable through the API | `is_whitelisted(uuid)`, `shareable_email(uuid)` (022: the whitelist and a person's verified address, resolved on the server), `agent_tag_home_check`, `tag_lists_home_guard`, `tag_members_keep_home` (023) | 022/023 |
 | helpers used by policies | `has_list_role`, `has_item_role`, `has_tag_list_role`, `has_tag_role`, `can_edit_item`, `can_use_category`, `is_household`, `is_human`, `is_agent`, `my_kind`, `my_verified_emails` | 002/010 |
