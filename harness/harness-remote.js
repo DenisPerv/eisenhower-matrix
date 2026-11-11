@@ -290,5 +290,6 @@
   // what the buttons depend on besides the session (the PC's beat, its controls switch): harness.js renders the open panel again when it changes
   function stamp() { var d = devices[device]; return d ? [!d.beat_at || Date.now() - Date.parse(d.beat_at) > SILENT_MS || d.state !== 'running', !!d.controls, me].join('|') : ''; }
 
-  W.HarnessTransport = { getJson: getJson, postJson: postJson, events: events, can: can, stamp: stamp };
+  // rpc and ready: for bridge.js only (the local harness page writes Autonomy and budgets with this origin's sign-in through it)
+  W.HarnessTransport = { getJson: getJson, postJson: postJson, events: events, can: can, stamp: stamp, rpc: rpc, ready: ready, whoami: function () { return me; } };
 })();

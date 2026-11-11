@@ -105,7 +105,7 @@ function applyEvent(e,live){
   var s=e.s?byName[e.s]:null;
   switch(e.type){
     case 'routine.fire':M.routine=true;break;
-    case 'session.start':sm(e.s).born=true;sm(e.s).bornT=e.t;break;
+    case 'session.start':sm(e.s).born=true;sm(e.s).bornT=e.t;/* a child never shows without its mother: a run's records may start a mother after her first child (2026-11-10), so the mother's system and axis come with the child */for(var up=s&&s.parent,hop=0;up&&byName[up]&&hop<8;up=byName[up].parent,hop++){var pq=sm(up);if(!pq.born){pq.born=true;pq.bornT=e.t}}break;
     case 'session.work':var w=sm(e.s);if(!w.working){w.working=true;w.from=e.t}break;
     case 'session.idle':var i=sm(e.s);if(i.working){i.working=false;i.work+=e.t-i.from}break;
     case 'session.end':var d=sm(e.s);d.ended=true;break;
@@ -1253,7 +1253,10 @@ $('play').onclick=function(){state.playing?stopPlay():startPlay()};
 $('next').onclick=function(){state.stepping=true;step(1);state.stepping=false};$('prev').onclick=function(){state.stepping=true;step(-1);state.stepping=false};
 $('speed').onclick=function(){var SPD=[1,2,4,8,16,32];state.speed=SPD[(SPD.indexOf(state.speed)+1)%SPD.length];$('speed').textContent=state.speed+'x'};
 $('scrub').oninput=function(e){var v=+e.target.value;if(state.playing)stopPlay();state.climb=null;clearClimb();var end=tEnd();setT(T0+(end-T0)*v/1000,false)};
-$('replay').onclick=function(){stopPlay();state.reportSeen=false;setT(T0,false);startPlay()};
+/* Replay: everything of the shown moment goes at once (fades, glides and CSS transitions snap), and play starts only after that frame,
+   so the master's appearance is never drawn over what was there before (Maksym 2026-11-11) */
+$('replay').onclick=function(){stopPlay();state.reportSeen=false;state.climb=null;clearClimb();VA={};STAGE.classList.add('snap');document.documentElement.classList.add('snap');setT(T0,false);syncScene();void STAGE.offsetWidth;
+  requestAnimationFrame(function(){requestAnimationFrame(function(){STAGE.classList.remove('snap');document.documentElement.classList.remove('snap');startPlay()})})};
 $('skip').onclick=function(e){e.preventDefault();var r=document.querySelector(VIEW==='classic'?'.wfr':'#tree .row');if(r)r.focus()};
 function fromHash(){var m=location.hash.match(/[#&]s=([^&]+)/);return m&&byName[decodeURIComponent(m[1])]?decodeURIComponent(m[1]):null}
 window.addEventListener('hashchange',function(){var rm=location.hash.match(/run=([0-9a-z_-]+)/i);if(rm&&rm[1]!==D.ts){location.reload();return}var n=fromHash();if(n&&n!==state.sel)select(n)});

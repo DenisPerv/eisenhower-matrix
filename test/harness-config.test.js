@@ -28,13 +28,18 @@ test('autonomy: a list is never inherit, a task inherits its parent chain first,
   assert.equal(C.autonomyOf(b, { list, byId: { a: { id: 'a', autonomy: 'inherit' }, b }, parentOf: { b: 'a', a: 'b' } }).from, 'list');
 });
 
-test('autonomy: guests pick Manual and Guided only; warnings for wider than the list or the parent', () => {
+test('autonomy: three modes to pick (Project rules, Mixed, AI Brain), guests Mixed only; Manual shown off when current; warnings', () => {
   const g = C.autonomyChoices(false, true);
-  assert.deepEqual(g.map(x => x.mode), ['inherit', 'manual', 'project_rules', 'guided', 'ai_brain']);
+  assert.deepEqual(g.map(x => x.mode), ['inherit', 'project_rules', 'guided', 'ai_brain']);
   assert.deepEqual(g.filter(x => x.off).map(x => x.mode), ['project_rules', 'ai_brain']);
+  assert.equal(C.AUTONOMY_NAME.guided, 'Mixed');
+  const old = C.autonomyChoices(true, false, 'manual');
+  assert.deepEqual(old.map(x => x.mode), ['project_rules', 'guided', 'ai_brain', 'manual']);
+  assert.deepEqual(old.filter(x => x.off).map(x => [x.mode, !!x.legacy]), [['manual', true]]);
+  assert.equal(C.autonomyChoices(true, false, 'guided').length, 3);
   assert.equal(g.find(x => x.mode === 'ai_brain').why, C.AUTONOMY_HOUSEHOLD);
   assert.equal(C.autonomyChoices(true, false).some(x => x.off || x.mode === 'inherit'), false);
-  assert.match(C.autonomyWarning('ai_brain', { mode: 'guided', from: 'list' }, 'guided'), /This list is Guided/);
+  assert.match(C.autonomyWarning('ai_brain', { mode: 'guided', from: 'list' }, 'guided'), /This list is Mixed/);
   assert.match(C.autonomyWarning('guided', { mode: 'manual', from: 'parent' }, 'ai_brain'), /parent is Manual/);
   assert.equal(C.autonomyWarning('manual', { mode: 'guided', from: 'list' }, 'guided'), '');
   assert.equal(C.autonomyWarning('inherit', null, 'manual'), '');

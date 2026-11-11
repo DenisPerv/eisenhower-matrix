@@ -831,7 +831,7 @@ h2[tabindex="-1"]:focus{outline:none}
 .nlmore{margin:12px 0;border:1px solid var(--hair);border-radius:var(--r);padding:0 12px}
 .nlmore summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font:500 15px var(--ui)}
 .nlmore[open]{padding-bottom:12px}
-.amtrack{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:12px 0}
+.amtrack{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin:12px 0}
 .amtrack span{height:4px;background:var(--hair2)}.amtrack span.on{background:var(--accent)}
 fieldset.amodes{border:0;padding:0;margin:0 0 8px;display:grid;gap:6px}
 label.amode{display:grid;grid-template-columns:18px 1fr;column-gap:10px;padding:10px 12px;border:1px solid var(--hair2);border-radius:var(--r);font:400 14px/1.45 var(--ui);color:var(--ink)}
@@ -1791,7 +1791,7 @@ async function createList(v) {
   const bad = more ? (await D.saveListSettings(r.list.id, more)).errs : [];
   setList(r.list.id); closeDlg('dlg-lists'); animateCards = true; renderAll(); toast(bad.length ? `Created ${r.list.name}; not saved: ${bad.join(' ')}` : `Created ${r.list.name}.`);
 }
-/* harness configurations T23 (web: newListMoreHtml, newListMoreSave): New list asks, optionally, Autonomy (default Guided), intake defaults
+/* harness configurations T23 (web: newListMoreHtml, newListMoreSave): New list asks, optionally, Autonomy (default Mixed), intake defaults
    and the list brief; saved after the list exists through TDData.saveListSettings (household people only) */
 function nlMoreHtml() {
   return `<details class="nlmore" id="nl-more"><summary>Autonomy and list brief (optional)</summary>
@@ -1829,13 +1829,13 @@ async function openListSettings(id) {
   if (!r.ok) { $('#lset-body').innerHTML = `<p class="note" role="alert">${esc(r.err.message)}</p>`; return; }
   const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, deploy: row.deploy_target || '', tg: !!row.notify_telegram, stage: row.stage_report !== false, cap: r.cap === null ? '' : String(r.cap), brief: C.briefOf(row) };
   LSET = { id, hh, base, expected: base.mode, decs: C.briefLines(base.brief.decisions) };
-  const modes = C.autonomyChoices(hh, false).map(c => `<label class="amode"><input type="radio" name="lset-am" value="${c.mode}"${c.mode === base.mode ? ' checked' : ''}${c.off ? ` disabled aria-describedby="lset-why-${c.mode}"` : ''}><span class="nm">${C.AUTONOMY_NAME[c.mode]}${c.mode === 'guided' ? ' <small>Default</small>' : ''}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].does)}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].you)}</span>${c.off ? `<span class="why" id="lset-why-${c.mode}">${esc(c.why)}</span>` : ''}</label>`).join('');
+  const modes = C.autonomyChoices(hh, false, base.mode).map(c => `<label class="amode"><input type="radio" name="lset-am" value="${c.mode}"${c.mode === base.mode ? ' checked' : ''}${c.off ? ` disabled aria-describedby="lset-why-${c.mode}"` : ''}><span class="nm">${C.AUTONOMY_NAME[c.mode]}${c.mode === 'guided' ? ' <small>Default</small>' : ''}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].does)}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].you)}</span>${c.off ? `<span class="why" id="lset-why-${c.mode}">${esc(c.why)}</span>` : ''}</label>`).join('');
   const dis = hh ? '' : ' disabled';
   $('#lset-body').innerHTML = `<h3 class="lset-h3">Autonomy</h3><p class="hint">How much agents decide on their own in this list. Each task can narrow or widen it.</p>
-    <div class="amtrack" aria-hidden="true">${C.AUTONOMY_MODES.map(m => `<span data-tr="${m}"></span>`).join('')}</div>
+    <div class="amtrack" aria-hidden="true">${C.AUTONOMY_PICK.map(m => `<span data-tr="${m}"></span>`).join('')}</div>
     <fieldset class="amodes"><legend class="vh">Autonomy mode</legend>${modes}</fieldset>
     <p class="note info" id="lset-brain" hidden>E0 still always comes to you: paid services, public publishing, protected harness files and the plan-gate pass-up are never decided by an agent.</p>
-    <p class="hint">${row.autonomy_set_at ? `Set by ${esc(personName(row.autonomy_set_by))} · ${ymd(new Date(row.autonomy_set_at))}` : 'Not set yet: Guided is the default.'}</p>
+    <p class="hint">${row.autonomy_set_at ? `Set by ${esc(personName(row.autonomy_set_by))} · ${ymd(new Date(row.autonomy_set_at))}` : 'Not set yet: Mixed is the default.'}</p>
     <h3 class="lset-h3">Intake defaults</h3><p class="hint">Asked once for the list, not for every task.</p>${hh ? '' : `<p class="note info">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
     <label class="cbline"><input type="checkbox" id="lset-e2e"${base.e2e ? ' checked' : ''}${dis}> Agent runs end-to-end tests</label>
     <label class="field"><span>Deploy target</span><select class="inp" id="lset-deploy"${dis}><option value="">No deploy</option>${r.targets.map(x => `<option value="${esc(x.key)}"${x.key === base.deploy ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
@@ -1891,7 +1891,7 @@ function autoRowHtml(t) {
   const r = role(t.list);
   if (!me() || me().kind !== 'human' || (r !== 'owner' && r !== 'editor') || isClosed(t)) return '';
   const cur = C.itemModeOf(t);
-  return `<div class="field fauto" role="group" aria-labelledby="t-au-l"><label class="flabel" id="t-au-l" for="t-au">Autonomy</label><select class="inp" id="t-au" aria-describedby="t-au-cap">${C.autonomyChoices(!!me().is_household, true).map(c => `<option value="${c.mode}"${c.mode === cur ? ' selected' : ''}${c.off ? ' disabled' : ''}>${C.AUTONOMY_NAME[c.mode]}${c.off ? ' (household only)' : ''}</option>`).join('')}</select><p class="hint" id="t-au-cap" aria-live="polite"></p><button type="button" class="linkbtn" data-act="t-au-reset" hidden>Reset to inherit</button><p class="note info" id="t-au-w" hidden></p></div>`;
+  return `<div class="field fauto" role="group" aria-labelledby="t-au-l"><label class="flabel" id="t-au-l" for="t-au">Autonomy</label><select class="inp" id="t-au" aria-describedby="t-au-cap">${C.autonomyChoices(!!me().is_household, true, cur).map(c => `<option value="${c.mode}"${c.mode === cur ? ' selected' : ''}${c.off ? ' disabled' : ''}>${C.AUTONOMY_NAME[c.mode]}${c.off && !c.legacy ? ' (household only)' : ''}</option>`).join('')}</select><p class="hint" id="t-au-cap" aria-live="polite"></p><button type="button" class="linkbtn" data-act="t-au-reset" hidden>Reset to inherit</button><p class="note info" id="t-au-w" hidden></p></div>`;
 }
 function autoCtx(t) { const by = {}; D.tasks.forEach(x => { by[x.id] = x; }); return { byId: by, parentOf: C.linkIndex(new Map(D.links), by).parentOf, list: L(t.list) }; }
 function drawAutoRow() {

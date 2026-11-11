@@ -225,7 +225,9 @@
   // a list's mode is never inherit (default guided); a task's is inherit unless a person set it (set_autonomy). A task that inherits
   // takes its parent's chain first, then its list's. The list is the ceiling: wider on a task only counts when the household owner set it
   const AUTONOMY_MODES = ['manual', 'project_rules', 'guided', 'ai_brain'];
-  const AUTONOMY_NAME = { inherit: 'Inherit', manual: 'Manual', project_rules: 'Project rules', guided: 'Guided', ai_brain: 'AI Brain' };
+  const AUTONOMY_NAME = { inherit: 'Inherit', manual: 'Manual (old)', project_rules: 'Project rules', guided: 'Mixed', ai_brain: 'AI Brain' };
+  // the modes a person picks (Maksym 2026-11-11): Project rules, Mixed ('guided' in the DB) and AI Brain. Manual stays readable for old rows
+  const AUTONOMY_PICK = ['project_rules', 'guided', 'ai_brain'];
   const AUTONOMY_RANK = { manual: 0, project_rules: 1, guided: 2, ai_brain: 3 };
   const AUTONOMY_INFO = {
     manual: { does: 'Agents ask before every step.', you: 'You answer each question on the board.' },
@@ -269,9 +271,11 @@
     const own = itemModeOf(t);
     return own !== 'inherit' ? { mode: own, from: 'here', parent: null } : autonomyInherited(t, ctx);
   }
-  // the modes a person may pick (set_autonomy): guests only Manual and Guided (and Inherit on a task)
-  const autonomyChoices = (household, onTask) => (onTask ? ['inherit'] : []).concat(AUTONOMY_MODES).map(m => {
-    const off = !household && !['inherit', 'manual', 'guided'].includes(m);
+  // the modes a person may pick (set_autonomy): Project rules, Mixed, AI Brain; guests only Mixed (and Inherit on a task). A current mode that is
+  // no longer offered (Manual) is listed off, so the window still shows it
+  const autonomyChoices = (household, onTask, current) => (onTask ? ['inherit'] : []).concat(AUTONOMY_PICK, current && !AUTONOMY_PICK.includes(current) && current !== 'inherit' && AUTONOMY_NAME[current] ? [current] : []).map(m => {
+    if (!AUTONOMY_PICK.includes(m) && m !== 'inherit') return { mode: m, off: true, legacy: true, why: 'No longer offered: pick another mode.' };
+    const off = !household && !['inherit', 'guided'].includes(m);
     return { mode: m, off, why: off ? AUTONOMY_HOUSEHOLD : '' };
   });
   // the warning under a task's choice: wider than its list (the ceiling) or than the parent it would inherit from; '' when none
@@ -1743,7 +1747,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,

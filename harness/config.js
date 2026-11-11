@@ -1,7 +1,9 @@
 /* Eisenhower harness viewer: the Configurations page (harness-configurations-plan.md T11, UI spec references/homeos/harness-configurations/ui/
-   configurations-page-spec.md, winner p1 with the p2 changes). Tabs Workload, Autonomy, Budgets, Notifications, Machine, Model routing (TBD).
-   Reads GET /api/config. Writes only this device's limits file through the page's own POST /api/limits (Workload, Machine). Autonomy, intake
-   and budgets are read-only here: people change them on the board with their own sign-in (set_autonomy, set_intake, set_budget).
+   configurations-page-spec.md, winner p1 with the p2 changes). Tabs Workload, Autonomy, Budgets, Model routing (TBD);
+   Notifications and Machine removed and the mothers cap moved to Workload (Maksym, 2026-11-11).
+   Reads GET /api/config. Writes this device's limits file through the page's own POST /api/limits (Workload: mothers, lists, Reset all), and
+   Autonomy and budgets with the person's own board sign-in: set_autonomy and set_budget through the board bridge (a hidden frame of
+   http://localhost:8788/harness/bridge.html), or straight through HarnessTransport.rpc on the web copy. homeos-agent never writes them.
    Uses what harness.js hands over (its UI object): el, $, panelHead, panelBody, openPanel, getJson, postJson, renderLimits, restoreSize, markSel, setLit, state, PO, canDo. */
 (function () {
   'use strict';
@@ -10,13 +12,13 @@
   var BOARD = 'http://localhost:8788/';
   var DAY = 864e5;
   var MODES = {
-    manual: { n: 'Manual', does: 'Agent does: nothing.', you: 'Comes to you: everything.' },
-    project_rules: { n: 'Project rules', does: "Agent does: what the project's rules allow; with no rules, as Guided.", you: 'Comes to you: anything the rules do not cover.' },
-    guided: { n: 'Guided', does: "Agent does: plans and work; the list's mother approves plans.", you: 'Comes to you: every question and every result check.' },
+    manual: { n: 'Manual (old)', does: 'Agent does: nothing.', you: 'Comes to you: everything. No longer offered: pick another mode.' },
+    project_rules: { n: 'Project rules', does: "Agent does: what the project's rules allow; with no rules, as Mixed.", you: 'Comes to you: anything the rules do not cover.' },
+    guided: { n: 'Mixed', does: "Agent does: plans and work; the list's mother approves plans.", you: 'Comes to you: every question and every result check.' },
     ai_brain: { n: 'AI Brain', does: 'Agent does: plans, side questions and checks, with your past answers.', you: 'Comes to you: security, data structure and E0.' }
   };
-  var ORDER = ['manual', 'project_rules', 'guided', 'ai_brain'];
-  var TABS = [['workload', 'Workload'], ['autonomy', 'Autonomy'], ['budgets', 'Budgets'], ['notify', 'Notifications'], ['machine', 'Machine'], ['routing', 'Model routing']];
+  var ORDER = ['project_rules', 'guided', 'ai_brain'];   // the modes a person picks (Maksym 2026-11-11: Project rules, Mixed, AI Brain); 'guided' is Mixed in the DB
+  var TABS = [['workload', 'Workload'], ['autonomy', 'Autonomy'], ['budgets', 'Budgets'], ['routing', 'Model routing']];
   var S = { tab: 'workload', filter: 'all', series: 'overall', range: 'month', data: null, error: null, cursor: null };
 
   function sv(tag, attrs, txt) { var e = document.createElementNS(SVGNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (txt != null) e.textContent = txt; return e; }
@@ -42,10 +44,8 @@
   function status(id) {
     var d = S.data; if (!d) return '';
     if (id === 'workload') { var live = 0, max = 0; limRows().forEach(function (r) { live += r.live || 0; if (r.enabled !== false) max += r.max_sessions || 0; }); return live + ' of ' + max + ' sessions live'; }
-    if (id === 'autonomy') { var b = lists().filter(function (l) { return l.effective === 'ai_brain'; }).length; return lists().length ? (b ? b + ' on AI Brain' : 'all Guided or narrower') : 'board not read'; }
+    if (id === 'autonomy') { var b = lists().filter(function (l) { return l.effective === 'ai_brain'; }).length; return lists().length ? (b ? b + ' on AI Brain' : 'all Mixed or narrower') : 'board not read'; }
     if (id === 'budgets') { var rows = (d.board && d.board.budgets && d.board.budgets.rows) || []; if (!rows.length) return 'no budget set'; var at = rows.filter(function (r) { return r.reached; }).length; return at ? at + ' at cap' : 'below caps'; }
-    if (id === 'notify') { var t = lists().filter(function (l) { return l.intake && l.intake.notify_telegram; }).length; return t ? t + ' with Telegram' : 'Daily report and cards'; }
-    if (id === 'machine') { var m = d.machine || {}; return (m.max_mothers ? m.max_mothers + ' mothers at once' : 'no mother cap') + (m.commit_free_gb != null ? ' · ' + m.commit_free_gb + ' GB free' : ''); }
     return 'TBD';
   }
 
@@ -72,11 +72,23 @@
     if (id === 'budgets') drawChart();
   }
 
-  /* ---------- Workload ---------- */
+  /* ---------- Workload (edited in place, saved on change; Maksym 2026-11-11) ---------- */
+  function gateOf(scope) { if (typeof canDo !== 'function') return null; var g = canDo('limits', null, { scope: scope }); return g && g.ok === false ? 'Run local version' + (g.why ? '\n' + g.why : '') : null; }
+  function numIn(val, max, label) { var i = el('input', 'cfg-num'); i.type = 'number'; i.step = '1'; i.min = '0'; i.max = String(max); i.value = val; i.setAttribute('aria-label', label); return i; }
+  var wlTimer = 0;
+  function saveLists(rowsOut, msg, okText) {
+    var L = S.data.limits || {}, n = function (v) { return v === '' ? NaN : Number(v); };
+    var listsOut = {}; rowsOut.forEach(function (r) { listsOut[r.slug] = { enabled: r.enabled, max_sessions: n(r.max_sessions), max_agents_per_session: n(r.max_agents_per_session) }; });
+    msg.className = 'cfg-msg'; msg.textContent = 'Saving…';
+    return postJson('/api/limits', { defaults: L.defaults, lists: listsOut, base_hash: L.base_hash }).then(function (r) {
+      if (r.ok) { S.data.limits = r.json; renderAll(); var m2 = $('cfg-wl-msg'); if (m2) m2.textContent = okText || 'Saved to this device.'; }
+      else { msg.className = 'cfg-msg bad'; msg.textContent = ((r.json && (r.json.errors || [r.json.error])) || ['Not saved.']).join('; ') + ' Nothing was saved.'; }
+    }).catch(function () { msg.className = 'cfg-msg bad'; msg.textContent = 'The server did not answer. Nothing was saved.'; });
+  }
   function renderWorkload(p) {
     p.textContent = '';
     if (!S.data) { p.appendChild(skel()); return; }
-    var rows = limRows(), live = 0, max = 0;
+    var rows = limRows(), live = 0, max = 0, L = S.data.limits || {}, MX = L.max || {}, DEF = L.defaults || {};
     rows.forEach(function (r) { live += r.live || 0; if (r.enabled !== false) max += r.max_sessions || 0; });
     var sec = el('section', 'cfg-sec'); sec.appendChild(el('h3', null, 'This device'));
     var t = table('This device and its sessions', [['Device'], ['Runs sessions'], ['Live / limit']]), tr = el('tr');
@@ -84,45 +96,131 @@
     cell(tr, 'Runs sessions', null, max ? 'On' : 'Off');
     cell(tr, 'Live / limit').appendChild(meter(live, max));
     t.tBodies[0].appendChild(tr); sec.appendChild(t);
-    sec.appendChild(el('p', 'cfg-note', 'The other device sets its own limits on its own page ("Set on that device"): limits are per device (D57), and switching a list off here gives it max sessions 0 on this device only, never a Manual mode on the board.'));
+    sec.appendChild(el('p', 'cfg-note', 'Limits are per device (D57): the other device sets its own on its own page.'));
     p.appendChild(sec);
+    // mothers at once (was the Machine tab)
+    var M = S.data.machine || {}, sm = el('section', 'cfg-sec'); sm.appendChild(el('h3', null, 'Mother sessions on this device'));
+    var mrow = el('div', 'cfg-inline'), ml = el('label', null, 'Mothers at once '), mi = numIn(M.max_mothers_set != null ? M.max_mothers_set : 2, 10, 'Mothers at once on this device'); mi.id = 'cfg-mothers'; mi.min = '1';
+    ml.htmlFor = 'cfg-mothers'; mrow.appendChild(ml); mrow.appendChild(mi);
+    var mmsg = el('span', 'cfg-msg'); mmsg.setAttribute('role', 'status'); mrow.appendChild(mmsg); sm.appendChild(mrow);
+    sm.appendChild(el('p', 'cfg-note', 'One mother runs one list. ' + (M.max_mothers_set != null ? 'Set on this device.' : 'Default: 2.')));
+    var mg = gateOf('machine'); if (mg) { mi.disabled = true; mi.title = mg; }
+    mi.onchange = function () {
+      var v = Number(mi.value); if (!(v >= 1 && v <= 10 && Math.round(v) === v)) { mmsg.className = 'cfg-msg bad'; mmsg.textContent = 'A whole number from 1 to 10.'; mi.value = M.max_mothers_set != null ? M.max_mothers_set : 2; return; }
+      mmsg.className = 'cfg-msg'; mmsg.textContent = 'Saving…';
+      postJson('/api/limits', { scope: 'machine', payload: { max_mothers: v }, base_hash: (L.base_hash && L.base_hash.machine) || null })
+        .then(function (r) { if (r.ok) { mmsg.textContent = 'Saved to this device.'; load(); } else { mmsg.className = 'cfg-msg bad'; mmsg.textContent = 'Could not write the limits file. Not saved.'; } })
+        .catch(function () { mmsg.className = 'cfg-msg bad'; mmsg.textContent = 'Could not write the limits file. Not saved.'; });
+    };
+    p.appendChild(sm);
+    // per list, edited in place
     var s2 = el('section', 'cfg-sec'); s2.appendChild(el('h3', null, 'Per list on this device'));
-    var t2 = table('Lists and their live sessions', [['List'], ['On'], ['Live / limit']]);
+    var msg = el('p', 'cfg-msg'); msg.id = 'cfg-wl-msg'; msg.setAttribute('role', 'status');
+    var t2 = table('Lists, their limits and live sessions', [['List'], ['On'], ['Sessions', 'n'], ['Subagents', 'n'], ['Live / limit']]);
     if (!rows.length) { var e = el('div', 'cfg-empty'); e.appendChild(el('b', null, 'No lists yet.')); e.appendChild(document.createTextNode('A list shows here after the board is read.')); s2.appendChild(e); }
-    rows.forEach(function (r) { var tr2 = el('tr'); if (r.enabled === false) tr2.className = 'muted'; cell(tr2, 'List', 'h', r.name || r.slug); cell(tr2, 'On', null, r.enabled === false ? 'Off' : 'On'); cell(tr2, 'Live / limit').appendChild(meter(r.live || 0, r.enabled === false ? 0 : r.max_sessions || 0)); t2.tBodies[0].appendChild(tr2); });
+    var collect = function () { return [].map.call(t2.tBodies[0].rows, function (tr2) { var q = function (f) { return tr2.querySelector('[data-f="' + f + '"]'); }; return { slug: tr2.dataset.slug, enabled: q('enabled').checked, max_sessions: q('max_sessions').value, max_agents_per_session: q('max_agents_per_session').value }; }); };
+    var changed = function () { clearTimeout(wlTimer); wlTimer = setTimeout(function () { saveLists(collect(), msg); }, 500); };
+    rows.forEach(function (r) {
+      var tr2 = el('tr'); tr2.dataset.slug = r.slug; if (r.enabled === false) tr2.className = 'muted';
+      var nm = cell(tr2, 'List', 'h', r.name || r.slug); if (r.on_board === false) nm.appendChild(el('span', 'cfg-st', 'not on the board'));
+      var cb = el('input'); cb.type = 'checkbox'; cb.checked = r.enabled !== false; cb.dataset.f = 'enabled'; cb.setAttribute('aria-label', (r.name || r.slug) + ' on'); cb.onchange = changed; cell(tr2, 'On').appendChild(cb);
+      var i1 = numIn(r.max_sessions, MX.max_sessions || 10, (r.name || r.slug) + ' max sessions'); i1.dataset.f = 'max_sessions'; i1.onchange = changed; cell(tr2, 'Sessions', 'n').appendChild(i1);
+      var i2 = numIn(r.max_agents_per_session, MX.max_agents_per_session || 10, (r.name || r.slug) + ' max subagents'); i2.dataset.f = 'max_agents_per_session'; i2.onchange = changed; cell(tr2, 'Subagents', 'n').appendChild(i2);
+      cell(tr2, 'Live / limit').appendChild(meter(r.live || 0, r.enabled === false ? 0 : r.max_sessions || 0));
+      var g = gateOf('list:' + r.slug); if (g) [cb, i1, i2].forEach(function (x) { x.disabled = true; x.title = g; });
+      t2.tBodies[0].appendChild(tr2);
+    });
     if (rows.length) s2.appendChild(t2);
-    s2.appendChild(el('p', 'cfg-note', 'A session started for a task with its own Autonomy mode counts against its list’s limit like any other.'));
-    var ed = el('details', 'cfg-edit'); ed.appendChild(el('summary', null, 'Change the limits of this device')); var h = el('div'); h.id = 'limits'; ed.appendChild(h); s2.appendChild(ed);
-    ed.addEventListener('toggle', function () { if (ed.open && typeof renderLimits === 'function') renderLimits(S.data.limits); });
+    var acts = el('div', 'cfg-acts'), rb = el('button', 'btn', 'Reset all'); rb.type = 'button';
+    rb.title = 'Every list on, with the default sessions and subagents of this device';
+    rb.onclick = function () {
+      if (!window.confirm('Reset every list on this device to on, ' + DEF.max_sessions + ' sessions and ' + DEF.max_agents_per_session + ' subagents?')) return;
+      clearTimeout(wlTimer); saveLists(rows.map(function (r) { return { slug: r.slug, enabled: true, max_sessions: String(DEF.max_sessions), max_agents_per_session: String(DEF.max_agents_per_session) }; }), msg, 'Every list reset to the defaults.');
+    };
+    if (!rows.length || gateOf('any')) rb.disabled = true;
+    acts.appendChild(rb); s2.appendChild(acts); s2.appendChild(msg);
+    s2.appendChild(el('p', 'cfg-note', 'On unticked: this device takes no task of that list (max sessions 0 on this device only); the other device and the board are not changed. Changes save on their own. A session started for a task with its own Autonomy mode counts against its list’s limit like any other.'));
     p.appendChild(s2);
   }
   function meter(live, max) { var m = el('span', 'cfg-meter' + (max > 0 && live >= max ? ' full' : '')); var tr = el('span', 'tr'), f = el('span'); f.style.width = (max ? Math.min(100, live / max * 100) : 0) + '%'; tr.appendChild(f); m.appendChild(tr); m.appendChild(el('b', null, live + ' / ' + max)); if (max > 0 && live >= max) m.appendChild(el('span', 'flag', 'at limit')); return m; }
 
-  /* ---------- Autonomy ---------- */
+  /* ---------- the board bridge: writes with the person's own board sign-in (set_autonomy, set_budget) ---------- */
+  var BR = { frame: null, ready: null, wait: {}, n: 0, hello: null };
+  function bridgeReady() {
+    if (BR.ready) return BR.ready;
+    if (location.hostname !== 'localhost') return Promise.reject(new Error('saving needs this page at http://localhost:' + (location.port || '8790') + '/ (the board signs in on localhost; on ' + location.hostname + ' the browser keeps the two apart). Open it there and try again'));
+    BR.ready = new Promise(function (resolve, reject) {
+      var origin = BOARD.replace(/\/$/, ''), done = false;
+      var to = setTimeout(function () { if (!done) { done = true; BR.ready = null; reject(new Error('the board at ' + origin + ' did not answer. Is it running (localhost:8788)?')); } }, 12000);
+      window.addEventListener('message', function (e) {
+        if (e.origin !== origin || !BR.frame || e.source !== BR.frame.contentWindow) return;
+        var m = e.data || {};
+        if (m.bridge === 'loaded') BR.frame.contentWindow.postMessage({ bridge: 'hello' }, origin);
+        else if (m.bridge === 'hello' && !done) { done = true; clearTimeout(to); BR.hello = m; if (m.signedIn) resolve(m); else { BR.ready = null; reject(new Error('not signed in on the board. Sign in at ' + origin + '/board/ in this browser, then try again')); } }
+        else if (m.bridge === 'reply' && BR.wait[m.id]) { var w = BR.wait[m.id]; delete BR.wait[m.id]; if (m.ok) w.ok(m.result); else w.no(Object.assign(new Error(m.error || 'refused'), { code: m.code })); }
+      });
+      if (BR.frame) BR.frame.remove();
+      BR.frame = el('iframe'); BR.frame.hidden = true; BR.frame.title = 'Board bridge'; BR.frame.setAttribute('aria-hidden', 'true'); BR.frame.src = origin + '/harness/bridge.html';
+      document.body.appendChild(BR.frame);
+    });
+    return BR.ready;
+  }
+  // on 127.0.0.1 the board's sign-in (localhost:8788) is out of reach: say so above the controls, with the link
+  function hostNote(p) {
+    if (location.hostname === 'localhost' || (window.HarnessTransport && window.HarnessTransport.rpc)) return;
+    var d = el('div', 'cfg-banner'), u = 'http://localhost:' + (location.port || '8790') + '/' + location.hash, a = el('a', 'lk', u); a.href = u;
+    d.appendChild(el('span', null, 'To save here, open this page at ')); d.appendChild(a); d.appendChild(el('span', null, ': changes are saved with your board sign-in on localhost.')); p.appendChild(d);
+  }
+  function boardRpc(name, args) {
+    var T = window.HarnessTransport;
+    if (T && typeof T.rpc === 'function') return T.rpc(name, args);   // the web copy: same origin as the board
+    return bridgeReady().then(function () {
+      return new Promise(function (ok, no) {
+        var id = 'r' + (++BR.n) + '-' + Date.now(); BR.wait[id] = { ok: ok, no: no };
+        setTimeout(function () { if (BR.wait[id]) { delete BR.wait[id]; no(new Error('the board did not answer in time')); } }, 20000);
+        BR.frame.contentWindow.postMessage({ bridge: 'rpc', id: id, name: name, args: args }, BOARD.replace(/\/$/, ''));
+      });
+    });
+  }
+
+  /* ---------- Autonomy (edited here too, Maksym 2026-11-11: harness page, board and phone) ---------- */
   function renderAutonomy(p) {
     p.textContent = '';
     if (!S.data) { p.appendChild(skel()); return; }
     if (!S.data.board) { p.appendChild(banner('The board could not be read' + (S.data.board_error ? ': ' + S.data.board_error : '') + '. Modes are shown once it can.')); }
+    hostNote(p);
     var ls = lists(), cards = el('div', 'cfg-cards'); cards.setAttribute('role', 'group'); cards.setAttribute('aria-label', 'Filter by mode');
-    [['all', 'All lists']].concat(ORDER.map(function (m) { return [m, MODES[m].n]; })).forEach(function (x) {
+    var shown = ORDER.concat(ls.some(function (l) { return l.effective === 'manual'; }) ? ['manual'] : []);
+    [['all', 'All lists']].concat(shown.map(function (m) { return [m, MODES[m].n]; })).forEach(function (x) {
       var n = x[0] === 'all' ? ls.length : ls.filter(function (l) { return l.effective === x[0]; }).length;
       var b = el('button', 'cfg-card'); b.type = 'button'; b.setAttribute('aria-pressed', S.filter === x[0] ? 'true' : 'false');
       if (x[0] !== 'all') b.appendChild(modeMark(x[0])); b.appendChild(el('b', null, String(n))); b.appendChild(el('span', null, x[1]));
       b.onclick = function () { S.filter = x[0]; renderAutonomy(p); }; cards.appendChild(b);
     });
     p.appendChild(cards);
+    var msg = el('p', 'cfg-msg'); msg.id = 'cfg-au-msg'; msg.setAttribute('role', 'status');
     var rows = ls.filter(function (l) { return S.filter === 'all' || l.effective === S.filter; });
-    var t = table('Lists and their Autonomy mode', [['List'], ['Mode'], ['Set by'], ['Tasks with own mode', 'n'], ['']]);
+    var t = table('Lists and their Autonomy mode', [['List'], ['Mode'], ['Set by'], ['Tasks with own mode', 'n']]);
     rows.forEach(function (l) {
       var tr = el('tr'); cell(tr, 'List', 'h', l.name);
-      var cm = cell(tr, 'Mode'); cm.appendChild(modeEl(l.effective)); if (l.effective !== l.mode) cm.appendChild(el('span', 'cfg-st', 'Set to ' + (MODES[l.mode] || MODES.guided).n + ': ' + (l.why || []).join('; ')));
+      var cm = cell(tr, 'Mode'), sel = el('select', 'cfg-sel'); sel.setAttribute('aria-label', 'Autonomy mode of ' + l.name);
+      ORDER.concat(ORDER.indexOf(l.mode) < 0 ? [l.mode] : []).forEach(function (m) { var o = el('option', null, (MODES[m] || MODES.guided).n + (m === 'guided' ? ' (default)' : '')); o.value = m; if (m === l.mode) o.selected = true; if (ORDER.indexOf(m) < 0) o.disabled = true; sel.appendChild(o); });
+      if (!l.id) { sel.disabled = true; sel.title = 'Restart the page server: it does not send list ids yet.'; }
+      sel.onchange = function () {
+        var want = sel.value; sel.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Saving ' + l.name + ' with your board sign-in…';
+        boardRpc('set_autonomy', { p_kind: 'list', p_id: l.id, p_mode: want, p_expected: l.mode }).then(function () {
+          l.mode = want; l.effective = want; msg.textContent = l.name + ': ' + MODES[want].n + '. Saved on the board.'; load(true);
+        }, function (e) { sel.disabled = false; sel.value = l.mode; msg.className = 'cfg-msg bad'; msg.textContent = l.name + ' not saved: ' + e.message; });
+      };
+      cm.appendChild(sel);
+      if (l.effective !== l.mode) cm.appendChild(el('span', 'cfg-st', 'Runs as ' + (MODES[l.effective] || MODES.guided).n + ': ' + (l.why || []).join('; ')));
       cell(tr, 'Set by', null, l.set_by ? l.set_by : 'Default');
       cell(tr, 'Tasks with own mode', 'n', String(l.overrides || 0));
-      var a = el('a', 'lk', 'Edit on the board ↗'); a.href = BOARD; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', 'Edit ' + l.name + ' on the board'); cell(tr, '', 'n').appendChild(a);
       t.tBodies[0].appendChild(tr);
     });
     if (rows.length) p.appendChild(t); else { var e = el('div', 'cfg-empty'); e.appendChild(el('b', null, 'No list is in this mode.')); p.appendChild(e); }
-    p.appendChild(el('p', 'cfg-note', 'Read only here. Modes are set on the board, in each list’s settings, by its owner or editor with their own sign-in; AI Brain only by a household person. A task inherits from its parent, then its list; a Manual list is widened only by its household owner.'));
+    p.appendChild(msg);
+    p.appendChild(el('p', 'cfg-note', 'Saved with your own sign-in on the board (localhost:8788), as in the list’s settings on the board and in the phone app: the same three places. AI Brain and Project rules only by a household person. A task inherits from its parent, then its list. To stop a list on this device, untick it in Workload.'));
     var e0 = el('section', 'cfg-e0'); e0.setAttribute('aria-labelledby', 'cfg-e0h'); var h = el('h3', null, 'E0: always the person’s, in every mode'); h.id = 'cfg-e0h'; e0.appendChild(h);
     e0.appendChild(el('p', null, 'No mode, precedent, project rule or list brief makes these an agent’s decision.'));
     var u = el('ul'); ((S.data.board && S.data.board.e0) || []).forEach(function (x) { u.appendChild(el('li', null, x)); }); e0.appendChild(u); p.appendChild(e0);
@@ -148,7 +246,7 @@
     return { key: key, name: name, cap: cap, pts: pts, spent: sum, fc: fc, a: a };
   }
   function capText(s) {
-    if (!s.cap) return 'No budget set. Set it on the master’s list on the board.';
+    if (!s.cap) return 'No budget set. Set it in the table below.';
     if (s.fc.kind === 'forecast') return 'Cap reached around ' + ymd(s.fc.at, true);
     if (s.fc.kind === 'reached') return 'Cap reached. New sessions in this list are paused.';
     if (s.fc.kind === 'below') return 'Cap not reached this month.';
@@ -157,6 +255,7 @@
   function renderBudgets(p) {
     p.textContent = '';
     if (!S.data) { p.appendChild(skel()); return; }
+    hostNote(p);
     var keys = ['overall'].concat(lists().map(function (l) { return l.slug; }));
     var bar = el('div', 'cfg-toolbar'), lab = el('label', null, 'Budget'), sel = el('select', 'cfg-sel'); sel.id = 'cfg-bsel'; lab.htmlFor = 'cfg-bsel';
     keys.forEach(function (k) { var o = el('option', null, seriesOf(k).name); o.value = k; if (k === S.series) o.selected = true; sel.appendChild(o); });
@@ -168,17 +267,50 @@
     var tip = el('div', 'cfg-ctip'); tip.id = 'cfg-ctip'; w.appendChild(tip); p.appendChild(w);
     var lg = el('p', 'cfg-legend'); lg.appendChild(el('span', null, 'Blue: spent at API prices; dashed: forecast. Gold: the cap. The vertical line is the moment the cap is (or will be) reached.')); p.appendChild(lg);
     var sum = el('p', 'vh'); sum.id = 'cfg-chart-sum'; p.appendChild(sum); var live = el('p', 'vh'); live.id = 'cfg-chart-live'; live.setAttribute('aria-live', 'polite'); p.appendChild(live);
-    var t = table('Budgets per list', [['List'], ['Spent this month', 'n'], ['Cap', 'n'], ['Cap reached']]);
+    var t = table('Budgets per list', [['List'], ['Spent this month', 'n'], ['Cap per month, $', 'n'], ['Cap reached']]);
+    var msg = el('p', 'cfg-msg'); msg.id = 'cfg-bu-msg'; msg.setAttribute('role', 'status');
+    var idOf = function (key) { return key === 'overall' ? null : ((lists().filter(function (l) { return l.slug === key; })[0] || {}).id || undefined); };
+    var capOf = function (key) { return seriesOf(key).cap || null; };
     keys.forEach(function (key) {
       var x = seriesOf(key), tr = el('tr'); if (key === 'overall') tr.className = 'sum';
       var b = el('button', 'lk', x.name); b.type = 'button'; b.onclick = function () { S.series = key; renderBudgets(p); var c = $('cfg-chart'); if (c) c.focus(); }; cell(tr, 'List', 'h').appendChild(b);
-      cell(tr, 'Spent this month', 'n', money(x.spent)); cell(tr, 'Cap', 'n', x.cap ? moneyShort(x.cap) : 'Not set');
+      cell(tr, 'Spent this month', 'n', money(x.spent));
+      var inp = el('input', 'cfg-num cfg-money'); inp.type = 'number'; inp.min = '0'; inp.step = '1'; inp.max = '100000'; inp.placeholder = 'Not set';
+      inp.value = x.cap ? String(x.cap) : ''; inp.setAttribute('aria-label', 'Monthly cap of ' + x.name + ' in dollars, empty for none');
+      if (idOf(key) === undefined) { inp.disabled = true; inp.title = 'Restart the page server: it does not send list ids yet.'; }
+      inp.onchange = function () {
+        var v = inp.value.trim() === '' ? null : Number(inp.value), err = budgetError(key, v, capOf);
+        if (err) { msg.className = 'cfg-msg bad'; msg.textContent = err + ' Not saved.'; inp.value = x.cap ? String(x.cap) : ''; return; }
+        inp.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Saving ' + x.name + ' with your board sign-in…';
+        boardRpc('set_budget', { p_list: idOf(key), p_period: 'month', p_cap: v }).then(function () { msg.textContent = x.name + ': ' + (v == null ? 'no cap' : moneyShort(v) + ' a month') + '. Saved on the board.'; load(true); },
+          function (e) { inp.disabled = false; inp.value = x.cap ? String(x.cap) : ''; msg.className = 'cfg-msg bad'; msg.textContent = x.name + ' not saved: ' + e.message; });
+      };
+      cell(tr, 'Cap per month, $', 'n').appendChild(inp);
       cell(tr, 'Cap reached', null, !x.cap ? 'No budget set' : x.fc.kind === 'forecast' ? 'Around ' + ymd(x.fc.at, true) : x.fc.kind === 'reached' ? 'Reached. New sessions paused.' : x.fc.kind === 'below' ? 'Not this month' : 'No forecast yet');
       t.tBodies[0].appendChild(tr);
     });
     p.appendChild(t);
-    p.appendChild(el('p', 'cfg-note', 'At API prices. Caps are shared by every device through the board and are set there by a household person. A cap stops new starts in its list (no card, no try counted); running sessions finish their step. It never lifts the 90% token pause.'));
+    var acts = el('div', 'cfg-acts'), rb = el('button', 'btn', 'Reset all'); rb.type = 'button';
+    var set = keys.filter(function (k) { return capOf(k); });
+    rb.disabled = !set.length; rb.title = 'Removes every monthly cap: lists first, then the overall one';
+    rb.onclick = function () {
+      if (!window.confirm('Remove all ' + set.length + ' monthly caps? Nothing then stops new sessions for money until a cap is set again.')) return;
+      rb.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Removing the caps…';
+      var order = set.filter(function (k) { return k !== 'overall'; }).concat(set.indexOf('overall') >= 0 ? ['overall'] : []);
+      order.reduce(function (pr, k) { return pr.then(function () { return boardRpc('set_budget', { p_list: idOf(k), p_period: 'month', p_cap: null }); }); }, Promise.resolve())
+        .then(function () { msg.textContent = 'Every monthly cap removed.'; load(true); }, function (e) { msg.className = 'cfg-msg bad'; msg.textContent = 'Stopped: ' + e.message; load(true); });
+    };
+    acts.appendChild(rb); p.appendChild(acts); p.appendChild(msg);
+    p.appendChild(el('p', 'cfg-note', 'Set a cap for the whole harness (Overall), for a list, or both; empty means no cap. A list’s cap may not be above the overall cap. Saved with your own board sign-in, household people only, and shared by every device. At API prices. A cap stops new starts in its list (no card, no try counted); running sessions finish their step. It never lifts the 90% token pause.'));
     drawChart();
+  }
+  // a new cap for key is refused when a list's cap is above the overall cap, or the overall cap would go below a list's
+  function budgetError(key, v, capOf) {
+    if (v != null && !(v >= 0 && v <= 100000)) return 'A cap is a number from 0 to 100000.';
+    if (v == null) return '';
+    if (key !== 'overall') { var o = capOf('overall'); return o != null && v > o ? 'A list’s cap may not be above the overall cap (' + moneyShort(o) + ').' : ''; }
+    var over = lists().filter(function (l) { var c = capOf(l.slug); return c != null && c > v; }).map(function (l) { return l.name + ' ' + moneyShort(capOf(l.slug)); });
+    return over.length ? 'The overall cap may not be below a list’s cap: ' + over.join(', ') + '.' : '';
   }
   function drawChart() {
     if (!$) return; var svg = $('cfg-chart'); if (!svg || !panels.budgets || panels.budgets.hidden) return;
@@ -205,7 +337,7 @@
       if (at >= A && at <= Bt) { var vx = x(at), right = vx > m.l + iw * 0.62; plot.appendChild(sv('line', { x1: vx, x2: vx, y1: m.t - 4, y2: m.t + ih, stroke: col, 'stroke-width': reached ? 2 : 1.5, 'stroke-dasharray': reached ? 'none' : '5 4' })); plot.appendChild(sv('circle', { cx: vx, cy: y(s.cap), r: 4, fill: col })); g.appendChild(sv('text', { x: right ? vx - 6 : vx + 6, y: m.t - 12, 'text-anchor': right ? 'end' : 'start', 'class': 'lbl', style: 'fill:' + col }, txt)); }
       else note = ' ' + txt + (at > Bt ? ', after this range.' : ', before this range.');
     }
-    if (!s.cap) g.appendChild(sv('text', { x: m.l + iw / 2, y: m.t + 14, 'text-anchor': 'middle', 'class': 'lbl', style: 'fill:#eef2fa' }, 'No budget set. Set it on the master’s list.'));
+    if (!s.cap) g.appendChild(sv('text', { x: m.l + iw / 2, y: m.t + 14, 'text-anchor': 'middle', 'class': 'lbl', style: 'fill:#eef2fa' }, 'No budget set. Set it in the table below.'));
     var sumEl = $('cfg-chart-sum'); if (sumEl) sumEl.textContent = 'Chart: ' + s.name + ', spent ' + money(s.spent) + ' this month' + (s.cap ? ' against a cap of ' + moneyShort(s.cap) + '. ' : '. ') + capText(s) + note;
     var tip = $('cfg-ctip'), cur = sv('g', { visibility: 'hidden' }); cur.appendChild(sv('line', { y1: m.t, y2: m.t + ih, stroke: '#eef2fa', 'stroke-opacity': 0.5 })); cur.appendChild(sv('circle', { r: 4, fill: '#eef2fa' })); svg.appendChild(cur);
     var valueAt = function (tm) { var all = s.pts.slice(); if (f) all.push(f[1]); if (tm < all[0][0]) return null; for (var i = 1; i < all.length; i++) if (tm <= all[i][0]) { var p0 = all[i - 1], p1 = all[i]; return p1[0] === p0[0] ? p1[1] : p0[1] + (p1[1] - p0[1]) * (tm - p0[0]) / (p1[0] - p0[0]); } return null; };
@@ -213,47 +345,6 @@
     svg.onmousemove = function (e) { var r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width), tm = Math.round((A + (px - m.l) / iw * (Bt - A)) / DAY) * DAY; if (tm < A || tm > Bt) return; S.cursor = tm; show(tm); };
     svg.onmouseleave = svg.onblur = function () { cur.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; };
     svg.onkeydown = function (e) { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); var tm = S.cursor == null ? Math.min(now, Bt) : S.cursor + (e.key === 'ArrowRight' ? DAY : -DAY); tm = Math.max(A, Math.min(Bt, tm)); S.cursor = tm; show(tm, true); };
-  }
-
-  /* ---------- Notifications ---------- */
-  function renderNotify(p) {
-    p.textContent = '';
-    if (!S.data) { p.appendChild(skel()); return; }
-    var t = table('Notifications per list', [['List'], ['Daily report'], ['Delegate task'], ['Telegram'], ['Stage report']]);
-    lists().forEach(function (l) {
-      var tr = el('tr'); cell(tr, 'List', 'h', l.name);
-      cell(tr, 'Daily report', null, 'Always on'); cell(tr, 'Delegate task', null, 'Always on');
-      cell(tr, 'Telegram', null, l.intake && l.intake.notify_telegram ? 'On (own chat)' : 'Off');
-      cell(tr, 'Stage report', null, l.intake && l.intake.stage_report ? 'On' : 'Off');
-      t.tBodies[0].appendChild(tr);
-    });
-    p.appendChild(t);
-    p.appendChild(el('p', 'cfg-note', 'By default the harness tells you only in the Daily report and on a Delegate task. Telegram is on request, set in the list’s intake on the board by a household person; it goes to your own chat with a fixed text and never takes an answer: answers come only from the board.'));
-  }
-
-  /* ---------- Machine ---------- */
-  function renderMachine(p) {
-    p.textContent = '';
-    if (!S.data) { p.appendChild(skel()); return; }
-    var M = S.data.machine || {}, dl = el('dl', 'cfg-kvf');
-    var row = function (lbl, nodes) { dl.appendChild(el('dt', null, lbl)); var dd = el('dd'); nodes.forEach(function (n) { dd.appendChild(typeof n === 'string' ? document.createTextNode(n) : n); }); dl.appendChild(dd); };
-    var inp = el('input', 'cfg-num'); inp.type = 'number'; inp.min = 0; inp.max = 10; inp.id = 'cfg-mothers'; inp.value = M.max_mothers_set != null ? M.max_mothers_set : (M.max_mothers || 0);
-    var lab = el('label', 'vh', 'Mothers at once on this device'); lab.htmlFor = 'cfg-mothers';
-    var save = el('button', 'btn', 'Save'); save.type = 'button'; var msg = el('span', 'cfg-msg'); msg.setAttribute('role', 'status');
-    save.onclick = function () {
-      var n = Number(inp.value); if (!(n >= 0 && n <= 10 && Math.round(n) === n)) { msg.textContent = 'A whole number from 0 to 10.'; return; }
-      save.disabled = true; var base = (S.data.limits && S.data.limits.base_hash && S.data.limits.base_hash.machine) || null;
-      postJson('/api/limits', { scope: 'machine', payload: { max_mothers: n }, base_hash: base }).then(function (r) { save.disabled = false; if (r.ok) { msg.textContent = 'Saved to this device.'; load(); } else msg.textContent = 'Could not write the limits file. Your change is not saved.'; })
-        .catch(function () { save.disabled = false; msg.textContent = 'Could not write the limits file. Your change is not saved.'; });
-    };
-    if (typeof canDo === 'function') { var gate = canDo('limits', null, { scope: 'machine' }); if (gate && gate.ok === false) { inp.disabled = true; save.disabled = true; save.title = 'Run local version' + (gate.why ? '\n' + gate.why : ''); } }
-    row('Mothers at once', [lab, inp, save, msg, el('span', 'cfg-st', M.max_mothers_set != null ? 'Set on this device.' : 'Default: ' + (M.max_mothers ? M.max_mothers + ' (16 GB of memory or less)' : 'no cap') + '.')]);
-    row('Memory', [(M.commit_free_gb != null ? M.commit_free_gb + ' GB of commit free' : 'not read') + ', ' + (M.memory_gb || '?') + ' GB in all. Under 4 GB no session starts.']);
-    row('Reaper', ['Ends only processes it registered itself, of a session whose runner is gone, every ' + (M.reaper && M.reaper.tick_min || 5) + ' min and at each mother start. Registered now: ' + (M.reaper ? M.reaper.registered : 0) + '.']);
-    var log = el('ul', 'cfg-log'); (M.watchdog || []).forEach(function (l) { log.appendChild(el('li', null, l)); }); if (!(M.watchdog || []).length) log.appendChild(el('li', null, 'No alert in the newest run.'));
-    row('Watchdog', [el('span', null, 'No child start for a while while mothers wait: an alert, and the youngest waiting mother ends (never a master).'), log]);
-    p.appendChild(dl);
-    p.appendChild(el('p', 'cfg-note', 'This device saves changes right away. The other device has its own page.'));
   }
 
   /* ---------- Model routing (TBD) ---------- */
@@ -266,14 +357,14 @@
     if (Object.keys(roles).length) p.appendChild(t);
   }
 
-  var RENDER = { workload: renderWorkload, autonomy: renderAutonomy, budgets: renderBudgets, notify: renderNotify, machine: renderMachine, routing: renderRouting };
+  var RENDER = { workload: renderWorkload, autonomy: renderAutonomy, budgets: renderBudgets, routing: renderRouting };
   function renderAll() {
     Object.keys(panels).forEach(function (k) { RENDER[k](panels[k]); });
     tabBtns.forEach(function (b) { var id = b.id.slice(5); b.lastChild.textContent = status(id); });
     var pb = $('cfg-banner-host'); if (pb) { pb.textContent = ''; if (S.error) pb.appendChild(banner('Could not read the configuration: ' + S.error + '. The last values read are shown.')); }
     if (PO) PO.setAttribute('aria-busy', S.data ? 'false' : 'true');
   }
-  function load() { getJson('/api/config').then(function (v) { S.data = v; S.error = null; renderAll(); }).catch(function (e) { S.error = (e && e.message) || 'no answer'; renderAll(); }); }
+  function load(fresh) { getJson('/api/config' + (fresh ? '?fresh=1' : '')).then(function (v) { S.data = v; S.error = null; renderAll(); }).catch(function (e) { S.error = (e && e.message) || 'no answer'; renderAll(); }); }
 
   window.renderConfigPage = function (U) {
     el = U.el; $ = U.$; panelHead = U.panelHead; panelBody = U.panelBody; openPanel = U.openPanel; getJson = U.getJson; postJson = U.postJson; renderLimits = U.renderLimits; restoreSize = U.restoreSize; markSel = U.markSel; setLit = U.setLit; state = U.state; PO = U.PO; canDo = U.canDo;
