@@ -528,7 +528,9 @@
   // ('tl:<id>'), and 'tl:*' marks where the tag lists not placed by hand go (starred first). title, close and decision are never hidden.
   // Stored as prefs.cardLayout.zones.task = { v: 3, sections: [{ id, name, cols, cells }], off }; a v2 value ({ top, main, bottom, off }
   // with 'tags') is migrated by readTaskLayout
-  const TASK_BLOCKS = ['list', 'id', 'title', 'close', 'autonomy', 'decision', 'format', 'description', 'dates', 'links', 'sources'];
+  // 'close' is the done checkbox, labelled Done (round 3, Max; the id stays for stored layouts); 'tagsearch' is the Find a tag box, which
+  // filters every tag list block wherever they stand (round 3)
+  const TASK_BLOCKS = ['list', 'id', 'title', 'close', 'autonomy', 'decision', 'format', 'description', 'dates', 'tagsearch', 'links', 'sources'];
   const TASK_NEVER_HIDDEN = ['title', 'close', 'decision'];
   const TASK_CREATE_SKIP = ['id', 'autonomy', 'decision', 'sources'];
   const TASK_LAYOUT_V = 3, TASK_SECTIONS_MAX = 8, TASK_SECTION_NAME_MAX = 24, TASK_COLS = [1, 2, 3];
@@ -538,7 +540,7 @@
     { id: 'header', name: 'Header', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['id'], ['title', 'list'], ['close']] },
     { id: 'top', name: 'Top', cols: 1, widths: ['fill'], cells: [['autonomy', 'decision', 'format']] },
     { id: 'main', name: 'Main', cols: 1, widths: ['fill'], cells: [['description', 'dates']] },
-    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tl:*', 'links', 'sources']] }], off: [] };
+    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tagsearch', 'tl:*', 'links', 'sources']] }], off: [] };
   const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: TASK_BLOCKS };
   const LAYOUT_FIXED = { board: [], task: TASK_NEVER_HIDDEN };
   const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] }, task: TASK_LAYOUT_DEFAULTS };
@@ -732,12 +734,14 @@
     sections.forEach((s, i) => { if (!s.id) { s.id = freeSectionId(taken, i + 1); taken.add(s.id); } });
     const last = sections[sections.length - 1];
     TASK_BLOCKS.forEach(b => {
-      if (seen.has(b)) return;
+      if (seen.has(b) || b === 'tagsearch') return;
       const d = TASK_LAYOUT_DEFAULTS.sections.find(x => x.cells.some(c => c.includes(b)));
       const s = sections.find(x => x.id === d.id) || last;
       s.cells[s.cells.length - 1].push(b); seen.add(b);
     });
     if (!seen.has('tl:*')) { const s = sections.find(x => x.id === 'bottom') || last; s.cells[0].unshift('tl:*'); seen.add('tl:*'); }
+    // a layout stored before Find a tag was a block: the box goes right before the tag lists (tl:*)
+    if (!seen.has('tagsearch')) { for (const s of sections) for (const c of s.cells) { const i = c.indexOf('tl:*'); if (i >= 0 && !seen.has('tagsearch')) { c.splice(i, 0, 'tagsearch'); seen.add('tagsearch'); } } }
     const off = Array.isArray(raw.off) ? [...new Set(raw.off.filter(b => typeof b === 'string' && seen.has(b) && b !== 'tl:*' && !TASK_NEVER_HIDDEN.includes(b)))] : [];
     return { v: TASK_LAYOUT_V, sections, off };
   }

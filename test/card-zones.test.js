@@ -12,7 +12,7 @@ test('zones: defaults draw today\'s card and window; tag lists stand where tl:* 
   assert.deepEqual(plain(C.layoutZones(L, 'board', ['a', 'b'])), { top: [], main: ['facts', 'tl:a', 'tl:b', 'description'], bottom: [], off: [] });
   // the task window draws the v3 sections (taskLayoutView): Header, Top, Main, Bottom; tl:* expands to the tag lists
   const V = C.taskLayoutView(L, ['a', 'b'], [], [], 'edit');
-  assert.deepEqual(plain(V.sections.map(s => s.cells)), [[['id'], ['title', 'list'], ['close']], [['autonomy', 'decision', 'format']], [['description', 'dates']], [['tl:a', 'tl:b', 'links', 'sources']]]);
+  assert.deepEqual(plain(V.sections.map(s => s.cells)), [[['id'], ['title', 'list'], ['close']], [['autonomy', 'decision', 'format']], [['description', 'dates']], [['tagsearch', 'tl:a', 'tl:b', 'links', 'sources']]]);
 });
 
 test('zones: stored zones are checked; unknown blocks, duplicates and unknown tag lists are dropped; decision is never hidden', () => {
@@ -25,7 +25,7 @@ test('zones: stored zones are checked; unknown blocks, duplicates and unknown ta
   // drawn: tl:b (new) goes where tl:* stands; missing task blocks go to the end of their default zone
   assert.deepEqual(plain(C.layoutZones(L, 'board', ['a', 'b'])), { top: ['description'], main: ['facts', 'tl:a'], bottom: ['tl:b'], off: ['facts'] });
   const T = C.taskLayoutView(L, [], [], [], 'edit');
-  assert.deepEqual(plain(T.sections.map(s => s.cells.flat())), [['id', 'title', 'list', 'close'], ['autonomy', 'format'], ['decision', 'description', 'dates'], ['sources']]);
+  assert.deepEqual(plain(T.sections.map(s => s.cells.flat())), [['id', 'title', 'list', 'close'], ['autonomy', 'format'], ['decision', 'description', 'dates'], ['tagsearch', 'sources']]);
   assert.deepEqual(plain(T.hidden), ['links']);
   assert.equal(C.readCardLayout({ zones: { board: 'junk' } }).zones.board.main.join(), 'facts,tl:*,description');
 });
@@ -56,7 +56,7 @@ test('task layout v3: defaults; readCardLayout keeps a v3 value', () => {
     { id: 'header', name: 'Header', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['id'], ['title', 'list'], ['close']] },
     { id: 'top', name: 'Top', cols: 1, widths: ['fill'], cells: [['autonomy', 'decision', 'format']] },
     { id: 'main', name: 'Main', cols: 1, widths: ['fill'], cells: [['description', 'dates']] },
-    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tl:*', 'links', 'sources']] }], off: [] });
+    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tagsearch', 'tl:*', 'links', 'sources']] }], off: [] });
   assert.ok(!C.TASK_BLOCKS.includes('tags'));
   const v = C.taskLayoutSetCols(T, 'top', 3);
   assert.deepEqual(plain(C.readCardLayout({ zones: { task: v } }).zones.task), plain(v));
@@ -79,7 +79,7 @@ test('task layout v3: the reader drops unknown and duplicate blocks, fixes cells
   assert.ok(L.sections[0].name.length <= 24 && !/[\u0000-\u001f]/.test(L.sections[0].name));
   assert.equal(L.sections[1].name, 'Section 2');
   assert.deepEqual(plain(L.sections[0].cells), [['title', 'tl:a', 'close']], 'the extra cell joins the last cell; unknown, duplicate, gone tag list dropped');
-  assert.deepEqual(plain(L.sections[1].cells), [['tl:*'], []], 'cells padded to cols');
+  assert.deepEqual(plain(L.sections[1].cells), [['tagsearch', 'tl:*'], []], 'cells padded to cols; Find a tag added right before tl:*');
   assert.equal(L.sections[2].cols, 3, 'a bad cols comes from the cells');
   // the default sections are gone: missing blocks go to the end of the last section's last cell
   const last = L.sections[7].cells[0];
@@ -87,7 +87,7 @@ test('task layout v3: the reader drops unknown and duplicate blocks, fixes cells
   assert.deepEqual(plain(L.off), ['list'], 'never-hidden, tl:*, duplicates and unknown blocks are not in off');
   // tl:* missing → start of Bottom's first cell
   const M = C.readTaskLayout({ v: 3, sections: [{ id: 'header', cols: 1, cells: [['title', 'close']] }, { id: 'bottom', name: 'B', cols: 2, cells: [['links'], []] }] });
-  assert.deepEqual(cellsOf(M, 'bottom'), [['tl:*', 'links'], ['autonomy', 'decision', 'format', 'description', 'dates', 'sources']], 'tl:* at the start of the first cell; blocks of the missing Top and Main go to the last section, end of its last cell');
+  assert.deepEqual(cellsOf(M, 'bottom'), [['tagsearch', 'tl:*', 'links'], ['autonomy', 'decision', 'format', 'description', 'dates', 'sources']], 'tl:* at the start of the first cell; blocks of the missing Top and Main go to the last section, end of its last cell');
   assert.deepEqual(cellsOf(M, 'header')[0], ['title', 'close', 'list', 'id'], 'list and id go to the end of the default section (header)');
 });
 
@@ -100,13 +100,13 @@ test('task layout v3: a realistic v2 row is migrated', () => {
     { id: 'header', name: 'Header', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['id'], ['title', 'list'], ['close']] },
     { id: 'top', name: 'Top', cols: 1, widths: ['fill'], cells: [['format', 'autonomy', 'decision']] },
     { id: 'main', name: 'Main', cols: 1, widths: ['fill'], cells: [['description']] },
-    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tl:*', 'dates', 'links', 'sources']] }], off: ['sources'] });
+    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tagsearch', 'tl:*', 'dates', 'links', 'sources']] }], off: ['sources'] });
 });
 
 test('task layout v3: the view expands tl:* starred first, then tagListOrder, then as given; create mode; hidden reported', () => {
   const lists = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
   let V = C.taskLayoutView(C.readCardLayout(null), lists, ['d', 'b'], ['c', 'b'], 'edit');
-  assert.deepEqual(plain(V.sections[3].cells[0]), ['tl:b', 'tl:d', 'tl:c', 'tl:a', 'links', 'sources']);
+  assert.deepEqual(plain(V.sections[3].cells[0]), ['tagsearch', 'tl:b', 'tl:d', 'tl:c', 'tl:a', 'links', 'sources']);
   assert.deepEqual(plain(V.hidden), []);
   // a placed tag list stays where it is; the rest follow tl:*; a hidden block is reported
   let L = C.taskLayoutMove(C.TASK_LAYOUT_DEFAULTS, 'links', null, { section: 'top', cell: 0, before: null });
@@ -116,9 +116,9 @@ test('task layout v3: the view expands tl:* starred first, then tagListOrder, th
   assert.deepEqual(plain(V.sections[0].cells), [[], ['title'], ['close']], 'create drops id; list hidden (an empty cell stays)');
   assert.deepEqual(plain(V.sections[1].cells[0]), ['format', 'links'], 'create drops autonomy and decision');
   assert.deepEqual(plain(V.sections[2].cells[0]), ['description', 'dates']);
-  assert.deepEqual(plain(V.sections[3].cells[0]), ['tl:a', 'tl:b'], 'create drops sources');
+  assert.deepEqual(plain(V.sections[3].cells[0]), ['tagsearch', 'tl:a', 'tl:b'], 'create drops sources');
   assert.deepEqual(plain(V.hidden).sort(), ['list', 'tl:c']);
-  assert.deepEqual(plain(C.taskLayoutView(null, [], [], [], 'edit').sections[3].cells[0]), ['links', 'sources']);
+  assert.deepEqual(plain(C.taskLayoutView(null, [], [], [], 'edit').sections[3].cells[0]), ['tagsearch', 'links', 'sources']);
 });
 
 // the round-1 default Header (2 columns: list, id, title | close), as a person's stored layout
@@ -185,16 +185,16 @@ test('task layout v3: hide and show, sections added, renamed, columns set, reord
 test('task layout v3: expand for the editor, store back with one tl:*; round trip through rowFromPrefs and prefsFromRow', () => {
   const tl = ['a', 'b', 'c'];
   let E = C.taskLayoutExpand(C.TASK_LAYOUT_DEFAULTS, tl, ['c'], []);
-  assert.deepEqual(cellsOf(E, 'bottom')[0], ['tl:c', 'tl:a', 'tl:b', 'links', 'sources']);
+  assert.deepEqual(cellsOf(E, 'bottom')[0], ['tagsearch', 'tl:c', 'tl:a', 'tl:b', 'links', 'sources']);
   assert.deepEqual(plain(C.taskLayoutStore(E, tl, ['c'], [])), plain(C.TASK_LAYOUT_DEFAULTS), 'an unchanged run becomes tl:* again');
   E = C.taskLayoutMove(E, 'tl:b', null, { section: 'top', cell: 0, before: null });
   const S = C.taskLayoutStore(E, tl, ['c'], []);
   assert.deepEqual(cellsOf(S, 'top')[0], ['autonomy', 'decision', 'format', 'tl:b']);
-  assert.deepEqual(cellsOf(S, 'bottom')[0], ['tl:*', 'links', 'sources']);
+  assert.deepEqual(cellsOf(S, 'bottom')[0], ['tagsearch', 'tl:*', 'links', 'sources']);
   const V = C.taskLayoutView(S, ['a', 'b', 'c', 'd'], ['c'], []);
-  assert.deepEqual(plain(V.sections[3].cells[0]), ['tl:c', 'tl:a', 'tl:d', 'links', 'sources'], 'a new tag list joins tl:*');
+  assert.deepEqual(plain(V.sections[3].cells[0]), ['tagsearch', 'tl:c', 'tl:a', 'tl:d', 'links', 'sources'], 'a new tag list joins tl:*');
   // without tag lists: tl:* after the last tag list block
-  assert.deepEqual(cellsOf(C.taskLayoutStore(E), 'bottom')[0], ['tl:c', 'tl:a', 'tl:*', 'links', 'sources']);
+  assert.deepEqual(cellsOf(C.taskLayoutStore(E), 'bottom')[0], ['tagsearch', 'tl:c', 'tl:a', 'tl:*', 'links', 'sources']);
   const prefs = C.prefsFromRow({ cardLayout: { zones: { task: S } }, tagListFavs: ['c'] }, { tagListIds: tl });
   const back = C.prefsFromRow(JSON.parse(JSON.stringify(C.rowFromPrefs('p1', prefs).prefs)), { tagListIds: tl });
   assert.deepEqual(plain(back.cardLayout.zones.task), plain(S));
@@ -218,6 +218,16 @@ test('task layout v3: column widths (fit / fill) are read, padded and trimmed to
   assert.deepEqual(plain(C.readTaskLayout(JSON.parse(JSON.stringify(M)))), plain(M), 'widths survive the reader');
   assert.deepEqual(plain(C.taskLayoutView(M, [], [], [], 'edit').sections[0].widths), ['fit', 'fit'], 'the view carries the widths');
   assert.deepEqual(plain(C.TASK_WIDTHS), ['fit', 'fill']);
+});
+
+test('task layout v3 round 3: Find a tag is a block (default before the tag lists, added to old layouts there, hideable); close stays the Done block', () => {
+  assert.ok(C.TASK_BLOCKS.includes('tagsearch') && C.TASK_BLOCKS.includes('close') && C.TASK_NEVER_HIDDEN.includes('close'));
+  assert.deepEqual(plain(C.TASK_LAYOUT_DEFAULTS.sections[3].cells[0].slice(0, 2)), ['tagsearch', 'tl:*']);
+  const old = C.readTaskLayout({ v: 3, sections: [{ id: 'a', cols: 2, cells: [['title', 'close'], ['tl:x', 'tl:*', 'links']] }] }, ['x']);
+  assert.deepEqual(plain(old.sections[0].cells[1]).slice(0, 3), ['tl:x', 'tagsearch', 'tl:*'], 'a stored layout without it gets it right before tl:*');
+  assert.deepEqual(plain(C.taskLayoutHide(C.TASK_LAYOUT_DEFAULTS, 'tagsearch', true).off), ['tagsearch']);
+  const moved = C.taskLayoutMove(C.TASK_LAYOUT_DEFAULTS, 'tagsearch', null, { section: 'header', cell: 1, before: null });
+  assert.deepEqual(plain(C.readTaskLayout(JSON.parse(JSON.stringify(moved))).sections[0].cells[1]), ['title', 'list', 'tagsearch'], 'placed by hand, it stays there');
 });
 
 test('list brief (T23): lines, a new Decisions line with day and who, the four texts from a row, the count', () => {

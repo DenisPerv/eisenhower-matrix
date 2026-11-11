@@ -1138,10 +1138,10 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .tzb{min-width:0}
 .tzb.fill{container-type:inline-size}
 .tzb.fit{justify-self:start}
-.tzb[data-tb=close]{justify-self:end}
+.tzb[data-tb=close]{justify-self:end;container-type:normal} /* no size containment: it is drawn at its own width */
 .tzb .fref{margin-top:2px}
-.tk-x{width:32px;height:32px;min-height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--ink3);box-shadow:none}
-.tk-x:hover{background:var(--hover);color:var(--ink)}
+/* the Done block (round 3): the done checkbox with its label */
+dialog label.fdone-l{display:inline-flex;align-items:center;gap:6px;margin:0;min-height:34px;font:500 13px var(--ui);color:var(--ink2);white-space:nowrap;cursor:pointer}
 /* the Title block is the window's heading (round 2): no label, no box until hovered or focused, two lines at most; editable in place */
 .rt.one.tk-title{margin-top:0;padding:2px 6px;border-color:transparent;background:transparent;font:500 24px/1.25 var(--serif);color:var(--ink);max-height:calc(2 * 1.25em + 6px)}
 .rt.one.tk-title:hover{border-color:var(--hair)}
@@ -1151,7 +1151,7 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .tzb .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:0 var(--s4)}
 .tzb .frow>div{min-width:0}.tzb .frow input{width:100%;min-width:0;box-sizing:border-box}
 .flist select{width:100%}
-@media (max-width:700px){.tsec{display:flex;flex-wrap:wrap;gap:0 var(--s3)}.tzb.fill{flex:1 1 200px}.tzb.fit{flex:0 0 auto;max-width:100%}.tzb[data-tb=close]{margin-left:auto}.rt.one.tk-title{font-size:20px}}
+@media (max-width:700px){.tsec{display:flex;flex-wrap:wrap;gap:0 var(--s3)}.tzb.fill{flex:1 1 200px}.tzb.fit{flex:0 0 auto;max-width:100%}.tzb[data-tb=close]{margin-left:auto}.tzb.fill[data-tb=title]{flex-basis:120px}.rt.one.tk-title{font-size:20px}}
 /* the quadrant buttons under the title (2026-11-07): an outline in the quadrant's colour, the current one filled */
 .fquad{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s2) 0 var(--s3)}
 .fquad button{min-height:32px;padding:0 14px;border-radius:999px;border:1.5px solid var(--c);background:transparent;color:var(--ink2);font:500 13.5px var(--ui);cursor:pointer}
@@ -1205,6 +1205,7 @@ button.ar-open,button.lm-open{all:unset;cursor:pointer;text-decoration:underline
 /* the task window's tags (U1, U2, U6, U7, U8): a search box, then one group per tag list, its name on top and its chips below; a
    closed group is one row; the groups scroll inside a box of about 40% of the window's height */
 .tagpick{margin-top:var(--s4)}
+.tagsrch{margin-top:var(--s4)}.tagsrch .tg-q{width:min(260px,100%)}
 dialog input.tg-q{width:min(260px,100%);min-height:32px;padding:0 10px;font-size:13px;border-radius:var(--r-sm)}
 .tagbox{display:block;max-height:40vh;overflow-y:auto;overscroll-behavior:contain;margin-top:var(--s3);padding:2px 4px 2px 0}
 .tagbox > .n{margin:6px 0;font-size:12.5px}
@@ -2185,7 +2186,9 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   // ('tl:<id>'), and 'tl:*' marks where the tag lists not placed by hand go (starred first). title, close and decision are never hidden.
   // Stored as prefs.cardLayout.zones.task = { v: 3, sections: [{ id, name, cols, cells }], off }; a v2 value ({ top, main, bottom, off }
   // with 'tags') is migrated by readTaskLayout
-  const TASK_BLOCKS = ['list', 'id', 'title', 'close', 'autonomy', 'decision', 'format', 'description', 'dates', 'links', 'sources'];
+  // 'close' is the done checkbox, labelled Done (round 3, Max; the id stays for stored layouts); 'tagsearch' is the Find a tag box, which
+  // filters every tag list block wherever they stand (round 3)
+  const TASK_BLOCKS = ['list', 'id', 'title', 'close', 'autonomy', 'decision', 'format', 'description', 'dates', 'tagsearch', 'links', 'sources'];
   const TASK_NEVER_HIDDEN = ['title', 'close', 'decision'];
   const TASK_CREATE_SKIP = ['id', 'autonomy', 'decision', 'sources'];
   const TASK_LAYOUT_V = 3, TASK_SECTIONS_MAX = 8, TASK_SECTION_NAME_MAX = 24, TASK_COLS = [1, 2, 3];
@@ -2195,7 +2198,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     { id: 'header', name: 'Header', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['id'], ['title', 'list'], ['close']] },
     { id: 'top', name: 'Top', cols: 1, widths: ['fill'], cells: [['autonomy', 'decision', 'format']] },
     { id: 'main', name: 'Main', cols: 1, widths: ['fill'], cells: [['description', 'dates']] },
-    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tl:*', 'links', 'sources']] }], off: [] };
+    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tagsearch', 'tl:*', 'links', 'sources']] }], off: [] };
   const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: TASK_BLOCKS };
   const LAYOUT_FIXED = { board: [], task: TASK_NEVER_HIDDEN };
   const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] }, task: TASK_LAYOUT_DEFAULTS };
@@ -2389,12 +2392,14 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     sections.forEach((s, i) => { if (!s.id) { s.id = freeSectionId(taken, i + 1); taken.add(s.id); } });
     const last = sections[sections.length - 1];
     TASK_BLOCKS.forEach(b => {
-      if (seen.has(b)) return;
+      if (seen.has(b) || b === 'tagsearch') return;
       const d = TASK_LAYOUT_DEFAULTS.sections.find(x => x.cells.some(c => c.includes(b)));
       const s = sections.find(x => x.id === d.id) || last;
       s.cells[s.cells.length - 1].push(b); seen.add(b);
     });
     if (!seen.has('tl:*')) { const s = sections.find(x => x.id === 'bottom') || last; s.cells[0].unshift('tl:*'); seen.add('tl:*'); }
+    // a layout stored before Find a tag was a block: the box goes right before the tag lists (tl:*)
+    if (!seen.has('tagsearch')) { for (const s of sections) for (const c of s.cells) { const i = c.indexOf('tl:*'); if (i >= 0 && !seen.has('tagsearch')) { c.splice(i, 0, 'tagsearch'); seen.add('tagsearch'); } } }
     const off = Array.isArray(raw.off) ? [...new Set(raw.off.filter(b => typeof b === 'string' && seen.has(b) && b !== 'tl:*' && !TASK_NEVER_HIDDEN.includes(b)))] : [];
     return { v: TASK_LAYOUT_V, sections, off };
   }
@@ -5338,9 +5343,9 @@ function openTask(id, quad, opts) {
   const autoOn = !!t && editable && !o.preview && me && me.kind === 'human' && (ROLE[t.list] === 'owner' || ROLE[t.list] === 'editor');
   const autoCtx = () => { const by = {}; all().forEach(x => { by[x.id] = x; }); return { byId: by, parentOf: C.linkIndex(new Map(LINKS), by).parentOf, list: LIST[t.list] }; };
   const autoShown = t ? C.itemModeOf(t) : 'inherit';
-  const autoHtml = !autoOn ? '' : '<div class="fauto" role="group" aria-labelledby="fau-l"><div class="row"><label id="fau-l" for="fau">Autonomy<select id="fau" aria-describedby="fau-cap">' +
+  const autoHtml = !autoOn ? '' : '<div class="fauto" role="group" aria-labelledby="fau-l"><div class="row"><label id="fau-l" for="fau">Autonomy<select id="fau" aria-describedby="fau-w">' +
     C.autonomyChoices(!!me.is_household, true, autoShown).map(c => '<option value="' + c.mode + '"' + (c.mode === autoShown ? ' selected' : '') + (c.off ? ' disabled' : '') + '>' + C.AUTONOMY_NAME[c.mode] + (c.off && !c.legacy ? ' (household only)' : '') + '</option>').join('') +
-    '</select></label><span class="cap" id="fau-cap" aria-live="polite"></span><button type="button" class="linkbtn" id="fau-reset" hidden>Reset to inherit</button></div><p class="note" id="fau-w" hidden></p></div>';
+    '</select></label><button type="button" class="linkbtn" id="fau-reset" hidden>Reset to inherit</button></div><p class="note" id="fau-w" hidden></p></div>';
   // harness configurations T16: one Decision section. A Delegate card (C.delegateCard: questions, options, class, facts) is answered here:
   // the answers go under ## Your answer (C.setAnswer, every other byte kept; settle.js reads them as before) and, on a card with two
   // answers (details.decision), Accept or Decline also answers it as the buttons always did. A check card keeps its answer box
@@ -5356,10 +5361,11 @@ function openTask(id, quad, opts) {
   // "Completed" with Undo, then the next task of the shown order (none: the window closes). Not on a decision card (its answer buttons
   // close it), a task awaiting its check (settle.js would read it as closed by hand), a read-only, done or new task, or a preview
   const doneOn = !!t && editable && !o.preview && !C.decisionOf(t) && t.status !== 'waiting' && !C.awaitingCheck(t) && !C.CLOSED.includes(t.status);
-  const doneHtml = doneOn ? '<input type="checkbox" class="fdone" id="fdone" aria-label="Mark done" title="Mark done">' : '';
+  // round 3 (Max): the 'close' block of Card layout is this checkbox, labelled Done (the window closes with Cancel, Escape and the zones)
+  const doneHtml = doneOn ? '<label class="fdone-l"><input type="checkbox" class="fdone" id="fdone" aria-label="Mark done" title="Mark done">Done</label>' : '';
   // Card layout v3 (2026-11-11): the window's blocks in the person's sections and columns; one tag picker per tag list ('tl:<id>')
   const TV = C.taskLayoutView(cardLayout, taskTagLists(), tagListFavs, tagListOrder, t ? 'edit' : 'create');
-  const tlFirst = (TV.sections.flatMap(s => s.cells.flat()).find(b => /^tl:/.test(b)) || ''); // the search box over the tags sits in this block
+  const tlAny = TV.sections.some(s => s.cells.some(c => c.some(b => /^tl:/.test(b) && TAG_LISTS[b.slice(3)]))); // Find a tag shows only with a tag list block to filter
   let formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h sr" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml + '</div>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
@@ -5384,14 +5390,16 @@ function openTask(id, quad, opts) {
   function tblock(b) {
     if (/^tl:/.test(b)) {
       const l = TAG_LISTS[b.slice(3)]; if (!l) return '';
-      return '<div class="tagpick" data-tl="' + esc(l.id) + '">' + (b === tlFirst ? '<input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' : '') +
+      return '<div class="tagpick" data-tl="' + esc(l.id) + '">' + 
         '<div class="tagbox" role="group" aria-label="Tags: ' + esc(l.name) + '" data-tl-box="' + esc(l.id) + '"></div></div>';
     }
     switch (b) {
       case 'list': return '<div class="flist"><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>';
       case 'id': return wnum ? '<span class="fref" id="fref">' + esc(wnum) + '</span>' : '';
-      case 'title': return '<div class="ftrow"><div class="rt one tk-title" id="ft" contenteditable="' + editable + '" role="textbox" aria-label="Title" data-ph="Title">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>';
-      case 'close': return '<button type="button" class="tk-x" id="fx" aria-label="Close" title="Close (Esc)">' + I.x + '</button>';
+      case 'title': return '<div class="ftrow"><div class="rt one tk-title" id="ft" contenteditable="' + editable + '" role="textbox" aria-label="Title" data-ph="Title">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div></div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>';
+      case 'close': return doneHtml;
+      // Find a tag (round 3): its own block; it filters every tag list block wherever they stand
+      case 'tagsearch': return tlAny ? '<div class="tagsrch"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40"></div>' : '';
       case 'autonomy': return autoHtml;
       case 'decision': return decHtml;
       case 'format': return '<div class="fbar has-q">' + fmtHtml + quadHtml + whoHtml + '</div>';
@@ -5799,11 +5807,12 @@ function openTask(id, quad, opts) {
   const autoEl = dlg.querySelector('#fau');
   const drawAuto = () => {
     if (!autoEl) return;
-    const v = autoEl.value, ctx = autoCtx(), inh = C.autonomyInherited(t, ctx), cap = dlg.querySelector('#fau-cap'), w = dlg.querySelector('#fau-w');
+    // round 3 (Max): no caption line; the inherited mode is in the Inherit option ("Inherit (AI Brain)"), where it comes from and who set
+    // a mode in the dropdown's title
+    const v = autoEl.value, ctx = autoCtx(), inh = C.autonomyInherited(t, ctx), w = dlg.querySelector('#fau-w');
     const from = inh.from === 'parent' ? 'from parent ' + ref(inh.parent) + ': ' + C.AUTONOMY_NAME[inh.mode] : 'from list: ' + C.AUTONOMY_NAME[inh.mode];
-    if (v === 'inherit') cap.textContent = from;
-    else if (v === autoShown && t.autonomySetAt) cap.innerHTML = '<b>' + esc(C.AUTONOMY_NAME[v]) + '</b> · set here by ' + esc(personName(t.autonomySetBy)) + ' · ' + esc(fmtDay(t.autonomySetAt));
-    else cap.innerHTML = '<b>' + esc(C.AUTONOMY_NAME[v]) + '</b> · set here when you save';
+    const io = autoEl.querySelector('option[value=inherit]'); if (io) io.textContent = 'Inherit (' + C.AUTONOMY_NAME[inh.mode] + ')';
+    autoEl.title = v === 'inherit' ? 'Inherit ' + from : v === autoShown && t.autonomySetAt ? C.AUTONOMY_NAME[v] + ' · set here by ' + personName(t.autonomySetBy) + ' · ' + fmtDay(t.autonomySetAt) : C.AUTONOMY_NAME[v] + ' · set here when you save';
     dlg.querySelector('#fau-reset').hidden = v === 'inherit';
     const warn = C.autonomyWarning(v, inh, C.listModeOf(LIST[t.list]));
     w.textContent = warn; w.hidden = !warn;
@@ -6030,8 +6039,6 @@ function openTask(id, quad, opts) {
   head.addEventListener('pointercancel', () => { sw = null; });
   head.addEventListener('pointerup', e => { if (!sw) return; const k = C.swipeDir(e.clientX - sw.x, e.clientY - sw.y); sw = null; if (k && nav[k]) here.leave(k); });
   here.onClose = () => { render(); const back = opener && document.querySelector(opener); if (back) back.focus(); };
-  // the Close block (Card layout v3, never hidden): as Escape, it asks first when something changed
-  const fx = dlg.querySelector('#fx'); if (fx) fx.addEventListener('click', () => here.leave('close'), sig);
   dlg.querySelector('#ft').addEventListener('input', () => dlg.querySelector('#fe').textContent = '');
   dlg.querySelector('#fl').addEventListener('change', () => {
     dlg.querySelector('#fle').textContent = '';
@@ -6457,7 +6464,7 @@ function openSettings(kind) {
 // Create. "Options" holds the switches the window always had. Same for all lists; Save stores it all in prefs.cardLayout, Reset puts
 // every tab back to the defaults (kept only with Save)
 const CL_BLOCK = { board: { facts: 'Facts (end, created, by)', description: 'Description' },
-  task: { list: 'List', id: 'ID', title: 'Title', close: 'Close', autonomy: 'Autonomy', decision: 'Decision section', format: 'Formatting, quadrant, created', description: 'Description', dates: 'Start and end', links: 'Links', sources: 'Sources' } };
+  task: { list: 'List', id: 'ID', title: 'Title', close: 'Done', tagsearch: 'Find a tag', autonomy: 'Autonomy', decision: 'Decision section', format: 'Formatting, quadrant, created', description: 'Description', dates: 'Start and end', links: 'Links', sources: 'Sources' } };
 const CL_ZN = { top: 'Top', main: 'Main', bottom: 'Bottom' };
 const CL_GRIP = '<svg class="grip" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
 const CL_LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
@@ -6585,7 +6592,7 @@ function openCardLayout() {
   function previewTask() {
     const el = q('.cl-pv[data-pv=task]'), create = cs.pv === 'create', off = new Set(TL.off);
     q('#cl-pvh-task').textContent = create ? 'Preview: New task' : 'Preview: Edit task';
-    const label = b => b === 'title' ? (create ? 'Title' : 'Task title') : b === 'id' ? '#142' : b === 'list' ? (LIST[st.list] || {}).name || 'List' : b === 'close' ? '✕ Close' : name('task', b);
+    const label = b => b === 'title' ? (create ? 'Title' : 'Task title') : b === 'id' ? '#142' : b === 'list' ? (LIST[st.list] || {}).name || 'List' : b === 'close' ? '☐ Done' : name('task', b);
     // the window's grid: a block's column is its cell, its row its place there (rows line up); fit / fill as in the window
     const psec = s => {
       const cols = s.cells.map((c, ci) => ({ w: s.widths[ci] || 'fill', items: c.filter(b => !off.has(b) && !(create && C.TASK_CREATE_SKIP.includes(b))) })).filter(x => x.items.length);

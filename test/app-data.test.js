@@ -545,7 +545,7 @@ test('list panels: listBar survives a phone write, ids the phone does not know i
 
 test('task window layout v3 survives a phone write; a stored v2 task layout arrives migrated', async () => {
   const task = { v: 3, sections: [{ id: 'header', name: 'Head', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['list'], ['title', 'id'], ['close']] },
-    { id: 'notes', name: 'Notes', cols: 2, widths: ['fill', 'fill'], cells: [['description', 'tl:*'], ['dates']] },
+    { id: 'notes', name: 'Notes', cols: 2, widths: ['fill', 'fill'], cells: [['description', 'tagsearch', 'tl:*'], ['dates']] },
     { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['autonomy', 'decision', 'format', 'links', 'sources']] }], off: ['id'] };
   for (const [stored, want] of [[task, task], [{ top: ['format'], main: ['tags'], bottom: [], off: [] }, null]]) {
     const saved = [];
@@ -560,7 +560,7 @@ test('task window layout v3 survives a phone write; a stored v2 task layout arri
     await d.writePrefs();
     const got = saved[saved.length - 1].cardLayout.zones.task;
     if (want) assert.deepEqual(got, want);
-    else { assert.equal(got.v, 3); assert.deepEqual(got.sections.map(s => s.id), ['header', 'top', 'main', 'bottom']); assert.equal(got.sections[3].cells[0][0], 'tl:*'); }
+    else { assert.equal(got.v, 3); assert.deepEqual(got.sections.map(s => s.id), ['header', 'top', 'main', 'bottom']); assert.deepEqual(got.sections[3].cells[0].slice(0, 2), ['tagsearch', 'tl:*']); }
   }
 });
 
