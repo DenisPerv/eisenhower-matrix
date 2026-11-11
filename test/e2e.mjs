@@ -1763,6 +1763,7 @@ async function gHarness() {
       const ci = await mkItem('card layout', { body_md: 'e2e card layout description', sort_key: 9100000 });
       await T.reload(); await T.ready(); await pick(T, ST.id);
       await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+      await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();true'); // start from the defaults, whatever the person stored (cleanup restores the row)
       const cl = await T.ev(`(()=>{const d=document.querySelector('${W}');return {tabs:[...d.querySelectorAll('[role=tab]')].map(t=>t.textContent),zones:d.querySelectorAll('#cl-p-board .cl-zone').length,blocks:d.querySelectorAll('#cl-p-board .cl-blk').length,tl:d.querySelectorAll('#cl-p-board .cl-blk[data-b^="tl:"]').length,prev:!!d.querySelector('#cl-p-board .cl-pv .card'),fixed:!!d.querySelector('#cl-p-board .cl-fixed')}})()`);
       check(G, 'Card layout (T17): tabs On the board, Open task, Options; three zones; facts, description and one block per tag list; a live card preview; the fixed row',
         JSON.stringify(cl.tabs) === '["On the board","Open task","Options"]' && cl.zones === 3 && cl.blocks === 2 + cl.tl && cl.prev && cl.fixed, JSON.stringify(cl));
@@ -1790,27 +1791,30 @@ async function gHarness() {
       const SX = ns.id;
       await T.ev(`(()=>{const P=document.querySelector('${W} #cl-p-task'),sec=()=>P.querySelector('.cl-sec[data-sec="${SX}"]'),n=sec().querySelector('[data-secn]');n.value='E2E';n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));
         const c=sec().querySelector('[data-cols]');c.value='3';c.dispatchEvent(new Event('change',{bubbles:true}));
-        const mv=(b,v)=>{const s=P.querySelector('[data-zsel="'+b+'"]');s.value=v;s.dispatchEvent(new Event('change',{bubbles:true}))};mv('list','${SX}|0');mv('title','${SX}|1');mv('close','main|0');return true})()`);
+        const mv=(b,v)=>{const s=P.querySelector('[data-zsel="'+b+'"]');s.value=v;s.dispatchEvent(new Event('change',{bubbles:true}))};mv('list','${SX}|0');mv('title','${SX}|1');mv('close','main|0');mv('format','${SX}|2');return true})()`);
+      await T.ev(`document.querySelector('${W} #cl-p-task [data-w=fit][data-wsec="${SX}"][data-wcol="0"]').click(),true`);
       await T.ev(`document.querySelector('${W} #cl-p-task .cl-blk[data-b=id]').focus(),true`); await T.key('ArrowRight', 1);
       const lay = await T.ev(`(()=>{const d=document.querySelector('${W}'),P=d.querySelector('#cl-p-task'),cell=(s,i)=>[...P.querySelectorAll('.cl-cell[data-sec="'+s+'"][data-cell="'+i+'"] .cl-blk')].map(b=>b.dataset.b),sx=P.querySelector('.cl-sec[data-sec="${SX}"]');
         return {name:sx.querySelector('[data-secn]').value,cols:sx.querySelectorAll('.cl-cell').length,c0:cell('${SX}',0),c1:cell('${SX}',1),main:cell('main',0),h1:cell('header',1),live:d.querySelector('#cl-live').textContent,
-          pv:getComputedStyle(P.querySelectorAll('.cl-pv .cl-pcells')[4]).gridTemplateColumns.split(' ').length,st:d.querySelector('#cl-st').textContent,max:d.querySelector('#cl-addsec').disabled}})()`);
-      check(G, 'Card layout v3: Add section adds an empty, removable section at the end (focus on its name); renamed E2E with 3 columns; List and Title in its columns 1 and 2, Close in Main; Alt+ArrowRight moves ID to the next cell, announced; the preview draws 3 columns',
-        ns.n === 5 && ns.focus && ns.rm && lay.name === 'E2E' && lay.cols === 3 && JSON.stringify(lay.c0) === '["list"]' && JSON.stringify(lay.c1) === '["title"]' && lay.main.includes('close') && lay.h1.includes('id') && /ID moved to Header, column 2/.test(lay.live) && lay.pv === 3 && lay.st === 'Unsaved changes' && !lay.max, JSON.stringify({ ns, lay }));
+          pv:getComputedStyle(P.querySelectorAll('.cl-pv .cl-pcells')[4]).gridTemplateColumns.split(' ').map(parseFloat),fit:sx.querySelector('[data-w=fit][data-wcol="0"]').getAttribute('aria-pressed')==='true'&&sx.querySelector('[data-w=fill][data-wcol="1"]').getAttribute('aria-pressed')==='true',
+          list:(l=>({sh:l.scrollHeight,ch:l.clientHeight,ov:getComputedStyle(l).overflowY}))(P.querySelector('.cl-list')),save:(r=>r.bottom<=innerHeight&&r.top>=0)(d.querySelector('#cl-save').getBoundingClientRect()),st:d.querySelector('#cl-st').textContent,max:d.querySelector('#cl-addsec').disabled}})()`);
+      check(G, 'Card layout v3: Add section adds an empty, removable section at the end (focus on its name); renamed E2E with 3 columns; List and Title in its columns 1 and 2, Close in Main; Alt+ArrowRight moves ID to the next cell, announced; column 1 set to Fit; the section list scrolls inside the dialog with Save in view; the preview draws 3 columns',
+        ns.n === 5 && ns.focus && ns.rm && lay.name === 'E2E' && lay.cols === 3 && JSON.stringify(lay.c0) === '["list"]' && JSON.stringify(lay.c1) === '["title"]' && lay.main.includes('close') && lay.h1.includes('id') && /ID moved to Header, column 2/.test(lay.live) && lay.pv.length === 3 && lay.pv[0] <= (lay.pv[0] + lay.pv[1] + lay.pv[2]) / 2 + 1 && lay.fit && lay.list.sh > lay.list.ch && lay.list.ov === 'auto' && lay.save && lay.st === 'Unsaved changes' && !lay.max, JSON.stringify({ ns, lay }));
       await sleep(300); await T.shot('card-layout-task-1440x900');
       await T.size(390, 844); await sleep(400);
-      const tph = await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('form'),c=d.querySelector('#cl-p-task .cl-sec[data-sec="${SX}"] .cl-cells');return {one:getComputedStyle(c).gridTemplateColumns.split(' ').length===1,fits:f.scrollWidth<=f.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth}})()`);
-      check(G, 'Card layout v3 (390 px): the cells of a section stack into one column, no horizontal scroll', tph.one && tph.fits, JSON.stringify(tph));
+      const tph = await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('form'),c=d.querySelector('#cl-p-task .cl-sec[data-sec="${SX}"] .cl-cells');c.scrollIntoView({block:'center'});const cr=c.getBoundingClientRect(),sv=d.querySelector('#cl-save').getBoundingClientRect();return {reach:cr.top>=0&&cr.top<innerHeight,save:sv.bottom<=innerHeight+1&&sv.top>=0,one:getComputedStyle(c).gridTemplateColumns.split(' ').length===1,fits:f.scrollWidth<=f.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth}})()`);
+      check(G, 'Card layout v3 (390 px): the cells of a section stack into one column, the last section is in reach with Save in view, no horizontal scroll', tph.one && tph.fits && tph.reach && tph.save, JSON.stringify(tph));
       await T.size(1440, 900); await sleep(300);
       await T.click(W + ' #cl-save');
       const onBoard = await T.wait(`!!document.querySelector('[data-card="${ci.id}"].full .details.cz-top .md')`, 6000);
       check(G, 'Card layout (T17): saved; the board card shows its description in the Top zone, above the title', onBoard);
       const tw = await openCard(T, ci.id, W + ' .tk-card .tsec');
       const tws = tw ? await T.ev(`(()=>{const d=document.querySelector('${W} .tk-card'),sx=d.querySelector('.tsec[data-sec="${SX}"]');return {secs:[...d.querySelectorAll('.tsec')].map(s=>s.dataset.sec),links:d.querySelector('[data-tb=links]').hidden&&!!d.querySelector('.tsec-off [data-tb=links]'),fn:!!d.querySelector('#fn'),
-        cols:sx?getComputedStyle(sx).gridTemplateColumns.split(' ').length:0,list:!!(sx&&sx.querySelector('.tcell:nth-child(1) [data-tb=list] #fl')),title:!!(sx&&sx.querySelector('.tcell:nth-child(2) [data-tb=title] #ft')),close:!!d.querySelector('.tsec[data-sec=main] [data-tb=close] #fx'),
+        cols:sx?getComputedStyle(sx).gridTemplateColumns.split(' ').length:0,list:!!(sx&&sx.querySelector('[data-tb=list] #fl'))&&getComputedStyle(sx.querySelector('[data-tb=list]')).gridColumnStart==='1',title:!!(sx&&sx.querySelector('[data-tb=title] #ft'))&&getComputedStyle(sx.querySelector('[data-tb=title]')).gridColumnStart==='2',
+        q:sx?(()=>{const f=sx.querySelector('[data-tb=format]'),g=f&&f.querySelector('.fquad');if(!g)return null;const a=f.getBoundingClientRect(),b=g.getBoundingClientRect();return {in:b.right<=a.right+1&&b.left>=a.left-1,cols:getComputedStyle(g).gridTemplateColumns.split(' ').length}})():null,row:sx?Math.abs(sx.querySelector('[data-tb=list]').getBoundingClientRect().top-sx.querySelector('[data-tb=title]').getBoundingClientRect().top):99,fitw:sx?getComputedStyle(sx).gridTemplateColumns.split(' ').map(parseFloat):[],close:!!d.querySelector('.tsec[data-sec=main] [data-tb=close] #fx'),
         tags:d.querySelectorAll('.tsec [data-tb^="tl:"] .tagbox').length,search:!!d.querySelector('.tsec [data-tb^="tl:"] #tg-q')}})()`) : null;
-      check(G, 'Card layout v3: the task window (Edit) draws the sections as a grid: E2E with List and Title side by side, Close in Main; Links kept in the form but hidden; one tag picker per tag list with the search box in the first',
-        !!tws && tws.secs.includes(SX) && tws.cols === 2 && tws.list && tws.title && tws.close && tws.links && tws.fn && tws.tags === tk.tl && tws.search, JSON.stringify(tws));
+      check(G, 'Card layout v3: the task window (Edit) draws the sections as a grid: E2E with List (Fit) and Title (Fill) side by side on one row, the quadrant buttons folded (2×2 or one per line) inside the narrow Formatting cell, Close in Main; Links kept in the form but hidden; one tag picker per tag list with the search box in the first',
+        !!tws && tws.secs.includes(SX) && tws.cols === 3 && !!tws.q && tws.q.in && tws.q.cols <= 2 && tws.list && tws.title && tws.row <= 1 && tws.fitw.length === 3 && tws.fitw[0] <= (tws.fitw[0] + tws.fitw[1] + tws.fitw[2]) / 2 + 1 && tws.close && tws.links && tws.fn && tws.tags === tk.tl && tws.search, JSON.stringify(tws));
       if (tw) {
         await sleep(300); await T.shot('task-zones-1440x900'); await T.size(390, 844); await sleep(300);
         const hx = await T.ev(`(()=>{const c=document.querySelector('${W} .tk-card');if(!c)return {card:false};const r=c.getBoundingClientRect(),wide=[...c.querySelectorAll('*')].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().right>r.right+1).slice(0,4).map(e=>e.tagName+'.'+e.className+'#'+e.id+':'+Math.round(e.getBoundingClientRect().right));return {fits:c.scrollWidth<=c.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth,sw:c.scrollWidth,cw:c.clientWidth,dw:document.documentElement.scrollWidth,iw:innerWidth,wide}})()`);
@@ -1821,7 +1825,7 @@ async function gHarness() {
       }
       await closeDialogs(T);
       // Create: the same grid without ID, Autonomy, Decision and Sources
-      await T.click('[data-add="B"]'); await T.wait(`!!document.querySelector('${W} .tk-card #ft')`, 4000);
+      await sleep(500); await T.ev(`document.querySelector('[data-add="B"]').click(),true`); await T.wait(`!!document.querySelector('${W} .tk-card #ft')`, 4000);
       const cr = await T.ev(`(()=>{const d=document.querySelector('${W} .tk-card');if(!d)return {open:false,dialogs:document.querySelectorAll('dialog[open]').length,add:!!document.querySelector('[data-add="B"]')};return {title:!!d.querySelector('.tsec[data-sec="${SX}"] [data-tb=title]'),close:!!d.querySelector('.tsec[data-sec=main] #fx'),skip:['id','autonomy','decision','sources'].every(b=>!d.querySelector('[data-tb='+b+']'))}})()`);
       check(G, 'Card layout v3: the task window (Create) uses the same sections and leaves out ID, Autonomy, Decision and Sources', cr.title && cr.close && cr.skip, JSON.stringify(cr));
       await closeDialogs(T);
@@ -1836,6 +1840,15 @@ async function gHarness() {
       check(G, 'Card layout v3: Reset gives the default sections Header, Top, Main, Bottom', JSON.stringify(rs) === '["Header","Top","Main","Bottom"]', JSON.stringify(rs));
       await T.ev('document.getElementById("cl-save").click();true');
       await closeDialogs(T);
+      // round 2: the default Header lines up ID, Title and Close on one row; the Title (the heading, no label) sits right next to the ID
+      if (await openCard(T, ci.id, W + ' .tk-card .tsec[data-sec=header] [data-tb=title]')) {
+        const hd = await T.ev(`(()=>{const d=document.querySelector('${W} .tk-card'),h=d.querySelector('.tsec[data-sec=header]'),r=b=>{const e=h.querySelector('[data-tb='+b+']');return e?e.getBoundingClientRect():null},i=r('id'),t=r('title'),c=r('close'),ft=d.querySelector('#ft');
+          return {tops:[i,t,c].map(x=>x&&Math.round(x.top)),gap:i&&t?Math.round(t.left-i.right):null,label:!!d.querySelector('#ft-l'),font:parseFloat(getComputedStyle(ft).fontSize),border:getComputedStyle(ft).borderTopColor,list:!!h.querySelector('[data-tb=list] #fl')}})()`);
+        check(G, 'Card layout v3: the default Header puts ID, Title and Close on one row (tops within 4 px), the Title right next to the ID, as a heading without a label; List under it',
+          hd.tops.every(x => x !== null) && Math.max(...hd.tops) - Math.min(...hd.tops) <= 4 && hd.gap !== null && hd.gap <= 40 && !hd.label && hd.font >= 20 && hd.list, JSON.stringify(hd));
+        await sleep(300); await T.shot('task-header-1440x900'); await T.size(390, 844); await sleep(300); await T.shot('task-header-390x844'); await T.size(1440, 900);
+        await closeDialogs(T);
+      }
     }
     // the task's Autonomy row: the child inherits Manual from its parent, Guided is wider than the parent
     const par = await mkItem('autonomy parent', { sort_key: 9100001 }), kid = await mkItem('autonomy child', { sort_key: 9100002 });

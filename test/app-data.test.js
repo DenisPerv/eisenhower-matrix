@@ -544,9 +544,9 @@ test('list panels: listBar survives a phone write, ids the phone does not know i
 });
 
 test('task window layout v3 survives a phone write; a stored v2 task layout arrives migrated', async () => {
-  const task = { v: 3, sections: [{ id: 'header', name: 'Head', cols: 3, cells: [['list'], ['title', 'id'], ['close']] },
-    { id: 'notes', name: 'Notes', cols: 2, cells: [['description', 'tl:*'], ['dates']] },
-    { id: 'bottom', name: 'Bottom', cols: 1, cells: [['autonomy', 'decision', 'format', 'links', 'sources']] }], off: ['id'] };
+  const task = { v: 3, sections: [{ id: 'header', name: 'Head', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['list'], ['title', 'id'], ['close']] },
+    { id: 'notes', name: 'Notes', cols: 2, widths: ['fill', 'fill'], cells: [['description', 'tl:*'], ['dates']] },
+    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['autonomy', 'decision', 'format', 'links', 'sources']] }], off: ['id'] };
   for (const [stored, want] of [[task, task], [{ top: ['format'], main: ['tags'], bottom: [], off: [] }, null]]) {
     const saved = [];
     const f = fakeSupabase([

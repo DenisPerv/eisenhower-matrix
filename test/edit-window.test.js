@@ -77,7 +77,7 @@ test('the done checkbox: at the right end of the title row, hidden on decision c
   const html = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
   assert.match(html, /const doneOn = !!t && editable && !o\.preview && !C\.decisionOf\(t\) && t\.status !== 'waiting' && !C\.awaitingCheck\(t\) && !C\.CLOSED\.includes\(t\.status\);/);
   // at the right end of the title row, after the title field (2026-11-07, after Anastasiia's local test)
-  assert.match(html, /<div class="ftrow"><div class="rt one" id="ft"[^\n]*'<\/div>' \+ doneHtml \+ '<\/div><div class="err" id="fe"/);
+  assert.match(html, /<div class="ftrow"><div class="rt one tk-title" id="ft"[^\n]*'<\/div>' \+ doneHtml \+ '<\/div><div class="err" id="fe"/);
   assert.match(html, /if \(doneTick\) x\.status = 'done';/, 'status done in the window\'s one versioned write');
   assert.match(html, /doneTick = true; after = nav\.next \? 'next' : null; fs\.click\(\);/, 'then the next task, else the window closes');
   const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');

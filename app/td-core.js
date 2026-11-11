@@ -532,11 +532,13 @@
   const TASK_NEVER_HIDDEN = ['title', 'close', 'decision'];
   const TASK_CREATE_SKIP = ['id', 'autonomy', 'decision', 'sources'];
   const TASK_LAYOUT_V = 3, TASK_SECTIONS_MAX = 8, TASK_SECTION_NAME_MAX = 24, TASK_COLS = [1, 2, 3];
+  // a column's width (round 2, Max 2026-11-11): 'fit' = as wide as its blocks, 'fill' = shares the rest; one per column, default 'fill'
+  const TASK_WIDTHS = ['fit', 'fill'];
   const TASK_LAYOUT_DEFAULTS = { v: TASK_LAYOUT_V, sections: [
-    { id: 'header', name: 'Header', cols: 2, cells: [['list', 'id', 'title'], ['close']] },
-    { id: 'top', name: 'Top', cols: 1, cells: [['autonomy', 'decision', 'format']] },
-    { id: 'main', name: 'Main', cols: 1, cells: [['description', 'dates']] },
-    { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*', 'links', 'sources']] }], off: [] };
+    { id: 'header', name: 'Header', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['id'], ['title', 'list'], ['close']] },
+    { id: 'top', name: 'Top', cols: 1, widths: ['fill'], cells: [['autonomy', 'decision', 'format']] },
+    { id: 'main', name: 'Main', cols: 1, widths: ['fill'], cells: [['description', 'dates']] },
+    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tl:*', 'links', 'sources']] }], off: [] };
   const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: TASK_BLOCKS };
   const LAYOUT_FIXED = { board: [], task: TASK_NEVER_HIDDEN };
   const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] }, task: TASK_LAYOUT_DEFAULTS };
@@ -705,6 +707,8 @@
       { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*'].concat(arr('bottom'))] }],
       off: arr('off').filter(b => !TASK_NEVER_HIDDEN.includes(b)) };
   }
+  // a section's column widths, checked: one per column ('fit' or 'fill'), missing or unknown → 'fill'
+  const taskWidths = (raw, cols) => Array.from({ length: cols }, (x, i) => Array.isArray(raw) && TASK_WIDTHS.includes(raw[i]) ? raw[i] : 'fill');
   // the stored task layout, checked: v3 shape (a v2 value is migrated); unknown and duplicate blocks dropped, tag list blocks only for
   // known tag lists (when tagListIds is given), cells.length = cols (extra cells' blocks join the last cell), at most TASK_SECTIONS_MAX
   // sections, names cleaned, ids unique; a missing block goes to the end of its default section's last cell ('tl:*' to the start of
@@ -723,7 +727,7 @@
       const cells = Array.from({ length: cols }, () => []);
       rc.forEach((c, ci) => { if (Array.isArray(c)) c.forEach(b => { if (ok(b)) { seen.add(b); cells[Math.min(ci, cols - 1)].push(b); } }); });
       const id = typeof s.id === 'string' && TASK_SECTION_ID.test(s.id) && !taken.has(s.id) ? s.id : null; if (id) taken.add(id);
-      return { id, name: taskSectionName(s.name, i + 1), cols, cells };
+      return { id, name: taskSectionName(s.name, i + 1), cols, widths: taskWidths(s.widths, cols), cells };
     });
     sections.forEach((s, i) => { if (!s.id) { s.id = freeSectionId(taken, i + 1); taken.add(s.id); } });
     const last = sections[sections.length - 1];
@@ -761,7 +765,7 @@
   // autonomy, decision and sources (a new task has none)
   function taskLayoutView(layout, tagLists, favs, order, mode) {
     const L = taskLayoutExpand(layout, tagLists, favs, order), off = new Set(L.off), hidden = [];
-    const sections = L.sections.map(s => ({ id: s.id, name: s.name, cols: s.cols, cells: s.cells.map(c => c.filter(b => {
+    const sections = L.sections.map(s => ({ id: s.id, name: s.name, cols: s.cols, widths: s.widths.slice(), cells: s.cells.map(c => c.filter(b => {
       if (mode === 'create' && TASK_CREATE_SKIP.includes(b)) return false;
       if (off.has(b)) { hidden.push(b); return false; }
       return true;
@@ -847,7 +851,7 @@
     if (layout.sections.length >= TASK_SECTIONS_MAX) return layout;
     const L = clone(layout), taken = new Set(L.sections.map(s => s.id)), names = new Set(L.sections.map(s => s.name));
     let n = L.sections.length + 1; while (names.has('Section ' + n)) n++;
-    const s = { id: freeSectionId(taken, n), name: 'Section ' + n, cols: 1, cells: [[]] };
+    const s = { id: freeSectionId(taken, n), name: 'Section ' + n, cols: 1, widths: ['fill'], cells: [[]] };
     const i = L.sections.findIndex(x => x.id === afterId);
     L.sections.splice(i < 0 ? L.sections.length : i + 1, 0, s);
     return L;
@@ -863,7 +867,13 @@
     if (!s || !TASK_COLS.includes(cols) || cols === s.cols) return L;
     if (cols > s.cols) while (s.cells.length < cols) s.cells.push([]);
     else { const gone = s.cells.splice(cols).flat(); s.cells[cols - 1].push(...gone); }
-    s.cols = cols;
+    s.cols = cols; s.widths = taskWidths(s.widths, cols);
+    return L;
+  }
+  // one column's width: 'fit' or 'fill'
+  function taskLayoutSetWidth(layout, id, col, w) {
+    const L = clone(layout), s = L.sections.find(x => x.id === id);
+    if (s && TASK_WIDTHS.includes(w) && Number.isInteger(col) && col >= 0 && col < s.cols) { s.widths = taskWidths(s.widths, s.cols); s.widths[col] = w; }
     return L;
   }
   function taskLayoutMoveSection(layout, id, dir) {
@@ -1965,7 +1975,7 @@
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     ASSIGNEE_DEFAULT, isHomeosList, homeosAssigneeTag, assigneeOnListChange,
     createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, TASK_BLOCKS, TASK_NEVER_HIDDEN, TASK_CREATE_SKIP, TASK_LAYOUT_V, TASK_SECTIONS_MAX, TASK_SECTION_NAME_MAX, TASK_COLS, TASK_LAYOUT_DEFAULTS, readTaskLayout, taskSectionName, taskTagListOrder, taskLayoutExpand, taskLayoutView, taskLayoutStore, taskLayoutMove, taskLayoutHide, taskLayoutAddSection, taskLayoutRename, taskLayoutSetCols, taskLayoutMoveSection, taskLayoutRemoveSection, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, TASK_BLOCKS, TASK_NEVER_HIDDEN, TASK_CREATE_SKIP, TASK_LAYOUT_V, TASK_SECTIONS_MAX, TASK_SECTION_NAME_MAX, TASK_COLS, TASK_LAYOUT_DEFAULTS, readTaskLayout, taskSectionName, taskTagListOrder, taskLayoutExpand, taskLayoutView, taskLayoutStore, taskLayoutMove, taskLayoutHide, taskLayoutAddSection, taskLayoutRename, taskLayoutSetCols, taskLayoutSetWidth, TASK_WIDTHS, taskLayoutMoveSection, taskLayoutRemoveSection, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,

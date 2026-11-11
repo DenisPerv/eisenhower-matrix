@@ -724,7 +724,12 @@ dialog form.cl2{width:auto;min-width:0}
 .cl-tabs [role=tab]{border:0;border-right:1px solid var(--hair);border-radius:0;min-height:36px;padding:0 16px;font:500 14px var(--ui);background:transparent;color:var(--ink2)}
 .cl-tabs [role=tab]:last-child{border-right:0}
 .cl-tabs [role=tab][aria-selected="true"]{background:var(--accent-bg);color:var(--accent-ink);box-shadow:inset 0 -2px 0 var(--accent)}
-.cl-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid var(--hair);border-radius:var(--r);max-height:min(62vh,640px);overflow:hidden}
+/* round 2: each side scrolls on its own inside the body (the body itself grows with them), so every section stays in reach; the tabs
+   and the Reset / Save row stay in view */
+.cl-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid var(--hair);border-radius:var(--r);overflow:hidden}
+.cl-list,.cl-prev{max-height:min(calc(90vh - 230px),640px)}
+form.cl2 > .cl-tabs{position:sticky;top:-22px;z-index:3;box-shadow:0 0 0 8px var(--solid)}
+form.cl2 > .actions{position:sticky;bottom:-22px;z-index:3;margin:var(--s3) 0 -22px;padding:var(--s3) 0 22px;background:var(--solid);border-top:1px solid var(--hair);box-shadow:-24px 0 0 var(--solid),24px 0 0 var(--solid)}
 .cl-body[hidden],.cl-opts[hidden]{display:none}
 .cl-list{overflow:auto;padding:var(--s4) var(--s5);border-right:1px solid var(--hair)}
 .cl-prev{overflow:auto;padding:var(--s4) var(--s5);background:var(--well)}
@@ -776,13 +781,18 @@ dialog label.cl-cols > select{margin-top:0;width:auto;min-height:32px}
 .cl-sech button{min-height:32px;padding:0 8px;font-size:13px}.cl-sech .cl-mv{width:32px;padding:0}
 .cl-cells{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr));gap:var(--s2);margin-top:var(--s2)}
 .cl-cells .cl-zl{margin:0}
-.cl-cells .cl-blk{flex-wrap:wrap;row-gap:2px}.cl-cells .cl-blk .bn{flex:1 1 72px}
-.cl-cells .cl-blk .cl-eye,.cl-cells .cl-always{width:auto;min-width:56px}
+/* in a cell the name takes its own line and the controls share the next one, so a block fits a narrow column */
+.cl-cells.multi .cl-blk{flex-wrap:wrap;gap:2px 4px;padding:4px 6px}.cl-cells.multi .cl-blk .bn{flex:1 1 calc(100% - 24px)}
+.cl-cells.multi .cl-blk button{min-height:28px}.cl-cells.multi .cl-blk .cl-mv{width:28px}
+.cl-cells.multi .cl-blk .cl-eye,.cl-cells.multi .cl-always{width:auto;min-width:56px;padding:0 6px;margin-left:auto}
 .cl-addrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s3)}.cl-addrow .n{font-size:12px;color:var(--ink3)}
 .cl-psec{margin-top:6px;padding-top:4px;border-top:1px dashed var(--hair2)}.cl-psec:first-child{margin-top:0;border-top:0}
 .cl-psh{font:500 11px var(--ui);color:var(--ink3)}
-.cl-pcells{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr));gap:6px}
-.cl-pcell{min-width:0}
+.cl-pcells{display:grid;grid-template-columns:var(--pcols,minmax(0,1fr));gap:0 6px;align-items:start}
+.cl-pcells > .cl-pi{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-col{min-width:0;display:flex;flex-direction:column;gap:4px}
+.cl-colh{display:flex;align-items:center;justify-content:space-between;gap:var(--s2);font-size:12px}
+.cl-wseg button{min-height:26px;padding:0 8px;font-size:12px}
 @media (max-width:700px){
   .cl-body{display:flex;flex-direction:column;max-height:none;overflow:visible}
   .cl-prev{order:-1;border-bottom:1px solid var(--hair)}
@@ -794,7 +804,11 @@ dialog label.cl-cols > select{margin-top:0;width:auto;min-height:32px}
   .cl-blk .bn{flex:1 1 calc(100% - 32px)}
   .cl-blk .cl-eye,.cl-always{width:auto;min-width:64px}
   .cl-kbd{display:none}
-  .cl-cells,.cl-pcells{grid-template-columns:1fr}
+  .cl-cells{grid-template-columns:1fr}
+  .cl-cells.multi .cl-blk button,.cl-cells .cl-zsel{min-height:44px}.cl-cells.multi .cl-blk .cl-mv{width:44px}.cl-cells.multi .cl-blk .bn{flex:1 1 calc(100% - 32px)}
+  .cl-list,.cl-prev{max-height:none}
+  form.cl2 > .actions{margin:var(--s3) 0 -18px;padding:var(--s3) 0 18px;bottom:-18px;box-shadow:-16px 0 0 var(--solid),16px 0 0 var(--solid)}
+  form.cl2 > .cl-tabs{top:-16px}
   .cl-sech button,dialog label.cl-cols > select,dialog input.cl-secn{min-height:44px}.cl-sech .cl-mv{width:44px}
 }
 /* round 3, then version 3 (2026-10-29): the welcome card, pinned under the profile menu (which gets an accent ring while it is
@@ -1115,19 +1129,29 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 /* the done checkbox at the right end of the title row (2026-11-07) */
 .ftrow{display:flex;align-items:center;gap:10px}.ftrow #ft{flex:1;min-width:0}
 .fdone{flex:none;width:22px;height:22px;margin:0;accent-color:var(--accent);cursor:pointer}
-/* Card layout v3 (2026-11-11): the task window's sections, each a grid of its columns (--tcols, set per section); a cell with only the
-   number or Close takes its own width; at 700 px and below the cells wrap into one column (no horizontal scroll) */
+/* Card layout v3 (2026-11-11): a task window section is one grid; each block sits in its column (its cell) and its row (its place in
+   the cell), so rows line up across columns (round 2). Columns: fit = the blocks' width (at most half), fill = the rest (--tcols, per
+   section). Fill blocks are size containers (the quadrant buttons fold into a 2×2 grid when narrow). At 700 px and below the blocks
+   wrap row by row (no horizontal scroll) */
 .tsec{display:grid;grid-template-columns:var(--tcols,minmax(0,1fr));gap:0 var(--s4);align-items:start}
 .tsec + .tsec{margin-top:var(--s2)}
-.tcell{min-width:0}
-.tcell.small{display:flex;align-items:flex-start;justify-content:flex-end;gap:var(--s2)}
-.tcell .fref{margin-top:var(--s2)}
+.tzb{min-width:0}
+.tzb.fill{container-type:inline-size}
+.tzb.fit{justify-self:start}
+.tzb[data-tb=close]{justify-self:end}
+.tzb .fref{margin-top:2px}
 .tk-x{width:32px;height:32px;min-height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--ink3);box-shadow:none}
 .tk-x:hover{background:var(--hover);color:var(--ink)}
+/* the Title block is the window's heading (round 2): no label, no box until hovered or focused, two lines at most; editable in place */
+.rt.one.tk-title{margin-top:0;padding:2px 6px;border-color:transparent;background:transparent;font:500 24px/1.25 var(--serif);color:var(--ink);max-height:calc(2 * 1.25em + 6px)}
+.rt.one.tk-title:hover{border-color:var(--hair)}
+.rt.one.tk-title:focus{border-color:var(--hair2);outline:2px solid var(--focus);outline-offset:1px}
+.tk-title:empty::before{content:attr(data-ph);color:var(--ink3)}
 /* Start and End: a grid that drops to one column in a narrow cell (the menu's own .frow is a flex row, so scope it here) */
 .tzb .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:0 var(--s4)}
 .tzb .frow>div{min-width:0}.tzb .frow input{width:100%;min-width:0;box-sizing:border-box}
-@media (max-width:700px){.tsec{display:flex;flex-wrap:wrap;gap:0 var(--s3)}.tcell{flex:1 1 240px}.tcell.small{flex:0 0 auto}}
+.flist select{width:100%}
+@media (max-width:700px){.tsec{display:flex;flex-wrap:wrap;gap:0 var(--s3)}.tzb.fill{flex:1 1 200px}.tzb.fit{flex:0 0 auto;max-width:100%}.tzb[data-tb=close]{margin-left:auto}.rt.one.tk-title{font-size:20px}}
 /* the quadrant buttons under the title (2026-11-07): an outline in the quadrant's colour, the current one filled */
 .fquad{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s2) 0 var(--s3)}
 .fquad button{min-height:32px;padding:0 14px;border-radius:999px;border:1.5px solid var(--c);background:transparent;color:var(--ink2);font:500 13.5px var(--ui);cursor:pointer}
@@ -1169,6 +1193,13 @@ button.ar-open,button.lm-open{all:unset;cursor:pointer;text-decoration:underline
 .ro-task{min-width:min(640px,calc(100vw - 72px))}.ro-title{font:500 15px/1.35 var(--ui);margin-top:var(--s2)}
 @media (max-width:519px){.fbar .fwho{margin-left:0;justify-content:flex-start;flex-basis:100%}
   .fbar.has-q{display:flex}.fbar.has-q .fquad{order:1;flex-basis:100%;flex-wrap:wrap}.fbar.has-q .fwho{order:2;justify-self:auto}}
+/* the formatting row in a narrow block (round 2): the quadrant buttons fold into a 2×2 grid, one per line when narrower still */
+@container (max-width:640px){
+  .fbar.has-q{display:flex;flex-wrap:wrap}
+  .fbar.has-q .fquad{order:1;flex-basis:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0}
+  .fbar.has-q .fquad button{min-width:0;padding:0 8px}
+  .fbar.has-q .fwho{order:2;margin:0;justify-content:flex-start}}
+@container (max-width:220px){.fbar.has-q .fquad{grid-template-columns:minmax(0,1fr)}}
 /* round 3 P1: the task window is wider (U5); List, Quadrant and End share a row; Save stays in view at the bottom */
 .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 var(--s4)}
 /* the task window's tags (U1, U2, U6, U7, U8): a search box, then one group per tag list, its name on top and its chips below; a
@@ -1562,11 +1593,12 @@ dialog label.am-mode:has(input:disabled){cursor:not-allowed;opacity:.7}
 .lsd .e0box{margin-top:var(--s3);padding:var(--s3) var(--s4);border:1px solid var(--hair2);background:var(--well)}
 .lsd .e0box ul{margin:4px 0 0;padding-left:18px;font:400 13px/1.5 var(--font)}
 .lm-acts button[data-lm-set]{font-weight:600}
-.fauto{margin-top:var(--s4);padding:12px;background:var(--well);border:1px solid var(--hair)}
-.fauto .row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3)}
-.fauto label{margin:0;display:flex;align-items:center;gap:var(--s3)}
-dialog .fauto select{width:auto;min-width:200px;margin:0}
-.fauto .cap{color:var(--ink2);font:400 13px var(--font)}
+/* the task Autonomy block (round 2): as List - a small label above a full-width dropdown, the caption small and muted under it */
+.fauto{margin-top:var(--s4)}
+.fauto .row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px var(--s3)}
+dialog .fauto label{flex:1 1 100%;margin:0}
+dialog .fauto select{width:100%;min-width:0;margin-top:var(--s2)}
+.fauto .cap{color:var(--ink3);font:400 12px var(--font)}
 .dec{margin-top:var(--s4);border:1px solid var(--hair2);border-radius:var(--r-lg);box-shadow:inset 3px 0 0 var(--qc)}
 .dec-h{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);padding:12px 14px;background:color-mix(in srgb,var(--qc) 16%,transparent);border-bottom:1px solid var(--hair)}
 .dec-h h3{margin:0;font:600 18px var(--ui);margin-right:auto}
@@ -2157,11 +2189,13 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   const TASK_NEVER_HIDDEN = ['title', 'close', 'decision'];
   const TASK_CREATE_SKIP = ['id', 'autonomy', 'decision', 'sources'];
   const TASK_LAYOUT_V = 3, TASK_SECTIONS_MAX = 8, TASK_SECTION_NAME_MAX = 24, TASK_COLS = [1, 2, 3];
+  // a column's width (round 2, Max 2026-11-11): 'fit' = as wide as its blocks, 'fill' = shares the rest; one per column, default 'fill'
+  const TASK_WIDTHS = ['fit', 'fill'];
   const TASK_LAYOUT_DEFAULTS = { v: TASK_LAYOUT_V, sections: [
-    { id: 'header', name: 'Header', cols: 2, cells: [['list', 'id', 'title'], ['close']] },
-    { id: 'top', name: 'Top', cols: 1, cells: [['autonomy', 'decision', 'format']] },
-    { id: 'main', name: 'Main', cols: 1, cells: [['description', 'dates']] },
-    { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*', 'links', 'sources']] }], off: [] };
+    { id: 'header', name: 'Header', cols: 3, widths: ['fit', 'fill', 'fit'], cells: [['id'], ['title', 'list'], ['close']] },
+    { id: 'top', name: 'Top', cols: 1, widths: ['fill'], cells: [['autonomy', 'decision', 'format']] },
+    { id: 'main', name: 'Main', cols: 1, widths: ['fill'], cells: [['description', 'dates']] },
+    { id: 'bottom', name: 'Bottom', cols: 1, widths: ['fill'], cells: [['tl:*', 'links', 'sources']] }], off: [] };
   const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: TASK_BLOCKS };
   const LAYOUT_FIXED = { board: [], task: TASK_NEVER_HIDDEN };
   const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] }, task: TASK_LAYOUT_DEFAULTS };
@@ -2330,6 +2364,8 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
       { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*'].concat(arr('bottom'))] }],
       off: arr('off').filter(b => !TASK_NEVER_HIDDEN.includes(b)) };
   }
+  // a section's column widths, checked: one per column ('fit' or 'fill'), missing or unknown → 'fill'
+  const taskWidths = (raw, cols) => Array.from({ length: cols }, (x, i) => Array.isArray(raw) && TASK_WIDTHS.includes(raw[i]) ? raw[i] : 'fill');
   // the stored task layout, checked: v3 shape (a v2 value is migrated); unknown and duplicate blocks dropped, tag list blocks only for
   // known tag lists (when tagListIds is given), cells.length = cols (extra cells' blocks join the last cell), at most TASK_SECTIONS_MAX
   // sections, names cleaned, ids unique; a missing block goes to the end of its default section's last cell ('tl:*' to the start of
@@ -2348,7 +2384,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
       const cells = Array.from({ length: cols }, () => []);
       rc.forEach((c, ci) => { if (Array.isArray(c)) c.forEach(b => { if (ok(b)) { seen.add(b); cells[Math.min(ci, cols - 1)].push(b); } }); });
       const id = typeof s.id === 'string' && TASK_SECTION_ID.test(s.id) && !taken.has(s.id) ? s.id : null; if (id) taken.add(id);
-      return { id, name: taskSectionName(s.name, i + 1), cols, cells };
+      return { id, name: taskSectionName(s.name, i + 1), cols, widths: taskWidths(s.widths, cols), cells };
     });
     sections.forEach((s, i) => { if (!s.id) { s.id = freeSectionId(taken, i + 1); taken.add(s.id); } });
     const last = sections[sections.length - 1];
@@ -2386,7 +2422,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   // autonomy, decision and sources (a new task has none)
   function taskLayoutView(layout, tagLists, favs, order, mode) {
     const L = taskLayoutExpand(layout, tagLists, favs, order), off = new Set(L.off), hidden = [];
-    const sections = L.sections.map(s => ({ id: s.id, name: s.name, cols: s.cols, cells: s.cells.map(c => c.filter(b => {
+    const sections = L.sections.map(s => ({ id: s.id, name: s.name, cols: s.cols, widths: s.widths.slice(), cells: s.cells.map(c => c.filter(b => {
       if (mode === 'create' && TASK_CREATE_SKIP.includes(b)) return false;
       if (off.has(b)) { hidden.push(b); return false; }
       return true;
@@ -2472,7 +2508,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     if (layout.sections.length >= TASK_SECTIONS_MAX) return layout;
     const L = clone(layout), taken = new Set(L.sections.map(s => s.id)), names = new Set(L.sections.map(s => s.name));
     let n = L.sections.length + 1; while (names.has('Section ' + n)) n++;
-    const s = { id: freeSectionId(taken, n), name: 'Section ' + n, cols: 1, cells: [[]] };
+    const s = { id: freeSectionId(taken, n), name: 'Section ' + n, cols: 1, widths: ['fill'], cells: [[]] };
     const i = L.sections.findIndex(x => x.id === afterId);
     L.sections.splice(i < 0 ? L.sections.length : i + 1, 0, s);
     return L;
@@ -2488,7 +2524,13 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     if (!s || !TASK_COLS.includes(cols) || cols === s.cols) return L;
     if (cols > s.cols) while (s.cells.length < cols) s.cells.push([]);
     else { const gone = s.cells.splice(cols).flat(); s.cells[cols - 1].push(...gone); }
-    s.cols = cols;
+    s.cols = cols; s.widths = taskWidths(s.widths, cols);
+    return L;
+  }
+  // one column's width: 'fit' or 'fill'
+  function taskLayoutSetWidth(layout, id, col, w) {
+    const L = clone(layout), s = L.sections.find(x => x.id === id);
+    if (s && TASK_WIDTHS.includes(w) && Number.isInteger(col) && col >= 0 && col < s.cols) { s.widths = taskWidths(s.widths, s.cols); s.widths[col] = w; }
     return L;
   }
   function taskLayoutMoveSection(layout, id, dir) {
@@ -3590,7 +3632,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     ASSIGNEE_DEFAULT, isHomeosList, homeosAssigneeTag, assigneeOnListChange,
     createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, TASK_BLOCKS, TASK_NEVER_HIDDEN, TASK_CREATE_SKIP, TASK_LAYOUT_V, TASK_SECTIONS_MAX, TASK_SECTION_NAME_MAX, TASK_COLS, TASK_LAYOUT_DEFAULTS, readTaskLayout, taskSectionName, taskTagListOrder, taskLayoutExpand, taskLayoutView, taskLayoutStore, taskLayoutMove, taskLayoutHide, taskLayoutAddSection, taskLayoutRename, taskLayoutSetCols, taskLayoutMoveSection, taskLayoutRemoveSection, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, TASK_BLOCKS, TASK_NEVER_HIDDEN, TASK_CREATE_SKIP, TASK_LAYOUT_V, TASK_SECTIONS_MAX, TASK_SECTION_NAME_MAX, TASK_COLS, TASK_LAYOUT_DEFAULTS, readTaskLayout, taskSectionName, taskTagListOrder, taskLayoutExpand, taskLayoutView, taskLayoutStore, taskLayoutMove, taskLayoutHide, taskLayoutAddSection, taskLayoutRename, taskLayoutSetCols, taskLayoutSetWidth, TASK_WIDTHS, taskLayoutMoveSection, taskLayoutRemoveSection, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
@@ -5318,7 +5360,7 @@ function openTask(id, quad, opts) {
   // Card layout v3 (2026-11-11): the window's blocks in the person's sections and columns; one tag picker per tag list ('tl:<id>')
   const TV = C.taskLayoutView(cardLayout, taskTagLists(), tagListFavs, tagListOrder, t ? 'edit' : 'create');
   const tlFirst = (TV.sections.flatMap(s => s.cells.flat()).find(b => /^tl:/.test(b)) || ''); // the search box over the tags sits in this block
-  let formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml + '</div>' +
+  let formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h sr" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml + '</div>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
     (t && C.awaitingCheck(t) ? '<p class="note">Waits for your check: answer its check card.</p>' : '') +
@@ -5328,13 +5370,16 @@ function openTask(id, quad, opts) {
     // hidden blocks stay in the form (hidden), so Save reads their fields as before
     (TV.hidden.length ? '<div class="tsec-off" hidden>' + TV.hidden.map(b => { const x = tblock(b); return x ? '<div class="tzb" data-tb="' + esc(b) + '" hidden>' + x + '</div>' : ''; }).join('') + '</div>' : '') +
     '<div class="actions">';
-  // Card layout v3: one section is a grid of its cells (columns); an empty cell is left out (no gap box), a cell holding only small
-  // blocks (number, close) takes its own width. The heading, position line and actions stay fixed
+  // Card layout v3: one section is one grid. A block's column is its cell and its row is its place in the cell, so rows line up across
+  // columns (round 2, Max). A column with nothing to show is left out (no gap); 'fit' columns take their blocks' width (at most half the
+  // section), 'fill' columns share the rest. Blocks are written row by row, so the tab order and the wrapped phone layout read by rows
   function tsec(s) {
-    const cells = s.cells.map(c => ({ c, h: c.map(b => { const x = tblock(b); return x ? '<div class="tzb" data-tb="' + esc(b) + '">' + x + '</div>' : ''; }).join('') })).filter(x => x.h);
-    if (!cells.length) return '';
-    const cols = cells.map(x => x.c.every(b => b === 'id' || b === 'close') ? 'auto' : 'minmax(0,1fr)').join(' ');
-    return '<div class="tsec" data-sec="' + esc(s.id) + '" style="--tcols:' + cols + '">' + cells.map(x => '<div class="tcell' + (x.c.every(b => b === 'id' || b === 'close') ? ' small' : '') + '">' + x.h + '</div>').join('') + '</div>';
+    const cols = s.cells.map((c, ci) => ({ w: (s.widths || [])[ci] === 'fit' ? 'fit' : 'fill', items: c.map(b => ({ b, h: tblock(b) })).filter(x => x.h) })).filter(x => x.items.length);
+    if (!cols.length) return '';
+    const tpl = cols.map(x => x.w === 'fit' ? 'fit-content(50%)' : 'minmax(0,1fr)').join(' '), rows = Math.max(...cols.map(x => x.items.length));
+    let h = '';
+    for (let r = 0; r < rows; r++) cols.forEach((x, k) => { const it = x.items[r]; if (it) h += '<div class="tzb ' + x.w + '" data-tb="' + esc(it.b) + '" style="grid-column:' + (k + 1) + ';grid-row:' + (r + 1) + '">' + it.h + '</div>'; });
+    return '<div class="tsec" data-sec="' + esc(s.id) + '" style="--tcols:' + tpl + '">' + h + '</div>';
   }
   function tblock(b) {
     if (/^tl:/.test(b)) {
@@ -5345,7 +5390,7 @@ function openTask(id, quad, opts) {
     switch (b) {
       case 'list': return '<div class="flist"><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>';
       case 'id': return wnum ? '<span class="fref" id="fref">' + esc(wnum) + '</span>' : '';
-      case 'title': return '<div class="flabel" id="ft-l">Title</div><div class="ftrow"><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>';
+      case 'title': return '<div class="ftrow"><div class="rt one tk-title" id="ft" contenteditable="' + editable + '" role="textbox" aria-label="Title" data-ph="Title">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>';
       case 'close': return '<button type="button" class="tk-x" id="fx" aria-label="Close" title="Close (Esc)">' + I.x + '</button>';
       case 'autonomy': return autoHtml;
       case 'decision': return decHtml;
@@ -6507,6 +6552,9 @@ function openCardLayout() {
   const secsEl = q('.cl-secs');
   const MAXS = C.TASK_SECTIONS_MAX;
   const cellName = (s, ci) => s.name + (s.cols > 1 ? ', column ' + (ci + 1) : '');
+  // a column's head: its number and the Fit / Fill switch (round 2: fit = as wide as its blocks, fill = shares the rest)
+  const colHead = (s, ci) => { const w = s.widths[ci] || 'fill', lb = esc(cellName(s, ci)); return '<div class="cl-colh"><span class="n">Column ' + (ci + 1) + '</span><span class="cl-seg cl-wseg" role="group" aria-label="Width of ' + lb + '">' +
+    ['fit', 'fill'].map(x => '<button type="button" data-w="' + x + '" data-wsec="' + esc(s.id) + '" data-wcol="' + ci + '" aria-pressed="' + (w === x) + '" title="' + (x === 'fit' ? 'As wide as its blocks' : 'Takes the free width') + '">' + (x === 'fit' ? 'Fit' : 'Fill') + '</button>').join('') + '</span></div>'; };
   function drawTask(focus) {
     const off = new Set(TL.off), seq = TL.sections.flatMap(s => s.cells.flat()), n = TL.sections.length;
     const places = TL.sections.flatMap(s => s.cells.map((c, ci) => ({ v: s.id + '|' + ci, l: cellName(s, ci) })));
@@ -6528,8 +6576,8 @@ function openCardLayout() {
         '<button type="button" class="cl-mv" data-smv="up" data-s="' + id + '" aria-label="Move section ' + sn + ' up" title="Move section up"' + (si === 0 ? ' disabled' : '') + '>↑</button>' +
         '<button type="button" class="cl-mv" data-smv="down" data-s="' + id + '" aria-label="Move section ' + sn + ' down" title="Move section down"' + (si === n - 1 ? ' disabled' : '') + '>↓</button>' +
         '<button type="button" class="cl-srm" data-srm="' + id + '" aria-label="Remove section ' + sn + '" title="' + (empty ? 'Remove the section' : 'Only an empty section can be removed') + '"' + (empty && n > 1 ? '' : ' disabled') + '>Remove</button></div>' +
-        '<div class="cl-cells" style="--cols:' + s.cols + '">' + s.cells.map((c, ci) => '<ul class="cl-zl cl-cell" data-sec="' + id + '" data-cell="' + ci + '" aria-label="' + esc(cellName(s, ci)) + '">' +
-          (c.length ? c.map((b, i) => row(s, ci, c, b, i)).join('') : '<li class="cl-empty">Drop a block here</li>') + '</ul>').join('') + '</div></section>';
+        '<div class="cl-cells' + (s.cols > 1 ? ' multi' : '') + '" style="--cols:' + s.cols + '">' + s.cells.map((c, ci) => '<div class="cl-col">' + (s.cols > 1 ? colHead(s, ci) : '') + '<ul class="cl-zl cl-cell" data-sec="' + id + '" data-cell="' + ci + '" aria-label="' + esc(cellName(s, ci)) + '">' +
+          (c.length ? c.map((b, i) => row(s, ci, c, b, i)).join('') : '<li class="cl-empty">Drop a block here</li>') + '</ul></div>').join('') + '</div></section>';
     }).join('') + '<div class="cl-addrow"><button type="button" id="cl-addsec"' + (n >= MAXS ? ' disabled' : '') + '>Add section</button>' + (n >= MAXS ? '<span class="n">At most ' + MAXS + ' sections.</span>' : '') + '</div>';
     previewTask();
     if (focus) { const el = secsEl.querySelector(focus); if (el && !el.disabled) el.focus(); }
@@ -6538,9 +6586,14 @@ function openCardLayout() {
     const el = q('.cl-pv[data-pv=task]'), create = cs.pv === 'create', off = new Set(TL.off);
     q('#cl-pvh-task').textContent = create ? 'Preview: New task' : 'Preview: Edit task';
     const label = b => b === 'title' ? (create ? 'Title' : 'Task title') : b === 'id' ? '#142' : b === 'list' ? (LIST[st.list] || {}).name || 'List' : b === 'close' ? '✕ Close' : name('task', b);
-    el.innerHTML = '<div class="cl-ptask" inert>' + TL.sections.map(s => '<div class="cl-psec"><div class="cl-psh">' + esc(s.name) + '</div><div class="cl-pcells" style="--cols:' + s.cols + '">' +
-      s.cells.map(c => '<div class="cl-pcell">' + c.filter(b => !off.has(b) && !(create && C.TASK_CREATE_SKIP.includes(b))).map(b => '<div class="cl-pi' + (b === 'title' ? ' title' : '') + (create ? ' ph' : '') + (cs.moved === b ? ' flash' : '') + '">' + esc(label(b)) + '</div>').join('') + '</div>').join('') +
-      '</div></div>').join('') + '</div>';
+    // the window's grid: a block's column is its cell, its row its place there (rows line up); fit / fill as in the window
+    const psec = s => {
+      const cols = s.cells.map((c, ci) => ({ w: s.widths[ci] || 'fill', items: c.filter(b => !off.has(b) && !(create && C.TASK_CREATE_SKIP.includes(b))) })).filter(x => x.items.length);
+      const rows = Math.max(0, ...cols.map(x => x.items.length)); let h = '';
+      for (let r = 0; r < rows; r++) cols.forEach((x, k) => { const b = x.items[r]; if (b) h += '<div class="cl-pi' + (b === 'title' ? ' title' : '') + (create ? ' ph' : '') + (cs.moved === b ? ' flash' : '') + '" style="grid-column:' + (k + 1) + ';grid-row:' + (r + 1) + '">' + esc(label(b)) + '</div>'; });
+      return '<div class="cl-psec"><div class="cl-psh">' + esc(s.name) + '</div><div class="cl-pcells" style="--pcols:' + (cols.map(x => x.w === 'fit' ? 'fit-content(50%)' : 'minmax(0,1fr)').join(' ') || 'minmax(0,1fr)') + '">' + h + '</div></div>';
+    };
+    el.innerHTML = '<div class="cl-ptask" inert>' + TL.sections.map(psec).join('') + '</div>';
   }
   const where = b => { for (const s of TL.sections) for (let ci = 0; ci < s.cells.length; ci++) { const i = s.cells[ci].indexOf(b); if (i >= 0) return { s, ci, i, n: s.cells[ci].length }; } return null; };
   function movedTask(b, L, focus) {
@@ -6549,6 +6602,7 @@ function openCardLayout() {
   }
   secsEl.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.dataset.w) { const id = b.dataset.wsec, ci = Number(b.dataset.wcol), w = b.dataset.w; TL = C.taskLayoutSetWidth(TL, id, ci, w); dirty(); drawTask('[data-w="' + w + '"][data-wsec="' + id + '"][data-wcol="' + ci + '"]'); const s = TL.sections.find(x => x.id === id); say(cellName(s, ci) + ': ' + (w === 'fit' ? 'fits its blocks.' : 'fills the free width.')); return; }
     if (b.dataset.eye) { const k = b.dataset.eye; TL = C.taskLayoutHide(TL, k, !TL.off.includes(k)); dirty(); drawTask('[data-eye="' + k + '"]'); say(name('task', k) + (TL.off.includes(k) ? ' hidden.' : ' shown.')); return; }
     if (b.dataset.mv) { const k = b.dataset.b2, d = b.dataset.mv; movedTask(k, C.taskLayoutMove(TL, k, d), '[data-mv="' + d + '"][data-b2="' + k + '"]'); if (document.activeElement === document.body || !secsEl.contains(document.activeElement)) secsEl.querySelector('.cl-blk[data-b="' + k + '"]')?.focus(); return; }
     if (b.dataset.smv) {
