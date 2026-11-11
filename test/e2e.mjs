@@ -1700,17 +1700,17 @@ async function gHarness() {
     await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=lists]")'); await T.click('[data-menu=lists]');
     const sel = `[data-lm-set="${ST.id}"]`;
     const opened = await T.wait(`!!document.querySelector('${sel}')`, 6000) && (await T.click(sel), await T.wait('!!document.querySelector("dialog.lsd [name=am]")', 8000));
-    check(G, 'list settings: opens from the Lists window with four Autonomy modes', opened, opened ? '' : JSON.stringify(await T.ev(`(()=>{const d=[...document.querySelectorAll('dialog[open]')].map(x=>x.className+': '+x.textContent.slice(0,160));return d})()`)) + ' ' + T.errors.slice(-3).join(' / '));
+    check(G, 'list settings: opens from the Lists window with three Autonomy modes (Project rules, Mixed, AI Brain)', opened, opened ? '' : JSON.stringify(await T.ev(`(()=>{const d=[...document.querySelectorAll('dialog[open]')].map(x=>x.className+': '+x.textContent.slice(0,160));return d})()`)) + ' ' + T.errors.slice(-3).join(' / '));
     if (opened) {
       const st = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd');return {modes:d.querySelectorAll('[name=am]').length,checked:(d.querySelector('[name=am]:checked')||{}).value,nav:d.querySelectorAll('.ls-nav a').length,save:d.querySelector('#ls-save').disabled,status:d.querySelector('#ls-status').textContent,budget:!!d.querySelector('#ls-cap'),intake:!d.querySelector('#ls-e2e').disabled}})()`);
-      check(G, 'list settings: the stored mode is checked, five sections in the nav (List brief too), Save off with "No changes", intake and budget on for the household', st.modes === 4 && st.checked === list0.autonomy && st.nav === 5 && st.save && st.status === 'No changes' && st.budget && st.intake, JSON.stringify(st));
+      check(G, 'list settings: the stored mode is checked, five sections in the nav (List brief too), Save off with "No changes", intake and budget on for the household', st.modes === (list0.autonomy === 'manual' ? 4 : 3) && st.checked === list0.autonomy && st.nav === 5 && st.save && st.status === 'No changes' && st.budget && st.intake, JSON.stringify(st));
       await sleep(600); await T.shot('list-settings-1440x900');
       await T.size(390, 844); await sleep(400);
       const ph = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd'),r=d.getBoundingClientRect(),f=d.querySelector('#ls-foot').getBoundingClientRect();return {nav:getComputedStyle(d.querySelector('.ls-nav')).display,fits:r.left>=0&&r.right<=innerWidth+1&&d.scrollWidth<=d.clientWidth+1,foot:f.bottom<=innerHeight+1}})()`);
       check(G, 'list settings (390 px): a full-width sheet, the nav hidden, the footer in view, no horizontal scroll', ph.nav === 'none' && ph.fits && ph.foot, JSON.stringify(ph));
       await T.shot('list-settings-390x844');
       await T.size(1440, 900); await sleep(300);
-      const next = list0.autonomy === 'manual' ? 'guided' : 'manual';
+      const next = list0.autonomy === 'project_rules' ? 'guided' : 'project_rules';
       await T.ev(`(()=>{const x=document.querySelector('dialog.lsd [name=am][value=${next}]');x.click();return true})()`);
       const dirty = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd');return {save:!d.querySelector('#ls-save').disabled,status:d.querySelector('#ls-status').textContent}})()`);
       check(G, 'list settings: a new mode shows "Unsaved changes" and turns Save on', dirty.save && dirty.status === 'Unsaved changes', JSON.stringify(dirty));
@@ -1748,13 +1748,13 @@ async function gHarness() {
       check(G, 'New list (T23): an optional "Autonomy and list brief" section', more);
       if (more) {
         await T.insert('#nl-name', nm);
-        await T.ev(`(()=>{const d=document.querySelector('${W}');d.querySelector('#nl-more').open=true;d.querySelector('#nl-shared').checked=false;d.querySelector('#nl-au').value='manual';d.querySelector('#nl-b-decisions').value='first decision';d.querySelector('#nl-b-instruction').value='${RUN} what done means';return true})()`);
+        await T.ev(`(()=>{const d=document.querySelector('${W}');d.querySelector('#nl-more').open=true;d.querySelector('#nl-shared').checked=false;d.querySelector('#nl-au').value='project_rules';d.querySelector('#nl-b-decisions').value='first decision';d.querySelector('#nl-b-instruction').value='${RUN} what done means';return true})()`);
         await sleep(300); await T.shot('new-list-brief-1440x900');
         await T.ev(`document.querySelector('${W} #nl-go').click(),true`);
         const nl = await until(async () => { const x = (await MK.rest('GET', 'lists?select=id,slug,name,autonomy,brief_decisions,brief_instruction&archived_at=is.null&name=eq.' + encodeURIComponent(nm))).json[0]; return x && x.brief_instruction ? x : null; });
         if (nl) testLists.push(nl);
-        check(G, 'New list (T23): created with Autonomy Manual, the instruction and a dated Decisions line',
-          !!nl && nl.autonomy === 'manual' && nl.brief_instruction === `${RUN} what done means` && /^\d{4}-\d{2}-\d{2} · .+ · first decision$/.test(nl.brief_decisions || ''), JSON.stringify(nl));
+        check(G, 'New list (T23): created with Autonomy Project rules, the instruction and a dated Decisions line',
+          !!nl && nl.autonomy === 'project_rules' && nl.brief_instruction === `${RUN} what done means` && /^\d{4}-\d{2}-\d{2} · .+ · first decision$/.test(nl.brief_decisions || ''), JSON.stringify(nl));
       }
       await closeDialogs(T);
     }
@@ -1777,21 +1777,64 @@ async function gHarness() {
       check(G, 'Card layout (390 px): preview above the list, a zone select per block, no horizontal scroll', ph.above && ph.sel && ph.fits, JSON.stringify(ph));
       await T.shot('card-layout-board-390x844');
       await T.size(1440, 900); await sleep(300);
+      // Card layout v3 (2026-11-11): "Open task" is sections with 1-3 columns. Links hidden; a new section with 3 columns; List into its
+      // column 1, Title into its column 2, Close into Main; Alt+ArrowRight moves ID to the next cell
       await T.ev(`(()=>{const d=document.querySelector('${W}');d.querySelector('#cl-t-task').click();d.querySelector('#cl-p-task [data-eye=links]').click();d.querySelector('#cl-t-opts').click();d.querySelector('input[name=cl-mode][value=expanded]').checked=true;d.querySelector('#cl-t-task').click();return true})()`);
-      const tk = await T.ev(`(()=>{const d=document.querySelector('${W}');return {off:d.querySelector('#cl-p-task .cl-blk[data-b=links]').classList.contains('off'),dec:!d.querySelector('#cl-p-task [data-eye=decision]')&&!!d.querySelector('#cl-p-task .cl-blk[data-b=decision] .cl-always'),pv:[...d.querySelectorAll('#cl-p-task .cl-pi')].map(x=>x.textContent).includes('Links')}})()`);
-      check(G, 'Card layout (T17): Links hidden in "Open task" (gone from its preview); the Decision section cannot be hidden', tk.off && tk.dec && !tk.pv, JSON.stringify(tk));
+      const tk = await T.ev(`(()=>{const d=document.querySelector('${W}'),P=d.querySelector('#cl-p-task');return {secs:[...P.querySelectorAll('.cl-sec')].map(s=>s.querySelector('[data-secn]').value),off:P.querySelector('.cl-blk[data-b=links]').classList.contains('off'),
+        always:['title','close','decision'].every(b=>!P.querySelector('[data-eye='+b+']')&&!!P.querySelector('.cl-blk[data-b='+b+'] .cl-always')),tl:P.querySelectorAll('.cl-blk[data-b^="tl:"]').length,tags:!!P.querySelector('.cl-blk[data-b=tags]'),
+        rm:[...P.querySelectorAll('[data-srm]')].every(b=>b.disabled),pv:[...P.querySelectorAll('.cl-pi')].map(x=>x.textContent).includes('Links'),grid:P.querySelectorAll('.cl-pv .cl-psec').length}})()`);
+      check(G, 'Card layout v3: "Open task" shows sections Header, Top, Main, Bottom; Links hidden (gone from the preview); Title, Close and Decision always shown; one block per tag list, no single Tags block; no section with blocks can be removed',
+        JSON.stringify(tk.secs) === '["Header","Top","Main","Bottom"]' && tk.off && tk.always && tk.tl > 0 && !tk.tags && tk.rm && !tk.pv && tk.grid === 4, JSON.stringify(tk));
+      await T.ev(`document.querySelector('${W} #cl-addsec').click(),true`);
+      const ns = await T.ev(`(()=>{const P=document.querySelector('${W} #cl-p-task'),s=[...P.querySelectorAll('.cl-sec')].pop();return {id:s.dataset.sec,n:P.querySelectorAll('.cl-sec').length,focus:document.activeElement===s.querySelector('[data-secn]'),rm:!s.querySelector('[data-srm]').disabled}})()`);
+      const SX = ns.id;
+      await T.ev(`(()=>{const P=document.querySelector('${W} #cl-p-task'),sec=()=>P.querySelector('.cl-sec[data-sec="${SX}"]'),n=sec().querySelector('[data-secn]');n.value='E2E';n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));
+        const c=sec().querySelector('[data-cols]');c.value='3';c.dispatchEvent(new Event('change',{bubbles:true}));
+        const mv=(b,v)=>{const s=P.querySelector('[data-zsel="'+b+'"]');s.value=v;s.dispatchEvent(new Event('change',{bubbles:true}))};mv('list','${SX}|0');mv('title','${SX}|1');mv('close','main|0');return true})()`);
+      await T.ev(`document.querySelector('${W} #cl-p-task .cl-blk[data-b=id]').focus(),true`); await T.key('ArrowRight', 1);
+      const lay = await T.ev(`(()=>{const d=document.querySelector('${W}'),P=d.querySelector('#cl-p-task'),cell=(s,i)=>[...P.querySelectorAll('.cl-cell[data-sec="'+s+'"][data-cell="'+i+'"] .cl-blk')].map(b=>b.dataset.b),sx=P.querySelector('.cl-sec[data-sec="${SX}"]');
+        return {name:sx.querySelector('[data-secn]').value,cols:sx.querySelectorAll('.cl-cell').length,c0:cell('${SX}',0),c1:cell('${SX}',1),main:cell('main',0),h1:cell('header',1),live:d.querySelector('#cl-live').textContent,
+          pv:getComputedStyle(P.querySelectorAll('.cl-pv .cl-pcells')[4]).gridTemplateColumns.split(' ').length,st:d.querySelector('#cl-st').textContent,max:d.querySelector('#cl-addsec').disabled}})()`);
+      check(G, 'Card layout v3: Add section adds an empty, removable section at the end (focus on its name); renamed E2E with 3 columns; List and Title in its columns 1 and 2, Close in Main; Alt+ArrowRight moves ID to the next cell, announced; the preview draws 3 columns',
+        ns.n === 5 && ns.focus && ns.rm && lay.name === 'E2E' && lay.cols === 3 && JSON.stringify(lay.c0) === '["list"]' && JSON.stringify(lay.c1) === '["title"]' && lay.main.includes('close') && lay.h1.includes('id') && /ID moved to Header, column 2/.test(lay.live) && lay.pv === 3 && lay.st === 'Unsaved changes' && !lay.max, JSON.stringify({ ns, lay }));
       await sleep(300); await T.shot('card-layout-task-1440x900');
+      await T.size(390, 844); await sleep(400);
+      const tph = await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('form'),c=d.querySelector('#cl-p-task .cl-sec[data-sec="${SX}"] .cl-cells');return {one:getComputedStyle(c).gridTemplateColumns.split(' ').length===1,fits:f.scrollWidth<=f.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth}})()`);
+      check(G, 'Card layout v3 (390 px): the cells of a section stack into one column, no horizontal scroll', tph.one && tph.fits, JSON.stringify(tph));
+      await T.size(1440, 900); await sleep(300);
       await T.click(W + ' #cl-save');
       const onBoard = await T.wait(`!!document.querySelector('[data-card="${ci.id}"].full .details.cz-top .md')`, 6000);
       check(G, 'Card layout (T17): saved; the board card shows its description in the Top zone, above the title', onBoard);
-      const tw = await openCard(T, ci.id, W + ' [data-tb=links]');
-      const tws = tw ? await T.ev(`(()=>{const d=document.querySelector('${W}');return {links:d.querySelector('.tk-card [data-tb=links]').hidden,zones:[...d.querySelectorAll('.tk-card .tz')].map(z=>z.className.replace('tz tz-','')),fn:!!d.querySelector('#fn')}})()`) : null;
-      check(G, 'Card layout (T17): the task window keeps the Links block in the form but hidden; zones top, main, bottom; the description field is there', !!tws && tws.links && tws.fn && tws.zones.join() === 'top,main,bottom', JSON.stringify(tws));
-      if (tw) { await sleep(300); await T.shot('task-zones-1440x900'); await T.size(390, 844); await sleep(300); await T.shot('task-zones-390x844'); await T.size(1440, 900); }
+      const tw = await openCard(T, ci.id, W + ' .tk-card .tsec');
+      const tws = tw ? await T.ev(`(()=>{const d=document.querySelector('${W} .tk-card'),sx=d.querySelector('.tsec[data-sec="${SX}"]');return {secs:[...d.querySelectorAll('.tsec')].map(s=>s.dataset.sec),links:d.querySelector('[data-tb=links]').hidden&&!!d.querySelector('.tsec-off [data-tb=links]'),fn:!!d.querySelector('#fn'),
+        cols:sx?getComputedStyle(sx).gridTemplateColumns.split(' ').length:0,list:!!(sx&&sx.querySelector('.tcell:nth-child(1) [data-tb=list] #fl')),title:!!(sx&&sx.querySelector('.tcell:nth-child(2) [data-tb=title] #ft')),close:!!d.querySelector('.tsec[data-sec=main] [data-tb=close] #fx'),
+        tags:d.querySelectorAll('.tsec [data-tb^="tl:"] .tagbox').length,search:!!d.querySelector('.tsec [data-tb^="tl:"] #tg-q')}})()`) : null;
+      check(G, 'Card layout v3: the task window (Edit) draws the sections as a grid: E2E with List and Title side by side, Close in Main; Links kept in the form but hidden; one tag picker per tag list with the search box in the first',
+        !!tws && tws.secs.includes(SX) && tws.cols === 2 && tws.list && tws.title && tws.close && tws.links && tws.fn && tws.tags === tk.tl && tws.search, JSON.stringify(tws));
+      if (tw) {
+        await sleep(300); await T.shot('task-zones-1440x900'); await T.size(390, 844); await sleep(300);
+        const hx = await T.ev(`(()=>{const c=document.querySelector('${W} .tk-card');if(!c)return {card:false};const r=c.getBoundingClientRect(),wide=[...c.querySelectorAll('*')].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().right>r.right+1).slice(0,4).map(e=>e.tagName+'.'+e.className+'#'+e.id+':'+Math.round(e.getBoundingClientRect().right));return {fits:c.scrollWidth<=c.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth,sw:c.scrollWidth,cw:c.clientWidth,dw:document.documentElement.scrollWidth,iw:innerWidth,wide}})()`);
+        check(G, 'Card layout v3 (390 px): the task window has no horizontal scroll', !!hx.fits, JSON.stringify(hx));
+        await T.shot('task-zones-390x844'); await T.size(1440, 900); await sleep(300);
+        await T.click(W + ' #fx');
+        check(G, 'Card layout v3: the Close block closes the window', await T.wait(`!document.querySelector('${W} .tk-card')`, 3000));
+      }
       await closeDialogs(T);
-      // put Card layout back to the defaults (cleanup also restores the preferences row)
+      // Create: the same grid without ID, Autonomy, Decision and Sources
+      await T.click('[data-add="B"]'); await T.wait(`!!document.querySelector('${W} .tk-card #ft')`, 4000);
+      const cr = await T.ev(`(()=>{const d=document.querySelector('${W} .tk-card');if(!d)return {open:false,dialogs:document.querySelectorAll('dialog[open]').length,add:!!document.querySelector('[data-add="B"]')};return {title:!!d.querySelector('.tsec[data-sec="${SX}"] [data-tb=title]'),close:!!d.querySelector('.tsec[data-sec=main] #fx'),skip:['id','autonomy','decision','sources'].every(b=>!d.querySelector('[data-tb='+b+']'))}})()`);
+      check(G, 'Card layout v3: the task window (Create) uses the same sections and leaves out ID, Autonomy, Decision and Sources', cr.title && cr.close && cr.skip, JSON.stringify(cr));
+      await closeDialogs(T);
+      // a reload keeps the layout; Reset gives the defaults back (cleanup also restores the preferences row)
+      const stored = await until(async () => { const p = (await MK.rest('GET', 'preferences?select=prefs&profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard')).json?.[0]?.prefs; const tz = p && p.cardLayout && p.cardLayout.zones && p.cardLayout.zones.task; return tz && (tz.sections || []).some(x => x.id === SX) ? tz : null; }, 8000);
+      await T.reload(); await T.ready(); await pick(T, ST.id);
       await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
-      await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();document.getElementById("cl-save").click();true');
+      const kept = await T.ev(`(()=>{const P=document.querySelector('${W} #cl-p-task'),sx=P.querySelector('.cl-sec[data-sec="${SX}"]');return {name:sx&&sx.querySelector('[data-secn]').value,cols:sx&&sx.querySelector('[data-cols]').value,title:!!P.querySelector('.cl-cell[data-sec="${SX}"][data-cell="1"] .cl-blk[data-b=title]'),off:P.querySelector('.cl-blk[data-b=links]').classList.contains('off')}})()`);
+      check(G, 'Card layout v3: a reload keeps the sections, the columns, Title\'s place and hidden Links', !!stored && kept.name === 'E2E' && kept.cols === '3' && kept.title && kept.off, JSON.stringify({ kept, stored: !!stored }));
+      await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();true');
+      const rs = await T.ev(`[...document.querySelectorAll('${W} #cl-p-task .cl-sec [data-secn]')].map(x=>x.value)`);
+      check(G, 'Card layout v3: Reset gives the default sections Header, Top, Main, Bottom', JSON.stringify(rs) === '["Header","Top","Main","Bottom"]', JSON.stringify(rs));
+      await T.ev('document.getElementById("cl-save").click();true');
       await closeDialogs(T);
     }
     // the task's Autonomy row: the child inherits Manual from its parent, Guided is wider than the parent
@@ -1802,10 +1845,10 @@ async function gHarness() {
     await T.reload(); await T.ready();
     const ao = await openCard(T, kid.id, W + ' #fau');
     const cap = ao ? await T.ev(`(()=>{const d=document.querySelector('${W}');return {v:d.querySelector('#fau').value,cap:d.querySelector('#fau-cap').textContent,reset:d.querySelector('#fau-reset').hidden}})()`) : null;
-    check(G, 'task window: Autonomy Inherit says "from parent #… : Manual", no Reset', !!cap && cap.v === 'inherit' && /^from parent .+: Manual$/.test(cap.cap) && cap.reset, JSON.stringify(cap));
+    check(G, 'task window: Autonomy Inherit says "from parent #… : Manual", no Reset', !!cap && cap.v === 'inherit' && /^from parent .+: Manual \(old\)$/.test(cap.cap) && cap.reset, JSON.stringify(cap));
     if (ao) {
       await T.ev(`(()=>{const s=document.querySelector('${W} #fau');s.value='guided';s.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
-      const w = await T.ev(`(()=>{const d=document.querySelector('${W}'),n=d.querySelector('#fau-w');return {warn:!n.hidden&&/parent is Manual|This list is Manual/.test(n.textContent),reset:!d.querySelector('#fau-reset').hidden}})()`);
+      const w = await T.ev(`(()=>{const d=document.querySelector('${W}'),n=d.querySelector('#fau-w');return {warn:!n.hidden&&/parent is Manual|This list is (Manual|Project rules)/.test(n.textContent),reset:!d.querySelector('#fau-reset').hidden}})()`);
       check(G, 'task window: Guided under a Manual parent (or list) warns and offers Reset to inherit', w.warn && w.reset, JSON.stringify(w));
       await sleep(600); await T.shot('task-autonomy-1440x900');
       await T.click(W + ' #fs');
@@ -1823,11 +1866,11 @@ async function gHarness() {
       let ps = await P.wait(`!!document.querySelector('${kidCard}')`, 20000);
       if (ps) { await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); await P.click(kidCard); ps = await P.wait('!!document.querySelector("#dlg-task[open] #t-au")', 8000); }
       const pa = ps ? await P.ev(`(()=>{const d=document.querySelector('#dlg-task');return {v:d.querySelector('#t-au').value,cap:d.querySelector('#t-au-cap').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
-      check(G, 'phone: the task sheet shows the Autonomy row with the mode set on the web, no horizontal scroll', !!pa && pa.v === 'guided' && /^Guided/.test(pa.cap) && !pa.wide, JSON.stringify(pa) + ' ' + P.errors.slice(-2).join(' / '));
+      check(G, 'phone: the task sheet shows the Autonomy row with the mode set on the web, no horizontal scroll', !!pa && pa.v === 'guided' && /^Mixed/.test(pa.cap) && !pa.wide, JSON.stringify(pa) + ' ' + P.errors.slice(-2).join(' / '));
       if (ps) { await sleep(700); await P.shot('task-autonomy-app-375x812'); await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true'); }
       const lsOk = await P.ev(`(()=>{if(typeof openListSettings!=='function')return false;openListSettings(${JSON.stringify(ST.id)});return true})()`) && await P.wait('!!document.querySelector("#dlg-lset[open] [name=lset-am]")', 8000);
       const pl = lsOk ? await P.ev(`(()=>{const d=document.querySelector('#dlg-lset');return {modes:d.querySelectorAll('[name=lset-am]').length,save:d.querySelector('#lset-save').disabled,status:d.querySelector('#lset-status').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
-      check(G, 'phone: list settings sheet with four modes, Save off with "No changes", no horizontal scroll', !!pl && pl.modes === 4 && pl.save && pl.status === 'No changes' && !pl.wide, JSON.stringify(pl));
+      check(G, 'phone: list settings sheet with three modes, Save off with "No changes", no horizontal scroll', !!pl && pl.modes === 3 && pl.save && pl.status === 'No changes' && !pl.wide, JSON.stringify(pl));
       if (lsOk) { await sleep(700); await P.shot('list-settings-app-375x812'); }
     } finally { await P.close().catch(() => {}); }
     // the Decision section on a Delegate card (the text HomeOS claim.js cardText writes)

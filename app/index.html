@@ -388,6 +388,8 @@ dialog.alert form .field{margin:0 0 6px}
 /* the decision block of a self-improvement card (details.decision): two answers above the description; the chosen one is ringed */
 /* the done checkbox before the title in the task sheet (2026-11-07) */
 .ttrow{display:flex;align-items:flex-end;gap:10px}.ttrow .field{flex:1;min-width:0}
+.tsec{margin:0 0 4px}.tsec-h{margin:6px 0 8px;font:600 12px/1.2 var(--ui);letter-spacing:.04em;text-transform:uppercase;color:var(--ink2)}
+.fclose{display:flex;align-items:center;gap:10px;margin:0 0 16px;font:600 14px/1.2 var(--ui);min-height:44px}.fid{display:flex;flex-wrap:wrap;gap:6px 12px;margin:0 0 12px}
 .tdone{flex:none;width:28px;height:28px;margin:0 0 18px;accent-color:var(--accent)}
 /* the quadrant buttons in the task sheet (2026-11-07): an outline in the quadrant's colour, the current one filled */
 .tquad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 12px}
@@ -1329,16 +1331,17 @@ function tpOpen(p, list) {
 }
 function resetPicker(p) { for (const k in TPO) if (k.startsWith(p + ':')) delete TPO[k]; PEND = PEND.filter(g => g.p !== p); }
 function tlShare(l) { return me() && l.owner_id !== me().id ? `Shared by ${D.names[l.owner_id] || 'someone'}` : ''; }
-function tagPicker(p, picked) {
+function tagPicker(p, picked, only) {
   const q = (($('#' + p + '-tagq') || {}).value || '').trim().toLowerCase(); let h = '';
   for (const g of groupsNow()) {
+    if (only && g.list.id !== only) continue;
     const l = g.list, add = C.tagListRights(l).has('addTag');
     const ids = g.tags.concat(PEND.filter(x => x.p === p && x.list === l.id).map(x => x.id)).filter(id => !q || tagName(id).toLowerCase().includes(q));
     if (!ids.length && (q || !add)) continue;
     const open = q ? true : tpOpen(p, l), sh = tlShare(l), fav = C.tagGroupOpen(l, D.prefs.tagListFavs);
     h += `<div class="tgrp"><button type="button" class="tgh" data-act="tp-grp" data-p="${p}" data-id="${l.id}" aria-expanded="${open}"><span class="tgn">${esc(l.name)}${fav ? '<svg class="star" aria-hidden="true" focusable="false"><use href="#i-star"/></svg><span class="vh">, favourite</span>' : ''}</span>${sh ? `<span class="vh">, </span><small>${esc(sh)}</small>` : ''}${ic('chev')}</button>${open ? `<div class="chips tchips">${ids.map(id => `<button type="button" class="chip" data-act="tp-tag" data-p="${p}" data-id="${id}" aria-pressed="${picked.includes(id)}">${esc(tagName(id))}${id.startsWith('new:') ? '<span class="vh">, new</span>' : ''}</button>`).join('')}${add && !q ? `<button type="button" class="chip ghost" data-act="tp-new" data-p="${p}" data-id="${l.id}">${ic('plus')}New tag<span class="vh"> in ${esc(l.name)}</span></button>` : ''}</div>` : ''}</div>`;
   }
-  return h || '<p class="src" style="margin:6px 0 0">No tag matches.</p>';
+  return h || (only ? '' : '<p class="src" style="margin:6px 0 0">No tag matches.</p>');
 }
 const pickedHTML = picked => picked.map(id => { const tl = D.tagLists[tagListOf(id)], n = tagName(id), ln = tl ? tl.name : ''; return `<span class="badge tag" data-n="${esc(n)}" data-l="${esc(ln)}" title="${esc(ln)}">${esc(D.labels[id] || n)}<span class="vh"> (${esc(ln)})</span></span>`; }).join('');
 /* the picked ids with the new tags created (TDData.ensureTags); a tag that could not be made is dropped with a toast */
@@ -1516,28 +1519,51 @@ function openTask(id, swap, draft) {
   // the quadrant buttons share the Decision row on a decision card, at its right end (Anastasiia, 2026-11-07, after her local test)
   const quadHtml = `<div class="tquad" id="t-quad" role="group" aria-label="Quadrant">${QS.map(q => `<button type="button" class="chip" data-act="t-quad" data-v="${q}" data-q="${q}" aria-pressed="${q === TS.q}"${ro ? ' disabled' : ''}>${QN[q]}</button>`).join('')}</div>`;
   const decHtml = !dec ? '' : `<div class="field fdec" role="group" aria-labelledby="t-dec-l"><span class="flabel" id="t-dec-l">Decision</span><div class="fdec-b">${[1, 0].map(v => `<button type="button" class="btn${v ? ' primary' : ''}" data-act="t-decide" data-v="${v}" aria-pressed="${dec.answer === v}"${decOn ? '' : ' disabled'}>${dec.answer === v ? '✓ ' : ''}${esc(v ? dec.label_1 : dec.label_0)}</button>`).join('')}${quadHtml}</div>${decState ? `<p class="fdec-s" id="t-dec-s">${esc(decState)}</p>` : ''}</div>`;
+  /* the sheet draws cardLayout.zones.task (web: the task window's sections): C.taskLayoutView gives the sections in order, each section's
+     cells stacked into one column here. A block this page has no field for (format) is skipped; a hidden block, or a field the layout does not
+     place, is still rendered inside a hidden box, so Save keeps its value. Tags: one block per tag list (tl:<id>), starred lists first */
+  const BL = {
+    title: `<div class="ttrow"><label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label></div>
+    <p class="err" id="t-title-err" hidden></p>
+    ${dec ? '' : quadHtml}
+    <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>`,
+    close: doneOn ? '<label class="fclose"><input type="checkbox" class="tdone" id="t-done" style="margin:0"><span>Mark done</span></label>' : '',
+    id: info ? `<p class="info fid">${info}</p>` : '',
+    autonomy: `${autoRowHtml(t)}`,
+    decision: `${decHtml}`,
+    description: `<div class="field"><span class="flabel" id="t-desc-l">Description</span>
+      ${tb ? `<div class="fbar">${tb}</div>` : ''}
+      ${readHtml}
+      <textarea class="inp" id="t-desc" rows="6" aria-labelledby="t-desc-l"${readFirst ? ' hidden' : ''}${ro ? ' readonly' : ''}>${esc(notesBase)}</textarea></div>`,
+    list: `<label class="field"><span>List</span><select class="inp" id="t-list"${ro ? ' disabled' : ''}>${lists.map(l => `<option value="${l}"${l === t.list ? ' selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></label>`,
+    dates: `<div class="row2"><label class="field"><span>Start date</span><input class="inp" type="date" id="t-sdate" value="${ymd(t.start)}" aria-describedby="t-start-err"${dis}></label><label class="field"><span>Start time</span><input class="inp" type="time" id="t-stime" value="${sT}"${dis}></label></div>
+    <p class="err" id="t-start-err" style="margin:-8px 0 14px" hidden>Start is after End.</p>
+    <div class="row2"><label class="field"><span>End date</span><input class="inp" type="date" id="t-date" value="${ymd(t.deadline)}"${dis}></label><label class="field"><span>End time</span><input class="inp" type="time" id="t-time" value="${eT}"${dis}></label></div>`,
+    links: `<div class="field links" role="group" aria-labelledby="t-links-l"><span class="flabel" id="t-links-l">Links</span><div id="t-links"></div></div>`,
+    sources: `${showSource() ? `<div class="field"><span class="flabel">Sources</span><div id="t-srcs"><p class="src">Loading…</p></div></div>` : ''}`
+  };
+  const tlIds = groupsNow().map(x => x.list.id), tview = C.taskLayoutView(D.cardLayout, tlIds, D.prefs.tagListFavs, D.prefs.tagListOrder, 'edit'), placed = new Set();
+  let findDone = false;
+  const tlBlock = id => {
+    const l = D.tagLists[id]; if (!l || ro) return '';
+    const find = findDone ? '' : '<label class="vh" for="t-tagq">Find a tag</label><input class="inp" id="t-tagq" placeholder="Find a tag" autocomplete="off" enterkeyhint="search" style="margin-bottom:6px">'; findDone = true;
+    return `<div class="field tagsw" role="group" aria-label="${esc(l.name)}"><span class="flabel">${esc(l.name)}</span>${find}<div class="tlbox" data-tl="${id}"></div></div>`;
+  };
+  const blockHtml = b => { placed.add(b); return b.startsWith('tl:') ? tlBlock(b.slice(3)) : BL[b] || ''; };
+  const DEF_SEC = ['Header', 'Top', 'Main', 'Bottom'];
+  const sectionsHtml = tview.sections.map(s => {
+    const h = s.cells.flat().map(blockHtml).join('');
+    return h.trim() ? `<section class="tsec">${DEF_SEC.includes(s.name) ? '' : `<h3 class="tsec-h">${esc(s.name)}</h3>`}${h}</section>` : '';
+  }).join('');
+  tview.hidden.forEach(b => placed.add(b));
+  const keep = ['title', 'list', 'description', 'dates', 'links'].filter(b => !placed.has(b)).concat(tview.hidden.filter(b => !b.startsWith('tl:') && ['title', 'list', 'description', 'dates', 'links'].includes(b)));
+  const hiddenHtml = keep.length ? `<div hidden>${keep.map(b => BL[b]).join('')}</div>` : '';
   $('#task-body').innerHTML = `
     ${lowConf(t) ? `<p class="note info">Added by an assistant with low confidence${t.aiConfidence !== null ? ` (${t.aiConfidence.toFixed(2)})` : ''}. Check the list and the text.</p>` : ''}
     ${closed ? `<div class="banner">${ic('lock')}<span>${t.status === 'done' ? 'Done' : 'Cancelled'}${t.doneAt ? ' ' + ymd(t.doneAt) : ''}. Restore it from Me, Archive, to change it.</span></div>` : ''}
     ${C.awaitingCheck(t) ? '<p class="note info">Waits for your check: answer its check card.</p>' : ''}
     <div class="note" id="t-conflict" role="alert" hidden></div>
-    <div class="ttrow"><label class="field" style="margin-bottom:6px"><span>Title</span><input class="inp" id="t-title" value="${esc(draft ? draft.title : t.title)}" aria-describedby="t-title-err"${dis}></label>${doneOn ? '<input type="checkbox" class="tdone" id="t-done" aria-label="Mark done">' : ''}</div>
-    <p class="err" id="t-title-err" hidden></p>
-    ${autoRowHtml(t)}
-    ${dec ? '' : quadHtml}
-    <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>
-    ${decHtml}
-    <div class="field"><span class="flabel" id="t-desc-l">Description</span>
-      ${tb || info ? `<div class="fbar">${tb}${info ? `<p class="info">${info}</p>` : ''}</div>` : ''}
-      ${readHtml}
-      <textarea class="inp" id="t-desc" rows="6" aria-labelledby="t-desc-l"${readFirst ? ' hidden' : ''}${ro ? ' readonly' : ''}>${esc(notesBase)}</textarea></div>
-    <label class="field"><span>List</span><select class="inp" id="t-list"${ro ? ' disabled' : ''}>${lists.map(l => `<option value="${l}"${l === t.list ? ' selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></label>
-    <div class="row2"><label class="field"><span>Start date</span><input class="inp" type="date" id="t-sdate" value="${ymd(t.start)}" aria-describedby="t-start-err"${dis}></label><label class="field"><span>Start time</span><input class="inp" type="time" id="t-stime" value="${sT}"${dis}></label></div>
-    <p class="err" id="t-start-err" style="margin:-8px 0 14px" hidden>Start is after End.</p>
-    <div class="row2"><label class="field"><span>End date</span><input class="inp" type="date" id="t-date" value="${ymd(t.deadline)}"${dis}></label><label class="field"><span>End time</span><input class="inp" type="time" id="t-time" value="${eT}"${dis}></label></div>
-    <div class="field tagsw" role="group" aria-labelledby="t-tags-l"><span class="flabel" id="t-tags-l">Tags</span>${ro ? '' : `<label class="vh" for="t-tagq">Find a tag</label><input class="inp" id="t-tagq" placeholder="Find a tag" autocomplete="off" enterkeyhint="search"><div id="t-tags"></div>`}</div>
-    <div class="field links" role="group" aria-labelledby="t-links-l"><span class="flabel" id="t-links-l">Links</span><div id="t-links"></div></div>
-    ${showSource() ? `<div class="field"><span class="flabel">Sources</span><div id="t-srcs"><p class="src">Loading…</p></div></div>` : ''}
+    ${sectionsHtml}${hiddenHtml}
     ${ro ? '' : `<div class="dangerrow"><button type="button" class="btn" data-act="t-cancel">Mark cancelled</button>${canDel(t) ? '<button type="button" class="btn danger" data-act="t-delete">Delete</button>' : ''}</div>`}`;
   $('#task-save').hidden = ro; $('#task-save').disabled = true; $('#task-save').textContent = 'Save';
   hideAsk(); renderTTags(); renderLinks(); drawAutoRow();
@@ -1609,9 +1635,9 @@ function validTask() {
 function onTaskInput() { if (!TS || TS.ro) return; const ok = validTask(); $('#task-save').disabled = !ok || (!dirty() && !TS.conflict); }
 $('#task-form').addEventListener('input', onTaskInput);
 $('#task-form').addEventListener('change', onTaskInput);
-function renderTTags() { if (!TS) return; const box = $('#t-tags'); if (box) box.innerHTML = tagPicker('t', TS.tags); $('#t-picked').innerHTML = pickedHTML(TS.tags); }
+function renderTTags() { if (!TS) return; document.querySelectorAll('#task-body .tlbox').forEach(box => { box.innerHTML = tagPicker('t', TS.tags, box.dataset.tl) || '<p class="src" style="margin:0">No tag matches.</p>'; }); $('#t-picked').innerHTML = pickedHTML(TS.tags); }
 $('#task-body').addEventListener('input', e => { if (e.target.id === 't-tagq') renderTTags(); });
-$('#task-body').addEventListener('keydown', e => { if (e.target.id === 't-tagq' && e.key === 'Enter') { e.preventDefault(); const b = $('#t-tags [data-act="tp-tag"]'); if (b) b.click(); } });
+$('#task-body').addEventListener('keydown', e => { if (e.target.id === 't-tagq' && e.key === 'Enter') { e.preventDefault(); const b = $('#task-body .tlbox [data-act="tp-tag"]'); if (b) b.click(); } });
 
 /* Links: parent, subtasks, comes after, next; changes apply on Save */
 function renderLinks() {
@@ -2944,7 +2970,7 @@ async function part2Click(a, b) {
     case 'tl-fold': { TLW.fold.has(tid) ? TLW.fold.delete(tid) : TLW.fold.add(tid); renderMe(); const f = $(`[data-act="tl-fold"][data-tid="${tid}"]`); if (f) f.focus(); break; }
     case 'tl-shift': { const d = +b.dataset.d; TLW.off = d ? TLW.off + d : 0; renderMe(); const f = $(`[data-act="tl-shift"][data-d="${d}"]`); if (f) f.focus(); break; }
     case 'g-welcome': D.setPrefs({ welcomeVersion: 0, welcomeSeen: false }); welcome(); break;
-    case 'cl-reset': { const g = D.cardLayout.group; D.setPrefs({ cardLayout: Object.assign(JSON.parse(JSON.stringify(C.CARD_LAYOUT_DEFAULTS)), { group: g }), cards: { mode: 'collapsed', flipped: [] } }); S.flip.clear(); renderBoard(); renderMe(); toast('Card layout reset. Tasks Grouping is kept as it was.'); break; }
+    case 'cl-reset': { const g = D.cardLayout.group, z = JSON.parse(JSON.stringify(D.cardLayout.zones || C.CARD_LAYOUT_DEFAULTS.zones)); D.setPrefs({ cardLayout: Object.assign(JSON.parse(JSON.stringify(C.CARD_LAYOUT_DEFAULTS)), { group: g, zones: z }), cards: { mode: 'collapsed', flipped: [] } }); S.flip.clear(); renderBoard(); renderMe(); toast('Card layout reset. Tasks Grouping is kept as it was.'); break; }
     case 'wl-next': WL = 1; drawWelcome(true); break;
     case 'wl-back': WL = 0; drawWelcome(true); break;
     case 'wl-later': case 'wl-done': welcomeDone(); break;

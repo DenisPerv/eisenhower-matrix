@@ -543,6 +543,27 @@ test('list panels: listBar survives a phone write, ids the phone does not know i
   assert.deepEqual(saved[saved.length - 1].listBar, listBar);
 });
 
+test('task window layout v3 survives a phone write; a stored v2 task layout arrives migrated', async () => {
+  const task = { v: 3, sections: [{ id: 'header', name: 'Head', cols: 3, cells: [['list'], ['title', 'id'], ['close']] },
+    { id: 'notes', name: 'Notes', cols: 2, cells: [['description', 'tl:*'], ['dates']] },
+    { id: 'bottom', name: 'Bottom', cols: 1, cells: [['autonomy', 'decision', 'format', 'links', 'sources']] }], off: ['id'] };
+  for (const [stored, want] of [[task, task], [{ top: ['format'], main: ['tags'], bottom: [], off: [] }, null]]) {
+    const saved = [];
+    const f = fakeSupabase([
+      ['GET', /^\/rest\/v1\/preferences/, () => [200, [{ prefs: { version: 2, cardLayout: { zones: { task: stored } }, tagListOrderV: 2 } }]]],
+      ['POST', /^\/rest\/v1\/preferences/, (m, body) => { saved.push(body.prefs); return [201, undefined]; }],
+    ]);
+    const d = make(f);
+    await signIn(d, true);
+    assert.equal((await d.loadAll()).ok, true);
+    d.setPrefs({ theme: 'dark' });
+    await d.writePrefs();
+    const got = saved[saved.length - 1].cardLayout.zones.task;
+    if (want) assert.deepEqual(got, want);
+    else { assert.equal(got.v, 3); assert.deepEqual(got.sections.map(s => s.id), ['header', 'top', 'main', 'bottom']); assert.equal(got.sections[3].cells[0][0], 'tl:*'); }
+  }
+});
+
 test('archived lists: tasks by list, Delete through the RPC, who else loses it, the backup line', async () => {
   const OLD = 'cccccccc-cccc-4ccc-8ccc-cccccccccc11', SYS = 'cccccccc-cccc-4ccc-8ccc-cccccccccc12', calls = [];
   const f = fakeSupabase([

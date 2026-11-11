@@ -766,6 +766,23 @@ dialog form.cl2{width:auto;min-width:0}
 .cl-pi.flash{border-color:var(--accent);background:var(--accent-bg)}
 .cl-pz{border-top:1px dashed var(--hair2);padding-bottom:6px}.cl-pz:empty{min-height:8px}
 .cl-st{font-size:12px;color:var(--warn-ink, var(--ink3));align-self:center}
+/* Card layout v3, Open task: sections (name, columns, ↑/↓, Remove) with their cells side by side; the preview draws the same grid */
+.cl-sec{margin-top:var(--s4);padding:var(--s3);border:1px solid var(--hair);border-radius:var(--r)}
+.cl-sech{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2)}
+dialog input.cl-secn{flex:1 1 140px;width:auto;min-width:0;min-height:32px;padding:0 8px;font:500 14px var(--ui)}
+.cl-secc{font-size:12px;color:var(--ink3)}
+dialog label.cl-cols{display:inline-flex;align-items:center;gap:6px;margin:0;font:500 13px var(--ui)}
+dialog label.cl-cols > select{margin-top:0;width:auto;min-height:32px}
+.cl-sech button{min-height:32px;padding:0 8px;font-size:13px}.cl-sech .cl-mv{width:32px;padding:0}
+.cl-cells{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr));gap:var(--s2);margin-top:var(--s2)}
+.cl-cells .cl-zl{margin:0}
+.cl-cells .cl-blk{flex-wrap:wrap;row-gap:2px}.cl-cells .cl-blk .bn{flex:1 1 72px}
+.cl-cells .cl-blk .cl-eye,.cl-cells .cl-always{width:auto;min-width:56px}
+.cl-addrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s3)}.cl-addrow .n{font-size:12px;color:var(--ink3)}
+.cl-psec{margin-top:6px;padding-top:4px;border-top:1px dashed var(--hair2)}.cl-psec:first-child{margin-top:0;border-top:0}
+.cl-psh{font:500 11px var(--ui);color:var(--ink3)}
+.cl-pcells{display:grid;grid-template-columns:repeat(var(--cols,1),minmax(0,1fr));gap:6px}
+.cl-pcell{min-width:0}
 @media (max-width:700px){
   .cl-body{display:flex;flex-direction:column;max-height:none;overflow:visible}
   .cl-prev{order:-1;border-bottom:1px solid var(--hair)}
@@ -777,6 +794,8 @@ dialog form.cl2{width:auto;min-width:0}
   .cl-blk .bn{flex:1 1 calc(100% - 32px)}
   .cl-blk .cl-eye,.cl-always{width:auto;min-width:64px}
   .cl-kbd{display:none}
+  .cl-cells,.cl-pcells{grid-template-columns:1fr}
+  .cl-sech button,dialog label.cl-cols > select,dialog input.cl-secn{min-height:44px}.cl-sech .cl-mv{width:44px}
 }
 /* round 3, then version 3 (2026-10-29): the welcome card, pinned under the profile menu (which gets an accent ring while it is
    open); one long card with two forms: the body scrolls inside it, the action row stays at the bottom */
@@ -1096,6 +1115,19 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 /* the done checkbox at the right end of the title row (2026-11-07) */
 .ftrow{display:flex;align-items:center;gap:10px}.ftrow #ft{flex:1;min-width:0}
 .fdone{flex:none;width:22px;height:22px;margin:0;accent-color:var(--accent);cursor:pointer}
+/* Card layout v3 (2026-11-11): the task window's sections, each a grid of its columns (--tcols, set per section); a cell with only the
+   number or Close takes its own width; at 700 px and below the cells wrap into one column (no horizontal scroll) */
+.tsec{display:grid;grid-template-columns:var(--tcols,minmax(0,1fr));gap:0 var(--s4);align-items:start}
+.tsec + .tsec{margin-top:var(--s2)}
+.tcell{min-width:0}
+.tcell.small{display:flex;align-items:flex-start;justify-content:flex-end;gap:var(--s2)}
+.tcell .fref{margin-top:var(--s2)}
+.tk-x{width:32px;height:32px;min-height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--ink3);box-shadow:none}
+.tk-x:hover{background:var(--hover);color:var(--ink)}
+/* Start and End: a grid that drops to one column in a narrow cell (the menu's own .frow is a flex row, so scope it here) */
+.tzb .frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:0 var(--s4)}
+.tzb .frow>div{min-width:0}.tzb .frow input{width:100%;min-width:0;box-sizing:border-box}
+@media (max-width:700px){.tsec{display:flex;flex-wrap:wrap;gap:0 var(--s3)}.tcell{flex:1 1 240px}.tcell.small{flex:0 0 auto}}
 /* the quadrant buttons under the title (2026-11-07): an outline in the quadrant's colour, the current one filled */
 .fquad{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s2) 0 var(--s3)}
 .fquad button{min-height:32px;padding:0 14px;border-radius:999px;border:1.5px solid var(--c);background:transparent;color:var(--ink2);font:500 13.5px var(--ui);cursor:pointer}
@@ -2116,10 +2148,23 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   // list goes); its fixed part is the header row (number, title, badges, done). Open task: the blocks between the fixed header (heading,
   // position, title) and the fixed actions; the Decision section is never hidden. Same for all lists (prefs.cardLayout.zones)
   const LAYOUT_ZONES = ['top', 'main', 'bottom'];
-  const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: ['autonomy', 'decision', 'format', 'description', 'dates', 'tags', 'links', 'sources'] };
-  const LAYOUT_FIXED = { board: [], task: ['decision'] };
-  const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] },
-    task: { top: ['autonomy', 'decision', 'format'], main: ['description', 'dates', 'tags'], bottom: ['links', 'sources'], off: [] } };
+  // task window layout v3 (2026-11-11, Max): the Open task tab places blocks in sections a person adds, renames, reorders and removes
+  // (when empty), each with 1-3 columns (cells). Blocks: the header pieces (list, id, title, close) move too; one block per tag list
+  // ('tl:<id>'), and 'tl:*' marks where the tag lists not placed by hand go (starred first). title, close and decision are never hidden.
+  // Stored as prefs.cardLayout.zones.task = { v: 3, sections: [{ id, name, cols, cells }], off }; a v2 value ({ top, main, bottom, off }
+  // with 'tags') is migrated by readTaskLayout
+  const TASK_BLOCKS = ['list', 'id', 'title', 'close', 'autonomy', 'decision', 'format', 'description', 'dates', 'links', 'sources'];
+  const TASK_NEVER_HIDDEN = ['title', 'close', 'decision'];
+  const TASK_CREATE_SKIP = ['id', 'autonomy', 'decision', 'sources'];
+  const TASK_LAYOUT_V = 3, TASK_SECTIONS_MAX = 8, TASK_SECTION_NAME_MAX = 24, TASK_COLS = [1, 2, 3];
+  const TASK_LAYOUT_DEFAULTS = { v: TASK_LAYOUT_V, sections: [
+    { id: 'header', name: 'Header', cols: 2, cells: [['list', 'id', 'title'], ['close']] },
+    { id: 'top', name: 'Top', cols: 1, cells: [['autonomy', 'decision', 'format']] },
+    { id: 'main', name: 'Main', cols: 1, cells: [['description', 'dates']] },
+    { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*', 'links', 'sources']] }], off: [] };
+  const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: TASK_BLOCKS };
+  const LAYOUT_FIXED = { board: [], task: TASK_NEVER_HIDDEN };
+  const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] }, task: TASK_LAYOUT_DEFAULTS };
   const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
     group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100, zones: LAYOUT_DEFAULTS };
   const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
@@ -2205,7 +2250,10 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     const ids = tagListIds ? new Set(tagListIds) : null;
     if (strs(raw.tagLists)) c.tagLists = raw.tagLists.filter(id => !ids || ids.has(id));
     if (Number.isInteger(raw.autoCollapse) && raw.autoCollapse >= 0 && raw.autoCollapse <= 5000) c.autoCollapse = raw.autoCollapse;
-    if (isObj(raw.zones)) Object.keys(LAYOUT_BLOCKS).forEach(kind => { const z = readZones(raw.zones[kind], kind, ids); if (z) c.zones[kind] = z; });
+    if (isObj(raw.zones)) {
+      const z = readZones(raw.zones.board, 'board', ids); if (z) c.zones.board = z;
+      if (raw.zones.task !== undefined) c.zones.task = readTaskLayout(raw.zones.task, ids);
+    }
     return c;
   }
   // T17: one kind's stored zones, checked for shape: known blocks only, each once; a tag list block only for a known tag list (when
@@ -2261,6 +2309,200 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     if (dir === 'down') { if (i < arr.length - 1) { arr.splice(i, 1); arr.splice(i + 1, 0, b); } else if (zi < 2) { arr.splice(i, 1); z[LAYOUT_ZONES[zi + 1]].unshift(b); } }
     if (dir === 'left' || dir === 'right') { const nk = LAYOUT_ZONES[zi + (dir === 'left' ? -1 : 1)]; if (nk) { arr.splice(i, 1); z[nk].push(b); } }
     return z;
+  }
+  // ---- task window layout v3 ----
+  const TASK_SECTION_ID = /^[a-z0-9-]{1,24}$/;
+  const isTlBlock = b => typeof b === 'string' && /^tl:[\w-]{1,64}$/.test(b);
+  const idSet = x => x instanceof Set ? x : Array.isArray(x) ? new Set(x) : null;
+  // a section name: control characters removed, trimmed, at most TASK_SECTION_NAME_MAX characters; empty → "Section n" (n from 1)
+  function taskSectionName(raw, n) {
+    const s = String(typeof raw === 'string' ? raw : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, TASK_SECTION_NAME_MAX).trim();
+    return s || 'Section ' + n;
+  }
+  const freeSectionId = (taken, n) => { let id = 's' + n, k = 1; while (taken.has(id)) id = 's' + n + '-' + (k++); return id; };
+  // a v2 task value { top, main, bottom, off } as v3: the default Header, then Top, Main, Bottom with 1 column each in the stored
+  // order; 'tags' becomes 'tl:*' at the start of Bottom; off is kept (never-hidden blocks are dropped)
+  function taskLayoutFromV2(raw) {
+    const arr = k => Array.isArray(raw[k]) ? raw[k].filter(b => typeof b === 'string' && b !== 'tags' && b !== 'tl:*') : [];
+    const H = TASK_LAYOUT_DEFAULTS.sections[0];
+    return { v: TASK_LAYOUT_V, sections: [clone(H),
+      { id: 'top', name: 'Top', cols: 1, cells: [arr('top')] }, { id: 'main', name: 'Main', cols: 1, cells: [arr('main')] },
+      { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*'].concat(arr('bottom'))] }],
+      off: arr('off').filter(b => !TASK_NEVER_HIDDEN.includes(b)) };
+  }
+  // the stored task layout, checked: v3 shape (a v2 value is migrated); unknown and duplicate blocks dropped, tag list blocks only for
+  // known tag lists (when tagListIds is given), cells.length = cols (extra cells' blocks join the last cell), at most TASK_SECTIONS_MAX
+  // sections, names cleaned, ids unique; a missing block goes to the end of its default section's last cell ('tl:*' to the start of
+  // Bottom's first cell), or to the last section. Malformed → the defaults
+  function readTaskLayout(raw, tagListIds) {
+    if (!isObj(raw)) return clone(TASK_LAYOUT_DEFAULTS);
+    if (raw.v === undefined && LAYOUT_ZONES.every(k => Array.isArray(raw[k]))) raw = taskLayoutFromV2(raw);
+    if (raw.v !== TASK_LAYOUT_V || !Array.isArray(raw.sections)) return clone(TASK_LAYOUT_DEFAULTS);
+    const ids = idSet(tagListIds), seen = new Set(), taken = new Set();
+    const ok = b => typeof b === 'string' && !seen.has(b) && (TASK_BLOCKS.includes(b) || b === 'tl:*' || (isTlBlock(b) && (!ids || ids.has(b.slice(3)))));
+    const secs = raw.sections.filter(isObj).slice(0, TASK_SECTIONS_MAX);
+    if (!secs.length) return clone(TASK_LAYOUT_DEFAULTS);
+    const sections = secs.map((s, i) => {
+      const rc = Array.isArray(s.cells) ? s.cells : [];
+      const cols = TASK_COLS.includes(s.cols) ? s.cols : Math.min(3, Math.max(1, rc.length || 1));
+      const cells = Array.from({ length: cols }, () => []);
+      rc.forEach((c, ci) => { if (Array.isArray(c)) c.forEach(b => { if (ok(b)) { seen.add(b); cells[Math.min(ci, cols - 1)].push(b); } }); });
+      const id = typeof s.id === 'string' && TASK_SECTION_ID.test(s.id) && !taken.has(s.id) ? s.id : null; if (id) taken.add(id);
+      return { id, name: taskSectionName(s.name, i + 1), cols, cells };
+    });
+    sections.forEach((s, i) => { if (!s.id) { s.id = freeSectionId(taken, i + 1); taken.add(s.id); } });
+    const last = sections[sections.length - 1];
+    TASK_BLOCKS.forEach(b => {
+      if (seen.has(b)) return;
+      const d = TASK_LAYOUT_DEFAULTS.sections.find(x => x.cells.some(c => c.includes(b)));
+      const s = sections.find(x => x.id === d.id) || last;
+      s.cells[s.cells.length - 1].push(b); seen.add(b);
+    });
+    if (!seen.has('tl:*')) { const s = sections.find(x => x.id === 'bottom') || last; s.cells[0].unshift('tl:*'); seen.add('tl:*'); }
+    const off = Array.isArray(raw.off) ? [...new Set(raw.off.filter(b => typeof b === 'string' && seen.has(b) && b !== 'tl:*' && !TASK_NEVER_HIDDEN.includes(b)))] : [];
+    return { v: TASK_LAYOUT_V, sections, off };
+  }
+  // a cardLayout, a task layout or nothing → a checked task layout (a copy)
+  const taskLayoutOf = layout => readTaskLayout(isObj(layout) && isObj(layout.zones) ? layout.zones.task : layout && layout.sections ? layout : null);
+  // the tag lists 'tl:*' stands for, in drawing order: starred (favs) first, then by order (tagListOrder ids), then as given
+  // (cardLayoutTagLists order). tagLists: ids or tag list rows
+  function taskTagListOrder(tagLists, favs, order) {
+    const ids = (tagLists || []).map(l => typeof l === 'string' ? l : l && l.id).filter(x => typeof x === 'string');
+    const fav = new Set(favs || []), at = id => { const i = (order || []).indexOf(id); return i < 0 ? Infinity : i; };
+    return ids.map((id, i) => ({ id, i })).sort((a, b) => (fav.has(b.id) - fav.has(a.id)) || (at(a.id) - at(b.id)) || (a.i - b.i)).map(x => x.id);
+  }
+  // the layout for the editor: 'tl:*' replaced by the tag lists not placed by hand (in taskTagListOrder), placed tag lists that are
+  // not in tagLists dropped; off kept. taskLayoutStore turns it back into what is stored
+  function taskLayoutExpand(layout, tagLists, favs, order) {
+    const L = taskLayoutOf(layout), live = taskTagListOrder(tagLists, favs, order), liveSet = new Set(live);
+    const placed = new Set(); L.sections.forEach(s => s.cells.forEach(c => c.forEach(b => { if (isTlBlock(b)) placed.add(b.slice(3)); })));
+    const rest = live.filter(id => !placed.has(id)).map(id => 'tl:' + id);
+    L.sections.forEach(s => { s.cells = s.cells.map(c => c.flatMap(b => b === 'tl:*' ? rest : isTlBlock(b) && !liveSet.has(b.slice(3)) ? [] : [b])); });
+    L.off = L.off.filter(b => !isTlBlock(b) || liveSet.has(b.slice(3)));
+    return L;
+  }
+  // what the task window draws: { sections: [{ id, name, cols, cells: [[block id]] }], hidden: [block id] }; 'tl:*' expanded, hidden
+  // (off) blocks left out of the cells and listed in hidden (the window keeps their form fields, hidden). mode 'create' drops id,
+  // autonomy, decision and sources (a new task has none)
+  function taskLayoutView(layout, tagLists, favs, order, mode) {
+    const L = taskLayoutExpand(layout, tagLists, favs, order), off = new Set(L.off), hidden = [];
+    const sections = L.sections.map(s => ({ id: s.id, name: s.name, cols: s.cols, cells: s.cells.map(c => c.filter(b => {
+      if (mode === 'create' && TASK_CREATE_SKIP.includes(b)) return false;
+      if (off.has(b)) { hidden.push(b); return false; }
+      return true;
+    })) }));
+    return { sections, hidden };
+  }
+  // an edited (expanded) layout back to what is stored: a checked v3 value with exactly one 'tl:*'. With tagLists, the longest run of
+  // visible tag list blocks in one cell that already stands in taskTagListOrder becomes 'tl:*' again (so stars and new tag lists keep
+  // ordering it); without, or with no tag list block, 'tl:*' goes after the last tag list block, else to the start of Bottom
+  function taskLayoutStore(layout, tagLists, favs, order) {
+    const L = readTaskLayout(clone(isObj(layout) ? layout : TASK_LAYOUT_DEFAULTS));
+    L.sections.forEach(s => { s.cells = s.cells.map(c => c.filter(b => b !== 'tl:*')); });
+    const off = new Set(L.off);
+    let best = null, lastAt = null;
+    const rank = tagLists ? new Map(taskTagListOrder(tagLists, favs, order).map((id, i) => [id, i])) : null;
+    L.sections.forEach((s, si) => s.cells.forEach((c, ci) => {
+      let i = 0;
+      while (i < c.length) {
+        if (!isTlBlock(c[i])) { i++; continue; }
+        lastAt = { si, ci, i: i + 1 };
+        if (!rank || off.has(c[i]) || !rank.has(c[i].slice(3))) { i++; continue; }
+        let j = i + 1;
+        while (j < c.length && isTlBlock(c[j]) && !off.has(c[j]) && rank.has(c[j].slice(3)) && rank.get(c[j].slice(3)) > rank.get(c[j - 1].slice(3))) j++;
+        if (!best || j - i > best.n) best = { si, ci, i, n: j - i };
+        if (j > i + 1) lastAt = { si, ci, i: j };
+        i = j;
+      }
+    }));
+    if (best) L.sections[best.si].cells[best.ci].splice(best.i, best.n, 'tl:*');
+    else if (lastAt) L.sections[lastAt.si].cells[lastAt.ci].splice(lastAt.i, 0, 'tl:*');
+    else { const s = L.sections.find(x => x.id === 'bottom') || L.sections[L.sections.length - 1]; s.cells[0].unshift('tl:*'); }
+    return readTaskLayout(L);
+  }
+  // where a block stands: { si, ci, i } or null
+  function taskBlockAt(L, b) {
+    for (let si = 0; si < L.sections.length; si++) for (let ci = 0; ci < L.sections[si].cells.length; ci++) {
+      const i = L.sections[si].cells[ci].indexOf(b); if (i >= 0) return { si, ci, i };
+    }
+    return null;
+  }
+  // move a block one step or to a drop target; a new layout, the input is not changed (no change: an equal copy).
+  // up / down: within its cell, at the cell's edge into the previous section's cell (end) or the next section's cell (start), same
+  // column or the last one. left / right: to the neighbouring cell at the same row, at the section's edge to the previous section's
+  // last cell (end) or the next section's first cell (start). to = { section: id, cell: index, before: block id or null (end) }
+  function taskLayoutMove(layout, b, dir, to) {
+    const L = clone(layout), p = taskBlockAt(L, b);
+    if (!p) return L;
+    const S = L.sections, cell = S[p.si].cells[p.ci];
+    const put = (si, ci, at) => { cell.splice(p.i, 1); const c = S[si].cells[ci]; c.splice(at === undefined ? c.length : Math.min(at, c.length), 0, b); };
+    if (to) {
+      const si = S.findIndex(s => s.id === to.section);
+      if (si < 0 || !Number.isInteger(to.cell) || to.cell < 0 || to.cell >= S[si].cells.length || to.before === b) return L;
+      cell.splice(p.i, 1);
+      const c = S[si].cells[to.cell], j = to.before ? c.indexOf(to.before) : -1;
+      if (j < 0) c.push(b); else c.splice(j, 0, b);
+      return L;
+    }
+    if (dir === 'up') {
+      if (p.i > 0) { cell.splice(p.i, 1); cell.splice(p.i - 1, 0, b); }
+      else if (p.si > 0) put(p.si - 1, Math.min(p.ci, S[p.si - 1].cols - 1));
+    } else if (dir === 'down') {
+      if (p.i < cell.length - 1) { cell.splice(p.i, 1); cell.splice(p.i + 1, 0, b); }
+      else if (p.si < S.length - 1) put(p.si + 1, Math.min(p.ci, S[p.si + 1].cols - 1), 0);
+    } else if (dir === 'left') {
+      if (p.ci > 0) put(p.si, p.ci - 1, p.i);
+      else if (p.si > 0) put(p.si - 1, S[p.si - 1].cols - 1);
+    } else if (dir === 'right') {
+      if (p.ci < S[p.si].cols - 1) put(p.si, p.ci + 1, p.i);
+      else if (p.si < S.length - 1) put(p.si + 1, 0, 0);
+    }
+    return L;
+  }
+  // hide (true) or show (false) a placed block; title, close, decision and 'tl:*' are never hidden
+  function taskLayoutHide(layout, b, hide) {
+    const L = clone(layout);
+    if (hide) { if (!TASK_NEVER_HIDDEN.includes(b) && b !== 'tl:*' && taskBlockAt(L, b) && !L.off.includes(b)) L.off.push(b); }
+    else L.off = L.off.filter(x => x !== b);
+    return L;
+  }
+  // a new empty section (1 column, "Section n", the first n free from the new count) after the section afterId (none: at the end);
+  // at TASK_SECTIONS_MAX the same layout comes back
+  function taskLayoutAddSection(layout, afterId) {
+    if (layout.sections.length >= TASK_SECTIONS_MAX) return layout;
+    const L = clone(layout), taken = new Set(L.sections.map(s => s.id)), names = new Set(L.sections.map(s => s.name));
+    let n = L.sections.length + 1; while (names.has('Section ' + n)) n++;
+    const s = { id: freeSectionId(taken, n), name: 'Section ' + n, cols: 1, cells: [[]] };
+    const i = L.sections.findIndex(x => x.id === afterId);
+    L.sections.splice(i < 0 ? L.sections.length : i + 1, 0, s);
+    return L;
+  }
+  function taskLayoutRename(layout, id, name) {
+    const L = clone(layout), i = L.sections.findIndex(s => s.id === id);
+    if (i >= 0) L.sections[i].name = taskSectionName(name, i + 1);
+    return L;
+  }
+  // 1, 2 or 3 columns; fewer columns move the removed cells' blocks to the end of the new last cell
+  function taskLayoutSetCols(layout, id, cols) {
+    const L = clone(layout), s = L.sections.find(x => x.id === id);
+    if (!s || !TASK_COLS.includes(cols) || cols === s.cols) return L;
+    if (cols > s.cols) while (s.cells.length < cols) s.cells.push([]);
+    else { const gone = s.cells.splice(cols).flat(); s.cells[cols - 1].push(...gone); }
+    s.cols = cols;
+    return L;
+  }
+  function taskLayoutMoveSection(layout, id, dir) {
+    const L = clone(layout), i = L.sections.findIndex(s => s.id === id), j = i + (dir === 'up' ? -1 : dir === 'down' ? 1 : 0);
+    if (i < 0 || j === i || j < 0 || j >= L.sections.length) return L;
+    const [s] = L.sections.splice(i, 1); L.sections.splice(j, 0, s);
+    return L;
+  }
+  // remove a section only when all its cells are empty and another section is left; otherwise the same layout comes back
+  function taskLayoutRemoveSection(layout, id) {
+    const i = layout.sections.findIndex(s => s.id === id);
+    if (i < 0 || layout.sections.length < 2 || layout.sections[i].cells.some(c => c.length)) return layout;
+    const L = clone(layout); L.sections.splice(i, 1);
+    return L;
   }
   // a card is expanded when the mode says so, unless flipped. Round 4, item 4: autoCollapse no longer collapses a card (it only
   // acted in Expanded mode, and the default is Collapsed); it cuts the description of an open card instead (descClip)
@@ -3348,7 +3590,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     ASSIGNEE_DEFAULT, isHomeosList, homeosAssigneeTag, assigneeOnListChange,
     createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, TASK_BLOCKS, TASK_NEVER_HIDDEN, TASK_CREATE_SKIP, TASK_LAYOUT_V, TASK_SECTIONS_MAX, TASK_SECTION_NAME_MAX, TASK_COLS, TASK_LAYOUT_DEFAULTS, readTaskLayout, taskSectionName, taskTagListOrder, taskLayoutExpand, taskLayoutView, taskLayoutStore, taskLayoutMove, taskLayoutHide, taskLayoutAddSection, taskLayoutRename, taskLayoutSetCols, taskLayoutMoveSection, taskLayoutRemoveSection, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
@@ -4741,6 +4983,8 @@ function toggleTagListFav(id) {
   savePrefsSoon();
   return tagListFavs.includes(id);
 }
+// the tag lists the task window offers (live, not hidden, one I can see): one 'tl:<id>' block each in Card layout's Open task
+const taskTagLists = () => me ? C.tagGroups(TAG_LISTS, TAG, me.id, NAMES, { order: tagListOrder }).map(g => g.list) : [];
 // a name typed in the task window: 'new:<tag list id>:<name>', created in that tag list on Save
 const isNew = x => String(x).startsWith('new:');
 const newKey = (list, name) => 'new:' + list + ':' + name;
@@ -5013,7 +5257,8 @@ function openTask(id, quad, opts) {
   // separators keep the line readable as one sentence for a screen reader
   const wnum = t && cardLayout.number ? refText(t) : '', wrest = t ? C.cardFacts(t, cardLayout).filter(f => f.k !== 'end').map(factText) : [];
   const contHtml = t ? continueHtml(t, (LIST[t.list] || {}).slug) : '';
-  const whoHtml = wnum || wrest.length ? '<p class="fwho" id="fwho">' + (wnum ? ['<span class="fref">' + esc(wnum) + '</span>'] : []).concat(wrest.map(x => '<span>' + esc(x) + '</span>')).join('<span class="sr"> · </span>') + '</p>' : '';
+  // the number is its own block now ('id', Card layout v3); Created and By stay on the formatting row
+  const whoHtml = wrest.length ? '<p class="fwho" id="fwho">' + wrest.map(x => '<span>' + esc(x) + '</span>').join('<span class="sr"> · </span>') + '</p>' : '';
   const fmtHtml = editable ? '<div class="fmt" role="toolbar" aria-label="Formatting"><button type="button" data-cmd="bold" aria-label="Bold" aria-pressed="false"><b>B</b></button><button type="button" data-cmd="italic" aria-label="Italic" aria-pressed="false"><i>I</i></button><button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list" aria-pressed="false">' + I.ul + '</button><button type="button" data-cmd="insertOrderedList" aria-label="Numbered list" aria-pressed="false">' + I.ol + '</button></div>' : '';
   // previous / next task: the neighbours in the board's shown order across the quadrants (C.deckSequence: A, B, C, D), shown by the
   // task deck beside the window (deckOpen). The window is the deck's card: a switch fills the same card again, the modal stays open.
@@ -5070,43 +5315,52 @@ function openTask(id, quad, opts) {
   // close it), a task awaiting its check (settle.js would read it as closed by hand), a read-only, done or new task, or a preview
   const doneOn = !!t && editable && !o.preview && !C.decisionOf(t) && t.status !== 'waiting' && !C.awaitingCheck(t) && !C.CLOSED.includes(t.status);
   const doneHtml = doneOn ? '<input type="checkbox" class="fdone" id="fdone" aria-label="Mark done" title="Mark done">' : '';
-  const TZ = C.layoutZones(cardLayout, 'task');
+  // Card layout v3 (2026-11-11): the window's blocks in the person's sections and columns; one tag picker per tag list ('tl:<id>')
+  const TV = C.taskLayoutView(cardLayout, taskTagLists(), tagListFavs, tagListOrder, t ? 'edit' : 'create');
+  const tlFirst = (TV.sections.flatMap(s => s.cells.flat()).find(b => /^tl:/.test(b)) || ''); // the search box over the tags sits in this block
   let formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml + '</div>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
     (t && C.awaitingCheck(t) ? '<p class="note">Waits for your check: answer its check card.</p>' : '') +
     (locked ? '<p class="note">' + (t.status === 'done' ? 'Done' : 'Cancelled') + (t.doneAt ? ' ' + fmtDay(t.doneAt) : '') + '. Read only. Restore it from the archive to change it.</p>' : '') +
     (t && lowConf(t) ? '<p class="note">Added by an assistant with low confidence' + (t.aiConfidence !== null ? ' (' + t.aiConfidence.toFixed(2) + ')' : '') + '. Check the list and the text.</p>' : '') +
-    '<div class="flabel" id="ft-l">Title</div><div class="ftrow"><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
-    // one row (Anastasiia, 2026-11-07): formatting on the left, the quadrant buttons centred, the number and facts on the right; on a
-    // decision card the quadrant buttons are on the Decision row instead
-    tzone('top') + tzone('main') + tzone('bottom') +
+    TV.sections.map(tsec).join('') +
+    // hidden blocks stay in the form (hidden), so Save reads their fields as before
+    (TV.hidden.length ? '<div class="tsec-off" hidden>' + TV.hidden.map(b => { const x = tblock(b); return x ? '<div class="tzb" data-tb="' + esc(b) + '" hidden>' + x + '</div>' : ''; }).join('') + '</div>' : '') +
     '<div class="actions">';
-  // harness configurations T17: the window's blocks in Card layout's zones and order ("Open task"); a hidden block stays in the form
-  // (hidden), so Save reads it as before. The heading, position, title and actions are fixed
+  // Card layout v3: one section is a grid of its cells (columns); an empty cell is left out (no gap box), a cell holding only small
+  // blocks (number, close) takes its own width. The heading, position line and actions stay fixed
+  function tsec(s) {
+    const cells = s.cells.map(c => ({ c, h: c.map(b => { const x = tblock(b); return x ? '<div class="tzb" data-tb="' + esc(b) + '">' + x + '</div>' : ''; }).join('') })).filter(x => x.h);
+    if (!cells.length) return '';
+    const cols = cells.map(x => x.c.every(b => b === 'id' || b === 'close') ? 'auto' : 'minmax(0,1fr)').join(' ');
+    return '<div class="tsec" data-sec="' + esc(s.id) + '" style="--tcols:' + cols + '">' + cells.map(x => '<div class="tcell' + (x.c.every(b => b === 'id' || b === 'close') ? ' small' : '') + '">' + x.h + '</div>').join('') + '</div>';
+  }
   function tblock(b) {
+    if (/^tl:/.test(b)) {
+      const l = TAG_LISTS[b.slice(3)]; if (!l) return '';
+      return '<div class="tagpick" data-tl="' + esc(l.id) + '">' + (b === tlFirst ? '<input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' : '') +
+        '<div class="tagbox" role="group" aria-label="Tags: ' + esc(l.name) + '" data-tl-box="' + esc(l.id) + '"></div></div>';
+    }
     switch (b) {
+      case 'list': return '<div class="flist"><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>';
+      case 'id': return wnum ? '<span class="fref" id="fref">' + esc(wnum) + '</span>' : '';
+      case 'title': return '<div class="flabel" id="ft-l">Title</div><div class="ftrow"><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>';
+      case 'close': return '<button type="button" class="tk-x" id="fx" aria-label="Close" title="Close (Esc)">' + I.x + '</button>';
       case 'autonomy': return autoHtml;
       case 'decision': return decHtml;
       case 'format': return '<div class="fbar has-q">' + fmtHtml + quadHtml + whoHtml + '</div>';
       case 'description': return '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
         '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>';
-      // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
-      // position in its quadrant (2026-10-29)
-      case 'dates': return '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
+      // Start and End share one row (stacked on a phone); Start is the Timeline's bar start; List is its own block (Card layout v3).
+      // No Priority: a task's priority is its position in its quadrant (2026-10-29)
+      case 'dates': return '<div class="frow">' +
     '<div><label>Start<input id="fsd" type="datetime-local"' + ro + ' value="' + dtl(start) + '"></label><div class="err" id="fsde" aria-live="polite"></div></div>' +
     '<div><label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div></div></div>';
-      // U1, U6, U8: no "Tags" label; a search box over the groups; the groups scroll inside a box of about 40% of the window's height
-      case 'tags': return '<div class="tagpick"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' +
-    '<div class="tagbox" role="group" aria-label="Tags"></div></div>';
       case 'links': return LINKS_READY ? '<div class="flabel" id="lk-l">Links</div><div class="links" id="lk" role="group" aria-labelledby="lk-l"></div>' : '';
       case 'sources': return t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '';
     }
     return '';
-  }
-  function tzone(k) {
-    const h = TZ[k].map(b => { const x = tblock(b); return x ? '<div class="tzb" data-tb="' + b + '"' + (TZ.off.includes(b) ? ' hidden' : '') + '>' + x + '</div>' : ''; }).join('');
-    return h ? '<div class="tz tz-' + k + '">' + h + '</div>' : '';
   }
   formHtml += (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) && !locked ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
     '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
@@ -5116,9 +5370,12 @@ function openTask(id, quad, opts) {
     const el = o.preview;
     el.innerHTML = formHtml; el.dataset.id = t.id; el.dataset.q = t.q; // its own top line in its own quadrant colour
     el.querySelectorAll('[contenteditable]').forEach(x => x.setAttribute('contenteditable', 'false'));
-    const tb = el.querySelector('.tagbox'), lk = el.querySelector('#lk'), sb = el.querySelector('#srcs');
-    // its tags as a card shows them: shown tag lists only, and Card layout's tag filter (cardTags; tags round, item 6)
-    if (tb) tb.innerHTML = cardTags(t).map(x => '<span class="pv-tag">' + esc(lab(x)) + '</span>').join('') || '<span class="n">No tags</span>';
+    const lk = el.querySelector('#lk'), sb = el.querySelector('#srcs');
+    // its tags as a card shows them (cardTags: shown tag lists only, Card layout's tag filter; tags round, item 6), each in its tag list's block
+    const pvt = cardTags(t), boxes = [...el.querySelectorAll('.tagbox[data-tl-box]')];
+    boxes.forEach(tb => { tb.innerHTML = pvt.filter(x => (TAG[x] || {}).tag_list_id === tb.dataset.tlBox).map(x => '<span class="pv-tag">' + esc(lab(x)) + '</span>').join(''); });
+    if (boxes.length && !pvt.length) boxes[0].innerHTML = '<span class="n">No tags</span>';
+    el.querySelectorAll('.tg-q').forEach(x => x.remove());
     if (lk) {
       const by = {}; all().forEach(x => { by[x.id] = x; });
       const ix = C.linkIndex(new Map(LINKS), by);
@@ -5217,7 +5474,22 @@ function openTask(id, quad, opts) {
   };
   dlg.querySelectorAll('[data-cmd]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { if (lastEditor === fnEl && fnEl.hidden) { editDesc(); syncFmt(); return; } lastEditor.focus(); if (lastEditor === fnEl) fmtRaw(b.dataset.cmd); else document.execCommand(b.dataset.cmd); syncFmt(); }; });
   syncFmt();
-  const box = dlg.querySelector('.tagbox'), qEl = dlg.querySelector('#tg-q');
+  // Card layout v3: one tag picker per tag list block; box is the window (the pickers live in several blocks), the search box sits in the
+  // first shown tag list block (none shown: an empty stand-in, so the search code needs no checks)
+  const box = dlg, qEl = dlg.querySelector('#tg-q') || { value: '' };
+  const tvMode = t ? 'edit' : 'create';
+  // after a move of the tag lists (my order), the blocks that stand for tl:* take the new order: each shown tag list slot in the
+  // window's order gets the list the layout puts there now
+  const retagSlots = () => {
+    const want = C.taskLayoutView(cardLayout, taskTagLists(), tagListFavs, tagListOrder, tvMode).sections.flatMap(s => s.cells.flat()).filter(b => /^tl:/.test(b) && TAG_LISTS[b.slice(3)]);
+    const slots = [...dlg.querySelectorAll('.tsec .tzb[data-tb^="tl:"]')];
+    if (want.length !== slots.length) return;
+    slots.forEach((z, i) => {
+      if (z.dataset.tb === want[i]) return;
+      const id = want[i].slice(3), bx = z.querySelector('.tagbox');
+      z.dataset.tb = want[i]; z.querySelector('.tagpick').dataset.tl = id; bx.dataset.tlBox = id; bx.setAttribute('aria-label', 'Tags: ' + TAG_LISTS[id].name);
+    });
+  };
   // tags (round 3 P1): one group per tag list, its name on top (not a button), its chips below (pressed = on the task). The chevron
   // opens or closes the group within this window only (C.tagGroupOpen: my favourite lists, ★ on their head, start open and every
   // other list starts closed, on each open; tags round); a closed group is one row, "name · count". The grip (drag) or Alt+Up /
@@ -5279,7 +5551,8 @@ function openTask(id, quad, opts) {
     const all = groupsNow().map(g => ({ list: g.list, tags: g.tags.concat(fresh[g.list.id] || []) }));
     const q = qEl.value.trim(), shown = C.tagSearch(all, q, nameOf);
     const total = id => (all.find(g => g.list.id === id) || { tags: [] }).tags.length;
-    box.innerHTML = shown.map(g => {
+    retagSlots();
+    const groupHtml = g => {
       const R = C.tagListRights(g.list), ids = g.tags, own = g.list.owner_id === me.id, open = !!q || isOpenG(g.list), id = esc(g.list.id), nm = esc(g.list.name);
       const moves = !q && !!(C.tagListReorder(all, me.id, g.list.id, { dir: -1 }, tagListOrder) || C.tagListReorder(all, me.id, g.list.id, { dir: 1 }, tagListOrder));
       const chips = !open ? '' : ids.map(x => {
@@ -5296,7 +5569,12 @@ function openTask(id, quad, opts) {
           (moves ? ' aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" title="Alt+Up or Alt+Down moves the list"' : '') + '>' + (open ? I.chevD : I.chevR) + '</button>') + '</div>';
       return '<div class="tgg' + (open ? '' : ' shut') + '" role="group" aria-label="' + nm + '" data-tgg="' + id + '">' + head +
         (open ? '<div class="tgg-c">' + (chips || (add ? '' : '<span class="n">no tags</span>')) + add + '</div>' : '') + '</div>';
-    }).join('') || (q ? '<p class="n">No tag matches “' + esc(q) + '”</p>' : '<p class="n">No tag lists</p>');
+    };
+    const byId = {}; shown.forEach(g => { byId[g.list.id] = g; });
+    const slots = [...dlg.querySelectorAll('.tagbox[data-tl-box]')];
+    slots.forEach(sl => { const g = byId[sl.dataset.tlBox]; sl.innerHTML = g ? groupHtml(g) : ''; });
+    const vis = slots.filter(sl => !sl.closest('[hidden]'));
+    if (q && vis.length && !vis.some(sl => sl.innerHTML)) vis[0].innerHTML = '<p class="n">No tag matches “' + esc(q) + '”</p>';
     // open, close and move groups: also on a task I may only read (it changes my view, not the task)
     box.querySelectorAll('[data-tgg-open]').forEach(b => {
       const l = TAG_LISTS[b.dataset.tggOpen];
@@ -5707,6 +5985,8 @@ function openTask(id, quad, opts) {
   head.addEventListener('pointercancel', () => { sw = null; });
   head.addEventListener('pointerup', e => { if (!sw) return; const k = C.swipeDir(e.clientX - sw.x, e.clientY - sw.y); sw = null; if (k && nav[k]) here.leave(k); });
   here.onClose = () => { render(); const back = opener && document.querySelector(opener); if (back) back.focus(); };
+  // the Close block (Card layout v3, never hidden): as Escape, it asks first when something changed
+  const fx = dlg.querySelector('#fx'); if (fx) fx.addEventListener('click', () => here.leave('close'), sig);
   dlg.querySelector('#ft').addEventListener('input', () => dlg.querySelector('#fe').textContent = '');
   dlg.querySelector('#fl').addEventListener('change', () => {
     dlg.querySelector('#fle').textContent = '';
@@ -6124,113 +6404,198 @@ function openSettings(kind) {
 }
 
 // round 3, adjustment 13: Card layout (prefs.cardLayout and cards.mode). Defaults are today's card.
-// harness configurations T17 (UI spec p3, board-pieces-spec.md (d)): three tabs. "On the board" and "Open task" place blocks in the
-// zones Top, Main and Bottom (drag, the ↑/↓ buttons, Alt+arrows, or the zone select on a phone) and show or hide them, with a live
-// preview; "Options" holds the switches the window always had. Same for all lists; Save stores it all in prefs.cardLayout, Reset puts
+// harness configurations T17 (UI spec p3, board-pieces-spec.md (d)): three tabs. "On the board" places blocks in the zones Top, Main
+// and Bottom (drag, the ↑/↓ buttons, Alt+arrows, or the zone select on a phone) and shows or hides them, with a live preview.
+// Card layout v3 (2026-11-11, Max): "Open task" places the window's blocks (List, ID, Title and Close too, one block per tag list) in
+// sections the person adds, renames, reorders and removes (only when empty), each with 1-3 columns; drag between any cells, ↑/↓,
+// Alt+↑/↓ within and across, Alt+←/→ to the neighbouring cell or section, or the place select on a phone; live preview in Edit or
+// Create. "Options" holds the switches the window always had. Same for all lists; Save stores it all in prefs.cardLayout, Reset puts
 // every tab back to the defaults (kept only with Save)
 const CL_BLOCK = { board: { facts: 'Facts (end, created, by)', description: 'Description' },
-  task: { autonomy: 'Autonomy', decision: 'Decision section', format: 'Formatting, quadrant, number', description: 'Description', dates: 'List, start and end', tags: 'Tags', links: 'Links', sources: 'Sources' } };
+  task: { list: 'List', id: 'ID', title: 'Title', close: 'Close', autonomy: 'Autonomy', decision: 'Decision section', format: 'Formatting, quadrant, created', description: 'Description', dates: 'Start and end', links: 'Links', sources: 'Sources' } };
 const CL_ZN = { top: 'Top', main: 'Main', bottom: 'Bottom' };
 const CL_GRIP = '<svg class="grip" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
 const CL_LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 function openCardLayout() {
   const tlIds = C.cardLayoutTagLists(TAG_LISTS, me && me.id).map(l => l.id);
-  const name = (kind, b) => /^tl:/.test(b) ? 'Tags: ' + ((TAG_LISTS[b.slice(3)] || {}).name || 'tag list') : CL_BLOCK[kind][b] || b;
-  const Z = { board: C.layoutZones(cardLayout, 'board', tlIds), task: C.layoutZones(cardLayout, 'task') };
+  const tls = taskTagLists(); // the tag lists of the task window, one block each
+  const name = (kind, b) => /^tl:/.test(b) ? 'Tags: ' + ((TAG_LISTS[b.slice(3)] || {}).name || 'tag list') + (kind === 'task' && tagListFavs.includes(b.slice(3)) ? ' ★' : '') : CL_BLOCK[kind][b] || b;
+  const Z = { board: C.layoutZones(cardLayout, 'board', tlIds) };
+  let TL = C.taskLayoutExpand(cardLayout, tls, tagListFavs, tagListOrder); // the Open task layout being edited, tl:* expanded
   const cs = { pv: 'edit', moved: null };
   const tab = (id, label) => '<button type="button" role="tab" id="cl-t-' + id + '" data-cltab="' + id + '" aria-controls="cl-p-' + id + '" aria-selected="' + (id === 'board') + '" tabindex="' + (id === 'board' ? 0 : -1) + '">' + label + '</button>';
-  const zonePanel = id => '<div class="cl-body" id="cl-p-' + id + '" role="tabpanel" aria-labelledby="cl-t-' + id + '"' + (id === 'board' ? '' : ' hidden') + '><div class="cl-list">' +
-    '<div class="cl-fixed">' + CL_LOCK + '<span class="lk">' + (id === 'board' ? '<span>Number</span><span>Title</span><span>Badges</span><span>Done</span>' : '<span>List</span><span>ID</span><span>Title</span><span>Close</span>') + '</span></div>' +
-    '<p class="s-hint">Fixed: ' + (id === 'board' ? 'the first row of the card stays as it is.' : 'the heading, the number, the title and the buttons stay in place.') + '</p><div class="cl-zones" data-kind="' + id + '"></div>' +
-    '<p class="s-hint cl-kbd">Drag a block, or focus it and press Alt+↑/↓ to reorder and Alt+←/→ to change zone.</p></div>' +
-    '<div class="cl-prev"><div class="cl-pvh"><strong id="cl-pvh-' + id + '">Preview</strong>' + (id === 'task' ? '<span class="cl-seg" role="group" aria-label="Preview window"><button type="button" data-clpv="edit" aria-pressed="true">Edit</button><button type="button" data-clpv="create" aria-pressed="false">Create</button></span>' : '') + '</div>' +
-    '<div class="cl-pv" data-pv="' + id + '"></div></div></div>';
+  const prevHtml = id => '<div class="cl-prev"><div class="cl-pvh"><strong id="cl-pvh-' + id + '">Preview</strong>' + (id === 'task' ? '<span class="cl-seg" role="group" aria-label="Preview window"><button type="button" data-clpv="edit" aria-pressed="true">Edit</button><button type="button" data-clpv="create" aria-pressed="false">Create</button></span>' : '') + '</div>' +
+    '<div class="cl-pv" data-pv="' + id + '"></div></div>';
+  const boardPanel = '<div class="cl-body" id="cl-p-board" role="tabpanel" aria-labelledby="cl-t-board"><div class="cl-list">' +
+    '<div class="cl-fixed">' + CL_LOCK + '<span class="lk"><span>Number</span><span>Title</span><span>Badges</span><span>Done</span></span></div>' +
+    '<p class="s-hint">Fixed: the first row of the card stays as it is.</p><div class="cl-zones" data-kind="board"></div>' +
+    '<p class="s-hint cl-kbd">Drag a block, or focus it and press Alt+↑/↓ to reorder and Alt+←/→ to change zone.</p></div>' + prevHtml('board') + '</div>';
+  const taskPanel = '<div class="cl-body" id="cl-p-task" role="tabpanel" aria-labelledby="cl-t-task" hidden><div class="cl-list">' +
+    '<p class="s-hint">Sections hold the window\'s blocks in 1 to 3 columns. Title, Close and the Decision section are always shown.</p><div class="cl-secs"></div>' +
+    '<p class="s-hint cl-kbd">Drag a block, or focus it and press Alt+↑/↓ to move it up or down and Alt+←/→ to the next column or section.</p></div>' + prevHtml('task') + '</div>';
   const dlg = dialogShell('<form method="dialog" class="settings cl cl2"><strong>Card layout</strong><p class="s-hint cl-sub">Same for all lists.</p>' +
     '<div class="cl-tabs" role="tablist" aria-label="Where the layout applies">' + tab('board', 'On the board') + tab('task', 'Open task') + tab('opts', 'Options') + '</div>' +
-    zonePanel('board') + zonePanel('task') + '<div class="cl-opts" id="cl-p-opts" role="tabpanel" aria-labelledby="cl-t-opts" hidden>' + cardLayoutFields('') + '</div>' +
+    boardPanel + taskPanel + '<div class="cl-opts" id="cl-p-opts" role="tabpanel" aria-labelledby="cl-t-opts" hidden>' + cardLayoutFields('') + '</div>' +
     '<p class="sr" id="cl-live" aria-live="polite"></p>' +
     '<div class="actions"><button type="button" id="cl-reset">Reset</button><span class="cl-st" id="cl-st" aria-live="polite"></span><span class="sp"></span><button value="cancel">Cancel</button><button id="cl-save" value="save">Save</button></div></form>', '#profile');
   const form = dlg.querySelector('form'), q = s => dlg.querySelector(s), resetOpts = wireCardLayout(form);
   const dirty = () => { q('#cl-st').textContent = 'Unsaved changes'; };
-  const zonesEl = kind => q('.cl-zones[data-kind=' + kind + ']');
-  function draw(kind, focus) {
-    const z = Z[kind], off = new Set(z.off), fixed = C.LAYOUT_FIXED[kind], seq = C.LAYOUT_ZONES.flatMap(k => z[k]);
-    zonesEl(kind).innerHTML = C.LAYOUT_ZONES.map(k => '<section class="cl-zone" aria-labelledby="cl-z-' + kind + k + '"><div class="cl-zh" id="cl-z-' + kind + k + '">' + CL_ZN[k] + ' <span class="n">' + z[k].length + (z[k].length === 1 ? ' block' : ' blocks') + '</span></div>' +
+  const say = s => { q('#cl-live').textContent = s; };
+  // ---- On the board: three zones ----
+  const zonesEl = q('.cl-zones[data-kind=board]');
+  function draw(focus) {
+    const z = Z.board, off = new Set(z.off), seq = C.LAYOUT_ZONES.flatMap(k => z[k]);
+    zonesEl.innerHTML = C.LAYOUT_ZONES.map(k => '<section class="cl-zone" aria-labelledby="cl-z-board' + k + '"><div class="cl-zh" id="cl-z-board' + k + '">' + CL_ZN[k] + ' <span class="n">' + z[k].length + (z[k].length === 1 ? ' block' : ' blocks') + '</span></div>' +
       '<ul class="cl-zl" data-zone="' + k + '">' + (z[k].length ? z[k].map((b, i) => {
-        const on = !off.has(b), nm = esc(name(kind, b));
+        const on = !off.has(b), nm = esc(name('board', b));
         return '<li class="cl-blk' + (on ? '' : ' off') + (cs.moved === b ? ' moved' : '') + '" draggable="true" tabindex="0" data-b="' + esc(b) + '" aria-label="' + nm + ', ' + CL_ZN[k] + ', ' + (i + 1) + ' of ' + z[k].length + (on ? '' : ', hidden') + '" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight">' + CL_GRIP +
           '<span class="bn">' + nm + '</span>' +
           '<select class="cl-zsel" data-zsel="' + esc(b) + '" aria-label="Zone of ' + nm + '">' + C.LAYOUT_ZONES.map(x => '<option value="' + x + '"' + (x === k ? ' selected' : '') + '>' + CL_ZN[x] + '</option>').join('') + '</select>' +
-          (fixed.includes(b) ? '<span class="cl-always">Always</span>' : '<button type="button" class="cl-eye" data-eye="' + esc(b) + '" aria-pressed="' + on + '" aria-label="Show ' + nm + '">' + (on ? 'Shown' : 'Hidden') + '</button>') +
+          '<button type="button" class="cl-eye" data-eye="' + esc(b) + '" aria-pressed="' + on + '" aria-label="Show ' + nm + '">' + (on ? 'Shown' : 'Hidden') + '</button>' +
           '<button type="button" class="cl-mv" data-mv="up" data-b2="' + esc(b) + '" aria-label="Move ' + nm + ' up" title="Move up"' + (seq[0] === b ? ' disabled' : '') + '>↑</button>' +
           '<button type="button" class="cl-mv" data-mv="down" data-b2="' + esc(b) + '" aria-label="Move ' + nm + ' down" title="Move down"' + (seq[seq.length - 1] === b ? ' disabled' : '') + '>↓</button></li>';
       }).join('') : '<li class="cl-empty">Drop a block here</li>') + '</ul></section>').join('');
-    preview(kind);
-    if (focus) { const el = zonesEl(kind).querySelector(focus); if (el) el.focus(); }
+    previewBoard();
+    if (focus) { const el = zonesEl.querySelector(focus); if (el) el.focus(); }
   }
-  function preview(kind) {
-    const el = q('.cl-pv[data-pv=' + kind + ']'), z = Z[kind], off = new Set(z.off);
-    if (kind === 'board') {
-      q('#cl-pvh-board').textContent = 'Preview: card on the board';
-      const open = x => !x.doneAt && !x.deleted && !!LIST[x.list], t = all().find(x => open(x) && inList(x) && x.notes) || all().find(x => open(x) && inList(x)) || all().find(open) || null; // this list first (one with a description), else any list
-      let card = '<p class="n">No open task to preview.</p>';
-      if (t) {
-        const keep = { L: cardLayout, mode: st.cardMode, flip: st.flip };
-        try {
-          cardLayout = Object.assign({}, cardLayout, { zones: Object.assign({}, cardLayout.zones, { board: C.layoutStore(z, 'board') }) }); st.cardMode = 'expanded'; st.flip = new Set();
-          card = '<div class="cl-pq" data-q="' + t.q + '"><div class="cl-pqh"><span class="ql">' + t.q + '</span> ' + QN[t.q] + '</div>' +
-            cardHtml(t, t.q).replace(/ (data-[a-z-]+|draggable|tabindex|id)="[^"]*"/g, '') + '</div>';
-        } catch (e) { card = '<p class="n">Preview unavailable.</p>'; } finally { cardLayout = keep.L; st.cardMode = keep.mode; st.flip = keep.flip; }
-      }
-      el.innerHTML = '<div inert>' + card + '</div>';
-    } else {
-      const create = cs.pv === 'create', none = create ? ['autonomy', 'decision', 'sources'] : [];
-      q('#cl-pvh-task').textContent = create ? 'Preview: New task' : 'Preview: Edit task';
-      el.innerHTML = '<div class="cl-ptask" inert><div class="fx"><span>' + esc((LIST[st.list] || {}).name || 'List') + '</span><span>' + (create ? 'New' : '#142') + '</span><span aria-hidden="true">✕</span></div>' +
-        '<div class="cl-pi title">' + (create ? 'Title' : 'Task title') + '</div>' +
-        C.LAYOUT_ZONES.map(k => '<div class="cl-pz">' + z[k].filter(b => !off.has(b) && !none.includes(b)).map(b => '<div class="cl-pi' + (create ? ' ph' : '') + (cs.moved === b ? ' flash' : '') + '">' + esc(name('task', b)) + '</div>').join('') + '</div>').join('') + '</div>';
+  function previewBoard() {
+    const el = q('.cl-pv[data-pv=board]'), z = Z.board;
+    q('#cl-pvh-board').textContent = 'Preview: card on the board';
+    const open = x => !x.doneAt && !x.deleted && !!LIST[x.list], t = all().find(x => open(x) && inList(x) && x.notes) || all().find(x => open(x) && inList(x)) || all().find(open) || null; // this list first (one with a description), else any list
+    let card = '<p class="n">No open task to preview.</p>';
+    if (t) {
+      const keep = { L: cardLayout, mode: st.cardMode, flip: st.flip };
+      try {
+        cardLayout = Object.assign({}, cardLayout, { zones: Object.assign({}, cardLayout.zones, { board: C.layoutStore(z, 'board') }) }); st.cardMode = 'expanded'; st.flip = new Set();
+        card = '<div class="cl-pq" data-q="' + t.q + '"><div class="cl-pqh"><span class="ql">' + t.q + '</span> ' + QN[t.q] + '</div>' +
+          cardHtml(t, t.q).replace(/ (data-[a-z-]+|draggable|tabindex|id)="[^"]*"/g, '') + '</div>';
+      } catch (e) { card = '<p class="n">Preview unavailable.</p>'; } finally { cardLayout = keep.L; st.cardMode = keep.mode; st.flip = keep.flip; }
     }
+    el.innerHTML = '<div inert>' + card + '</div>';
   }
-  function changed(kind, b, zones) {
-    Z[kind] = zones; cs.moved = b; dirty(); draw(kind, '.cl-blk[data-b="' + b + '"]');
-    const k = C.LAYOUT_ZONES.find(x => Z[kind][x].includes(b));
-    q('#cl-live').textContent = name(kind, b) + ' moved to ' + CL_ZN[k] + ', position ' + (Z[kind][k].indexOf(b) + 1) + ' of ' + Z[kind][k].length + '.';
+  function changedBoard(b, zones) {
+    Z.board = zones; cs.moved = b; dirty(); draw('.cl-blk[data-b="' + b + '"]');
+    const k = C.LAYOUT_ZONES.find(x => Z.board[x].includes(b));
+    say(name('board', b) + ' moved to ' + CL_ZN[k] + ', position ' + (Z.board[k].indexOf(b) + 1) + ' of ' + Z.board[k].length + '.');
   }
-  dlg.querySelectorAll('.cl-zones').forEach(root => {
-    const kind = root.dataset.kind;
-    root.addEventListener('click', e => {
-      const b = e.target.closest('button'); if (!b) return;
-      if (b.dataset.eye) { const k = b.dataset.eye, o = Z[kind].off; Z[kind] = Object.assign({}, Z[kind], { off: o.includes(k) ? o.filter(x => x !== k) : o.concat(k) }); dirty(); draw(kind, '[data-eye="' + k + '"]'); return; }
-      if (b.dataset.mv) { const k = b.dataset.b2, d = b.dataset.mv; changed(kind, k, C.layoutMove(Z[kind], k, d)); const nb = root.querySelector('[data-mv="' + d + '"][data-b2="' + k + '"]'); if (nb && !nb.disabled) nb.focus(); }
-    });
-    root.addEventListener('change', e => { const s = e.target.closest('[data-zsel]'); if (s) changed(kind, s.dataset.zsel, C.layoutMove(Z[kind], s.dataset.zsel, null, { zone: s.value })); });
-    root.addEventListener('keydown', e => {
-      const li = e.target.closest('.cl-blk'); if (!li || e.target !== li || !e.altKey) return;
-      const d = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key]; if (!d) return;
-      e.preventDefault(); changed(kind, li.dataset.b, C.layoutMove(Z[kind], li.dataset.b, d));
-    });
+  zonesEl.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.eye) { const k = b.dataset.eye, o = Z.board.off; Z.board = Object.assign({}, Z.board, { off: o.includes(k) ? o.filter(x => x !== k) : o.concat(k) }); dirty(); draw('[data-eye="' + k + '"]'); return; }
+    if (b.dataset.mv) { const k = b.dataset.b2, d = b.dataset.mv; changedBoard(k, C.layoutMove(Z.board, k, d)); const nb = zonesEl.querySelector('[data-mv="' + d + '"][data-b2="' + k + '"]'); if (nb && !nb.disabled) nb.focus(); }
+  });
+  zonesEl.addEventListener('change', e => { const s = e.target.closest('[data-zsel]'); if (s) changedBoard(s.dataset.zsel, C.layoutMove(Z.board, s.dataset.zsel, null, { zone: s.value })); });
+  zonesEl.addEventListener('keydown', e => {
+    const li = e.target.closest('.cl-blk'); if (!li || e.target !== li || !e.altKey) return;
+    const d = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key]; if (!d) return;
+    e.preventDefault(); changedBoard(li.dataset.b, C.layoutMove(Z.board, li.dataset.b, d));
+  });
+  // where a drop lands in a list of block rows: before the row under the pointer (upper half) or the one after it; null = the end
+  const dropBefore = (e, drag) => {
+    const over = e.target.closest('.cl-blk'); let before = null;
+    if (over && over.dataset.b !== drag) { const r = over.getBoundingClientRect(); before = e.clientY < r.top + r.height / 2 ? over.dataset.b : (over.nextElementSibling && over.nextElementSibling.dataset.b) || null; }
+    return before === drag ? null : before;
+  };
+  const dragWire = (root, onDrop) => {
     let drag = null;
     root.addEventListener('dragstart', e => { const li = e.target.closest('.cl-blk'); if (!li) return; drag = li.dataset.b; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', drag); } catch (x) { /* some browsers refuse */ } });
     root.addEventListener('dragend', () => { drag = null; root.querySelectorAll('.cl-zl').forEach(z => z.classList.remove('over')); });
     root.addEventListener('dragover', e => { const zl = e.target.closest('.cl-zl'); if (!zl || !drag) return; e.preventDefault(); root.querySelectorAll('.cl-zl').forEach(z => z.classList.toggle('over', z === zl)); });
-    root.addEventListener('drop', e => {
-      const zl = e.target.closest('.cl-zl'); if (!zl || !drag) return; e.preventDefault();
-      const over = e.target.closest('.cl-blk'); let before = null;
-      if (over && over.dataset.b !== drag) { const r = over.getBoundingClientRect(); before = e.clientY < r.top + r.height / 2 ? over.dataset.b : (over.nextElementSibling && over.nextElementSibling.dataset.b) || null; }
-      const b = drag; drag = null; changed(kind, b, C.layoutMove(Z[kind], b, null, { zone: zl.dataset.zone, before: before === b ? null : before }));
-    });
+    root.addEventListener('drop', e => { const zl = e.target.closest('.cl-zl'); if (!zl || !drag) return; e.preventDefault(); const b = drag; drag = null; onDrop(b, zl, dropBefore(e, b)); });
+  };
+  dragWire(zonesEl, (b, zl, before) => changedBoard(b, C.layoutMove(Z.board, b, null, { zone: zl.dataset.zone, before })));
+  // ---- Open task: sections with 1-3 columns ----
+  const secsEl = q('.cl-secs');
+  const MAXS = C.TASK_SECTIONS_MAX;
+  const cellName = (s, ci) => s.name + (s.cols > 1 ? ', column ' + (ci + 1) : '');
+  function drawTask(focus) {
+    const off = new Set(TL.off), seq = TL.sections.flatMap(s => s.cells.flat()), n = TL.sections.length;
+    const places = TL.sections.flatMap(s => s.cells.map((c, ci) => ({ v: s.id + '|' + ci, l: cellName(s, ci) })));
+    const row = (s, ci, c, b, i) => {
+      const on = !off.has(b), nm = esc(name('task', b)), always = C.TASK_NEVER_HIDDEN.includes(b);
+      return '<li class="cl-blk' + (on ? '' : ' off') + (cs.moved === b ? ' moved' : '') + '" draggable="true" tabindex="0" data-b="' + esc(b) + '" aria-label="' + nm + ', ' + esc(cellName(s, ci)) + ', ' + (i + 1) + ' of ' + c.length + (on ? '' : ', hidden') + '" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight">' + CL_GRIP +
+        '<span class="bn">' + nm + '</span>' +
+        '<select class="cl-zsel" data-zsel="' + esc(b) + '" aria-label="Place of ' + nm + '">' + places.map(p => '<option value="' + esc(p.v) + '"' + (p.v === s.id + '|' + ci ? ' selected' : '') + '>' + esc(p.l) + '</option>').join('') + '</select>' +
+        (always ? '<span class="cl-always">Always</span>' : '<button type="button" class="cl-eye" data-eye="' + esc(b) + '" aria-pressed="' + on + '" aria-label="Show ' + nm + '">' + (on ? 'Shown' : 'Hidden') + '</button>') +
+        '<button type="button" class="cl-mv" data-mv="up" data-b2="' + esc(b) + '" aria-label="Move ' + nm + ' up" title="Move up"' + (seq[0] === b ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="cl-mv" data-mv="down" data-b2="' + esc(b) + '" aria-label="Move ' + nm + ' down" title="Move down"' + (seq[seq.length - 1] === b ? ' disabled' : '') + '>↓</button></li>';
+    };
+    secsEl.innerHTML = TL.sections.map((s, si) => {
+      const id = esc(s.id), sn = esc(s.name), empty = s.cells.every(c => !c.length), k = s.cells.reduce((a, c) => a + c.length, 0);
+      return '<section class="cl-sec" data-sec="' + id + '" aria-label="Section ' + (si + 1) + ': ' + sn + '"><div class="cl-sech">' +
+        '<input class="cl-secn" data-secn="' + id + '" value="' + sn + '" maxlength="' + C.TASK_SECTION_NAME_MAX + '" aria-label="Name of section ' + (si + 1) + '" autocomplete="off" spellcheck="false">' +
+        '<span class="n cl-secc">' + k + (k === 1 ? ' block' : ' blocks') + '</span>' +
+        '<label class="cl-cols">Columns<select data-cols="' + id + '" aria-label="Columns of ' + sn + '">' + C.TASK_COLS.map(x => '<option value="' + x + '"' + (x === s.cols ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></label>' +
+        '<button type="button" class="cl-mv" data-smv="up" data-s="' + id + '" aria-label="Move section ' + sn + ' up" title="Move section up"' + (si === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button type="button" class="cl-mv" data-smv="down" data-s="' + id + '" aria-label="Move section ' + sn + ' down" title="Move section down"' + (si === n - 1 ? ' disabled' : '') + '>↓</button>' +
+        '<button type="button" class="cl-srm" data-srm="' + id + '" aria-label="Remove section ' + sn + '" title="' + (empty ? 'Remove the section' : 'Only an empty section can be removed') + '"' + (empty && n > 1 ? '' : ' disabled') + '>Remove</button></div>' +
+        '<div class="cl-cells" style="--cols:' + s.cols + '">' + s.cells.map((c, ci) => '<ul class="cl-zl cl-cell" data-sec="' + id + '" data-cell="' + ci + '" aria-label="' + esc(cellName(s, ci)) + '">' +
+          (c.length ? c.map((b, i) => row(s, ci, c, b, i)).join('') : '<li class="cl-empty">Drop a block here</li>') + '</ul>').join('') + '</div></section>';
+    }).join('') + '<div class="cl-addrow"><button type="button" id="cl-addsec"' + (n >= MAXS ? ' disabled' : '') + '>Add section</button>' + (n >= MAXS ? '<span class="n">At most ' + MAXS + ' sections.</span>' : '') + '</div>';
+    previewTask();
+    if (focus) { const el = secsEl.querySelector(focus); if (el && !el.disabled) el.focus(); }
+  }
+  function previewTask() {
+    const el = q('.cl-pv[data-pv=task]'), create = cs.pv === 'create', off = new Set(TL.off);
+    q('#cl-pvh-task').textContent = create ? 'Preview: New task' : 'Preview: Edit task';
+    const label = b => b === 'title' ? (create ? 'Title' : 'Task title') : b === 'id' ? '#142' : b === 'list' ? (LIST[st.list] || {}).name || 'List' : b === 'close' ? '✕ Close' : name('task', b);
+    el.innerHTML = '<div class="cl-ptask" inert>' + TL.sections.map(s => '<div class="cl-psec"><div class="cl-psh">' + esc(s.name) + '</div><div class="cl-pcells" style="--cols:' + s.cols + '">' +
+      s.cells.map(c => '<div class="cl-pcell">' + c.filter(b => !off.has(b) && !(create && C.TASK_CREATE_SKIP.includes(b))).map(b => '<div class="cl-pi' + (b === 'title' ? ' title' : '') + (create ? ' ph' : '') + (cs.moved === b ? ' flash' : '') + '">' + esc(label(b)) + '</div>').join('') + '</div>').join('') +
+      '</div></div>').join('') + '</div>';
+  }
+  const where = b => { for (const s of TL.sections) for (let ci = 0; ci < s.cells.length; ci++) { const i = s.cells[ci].indexOf(b); if (i >= 0) return { s, ci, i, n: s.cells[ci].length }; } return null; };
+  function movedTask(b, L, focus) {
+    TL = L; cs.moved = b; dirty(); drawTask(focus || '.cl-blk[data-b="' + b + '"]');
+    const p = where(b); if (p) say(name('task', b) + ' moved to ' + cellName(p.s, p.ci) + ', position ' + (p.i + 1) + ' of ' + p.n + '.');
+  }
+  secsEl.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.dataset.eye) { const k = b.dataset.eye; TL = C.taskLayoutHide(TL, k, !TL.off.includes(k)); dirty(); drawTask('[data-eye="' + k + '"]'); say(name('task', k) + (TL.off.includes(k) ? ' hidden.' : ' shown.')); return; }
+    if (b.dataset.mv) { const k = b.dataset.b2, d = b.dataset.mv; movedTask(k, C.taskLayoutMove(TL, k, d), '[data-mv="' + d + '"][data-b2="' + k + '"]'); if (document.activeElement === document.body || !secsEl.contains(document.activeElement)) secsEl.querySelector('.cl-blk[data-b="' + k + '"]')?.focus(); return; }
+    if (b.dataset.smv) {
+      const id = b.dataset.s, d = b.dataset.smv; TL = C.taskLayoutMoveSection(TL, id, d); dirty();
+      const i = TL.sections.findIndex(s => s.id === id), s = TL.sections[i];
+      drawTask('[data-smv="' + d + '"][data-s="' + id + '"]');
+      if (!secsEl.contains(document.activeElement)) secsEl.querySelector('[data-secn="' + id + '"]')?.focus();
+      say('Section ' + s.name + ' moved to position ' + (i + 1) + ' of ' + TL.sections.length + '.'); return;
+    }
+    if (b.dataset.srm) {
+      const id = b.dataset.srm, i = TL.sections.findIndex(s => s.id === id), nm = TL.sections[i].name, L = C.taskLayoutRemoveSection(TL, id);
+      if (L === TL) return;
+      TL = L; dirty(); drawTask(); const nx = TL.sections[Math.min(i, TL.sections.length - 1)];
+      secsEl.querySelector('[data-secn="' + nx.id + '"]')?.focus(); say('Section ' + nm + ' removed.'); return;
+    }
+    if (b.id === 'cl-addsec') {
+      const L = C.taskLayoutAddSection(TL); if (L === TL) return;
+      TL = L; dirty(); const s = TL.sections[TL.sections.length - 1];
+      drawTask('[data-secn="' + s.id + '"]'); secsEl.querySelector('[data-secn="' + s.id + '"]')?.select(); say('Section ' + s.name + ' added at the end.');
+    }
   });
+  secsEl.addEventListener('input', e => { const x = e.target.closest('[data-secn]'); if (!x) return; TL = C.taskLayoutRename(TL, x.dataset.secn, x.value); dirty(); previewTask(); });
+  secsEl.addEventListener('change', e => {
+    const x = e.target;
+    if (x.dataset.secn) { const s = TL.sections.find(y => y.id === x.dataset.secn); if (s) x.value = s.name; return; }
+    if (x.dataset.cols) { TL = C.taskLayoutSetCols(TL, x.dataset.cols, Number(x.value)); dirty(); drawTask('[data-cols="' + x.dataset.cols + '"]'); say('Columns: ' + x.value + '.'); return; }
+    if (x.dataset.zsel) { const [sec, ci] = x.value.split('|'); movedTask(x.dataset.zsel, C.taskLayoutMove(TL, x.dataset.zsel, null, { section: sec, cell: Number(ci), before: null }), '[data-zsel="' + x.dataset.zsel + '"]'); }
+  });
+  secsEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.secn) { e.preventDefault(); e.target.blur(); return; } // Enter in a name does not submit
+    const li = e.target.closest('.cl-blk'); if (!li || e.target !== li || !e.altKey) return;
+    const d = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key]; if (!d) return;
+    e.preventDefault(); movedTask(li.dataset.b, C.taskLayoutMove(TL, li.dataset.b, d));
+  });
+  dragWire(secsEl, (b, zl, before) => movedTask(b, C.taskLayoutMove(TL, b, null, { section: zl.dataset.sec, cell: Number(zl.dataset.cell), before })));
+  // ---- tabs, preview switch, reset, save ----
   const tabs = [...dlg.querySelectorAll('[data-cltab]')];
   const pick = t => { tabs.forEach(x => { const on = x === t; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; q('#cl-p-' + x.dataset.cltab).hidden = !on; }); cs.moved = null; };
   tabs.forEach((t, i) => { t.onclick = () => pick(t); t.onkeydown = e => { const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return; e.preventDefault(); const n = tabs[(i + d + tabs.length) % tabs.length]; pick(n); n.focus(); }; });
   const seg = q('.cl-seg');
-  if (seg) seg.onclick = e => { const b = e.target.closest('[data-clpv]'); if (!b) return; cs.pv = b.dataset.clpv; seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); preview('task'); };
+  if (seg) seg.onclick = e => { const b = e.target.closest('[data-clpv]'); if (!b) return; cs.pv = b.dataset.clpv; seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); previewTask(); };
   form.addEventListener('change', e => { if (e.target.closest('.cl-opts')) dirty(); });
-  draw('board'); draw('task');
-  q('#cl-reset').onclick = () => { resetOpts(); Z.board = C.layoutZones(null, 'board', tlIds); Z.task = C.layoutZones(null, 'task'); cs.moved = null; draw('board'); draw('task'); q('#cl-st').textContent = 'Reset to default. Save keeps it.'; };
+  draw(); drawTask();
+  q('#cl-reset').onclick = () => { resetOpts(); Z.board = C.layoutZones(null, 'board', tlIds); TL = C.taskLayoutExpand(C.TASK_LAYOUT_DEFAULTS, tls, tagListFavs, tagListOrder); cs.moved = null; draw(); drawTask(); q('#cl-st').textContent = 'Reset to default. Save keeps it.'; };
   q('#cl-save').onclick = () => {
     const v = readCardLayoutForm(form);
-    v.layout = C.readCardLayout(Object.assign({}, v.layout, { zones: { board: C.layoutStore(Z.board, 'board'), task: C.layoutStore(Z.task, 'task') } }), Object.keys(TAG_LISTS));
+    v.layout = C.readCardLayout(Object.assign({}, v.layout, { zones: { board: C.layoutStore(Z.board, 'board'), task: C.taskLayoutStore(TL, tls, tagListFavs, tagListOrder) } }), Object.keys(TAG_LISTS));
     applyCardLayout(v); toast('Card layout saved');
   };
 }

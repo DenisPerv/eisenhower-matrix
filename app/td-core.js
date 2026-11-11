@@ -523,10 +523,23 @@
   // list goes); its fixed part is the header row (number, title, badges, done). Open task: the blocks between the fixed header (heading,
   // position, title) and the fixed actions; the Decision section is never hidden. Same for all lists (prefs.cardLayout.zones)
   const LAYOUT_ZONES = ['top', 'main', 'bottom'];
-  const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: ['autonomy', 'decision', 'format', 'description', 'dates', 'tags', 'links', 'sources'] };
-  const LAYOUT_FIXED = { board: [], task: ['decision'] };
-  const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] },
-    task: { top: ['autonomy', 'decision', 'format'], main: ['description', 'dates', 'tags'], bottom: ['links', 'sources'], off: [] } };
+  // task window layout v3 (2026-11-11, Max): the Open task tab places blocks in sections a person adds, renames, reorders and removes
+  // (when empty), each with 1-3 columns (cells). Blocks: the header pieces (list, id, title, close) move too; one block per tag list
+  // ('tl:<id>'), and 'tl:*' marks where the tag lists not placed by hand go (starred first). title, close and decision are never hidden.
+  // Stored as prefs.cardLayout.zones.task = { v: 3, sections: [{ id, name, cols, cells }], off }; a v2 value ({ top, main, bottom, off }
+  // with 'tags') is migrated by readTaskLayout
+  const TASK_BLOCKS = ['list', 'id', 'title', 'close', 'autonomy', 'decision', 'format', 'description', 'dates', 'links', 'sources'];
+  const TASK_NEVER_HIDDEN = ['title', 'close', 'decision'];
+  const TASK_CREATE_SKIP = ['id', 'autonomy', 'decision', 'sources'];
+  const TASK_LAYOUT_V = 3, TASK_SECTIONS_MAX = 8, TASK_SECTION_NAME_MAX = 24, TASK_COLS = [1, 2, 3];
+  const TASK_LAYOUT_DEFAULTS = { v: TASK_LAYOUT_V, sections: [
+    { id: 'header', name: 'Header', cols: 2, cells: [['list', 'id', 'title'], ['close']] },
+    { id: 'top', name: 'Top', cols: 1, cells: [['autonomy', 'decision', 'format']] },
+    { id: 'main', name: 'Main', cols: 1, cells: [['description', 'dates']] },
+    { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*', 'links', 'sources']] }], off: [] };
+  const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: TASK_BLOCKS };
+  const LAYOUT_FIXED = { board: [], task: TASK_NEVER_HIDDEN };
+  const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] }, task: TASK_LAYOUT_DEFAULTS };
   const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
     group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100, zones: LAYOUT_DEFAULTS };
   const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
@@ -612,7 +625,10 @@
     const ids = tagListIds ? new Set(tagListIds) : null;
     if (strs(raw.tagLists)) c.tagLists = raw.tagLists.filter(id => !ids || ids.has(id));
     if (Number.isInteger(raw.autoCollapse) && raw.autoCollapse >= 0 && raw.autoCollapse <= 5000) c.autoCollapse = raw.autoCollapse;
-    if (isObj(raw.zones)) Object.keys(LAYOUT_BLOCKS).forEach(kind => { const z = readZones(raw.zones[kind], kind, ids); if (z) c.zones[kind] = z; });
+    if (isObj(raw.zones)) {
+      const z = readZones(raw.zones.board, 'board', ids); if (z) c.zones.board = z;
+      if (raw.zones.task !== undefined) c.zones.task = readTaskLayout(raw.zones.task, ids);
+    }
     return c;
   }
   // T17: one kind's stored zones, checked for shape: known blocks only, each once; a tag list block only for a known tag list (when
@@ -668,6 +684,200 @@
     if (dir === 'down') { if (i < arr.length - 1) { arr.splice(i, 1); arr.splice(i + 1, 0, b); } else if (zi < 2) { arr.splice(i, 1); z[LAYOUT_ZONES[zi + 1]].unshift(b); } }
     if (dir === 'left' || dir === 'right') { const nk = LAYOUT_ZONES[zi + (dir === 'left' ? -1 : 1)]; if (nk) { arr.splice(i, 1); z[nk].push(b); } }
     return z;
+  }
+  // ---- task window layout v3 ----
+  const TASK_SECTION_ID = /^[a-z0-9-]{1,24}$/;
+  const isTlBlock = b => typeof b === 'string' && /^tl:[\w-]{1,64}$/.test(b);
+  const idSet = x => x instanceof Set ? x : Array.isArray(x) ? new Set(x) : null;
+  // a section name: control characters removed, trimmed, at most TASK_SECTION_NAME_MAX characters; empty → "Section n" (n from 1)
+  function taskSectionName(raw, n) {
+    const s = String(typeof raw === 'string' ? raw : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, TASK_SECTION_NAME_MAX).trim();
+    return s || 'Section ' + n;
+  }
+  const freeSectionId = (taken, n) => { let id = 's' + n, k = 1; while (taken.has(id)) id = 's' + n + '-' + (k++); return id; };
+  // a v2 task value { top, main, bottom, off } as v3: the default Header, then Top, Main, Bottom with 1 column each in the stored
+  // order; 'tags' becomes 'tl:*' at the start of Bottom; off is kept (never-hidden blocks are dropped)
+  function taskLayoutFromV2(raw) {
+    const arr = k => Array.isArray(raw[k]) ? raw[k].filter(b => typeof b === 'string' && b !== 'tags' && b !== 'tl:*') : [];
+    const H = TASK_LAYOUT_DEFAULTS.sections[0];
+    return { v: TASK_LAYOUT_V, sections: [clone(H),
+      { id: 'top', name: 'Top', cols: 1, cells: [arr('top')] }, { id: 'main', name: 'Main', cols: 1, cells: [arr('main')] },
+      { id: 'bottom', name: 'Bottom', cols: 1, cells: [['tl:*'].concat(arr('bottom'))] }],
+      off: arr('off').filter(b => !TASK_NEVER_HIDDEN.includes(b)) };
+  }
+  // the stored task layout, checked: v3 shape (a v2 value is migrated); unknown and duplicate blocks dropped, tag list blocks only for
+  // known tag lists (when tagListIds is given), cells.length = cols (extra cells' blocks join the last cell), at most TASK_SECTIONS_MAX
+  // sections, names cleaned, ids unique; a missing block goes to the end of its default section's last cell ('tl:*' to the start of
+  // Bottom's first cell), or to the last section. Malformed → the defaults
+  function readTaskLayout(raw, tagListIds) {
+    if (!isObj(raw)) return clone(TASK_LAYOUT_DEFAULTS);
+    if (raw.v === undefined && LAYOUT_ZONES.every(k => Array.isArray(raw[k]))) raw = taskLayoutFromV2(raw);
+    if (raw.v !== TASK_LAYOUT_V || !Array.isArray(raw.sections)) return clone(TASK_LAYOUT_DEFAULTS);
+    const ids = idSet(tagListIds), seen = new Set(), taken = new Set();
+    const ok = b => typeof b === 'string' && !seen.has(b) && (TASK_BLOCKS.includes(b) || b === 'tl:*' || (isTlBlock(b) && (!ids || ids.has(b.slice(3)))));
+    const secs = raw.sections.filter(isObj).slice(0, TASK_SECTIONS_MAX);
+    if (!secs.length) return clone(TASK_LAYOUT_DEFAULTS);
+    const sections = secs.map((s, i) => {
+      const rc = Array.isArray(s.cells) ? s.cells : [];
+      const cols = TASK_COLS.includes(s.cols) ? s.cols : Math.min(3, Math.max(1, rc.length || 1));
+      const cells = Array.from({ length: cols }, () => []);
+      rc.forEach((c, ci) => { if (Array.isArray(c)) c.forEach(b => { if (ok(b)) { seen.add(b); cells[Math.min(ci, cols - 1)].push(b); } }); });
+      const id = typeof s.id === 'string' && TASK_SECTION_ID.test(s.id) && !taken.has(s.id) ? s.id : null; if (id) taken.add(id);
+      return { id, name: taskSectionName(s.name, i + 1), cols, cells };
+    });
+    sections.forEach((s, i) => { if (!s.id) { s.id = freeSectionId(taken, i + 1); taken.add(s.id); } });
+    const last = sections[sections.length - 1];
+    TASK_BLOCKS.forEach(b => {
+      if (seen.has(b)) return;
+      const d = TASK_LAYOUT_DEFAULTS.sections.find(x => x.cells.some(c => c.includes(b)));
+      const s = sections.find(x => x.id === d.id) || last;
+      s.cells[s.cells.length - 1].push(b); seen.add(b);
+    });
+    if (!seen.has('tl:*')) { const s = sections.find(x => x.id === 'bottom') || last; s.cells[0].unshift('tl:*'); seen.add('tl:*'); }
+    const off = Array.isArray(raw.off) ? [...new Set(raw.off.filter(b => typeof b === 'string' && seen.has(b) && b !== 'tl:*' && !TASK_NEVER_HIDDEN.includes(b)))] : [];
+    return { v: TASK_LAYOUT_V, sections, off };
+  }
+  // a cardLayout, a task layout or nothing → a checked task layout (a copy)
+  const taskLayoutOf = layout => readTaskLayout(isObj(layout) && isObj(layout.zones) ? layout.zones.task : layout && layout.sections ? layout : null);
+  // the tag lists 'tl:*' stands for, in drawing order: starred (favs) first, then by order (tagListOrder ids), then as given
+  // (cardLayoutTagLists order). tagLists: ids or tag list rows
+  function taskTagListOrder(tagLists, favs, order) {
+    const ids = (tagLists || []).map(l => typeof l === 'string' ? l : l && l.id).filter(x => typeof x === 'string');
+    const fav = new Set(favs || []), at = id => { const i = (order || []).indexOf(id); return i < 0 ? Infinity : i; };
+    return ids.map((id, i) => ({ id, i })).sort((a, b) => (fav.has(b.id) - fav.has(a.id)) || (at(a.id) - at(b.id)) || (a.i - b.i)).map(x => x.id);
+  }
+  // the layout for the editor: 'tl:*' replaced by the tag lists not placed by hand (in taskTagListOrder), placed tag lists that are
+  // not in tagLists dropped; off kept. taskLayoutStore turns it back into what is stored
+  function taskLayoutExpand(layout, tagLists, favs, order) {
+    const L = taskLayoutOf(layout), live = taskTagListOrder(tagLists, favs, order), liveSet = new Set(live);
+    const placed = new Set(); L.sections.forEach(s => s.cells.forEach(c => c.forEach(b => { if (isTlBlock(b)) placed.add(b.slice(3)); })));
+    const rest = live.filter(id => !placed.has(id)).map(id => 'tl:' + id);
+    L.sections.forEach(s => { s.cells = s.cells.map(c => c.flatMap(b => b === 'tl:*' ? rest : isTlBlock(b) && !liveSet.has(b.slice(3)) ? [] : [b])); });
+    L.off = L.off.filter(b => !isTlBlock(b) || liveSet.has(b.slice(3)));
+    return L;
+  }
+  // what the task window draws: { sections: [{ id, name, cols, cells: [[block id]] }], hidden: [block id] }; 'tl:*' expanded, hidden
+  // (off) blocks left out of the cells and listed in hidden (the window keeps their form fields, hidden). mode 'create' drops id,
+  // autonomy, decision and sources (a new task has none)
+  function taskLayoutView(layout, tagLists, favs, order, mode) {
+    const L = taskLayoutExpand(layout, tagLists, favs, order), off = new Set(L.off), hidden = [];
+    const sections = L.sections.map(s => ({ id: s.id, name: s.name, cols: s.cols, cells: s.cells.map(c => c.filter(b => {
+      if (mode === 'create' && TASK_CREATE_SKIP.includes(b)) return false;
+      if (off.has(b)) { hidden.push(b); return false; }
+      return true;
+    })) }));
+    return { sections, hidden };
+  }
+  // an edited (expanded) layout back to what is stored: a checked v3 value with exactly one 'tl:*'. With tagLists, the longest run of
+  // visible tag list blocks in one cell that already stands in taskTagListOrder becomes 'tl:*' again (so stars and new tag lists keep
+  // ordering it); without, or with no tag list block, 'tl:*' goes after the last tag list block, else to the start of Bottom
+  function taskLayoutStore(layout, tagLists, favs, order) {
+    const L = readTaskLayout(clone(isObj(layout) ? layout : TASK_LAYOUT_DEFAULTS));
+    L.sections.forEach(s => { s.cells = s.cells.map(c => c.filter(b => b !== 'tl:*')); });
+    const off = new Set(L.off);
+    let best = null, lastAt = null;
+    const rank = tagLists ? new Map(taskTagListOrder(tagLists, favs, order).map((id, i) => [id, i])) : null;
+    L.sections.forEach((s, si) => s.cells.forEach((c, ci) => {
+      let i = 0;
+      while (i < c.length) {
+        if (!isTlBlock(c[i])) { i++; continue; }
+        lastAt = { si, ci, i: i + 1 };
+        if (!rank || off.has(c[i]) || !rank.has(c[i].slice(3))) { i++; continue; }
+        let j = i + 1;
+        while (j < c.length && isTlBlock(c[j]) && !off.has(c[j]) && rank.has(c[j].slice(3)) && rank.get(c[j].slice(3)) > rank.get(c[j - 1].slice(3))) j++;
+        if (!best || j - i > best.n) best = { si, ci, i, n: j - i };
+        if (j > i + 1) lastAt = { si, ci, i: j };
+        i = j;
+      }
+    }));
+    if (best) L.sections[best.si].cells[best.ci].splice(best.i, best.n, 'tl:*');
+    else if (lastAt) L.sections[lastAt.si].cells[lastAt.ci].splice(lastAt.i, 0, 'tl:*');
+    else { const s = L.sections.find(x => x.id === 'bottom') || L.sections[L.sections.length - 1]; s.cells[0].unshift('tl:*'); }
+    return readTaskLayout(L);
+  }
+  // where a block stands: { si, ci, i } or null
+  function taskBlockAt(L, b) {
+    for (let si = 0; si < L.sections.length; si++) for (let ci = 0; ci < L.sections[si].cells.length; ci++) {
+      const i = L.sections[si].cells[ci].indexOf(b); if (i >= 0) return { si, ci, i };
+    }
+    return null;
+  }
+  // move a block one step or to a drop target; a new layout, the input is not changed (no change: an equal copy).
+  // up / down: within its cell, at the cell's edge into the previous section's cell (end) or the next section's cell (start), same
+  // column or the last one. left / right: to the neighbouring cell at the same row, at the section's edge to the previous section's
+  // last cell (end) or the next section's first cell (start). to = { section: id, cell: index, before: block id or null (end) }
+  function taskLayoutMove(layout, b, dir, to) {
+    const L = clone(layout), p = taskBlockAt(L, b);
+    if (!p) return L;
+    const S = L.sections, cell = S[p.si].cells[p.ci];
+    const put = (si, ci, at) => { cell.splice(p.i, 1); const c = S[si].cells[ci]; c.splice(at === undefined ? c.length : Math.min(at, c.length), 0, b); };
+    if (to) {
+      const si = S.findIndex(s => s.id === to.section);
+      if (si < 0 || !Number.isInteger(to.cell) || to.cell < 0 || to.cell >= S[si].cells.length || to.before === b) return L;
+      cell.splice(p.i, 1);
+      const c = S[si].cells[to.cell], j = to.before ? c.indexOf(to.before) : -1;
+      if (j < 0) c.push(b); else c.splice(j, 0, b);
+      return L;
+    }
+    if (dir === 'up') {
+      if (p.i > 0) { cell.splice(p.i, 1); cell.splice(p.i - 1, 0, b); }
+      else if (p.si > 0) put(p.si - 1, Math.min(p.ci, S[p.si - 1].cols - 1));
+    } else if (dir === 'down') {
+      if (p.i < cell.length - 1) { cell.splice(p.i, 1); cell.splice(p.i + 1, 0, b); }
+      else if (p.si < S.length - 1) put(p.si + 1, Math.min(p.ci, S[p.si + 1].cols - 1), 0);
+    } else if (dir === 'left') {
+      if (p.ci > 0) put(p.si, p.ci - 1, p.i);
+      else if (p.si > 0) put(p.si - 1, S[p.si - 1].cols - 1);
+    } else if (dir === 'right') {
+      if (p.ci < S[p.si].cols - 1) put(p.si, p.ci + 1, p.i);
+      else if (p.si < S.length - 1) put(p.si + 1, 0, 0);
+    }
+    return L;
+  }
+  // hide (true) or show (false) a placed block; title, close, decision and 'tl:*' are never hidden
+  function taskLayoutHide(layout, b, hide) {
+    const L = clone(layout);
+    if (hide) { if (!TASK_NEVER_HIDDEN.includes(b) && b !== 'tl:*' && taskBlockAt(L, b) && !L.off.includes(b)) L.off.push(b); }
+    else L.off = L.off.filter(x => x !== b);
+    return L;
+  }
+  // a new empty section (1 column, "Section n", the first n free from the new count) after the section afterId (none: at the end);
+  // at TASK_SECTIONS_MAX the same layout comes back
+  function taskLayoutAddSection(layout, afterId) {
+    if (layout.sections.length >= TASK_SECTIONS_MAX) return layout;
+    const L = clone(layout), taken = new Set(L.sections.map(s => s.id)), names = new Set(L.sections.map(s => s.name));
+    let n = L.sections.length + 1; while (names.has('Section ' + n)) n++;
+    const s = { id: freeSectionId(taken, n), name: 'Section ' + n, cols: 1, cells: [[]] };
+    const i = L.sections.findIndex(x => x.id === afterId);
+    L.sections.splice(i < 0 ? L.sections.length : i + 1, 0, s);
+    return L;
+  }
+  function taskLayoutRename(layout, id, name) {
+    const L = clone(layout), i = L.sections.findIndex(s => s.id === id);
+    if (i >= 0) L.sections[i].name = taskSectionName(name, i + 1);
+    return L;
+  }
+  // 1, 2 or 3 columns; fewer columns move the removed cells' blocks to the end of the new last cell
+  function taskLayoutSetCols(layout, id, cols) {
+    const L = clone(layout), s = L.sections.find(x => x.id === id);
+    if (!s || !TASK_COLS.includes(cols) || cols === s.cols) return L;
+    if (cols > s.cols) while (s.cells.length < cols) s.cells.push([]);
+    else { const gone = s.cells.splice(cols).flat(); s.cells[cols - 1].push(...gone); }
+    s.cols = cols;
+    return L;
+  }
+  function taskLayoutMoveSection(layout, id, dir) {
+    const L = clone(layout), i = L.sections.findIndex(s => s.id === id), j = i + (dir === 'up' ? -1 : dir === 'down' ? 1 : 0);
+    if (i < 0 || j === i || j < 0 || j >= L.sections.length) return L;
+    const [s] = L.sections.splice(i, 1); L.sections.splice(j, 0, s);
+    return L;
+  }
+  // remove a section only when all its cells are empty and another section is left; otherwise the same layout comes back
+  function taskLayoutRemoveSection(layout, id) {
+    const i = layout.sections.findIndex(s => s.id === id);
+    if (i < 0 || layout.sections.length < 2 || layout.sections[i].cells.some(c => c.length)) return layout;
+    const L = clone(layout); L.sections.splice(i, 1);
+    return L;
   }
   // a card is expanded when the mode says so, unless flipped. Round 4, item 4: autoCollapse no longer collapses a card (it only
   // acted in Expanded mode, and the default is Collapsed); it cuts the description of an open card instead (descClip)
@@ -1755,7 +1965,7 @@
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     ASSIGNEE_DEFAULT, isHomeosList, homeosAssigneeTag, assigneeOnListChange,
     createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, TASK_BLOCKS, TASK_NEVER_HIDDEN, TASK_CREATE_SKIP, TASK_LAYOUT_V, TASK_SECTIONS_MAX, TASK_SECTION_NAME_MAX, TASK_COLS, TASK_LAYOUT_DEFAULTS, readTaskLayout, taskSectionName, taskTagListOrder, taskLayoutExpand, taskLayoutView, taskLayoutStore, taskLayoutMove, taskLayoutHide, taskLayoutAddSection, taskLayoutRename, taskLayoutSetCols, taskLayoutMoveSection, taskLayoutRemoveSection, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,

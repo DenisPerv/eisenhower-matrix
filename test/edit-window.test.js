@@ -82,6 +82,7 @@ test('the done checkbox: at the right end of the title row, hidden on decision c
   assert.match(html, /doneTick = true; after = nav\.next \? 'next' : null; fs\.click\(\);/, 'then the next task, else the window closes');
   const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
   assert.match(app, /const doneOn = !ro && !closed && !dec && t\.status !== 'waiting' && !C\.awaitingCheck\(t\);/);
-  assert.match(app, /<div class="ttrow"><label[^\n]*<\/label>\$\{doneOn \? '<input type="checkbox" class="tdone" id="t-done" aria-label="Mark done">' : ''\}<\/div>/);
+  // the phone sheet draws it as the Close block of the task layout (cardLayout.zones.task)
+  assert.match(app, /close: doneOn \? '<label class="fclose"><input type="checkbox" class="tdone" id="t-done"/);
   assert.match(app, /ids = navIds\(task\(st\.id\)\)/, 'the next task is read before the save');
 });
