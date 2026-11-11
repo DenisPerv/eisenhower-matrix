@@ -167,6 +167,10 @@ begin
   perform public._au_chk('R3 the agent reads the brief', public._au(format('select brief_naming || %L || (brief_updated_by = %L)::text from public.lists where id = %L', '/', h2, l1)), 'kebab-case/true');
 
   -- ---------- B: budgets ----------
+  -- the live ledger already holds this month's real spend, which would fill the caps below: move it out of the current
+  -- periods (admin, rolled back with everything else) so B counts only this test's rows
+  reset role;
+  update public.budget_ledger set at = at - interval '40 days' where at >= public.budget_period_start('month');
   perform public._au_as(h1);
   perform public._au_chk('B1 overall day cap', public._au(format('select public.set_budget(null, %L, 5)', 'day')), '');
   perform public._au_chk('B2 L1 day cap', public._au(format('select public.set_budget(%L, %L, 2)', l1, 'day')), '');
