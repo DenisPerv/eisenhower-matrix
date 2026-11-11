@@ -12,7 +12,8 @@
   const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
   const strs = a => Array.isArray(a) && a.every(x => typeof x === 'string');
 
-  // config/tasksdashboard.config.js: window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs }. Public values only.
+  // config/tasksdashboard.config.js: window.TD_CONFIG = { supabaseUrl, publishableKey, pollMs, telegramBot }. Public values only.
+  // telegramBot is optional: a valid bot username is kept as config.telegramBot, anything else is left out (no error).
   function readAppConfig(raw) {
     const name = 'config/tasksdashboard.config.js';
     if (!isObj(raw)) return { config: null, errors: [name + ' is missing or does not set window.TD_CONFIG'] };
@@ -24,8 +25,26 @@
     else if (/^sb_secret_/.test(key) || /service_role/.test(jwtPayloadText(key))) errors.push('publishableKey: this is a secret key; use the publishable one and rotate the secret');
     const pollMs = raw.pollMs === undefined ? 30000 : raw.pollMs;
     if (typeof pollMs !== 'number' || !(pollMs >= 5000 && pollMs <= 600000)) errors.push('pollMs: milliseconds between 5000 and 600000');
-    return errors.length ? { config: null, errors } : { config: { supabaseUrl: url, publishableKey: key, pollMs }, errors: [] };
+    if (errors.length) return { config: null, errors };
+    const config = { supabaseUrl: url, publishableKey: key, pollMs };
+    const bot = typeof raw.telegramBot === 'string' ? raw.telegramBot.trim().replace(/^@/, '') : '';
+    if (TG_BOT_RE.test(bot)) config.telegramBot = bot;
+    return { config, errors: [] };
   }
+
+  // Telegram link (db/032). telegramClaim: the rules of set_telegram_claim (a username of 5-32 letters, digits or _, with or
+  // without @ or a t.me/ link, stored as '@name'; or a numeric id of 5-15 digits; empty = no claim). telegramDeepLink: the
+  // one-time link the bot redeems, or '' without a valid bot and a 40-hex token. signin.html has a copy of both.
+  const TG_BOT_RE = /^[A-Za-z][A-Za-z0-9_]{4,31}$/;
+  function telegramClaim(v) {
+    let s = String(v == null ? '' : v).trim();
+    if (!s) return { ok: true, value: null };
+    s = s.replace(/^(https?:\/\/)?(t\.me\/|telegram\.me\/)/i, '');
+    if (/^[0-9]{5,15}$/.test(s)) return { ok: true, value: s };
+    if (/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(s)) return { ok: true, value: '@' + s.replace(/^@/, '') };
+    return { ok: false, value: null, message: 'Telegram: a username of 5 to 32 letters, digits or _, or your numeric id.' };
+  }
+  const telegramDeepLink = (bot, token) => (TG_BOT_RE.test(String(bot || '')) && /^[0-9a-f]{40}$/.test(String(token || '')) ? 'https://t.me/' + bot + '?start=' + token : '');
   function jwtPayloadText(k) {
     const p = String(k).split('.');
     if (p.length !== 3) return '';
@@ -1532,7 +1551,7 @@
     return { rows, edges };
   }
 
-  return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
+  return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
     rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,

@@ -11,7 +11,10 @@
      goes on to `next` (/board/ or /app/ only, default /board/) with location.replace; everyone else stays on the request
      screens. With ?intent=consult (the landing's consulting-call buttons, db/025) it is a consulting-call request instead:
      Google sign-in, then rpc/my_consultation_request and a form (Telegram, WhatsApp, note) that calls
-     rpc/request_consultation; no access request, no board. One inline script: its sha256 is in the deploy's _headers
+     rpc/request_consultation; no access request, no board. Telegram link (db/032): an optional "Telegram" field on the
+     sign-in screen is kept in this tab through the Google round trip and sent with rpc/set_telegram_claim just before
+     rpc/request_access; the request screen then offers "Link Telegram" (rpc/telegram_link_token, a one-time deep link
+     https://t.me/<TD_CONFIG.telegramBot>?start=<token>). One inline script: its sha256 is in the deploy's _headers
      (docs/deployment/2-deploy.md). The look is the app's "Aurora instrument" (TasksDashboard.html UI 4-5). -->
 <style>
 :root{
@@ -118,6 +121,13 @@ input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outli
 input[readonly]{background:var(--well);color:var(--ink2)}
 textarea{min-height:88px;resize:vertical}
 form .primary{margin-top:2px}
+/* the Telegram field on the sign-in screen and the link readout after a request (db/032) */
+.tgfield{margin-top:4px}
+.secondary{justify-self:start;margin-top:6px;background:var(--solid);border:1px solid var(--hair2);color:var(--ink)}
+.secondary:hover{border-color:var(--accent-line);background:var(--hover)}
+.secondary:disabled{opacity:.55;cursor:not-allowed}
+.tglink{justify-self:start;margin-top:6px}
+dd .opt{color:var(--ink3);font-weight:400}
 @media (max-width:480px){.panel{padding:26px 20px 22px}h1{font-size:27px}.google,.primary{min-height:48px}}
 </style>
 <script src="config/tasksdashboard.config.js"></script>
@@ -127,7 +137,7 @@ form .primary{margin-top:2px}
   try { const t = localStorage.getItem('td.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
 
   // this tab only: the PKCE verifier while Google is open, then the session (never the board's td.auth)
-  const PKCE_KEY = 'td.request.pkce', AUTH_KEY = 'td.request.auth', NEXT_KEY = 'td.signin.next', INTENT_KEY = 'td.signin.intent';
+  const PKCE_KEY = 'td.request.pkce', AUTH_KEY = 'td.request.auth', NEXT_KEY = 'td.signin.next', INTENT_KEY = 'td.signin.intent', TG_KEY = 'td.signin.telegram';
   const ss = {
     get: k => { try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch (e) { return null; } },
     set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -136,12 +146,26 @@ form .primary{margin-top:2px}
   const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  // Telegram (db/032): the same rules as set_telegram_claim and the core's telegramClaim / telegramDeepLink
+  const TG_BOT_RE = /^[A-Za-z][A-Za-z0-9_]{4,31}$/;
+  function telegramClaim(v) {
+    let s = String(v == null ? '' : v).trim();
+    if (!s) return { ok: true, value: null };
+    s = s.replace(/^(https?:\/\/)?(t\.me\/|telegram\.me\/)/i, '');
+    if (/^[0-9]{5,15}$/.test(s)) return { ok: true, value: s };
+    if (/^@?[A-Za-z][A-Za-z0-9_]{4,31}$/.test(s)) return { ok: true, value: '@' + s.replace(/^@/, '') };
+    return { ok: false, value: null, message: 'Telegram: a username of 5 to 32 letters, digits or _, or your numeric id.' };
+  }
+  const telegramDeepLink = (bot, token) => (TG_BOT_RE.test(String(bot || '')) && /^[0-9a-f]{40}$/.test(String(token || '')) ? 'https://t.me/' + bot + '?start=' + token : '');
+
   // the public config, checked as the board checks it: an https origin and a publishable key, nothing else is read
   function readConfig(raw) {
     if (!isObj(raw)) return null;
     const url = typeof raw.supabaseUrl === 'string' ? raw.supabaseUrl.trim().replace(/\/+$/, '') : '';
     const key = typeof raw.publishableKey === 'string' ? raw.publishableKey.trim() : '';
-    return /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url) && /^sb_publishable_/.test(key) ? { supabaseUrl: url, publishableKey: key } : null;
+    const bot = typeof raw.telegramBot === 'string' ? raw.telegramBot.trim().replace(/^@/, '') : '';
+    return /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url) && /^sb_publishable_/.test(key)
+      ? { supabaseUrl: url, publishableKey: key, telegramBot: TG_BOT_RE.test(bot) ? bot : '' } : null;
   }
   const CFG = readConfig(window.TD_CONFIG);
 
@@ -189,7 +213,7 @@ form .primary{margin-top:2px}
     ss.del(NEXT_KEY);
     location.replace(to);
   }
-  window.TDSignin = { safeNext, backUrl, NEXT_PAGES, keepIntent, consultMode };
+  window.TDSignin = { safeNext, backUrl, NEXT_PAGES, keepIntent, consultMode, telegramClaim, telegramDeepLink };
   const CALLBACK_KEYS = ['code', 'error', 'error_code', 'error_description', 'state', 'access_token', 'refresh_token', 'expires_in', 'expires_at', 'token_type', 'provider_token', 'provider_refresh_token', 'type'];
   function readCallback(href) {
     let u;
@@ -268,6 +292,24 @@ form .primary{margin-top:2px}
   const account = () => session && session.email ? `<div><dt>Account</dt><dd>${esc(session.email)}</dd></div>` : '';
   const signOutBtn = '<button type="button" class="quiet" data-act="signout">Use another account</button>';
 
+  // the Telegram block of the request screen: tg = { claim, linked, username, token, expires_at, busy, message }
+  let tg = {};
+  function tgRows() {
+    if (tg.linked) return `<div><dt>Telegram</dt><dd>Linked${tg.username ? ' as @' + esc(tg.username) : ''}</dd></div>`;
+    let r = tg.claim ? `<div><dt>Telegram</dt><dd>${esc(tg.claim)} <span class="opt">(not confirmed yet)</span></dd></div>` : '';
+    if (tg.token) r += `<div><dt>Link valid until</dt><dd>${when(tg.expires_at)}</dd></div>`;
+    return r;
+  }
+  function tgAction() {
+    if (tg.linked) return '';
+    if (!CFG.telegramBot) return '<p class="fine">Telegram linking is not set up on this site yet.</p>';
+    if (tg.message) return `<p class="msg" role="alert">${esc(tg.message)}</p><button type="button" class="secondary" data-act="tglink">Link Telegram</button>`;
+    const link = telegramDeepLink(CFG.telegramBot, tg.token);
+    if (link) return `<a class="btn primary tglink" href="${esc(link)}" target="_blank" rel="noopener noreferrer" data-act="tgopen">Open Telegram</a>` +
+      '<p class="fine">Works once, for 15 minutes. Press Start in the bot: that tells it this Telegram account is yours.</p>';
+    return `<button type="button" class="secondary" data-act="tglink"${tg.busy ? ' disabled' : ''}>Link Telegram</button>`;
+  }
+
   function view(state, o = {}) {
     const m = main();
     m.dataset.state = state;
@@ -299,17 +341,19 @@ form .primary{margin-top:2px}
     } else if (state === 'signedout') {
       h = '<h1>Sign in</h1><p>TasksDashboard is a private board. Sign in with Google: if you have access, the board opens; if not, your request goes to the people who run it.</p>' +
         (o.message ? `<p class="msg" role="alert">${esc(o.message)}</p>` : '') +
+        `<label class="tgfield"><span>Telegram <span class="opt">(optional)</span></span><input type="text" name="telegram" id="tg-claim" maxlength="64" autocomplete="off" spellcheck="false" placeholder="@username or numeric id" aria-describedby="tg-hint" value="${esc(ss.get(TG_KEY) || '')}"></label>` +
+        '<p class="fine" id="tg-hint">For the household Telegram bot. You confirm it is yours later, with a one-time link.</p>' +
         `<button type="button" class="google" data-act="google"${HOSTED && CFG ? '' : ' disabled'}>${GOOGLE_G}<span>Continue with Google</span></button>` +
         (HOSTED ? '' : '<p class="fine">Open this page on its https address to sign in.</p>') +
-        '<p class="fine">We keep your email, your name and the time of the request. We also use your email address to send you one email with the decision (approved or not).</p>' +
+        '<p class="fine">We keep your email, your name, the Telegram you add and the time of the request. We also use your email address to send you one email with the decision (approved or not).</p>' +
         `<p class="fine" data-privacy>How we handle your data: <a href="${HOSTED ? '/privacy' : 'privacy.html'}">privacy</a>.</p>`;
     } else if (state === 'sending') {
       // also shown while check() asks who this is: most logins here have access and send nothing, so it never says a request is going
       h = '<h1>One moment</h1><div class="scan" aria-hidden="true"></div><p>Checking your access.</p>';
     } else if (state === 'sent') {
       h = COFFEE + '<h1>Request sent</h1><p>Your request is sent. We\'ll let you in soon.</p>' +
-        `<dl><div><dt>Requested</dt><dd>${when(o.row.requested_at) || 'just now'}</dd></div>${account()}<div><dt>Status</dt><dd><span class="dot" aria-hidden="true"></span>Waiting for a decision</dd></div></dl>` +
-        '<p class="fine">Come back to this page later to see the answer.</p>' + signOutBtn;
+        `<dl><div><dt>Requested</dt><dd>${when(o.row.requested_at) || 'just now'}</dd></div>${account()}<div><dt>Status</dt><dd><span class="dot" aria-hidden="true"></span>Waiting for a decision</dd></div>${tgRows()}</dl>` +
+        tgAction() + '<p class="fine">Come back to this page later to see the answer.</p>' + signOutBtn;
     } else if (state === 'approved') {
       h = '<h1>You\'re in</h1><p>You have access. Opening the board; sign in there with the same Google account if asked.</p>' +
         `<dl>${account()}${o.row.decided_at ? `<div><dt>Approved</dt><dd>${when(o.row.decided_at)}</dd></div>` : ''}</dl>` +
@@ -340,10 +384,35 @@ form .primary{margin-top:2px}
     view('approved', { row });
     if (HOSTED) goOn();
   }
-  function show(row) {
+  let lastRow = null;
+  async function show(row) {
     const st = String(row.status || 'pending');
     if (st === 'approved') return letIn(row);
+    if (st !== 'declined') {
+      // the link state for the request screen; a database without db/032 answers 404 and the block says so on a press
+      const r = await rpc('my_telegram_link');
+      const d = r.ok ? rowOf(r.data) : null;
+      tg = isObj(d) ? { claim: d.claim || null, linked: !!d.linked, username: d.tg_username || '' } : {};
+    }
+    lastRow = row;
     view(st === 'declined' ? st : 'sent', { row });
+  }
+  // Link Telegram: a one-time token (db/032), shown as the deep link t.me/<bot>?start=<token>
+  async function tgLink() {
+    tg = Object.assign({}, tg, { busy: true, message: '' });
+    view('sent', { row: lastRow || {} });
+    const r = await rpc('telegram_link_token');
+    const d = r.ok ? rowOf(r.data) : null;
+    if (isObj(d) && d.token) tg = Object.assign({}, tg, { busy: false, token: d.token, expires_at: d.expires_at });
+    else {
+      const msg = r.ok ? 'The link did not work. Try again.'
+        : r.code === '54000' ? 'Too many link codes. Try again in an hour.'
+        : r.status === 404 || r.code === 'PGRST202' ? 'Telegram linking is not set up on the database yet.'
+        : !r.status ? 'Can\'t reach the server. Check the connection and try again.'
+        : 'The link did not work' + (r.message ? ': ' + r.message.slice(0, 120).replace(/[.!?]*$/, '.') : '.');
+      tg = Object.assign({}, tg, { busy: false, message: msg });
+    }
+    view('sent', { row: lastRow || {} });
   }
   // consult mode (db/025): an open request is shown as sent; otherwise the form
   async function consultCheck() {
@@ -372,6 +441,10 @@ form .primary{margin-top:2px}
     if (!r.ok) return failed(r);
     let row = rowOf(r.data);
     if (!row || row.status === 'removed') {
+      // the claimed Telegram first, so the request task shows it (db/032); a refusal never blocks the request
+      const claim = telegramClaim(ss.get(TG_KEY));
+      if (claim.ok && claim.value) await rpc('set_telegram_claim', { p_claim: claim.value });
+      ss.del(TG_KEY);
       const q = await rpc('request_access');
       if (!q.ok) return failed(q);
       r = await rpc('my_access_request');
@@ -418,7 +491,14 @@ form .primary{margin-top:2px}
       const b = e.target.closest('[data-act]');
       if (!b) return;
       const act = b.dataset.act;
-      if (act === 'google') { b.disabled = true; startGoogle().catch(() => { b.disabled = false; view('signedout', { message: 'Google sign-in failed. Try again.' }); }); }
+      if (act === 'google') {
+        // the optional Telegram claim survives the Google round trip in this tab (db/032)
+        const inp = document.getElementById('tg-claim');
+        const claim = telegramClaim(inp ? inp.value : '');
+        if (!claim.ok) return view('signedout', { message: claim.message });
+        if (claim.value) ss.set(TG_KEY, claim.value); else ss.del(TG_KEY);
+        b.disabled = true; startGoogle().catch(() => { b.disabled = false; view('signedout', { message: 'Google sign-in failed. Try again.' }); }); }
+      else if (act === 'tglink') tgLink();
       else if (act === 'signout') signOut();
       else if (act === 'retry') session ? check() : view('signedout');
     });

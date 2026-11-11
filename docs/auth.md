@@ -77,6 +77,17 @@ Auth settings that go with it: "Allow new users to sign up" **on** only behind t
 - **Sign out:** `/auth/v1/logout?scope=local`: this browser only; other devices stay signed in. On the free plan a session never times out by itself.
 - **Per origin:** each hosted origin (and `file://`) has its own storage, so each needs its own sign-in, and signing out of one leaves the others signed in. Every local `file://` page in the same browser profile can read the `file://` storage: open only files you trust there.
 
+## Telegram link (db/032)
+
+The household Telegram bot signs in as the agent login `telegram-bot` and learns who writes to it only from a link a person makes:
+
+1. At `/signin` a person may type their Telegram (username or numeric id). It is a claim: stored with `set_telegram_claim` and shown on the access-request task, it proves nothing, because usernames can be changed and taken by someone else.
+2. **Link Telegram** (on `/signin` after a request, or the board's account menu) asks `telegram_link_token()` for a single-use token, valid 15 minutes and stored only as its sha256, and shows `https://t.me/<TD_CONFIG.telegramBot>?start=<token>`.
+3. In Telegram, Start sends `/start <token>`; the bot calls `telegram_redeem_link(token, from.id, from.username)`. Only the numeric `from.id` is the key.
+4. Each message: `telegram_member(from.id)` gives the group (household or approved guest), the display name and the default list "My tasks", or `null` = no access. The link shares "My tasks" with the bot as editor.
+
+Unlink (`telegram_unlink`) removes the link and the bot's membership of "My tasks". The bot never gets an email address.
+
 ## Agents
 
 Agent logins (`kind = agent`) sign in with a password only ("This login signs in with a password only." if one tries Google). They see only lists they are members of and never delete or restore. **Household:** `homeos-agent` (HomeOS skills and scripts) and `telegram-bot`.
