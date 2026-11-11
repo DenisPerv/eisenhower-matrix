@@ -207,10 +207,12 @@
       ORDER.concat(ORDER.indexOf(l.mode) < 0 ? [l.mode] : []).forEach(function (m) { var o = el('option', null, (MODES[m] || MODES.guided).n + (m === 'guided' ? ' (default)' : '')); o.value = m; if (m === l.mode) o.selected = true; if (ORDER.indexOf(m) < 0) o.disabled = true; sel.appendChild(o); });
       if (!l.id) { sel.disabled = true; sel.title = 'Restart the page server: it does not send list ids yet.'; }
       sel.onchange = function () {
-        var want = sel.value; sel.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Saving ' + l.name + ' with your board sign-in…';
-        boardRpc('set_autonomy', { p_kind: 'list', p_id: l.id, p_mode: want, p_expected: l.mode }).then(function () {
-          l.mode = want; l.effective = want; msg.textContent = l.name + ': ' + MODES[want].n + '. Saved on the board.'; load(true);
-        }, function (e) { sel.disabled = false; sel.value = l.mode; msg.className = 'cfg-msg bad'; msg.textContent = l.name + ' not saved: ' + e.message; });
+        var want = sel.value, was = l.mode; sel.disabled = true; msg.className = 'cfg-msg'; writeStart();
+        msg.textContent = WR.pend > 1 ? 'Saving ' + WR.pend + ' changes with your board sign-in…' : 'Saving ' + l.name + ' with your board sign-in…';
+        l.mode = want; l.effective = want;   // shown at once; the read after the last write confirms it
+        boardRpc('set_autonomy', { p_kind: 'list', p_id: l.id, p_mode: want, p_expected: was }).then(function () {
+          sel.disabled = false; writeEnd(); msg.textContent = WR.pend ? 'Saved ' + l.name + '; ' + WR.pend + ' more saving…' : l.name + ': ' + MODES[want].n + '. Saved on the board.';
+        }, function (e) { l.mode = was; l.effective = was; sel.disabled = false; sel.value = was; writeEnd(); msg.className = 'cfg-msg bad'; msg.textContent = l.name + ' not saved: ' + (/not allowed/.test(e.message) ? 'only its owner or an editor may change its mode' + (l.owner ? ' (owner: ' + l.owner + '); ask them to share it with you as editor' : '') : e.message); });
       };
       cm.appendChild(sel);
       if (l.effective !== l.mode) cm.appendChild(el('span', 'cfg-st', 'Runs as ' + (MODES[l.effective] || MODES.guided).n + ': ' + (l.why || []).join('; ')));
@@ -282,8 +284,9 @@
         var v = inp.value.trim() === '' ? null : Number(inp.value), err = budgetError(key, v, capOf);
         if (err) { msg.className = 'cfg-msg bad'; msg.textContent = err + ' Not saved.'; inp.value = x.cap ? String(x.cap) : ''; return; }
         inp.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Saving ' + x.name + ' with your board sign-in…';
-        boardRpc('set_budget', { p_list: idOf(key), p_period: 'month', p_cap: v }).then(function () { msg.textContent = x.name + ': ' + (v == null ? 'no cap' : moneyShort(v) + ' a month') + '. Saved on the board.'; load(true); },
-          function (e) { inp.disabled = false; inp.value = x.cap ? String(x.cap) : ''; msg.className = 'cfg-msg bad'; msg.textContent = x.name + ' not saved: ' + e.message; });
+        writeStart();
+        boardRpc('set_budget', { p_list: idOf(key), p_period: 'month', p_cap: v }).then(function () { inp.disabled = false; writeEnd(); msg.textContent = x.name + ': ' + (v == null ? 'no cap' : moneyShort(v) + ' a month') + '. Saved on the board.'; },
+          function (e) { inp.disabled = false; inp.value = x.cap ? String(x.cap) : ''; writeEnd(); msg.className = 'cfg-msg bad'; msg.textContent = x.name + ' not saved: ' + (/not allowed/.test(e.message) ? 'only its owner or an editor who is a household person may set its cap' : e.message); });
       };
       cell(tr, 'Cap per month, $', 'n').appendChild(inp);
       cell(tr, 'Cap reached', null, !x.cap ? 'No budget set' : x.fc.kind === 'forecast' ? 'Around ' + ymd(x.fc.at, true) : x.fc.kind === 'reached' ? 'Reached. New sessions paused.' : x.fc.kind === 'below' ? 'Not this month' : 'No forecast yet');
@@ -297,8 +300,9 @@
       if (!window.confirm('Remove all ' + set.length + ' monthly caps? Nothing then stops new sessions for money until a cap is set again.')) return;
       rb.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Removing the caps…';
       var order = set.filter(function (k) { return k !== 'overall'; }).concat(set.indexOf('overall') >= 0 ? ['overall'] : []);
+      writeStart();
       order.reduce(function (pr, k) { return pr.then(function () { return boardRpc('set_budget', { p_list: idOf(k), p_period: 'month', p_cap: null }); }); }, Promise.resolve())
-        .then(function () { msg.textContent = 'Every monthly cap removed.'; load(true); }, function (e) { msg.className = 'cfg-msg bad'; msg.textContent = 'Stopped: ' + e.message; load(true); });
+        .then(function () { writeEnd(); msg.textContent = 'Every monthly cap removed.'; }, function (e) { writeEnd(); msg.className = 'cfg-msg bad'; msg.textContent = 'Stopped: ' + e.message; });
     };
     acts.appendChild(rb); p.appendChild(acts); p.appendChild(msg);
     p.appendChild(el('p', 'cfg-note', 'Set a cap for the whole harness (Overall), for a list, or both; empty means no cap. A list’s cap may not be above the overall cap. Saved with your own board sign-in, household people only, and shared by every device. At API prices. A cap stops new starts in its list (no card, no try counted); running sessions finish their step. It never lifts the 90% token pause.'));
@@ -364,7 +368,16 @@
     var pb = $('cfg-banner-host'); if (pb) { pb.textContent = ''; if (S.error) pb.appendChild(banner('Could not read the configuration: ' + S.error + '. The last values read are shown.')); }
     if (PO) PO.setAttribute('aria-busy', S.data ? 'false' : 'true');
   }
-  function load(fresh) { getJson('/api/config' + (fresh ? '?fresh=1' : '')).then(function (v) { S.data = v; S.error = null; renderAll(); }).catch(function (e) { S.error = (e && e.message) || 'no answer'; renderAll(); }); }
+  /* board writes in flight (Maksym 2026-11-11, several lists switched in a row): the page reads the board again only once the last write is
+     back, and drops any answer read while a write was going, so a slow read never puts back an older mode over a newer pick */
+  var WR = { pend: 0, gen: 0, t: 0 };
+  function writeStart() { WR.pend++; WR.gen++; clearTimeout(WR.t); }
+  function writeEnd() { WR.pend = Math.max(0, WR.pend - 1); WR.gen++; clearTimeout(WR.t); if (!WR.pend) WR.t = setTimeout(function () { load(true); }, 600); }
+  function load(fresh) {
+    var g = WR.gen;
+    getJson('/api/config' + (fresh ? '?fresh=1' : '')).then(function (v) { if (WR.pend || g !== WR.gen) return; S.data = v; S.error = null; renderAll(); })
+      .catch(function (e) { if (WR.pend || g !== WR.gen) return; S.error = (e && e.message) || 'no answer'; renderAll(); });
+  }
 
   window.renderConfigPage = function (U) {
     el = U.el; $ = U.$; panelHead = U.panelHead; panelBody = U.panelBody; openPanel = U.openPanel; getJson = U.getJson; postJson = U.postJson; renderLimits = U.renderLimits; restoreSize = U.restoreSize; markSel = U.markSel; setLit = U.setLit; state = U.state; PO = U.PO; canDo = U.canDo;
