@@ -215,6 +215,22 @@
     ai_brain: { does: 'Agents decide on their own and log every decision.', you: 'Only E0 comes to you.' },
   };
   const AUTONOMY_HOUSEHOLD = 'Only household members can set this.';
+  // harness configurations T23: the list brief (db/032 lists.brief_*, written only through set_list_brief by household people; homeos-agent
+  // reads it). Decisions: one line each, "yyyy-mm-dd · who · text", the newest last; a precedent becomes a line only through an ask-first card
+  const BRIEF_FIELDS = [
+    { key: 'naming', col: 'brief_naming', label: 'Naming convention', help: 'How tasks, branches and files in this list are named.' },
+    { key: 'instruction', col: 'brief_instruction', label: 'Base project instruction', help: 'What the list is for, what done means, rules to follow.' },
+    { key: 'concept', col: 'brief_concept', label: 'Concept of work', help: 'What agents may decide alone under AI Brain and Guided, and what always comes to you.' }];
+  const BRIEF_MAX = 8000;
+  const briefLines = text => String(text || '').split('\n').map(x => x.trim()).filter(Boolean);
+  // a new Decisions line: control characters and line breaks out, the day and who in front
+  function briefLine(text, day, who) {
+    const t = String(text || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
+    return t ? [day, String(who || '').replace(/[\u0000-\u001f\u007f·\s]+/g, ' ').trim() || 'someone', t].join(' · ') : '';
+  }
+  // the four texts set_list_brief takes, from a lists row
+  const briefOf = row => ({ decisions: (row && row.brief_decisions) || '', naming: (row && row.brief_naming) || '', instruction: (row && row.brief_instruction) || '', concept: (row && row.brief_concept) || '' });
+  const briefCount = b => briefLines(b.decisions).length + BRIEF_FIELDS.filter(x => String(b[x.key] || '').trim()).length;
   const listModeOf = l => l && AUTONOMY_MODES.includes(l.autonomy) ? l.autonomy : 'guided';
   const itemModeOf = t => t && AUTONOMY_MODES.includes(t.autonomy) ? t.autonomy : 'inherit';
   // what a task inherits: { mode, from: 'parent' | 'list', parent (the task it comes from) }. ctx: { parentOf: id -> parent id,
@@ -479,8 +495,17 @@
   // Round 4: source = the category badge on cards and Sources in the task window (off by default; never with one list selected)
   // task links: group (children under their parent; off by default), waiting (open predecessors), progress (n/m). No priority:
   // a task's priority is its position in its quadrant (priority by position, 2026-10-29)
+  // harness configurations T17: Card layout's tabs "On the board" and "Open task" place blocks in three zones, Top, Main and Bottom,
+  // in order, and hide some (off). Board card: facts, description and one block per tag list ('tl:<id>'; 'tl:*' marks where a new tag
+  // list goes); its fixed part is the header row (number, title, badges, done). Open task: the blocks between the fixed header (heading,
+  // position, title) and the fixed actions; the Decision section is never hidden. Same for all lists (prefs.cardLayout.zones)
+  const LAYOUT_ZONES = ['top', 'main', 'bottom'];
+  const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: ['autonomy', 'decision', 'format', 'description', 'dates', 'tags', 'links', 'sources'] };
+  const LAYOUT_FIXED = { board: [], task: ['decision'] };
+  const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] },
+    task: { top: ['autonomy', 'decision', 'format'], main: ['description', 'dates', 'tags'], bottom: ['links', 'sources'], off: [] } };
   const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
-    group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
+    group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100, zones: LAYOUT_DEFAULTS };
   const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
   // tags round (2026-10-29): tagListOrder = my one free order of every tag list, own and shared (v2, tagListOrderV = TAG_LIST_ORDER_V;
   // before it: only the shared ones, migrated once by tagListPrefsMigrate); tagListFavs = my favourite (★) tag lists, any number, own
@@ -564,7 +589,62 @@
     const ids = tagListIds ? new Set(tagListIds) : null;
     if (strs(raw.tagLists)) c.tagLists = raw.tagLists.filter(id => !ids || ids.has(id));
     if (Number.isInteger(raw.autoCollapse) && raw.autoCollapse >= 0 && raw.autoCollapse <= 5000) c.autoCollapse = raw.autoCollapse;
+    if (isObj(raw.zones)) Object.keys(LAYOUT_BLOCKS).forEach(kind => { const z = readZones(raw.zones[kind], kind, ids); if (z) c.zones[kind] = z; });
     return c;
+  }
+  // T17: one kind's stored zones, checked for shape: known blocks only, each once; a tag list block only for a known tag list (when
+  // the caller knows them); null keeps the defaults
+  function readZones(raw, kind, tagListIds) {
+    if (!isObj(raw)) return null;
+    const known = new Set(LAYOUT_BLOCKS[kind]), seen = new Set(), out = { off: [] };
+    const ok = b => typeof b === 'string' && !seen.has(b) && (known.has(b) || (kind === 'board' && (b === 'tl:*' || (/^tl:[\w-]{1,64}$/.test(b) && (!tagListIds || tagListIds.has(b.slice(3)))))));
+    for (const k of LAYOUT_ZONES) { out[k] = []; if (!Array.isArray(raw[k])) return null; raw[k].forEach(b => { if (ok(b)) { seen.add(b); out[k].push(b); } }); }
+    out.off = Array.isArray(raw.off) ? raw.off.filter(b => typeof b === 'string' && seen.has(b) && b !== 'tl:*' && !LAYOUT_FIXED[kind].includes(b)) : [];
+    out.off = [...new Set(out.off)];
+    return out;
+  }
+  // T17: the zones to draw: stored order, every block of the kind once (a missing one at the end of its default zone), each tag list
+  // block (tagListIds: the lists Card layout offers) where 'tl:*' stands, else after the last tag list block, else at the end of Main
+  function layoutZones(layout, kind, tagListIds) {
+    const D = LAYOUT_DEFAULTS[kind], z = ((layout || CARD_LAYOUT_DEFAULTS).zones || {})[kind] || D;
+    const tls = kind === 'board' ? (tagListIds || []).map(id => 'tl:' + id) : [], live = new Set(LAYOUT_BLOCKS[kind].concat(tls));
+    const out = { top: [], main: [], bottom: [] }, seen = new Set();
+    let star = null;
+    LAYOUT_ZONES.forEach(k => (z[k] || []).forEach(b => {
+      if (b === 'tl:*') { if (!star) star = { k, i: out[k].length }; return; }
+      if (live.has(b) && !seen.has(b)) { seen.add(b); out[k].push(b); }
+    }));
+    LAYOUT_BLOCKS[kind].forEach(b => { if (!seen.has(b)) { const k = LAYOUT_ZONES.find(x => D[x].includes(b)) || 'main'; out[k].push(b); seen.add(b); } });
+    const rest = tls.filter(b => !seen.has(b));
+    if (rest.length) {
+      if (!star) LAYOUT_ZONES.forEach(k => out[k].forEach((b, i) => { if (/^tl:/.test(b)) star = { k, i: i + 1 }; }));
+      if (!star) star = { k: 'main', i: out.main.length };
+      out[star.k].splice(star.i, 0, ...rest); rest.forEach(b => seen.add(b));
+    }
+    const off = (z.off || []).filter(b => seen.has(b) && !LAYOUT_FIXED[kind].includes(b));
+    return { top: out.top, main: out.main, bottom: out.bottom, off };
+  }
+  // T17: zones drawn by layoutZones back to what is stored: a board keeps 'tl:*' after its last tag list block (new tag lists join them)
+  function layoutStore(zones, kind) {
+    const out = { top: zones.top.slice(), main: zones.main.slice(), bottom: zones.bottom.slice(), off: zones.off.filter(b => !LAYOUT_FIXED[kind].includes(b)) };
+    if (kind === 'board') {
+      let at = null; LAYOUT_ZONES.forEach(k => out[k].forEach((b, i) => { if (/^tl:/.test(b)) at = { k, i: i + 1 }; }));
+      if (!at) at = { k: 'main', i: out.main.indexOf('description') < 0 ? out.main.length : out.main.indexOf('description') };
+      out[at.k].splice(at.i, 0, 'tl:*');
+    }
+    return out;
+  }
+  // T17: move a block one step (up, down: within its zone, across a zone edge; left, right: to the end of the zone before or after) or
+  // to a zone before another block (to). Returns new zones; the input is not changed
+  function layoutMove(zones, b, dir, to) {
+    const z = { top: zones.top.slice(), main: zones.main.slice(), bottom: zones.bottom.slice(), off: zones.off.slice() };
+    const k = LAYOUT_ZONES.find(x => z[x].includes(b)); if (!k) return z;
+    const arr = z[k], i = arr.indexOf(b), zi = LAYOUT_ZONES.indexOf(k);
+    if (to) { arr.splice(i, 1); const t = z[to.zone], j = to.before ? t.indexOf(to.before) : -1; if (j < 0) t.push(b); else t.splice(j, 0, b); return z; }
+    if (dir === 'up') { if (i > 0) { arr.splice(i, 1); arr.splice(i - 1, 0, b); } else if (zi > 0) { arr.splice(i, 1); z[LAYOUT_ZONES[zi - 1]].push(b); } }
+    if (dir === 'down') { if (i < arr.length - 1) { arr.splice(i, 1); arr.splice(i + 1, 0, b); } else if (zi < 2) { arr.splice(i, 1); z[LAYOUT_ZONES[zi + 1]].unshift(b); } }
+    if (dir === 'left' || dir === 'right') { const nk = LAYOUT_ZONES[zi + (dir === 'left' ? -1 : 1)]; if (nk) { arr.splice(i, 1); z[nk].push(b); } }
+    return z;
   }
   // a card is expanded when the mode says so, unless flipped. Round 4, item 4: autoCollapse no longer collapses a card (it only
   // acted in Expanded mode, and the default is Collapsed); it cuts the description of an open card instead (descClip)
@@ -1644,7 +1724,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
@@ -1652,7 +1732,7 @@
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     ASSIGNEE_DEFAULT, isHomeosList, homeosAssigneeTag, assigneeOnListChange,
     createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,

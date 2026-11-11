@@ -1085,7 +1085,7 @@ async function gUi() {
     await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
     await T.shot(`ui-cardlayout-${who}-1440x900-${theme}`);
     // 2026-10-29: Moving between tasks above Cards open, and each radio group on one row
-    check(G, `${who}: Card layout: Moving between tasks comes before Cards open, each radio group on one row at 1440`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]'),leg=[...d.querySelectorAll('legend')].map(l=>l.textContent);
+    check(G, `${who}: Card layout: Moving between tasks comes before Cards open, each radio group on one row at 1440 (Options tab)`, await T.ev(`(()=>{const d=document.querySelector('dialog[open]');d.querySelector('#cl-t-opts')?.click();const leg=[...d.querySelectorAll('legend')].map(l=>l.textContent);
       const row=n=>{const t=[...d.querySelectorAll('input[name='+n+']')].map(i=>i.closest('label').getBoundingClientRect());return t.length===2&&Math.abs(t[0].top-t[1].top)<=2&&t[1].left>t[0].right};
       return leg.indexOf('Moving between tasks')===0&&leg.indexOf('Cards open')===1&&row('s-switch')&&row('cl-mode')})()`));
     await T.shot(`cardlayout-order-1440x900-${theme}`);
@@ -1700,10 +1700,10 @@ async function gHarness() {
     await T.click('#profile'); await T.wait('!!document.querySelector("[data-menu=lists]")'); await T.click('[data-menu=lists]');
     const sel = `[data-lm-set="${ST.id}"]`;
     const opened = await T.wait(`!!document.querySelector('${sel}')`, 6000) && (await T.click(sel), await T.wait('!!document.querySelector("dialog.lsd [name=am]")', 8000));
-    check(G, 'list settings: opens from the Lists window with four Autonomy modes', opened);
+    check(G, 'list settings: opens from the Lists window with four Autonomy modes', opened, opened ? '' : JSON.stringify(await T.ev(`(()=>{const d=[...document.querySelectorAll('dialog[open]')].map(x=>x.className+': '+x.textContent.slice(0,160));return d})()`)) + ' ' + T.errors.slice(-3).join(' / '));
     if (opened) {
       const st = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd');return {modes:d.querySelectorAll('[name=am]').length,checked:(d.querySelector('[name=am]:checked')||{}).value,nav:d.querySelectorAll('.ls-nav a').length,save:d.querySelector('#ls-save').disabled,status:d.querySelector('#ls-status').textContent,budget:!!d.querySelector('#ls-cap'),intake:!d.querySelector('#ls-e2e').disabled}})()`);
-      check(G, 'list settings: the stored mode is checked, four sections in the nav, Save off with "No changes", intake and budget on for the household', st.modes === 4 && st.checked === list0.autonomy && st.nav === 4 && st.save && st.status === 'No changes' && st.budget && st.intake, JSON.stringify(st));
+      check(G, 'list settings: the stored mode is checked, five sections in the nav (List brief too), Save off with "No changes", intake and budget on for the household', st.modes === 4 && st.checked === list0.autonomy && st.nav === 5 && st.save && st.status === 'No changes' && st.budget && st.intake, JSON.stringify(st));
       await sleep(600); await T.shot('list-settings-1440x900');
       await T.size(390, 844); await sleep(400);
       const ph = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd'),r=d.getBoundingClientRect(),f=d.querySelector('#ls-foot').getBoundingClientRect();return {nav:getComputedStyle(d.querySelector('.ls-nav')).display,fits:r.left>=0&&r.right<=innerWidth+1&&d.scrollWidth<=d.clientWidth+1,foot:f.bottom<=innerHeight+1}})()`);
@@ -1717,6 +1717,81 @@ async function gHarness() {
       await T.click('dialog.lsd #ls-save');
       const saved = await until(async () => { const r = (await MK.rest('GET', 'lists?select=autonomy,autonomy_set_by&id=eq.' + ST.id)).json[0]; return r && r.autonomy === next ? r : null; });
       check(G, 'list settings: Save writes the mode through set_autonomy (set_by Maksym), status "Saved"', !!saved && saved.autonomy_set_by === MK.uid && await T.wait(`document.querySelector('dialog.lsd #ls-status')?.textContent==='Saved'`, 5000), JSON.stringify(saved));
+      // T23 / V14: the List brief section: a decision added with date and who, a naming convention, saved through set_list_brief
+      const hasBrief = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd');return !!d.querySelector('#ls-brief #ls-decs')&&!!d.querySelector('#ls-b-naming')&&!!d.querySelector('#ls-b-instruction')&&!!d.querySelector('#ls-b-concept')})()`);
+      check(G, 'list brief (T23): List settings has Decisions, Naming convention, Base project instruction and Concept of work', hasBrief);
+      if (hasBrief) {
+        await T.ev(`(()=>{const d=document.querySelector('dialog.lsd');d.querySelector('#ls-brief').scrollIntoView();const n=d.querySelector('#ls-dec-new');n.value='${RUN} keep two backups';d.querySelector('#ls-dec-add').click();const t=d.querySelector('#ls-b-naming');t.value='${RUN} kebab-case';t.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+        await sleep(400); await T.shot('list-brief-1440x900');
+        await T.click('dialog.lsd #ls-save');
+        const br = await until(async () => { const r = (await MK.rest('GET', 'lists?select=brief_decisions,brief_naming,brief_updated_by&id=eq.' + ST.id)).json[0]; return r && r.brief_naming === `${RUN} kebab-case` ? r : null; });
+        check(G, 'list brief (T23): Save stores the naming and a Decisions line "yyyy-mm-dd · Maksym… · text" through set_list_brief (updated by Maksym)',
+          !!br && /^\d{4}-\d{2}-\d{2} · .+ · .+keep two backups$/m.test(br.brief_decisions || '') && br.brief_updated_by === MK.uid, JSON.stringify(br));
+      }
+      await closeDialogs(T);
+    }
+    // V14: homeos-agent reads the brief but cannot write it (set_list_brief refuses agents; no column grant for brief_*)
+    {
+      const AGT = await connect(env, 'homeos-agent', { core, via: 'script:e2e', runId: RUN }); clients.push(AGT);
+      const before = (await MK.rest('GET', 'lists?select=brief_naming&id=eq.' + ST.id)).json[0];
+      const r1 = await AGT.rest('POST', 'rpc/set_list_brief', { p_list: ST.id, p_decisions: 'agent', p_naming: 'agent', p_instruction: 'agents may deploy', p_concept: 'agent' });
+      const r2 = await AGT.rest('PATCH', 'lists?id=eq.' + ST.id, { brief_naming: 'agent' }, { Prefer: 'return=representation' });
+      const after = (await MK.rest('GET', 'lists?select=brief_naming&id=eq.' + ST.id)).json[0];
+      check(G, 'V14: homeos-agent cannot write the list brief (RPC refused, PATCH refused or no row), brief unchanged',
+        !r1.ok && (!r2.ok || !r2.json.length) && !!before && !!after && after.brief_naming === before.brief_naming, JSON.stringify({ rpc: r1.ok ? 'ok' : r1.err.message, patch: r2.ok ? r2.json.length + ' rows' : r2.err.message }));
+    }
+    // T23: New list asks for Autonomy and the brief (optional section); both saved after the list exists
+    {
+      const nm = `${RUN} brief list`;
+      await T.click('#newlist'); await T.wait('!!document.getElementById("nl-name")');
+      const more = await T.ev('!!document.getElementById("nl-more")');
+      check(G, 'New list (T23): an optional "Autonomy and list brief" section', more);
+      if (more) {
+        await T.insert('#nl-name', nm);
+        await T.ev(`(()=>{const d=document.querySelector('${W}');d.querySelector('#nl-more').open=true;d.querySelector('#nl-shared').checked=false;d.querySelector('#nl-au').value='manual';d.querySelector('#nl-b-decisions').value='first decision';d.querySelector('#nl-b-instruction').value='${RUN} what done means';return true})()`);
+        await sleep(300); await T.shot('new-list-brief-1440x900');
+        await T.ev(`document.querySelector('${W} #nl-go').click(),true`);
+        const nl = await until(async () => { const x = (await MK.rest('GET', 'lists?select=id,slug,name,autonomy,brief_decisions,brief_instruction&archived_at=is.null&name=eq.' + encodeURIComponent(nm))).json[0]; return x && x.brief_instruction ? x : null; });
+        if (nl) testLists.push(nl);
+        check(G, 'New list (T23): created with Autonomy Manual, the instruction and a dated Decisions line',
+          !!nl && nl.autonomy === 'manual' && nl.brief_instruction === `${RUN} what done means` && /^\d{4}-\d{2}-\d{2} · .+ · first decision$/.test(nl.brief_decisions || ''), JSON.stringify(nl));
+      }
+      await closeDialogs(T);
+    }
+    // T17: Card layout's tabs "On the board" and "Open task": Description moved to Top on the board, Links hidden in the open task
+    {
+      const ci = await mkItem('card layout', { body_md: 'e2e card layout description', sort_key: 9100000 });
+      await T.reload(); await T.ready(); await pick(T, ST.id);
+      await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+      const cl = await T.ev(`(()=>{const d=document.querySelector('${W}');return {tabs:[...d.querySelectorAll('[role=tab]')].map(t=>t.textContent),zones:d.querySelectorAll('#cl-p-board .cl-zone').length,blocks:d.querySelectorAll('#cl-p-board .cl-blk').length,tl:d.querySelectorAll('#cl-p-board .cl-blk[data-b^="tl:"]').length,prev:!!d.querySelector('#cl-p-board .cl-pv .card'),fixed:!!d.querySelector('#cl-p-board .cl-fixed')}})()`);
+      check(G, 'Card layout (T17): tabs On the board, Open task, Options; three zones; facts, description and one block per tag list; a live card preview; the fixed row',
+        JSON.stringify(cl.tabs) === '["On the board","Open task","Options"]' && cl.zones === 3 && cl.blocks === 2 + cl.tl && cl.prev && cl.fixed, JSON.stringify(cl));
+      // Description to Top with the zone select, then Alt+ArrowUp keeps it first; expanded cards (Options) so the zones show on the board
+      await T.ev(`(()=>{const d=document.querySelector('${W}'),s=d.querySelector('#cl-p-board [data-zsel=description]');s.value='top';s.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
+      const moved = await T.ev(`(()=>{const d=document.querySelector('${W}');const z=d.querySelector('#cl-p-board .cl-zl[data-zone=top]');return {top:[...z.querySelectorAll('.cl-blk')].map(b=>b.dataset.b),live:d.querySelector('#cl-live').textContent,pv:!!d.querySelector('#cl-p-board .cl-pv .cz-top .md'),st:d.querySelector('#cl-st').textContent}})()`);
+      check(G, 'Card layout (T17): Description moves to Top, announced, the preview shows it above the title, "Unsaved changes"',
+        JSON.stringify(moved.top) === '["description"]' && /Description moved to Top/.test(moved.live) && moved.pv && moved.st === 'Unsaved changes', JSON.stringify(moved));
+      await sleep(400); await T.shot('card-layout-board-1440x900');
+      await T.size(390, 844); await sleep(400);
+      const ph = await T.ev(`(()=>{const d=document.querySelector('${W}'),pv=d.querySelector('#cl-p-board .cl-prev').getBoundingClientRect(),li=d.querySelector('#cl-p-board .cl-list').getBoundingClientRect(),f=d.querySelector('form');return {above:pv.bottom<=li.top+1,sel:getComputedStyle(d.querySelector('.cl-zsel')).display!=='none',fits:f.scrollWidth<=f.clientWidth+1&&document.documentElement.scrollWidth<=innerWidth}})()`);
+      check(G, 'Card layout (390 px): preview above the list, a zone select per block, no horizontal scroll', ph.above && ph.sel && ph.fits, JSON.stringify(ph));
+      await T.shot('card-layout-board-390x844');
+      await T.size(1440, 900); await sleep(300);
+      await T.ev(`(()=>{const d=document.querySelector('${W}');d.querySelector('#cl-t-task').click();d.querySelector('#cl-p-task [data-eye=links]').click();d.querySelector('#cl-t-opts').click();d.querySelector('input[name=cl-mode][value=expanded]').checked=true;d.querySelector('#cl-t-task').click();return true})()`);
+      const tk = await T.ev(`(()=>{const d=document.querySelector('${W}');return {off:d.querySelector('#cl-p-task .cl-blk[data-b=links]').classList.contains('off'),dec:!d.querySelector('#cl-p-task [data-eye=decision]')&&!!d.querySelector('#cl-p-task .cl-blk[data-b=decision] .cl-always'),pv:[...d.querySelectorAll('#cl-p-task .cl-pi')].map(x=>x.textContent).includes('Links')}})()`);
+      check(G, 'Card layout (T17): Links hidden in "Open task" (gone from its preview); the Decision section cannot be hidden', tk.off && tk.dec && !tk.pv, JSON.stringify(tk));
+      await sleep(300); await T.shot('card-layout-task-1440x900');
+      await T.click(W + ' #cl-save');
+      const onBoard = await T.wait(`!!document.querySelector('[data-card="${ci.id}"].full .details.cz-top .md')`, 6000);
+      check(G, 'Card layout (T17): saved; the board card shows its description in the Top zone, above the title', onBoard);
+      const tw = await openCard(T, ci.id, W + ' [data-tb=links]');
+      const tws = tw ? await T.ev(`(()=>{const d=document.querySelector('${W}');return {links:d.querySelector('.tk-card [data-tb=links]').hidden,zones:[...d.querySelectorAll('.tk-card .tz')].map(z=>z.className.replace('tz tz-','')),fn:!!d.querySelector('#fn')}})()`) : null;
+      check(G, 'Card layout (T17): the task window keeps the Links block in the form but hidden; zones top, main, bottom; the description field is there', !!tws && tws.links && tws.fn && tws.zones.join() === 'top,main,bottom', JSON.stringify(tws));
+      if (tw) { await sleep(300); await T.shot('task-zones-1440x900'); await T.size(390, 844); await sleep(300); await T.shot('task-zones-390x844'); await T.size(1440, 900); }
+      await closeDialogs(T);
+      // put Card layout back to the defaults (cleanup also restores the preferences row)
+      await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+      await T.ev('document.getElementById("cl-reset").click();document.getElementById("grp-ok")?.click();document.getElementById("cl-save").click();true');
       await closeDialogs(T);
     }
     // the task's Autonomy row: the child inherits Manual from its parent, Guided is wider than the parent

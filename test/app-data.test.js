@@ -870,3 +870,18 @@ test('T15: Autonomy goes through set_autonomy with the shown mode; offline it wa
   assert.equal(d.opts.storage.local.getItem(D.SETTINGS_KEY), null, 'refused: out of the queue');
   assert.ok(toasts.some(m => /someone set it to Manual/.test(m)), toasts.join(' | '));
 });
+
+test('T23: saveListSettings sends the list brief through set_list_brief with all four texts; a refusal is told in order', async () => {
+  const sent = [];
+  let reply = () => [200, null];
+  const f = fakeSupabase([['POST', /^\/rest\/v1\/rpc\/set_list_brief/, (m, body) => { sent.push(body); return reply(); }]]);
+  const d = make(f);
+  await signIn(d);
+  await d.loadAll();
+  const b = { decisions: '2026-11-11 · Max · Keep 2 backups', naming: 'kebab-case', instruction: '', concept: 'Ask before deploys' };
+  assert.deepEqual(await d.saveListSettings(LIST, { brief: b }), { ok: true, errs: [] });
+  assert.deepEqual(sent.pop(), { p_list: LIST, p_decisions: b.decisions, p_naming: 'kebab-case', p_instruction: '', p_concept: 'Ask before deploys' });
+  reply = () => [403, { code: '42501', message: 'the list brief is written by household people' }];
+  const r = await d.saveListSettings(LIST, { brief: b });
+  assert.equal(r.ok, false); assert.equal(r.errs.length, 1, 'the refusal is told');
+});

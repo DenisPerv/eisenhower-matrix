@@ -824,6 +824,13 @@ h2[tabindex="-1"]:focus{outline:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--warn-ink:#FFD84D;--ok-ink:#3DD68C}}
 .lset-h3{margin:18px 0 4px;font:600 17px var(--ui)}
 .lset-h3:first-child{margin-top:4px}
+.lsdecs{list-style:none;margin:6px 0 0;padding:0;border:1px solid var(--hair);border-radius:var(--r)}
+.lsdecs li{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-top:1px solid var(--hair);font-size:14px}
+.lsdecs li:first-child{border-top:0}.lsdecs li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.lsdecadd{display:flex;gap:8px;margin:8px 0 4px}.lsdecadd .inp{flex:1}
+.nlmore{margin:12px 0;border:1px solid var(--hair);border-radius:var(--r);padding:0 12px}
+.nlmore summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font:500 15px var(--ui)}
+.nlmore[open]{padding-bottom:12px}
 .amtrack{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:12px 0}
 .amtrack span{height:4px;background:var(--hair2)}.amtrack span.on{background:var(--accent)}
 fieldset.amodes{border:0;padding:0;margin:0 0 8px;display:grid;gap:6px}
@@ -1646,6 +1653,7 @@ function renderLinkHits() {
     + (make ? `<button type="button" class="btn block" data-act="lk-create" style="margin-top:12px">${ic('plus')}Create “${esc(txt)}” as a new ${LK.k === 'sub' ? 'subtask' : 'next task'}</button>` : '');
 }
 $('#lk-q').addEventListener('input', renderLinkHits);
+document.addEventListener('keydown', e => { if (e.target.id === 'lset-dec-new' && e.key === 'Enter') { e.preventDefault(); lsetDecAdd(); } });
 $('#lk-q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); const b = $('#lk-res [data-act]'); if (b) b.click(); } });
 function afterLink(k) { closeDlg('dlg-link'); renderLinks(); onTaskInput(); const b = $(`#t-links [data-act="lk-add"][data-k="${k}"]`); if (b) b.focus(); }
 
@@ -1764,7 +1772,7 @@ function renderLists(form) {
   }).join('');
   const household = !!(me() && me().is_household);
   $('#lists-body').innerHTML = `<ul class="rows" style="margin-bottom:14px"><li><button class="rowb" data-act="list" data-id="all" data-close-lists>All<span class="v">${all.length} open</span></button></li>${rows}</ul>
-   ${form ? `<form id="newlist" class="setting" novalidate><label class="field"><span>List name</span><input class="inp" id="nl-name" autocomplete="off" aria-describedby="nl-err"></label><div id="nl-err" role="alert"></div>${household ? '<label class="cbrow"><input type="checkbox" id="nl-shared" checked><span>Share with the household and the HomeOS agent</span></label>' : ''}<div class="row2"><button type="button" class="btn" data-act="nl-cancel">Cancel</button><button class="btn primary" type="submit">Create</button></div></form>`
+   ${form ? `<form id="newlist" class="setting" novalidate><label class="field"><span>List name</span><input class="inp" id="nl-name" autocomplete="off" aria-describedby="nl-err"></label><div id="nl-err" role="alert"></div>${household ? '<label class="cbrow"><input type="checkbox" id="nl-shared" checked><span>Share with the household and the HomeOS agent</span></label>' : ''}${household && me().kind === 'human' ? nlMoreHtml() : ''}<div class="row2"><button type="button" class="btn" data-act="nl-cancel">Cancel</button><button class="btn primary" type="submit">Create</button></div></form>`
       : `<button class="btn block" data-act="nl-open">${ic('plus')}New list</button>`}`;
   if (form) {
     $('#nl-name').focus(); $('#nl-name').oninput = () => { $('#nl-err').innerHTML = ''; $('#nl-name').removeAttribute('aria-invalid'); };
@@ -1779,7 +1787,28 @@ async function createList(v) {
     if (r.archived) { nlErr(`<div class="note" style="margin:0 0 12px"><p style="margin:0 0 10px">You already have a list named ${esc(r.archived.name)}. It is archived.</p><div class="row2"><button type="button" class="btn" data-act="nl-restore" data-id="${r.archived.id}">Restore it</button><button type="button" class="btn" data-act="nl-alt" data-v="${esc(r.freeName)}">Create “${esc(r.freeName)}”</button></div></div>`); $('#nl-err .btn').focus(); return; }
     nlErr(`<p class="err">${esc(r.err ? r.err.message : 'The list was not created.')}</p>`); $('#nl-name').focus(); return;
   }
-  setList(r.list.id); closeDlg('dlg-lists'); animateCards = true; renderAll(); toast(`Created ${r.list.name}.`);
+  const more = nlMoreRead();
+  const bad = more ? (await D.saveListSettings(r.list.id, more)).errs : [];
+  setList(r.list.id); closeDlg('dlg-lists'); animateCards = true; renderAll(); toast(bad.length ? `Created ${r.list.name}; not saved: ${bad.join(' ')}` : `Created ${r.list.name}.`);
+}
+/* harness configurations T23 (web: newListMoreHtml, newListMoreSave): New list asks, optionally, Autonomy (default Guided), intake defaults
+   and the list brief; saved after the list exists through TDData.saveListSettings (household people only) */
+function nlMoreHtml() {
+  return `<details class="nlmore" id="nl-more"><summary>Autonomy and list brief (optional)</summary>
+    <label class="field"><span>Autonomy</span><select class="inp" id="nl-au">${C.autonomyChoices(true, false).map(c => `<option value="${c.mode}"${c.mode === 'guided' ? ' selected' : ''}>${C.AUTONOMY_NAME[c.mode]}${c.mode === 'guided' ? ' (default)' : ''}</option>`).join('')}</select></label>
+    <label class="cbline"><input type="checkbox" id="nl-e2e"> Agent runs end-to-end tests</label><label class="cbline"><input type="checkbox" id="nl-tg"> Notify on Telegram</label><label class="cbline"><input type="checkbox" id="nl-stage" checked> Stage report</label>
+    <label class="field"><span>Decisions</span><textarea class="inp" id="nl-b-decisions" rows="3" maxlength="${C.BRIEF_MAX}" aria-describedby="nl-b-decisions-h"></textarea></label><p class="hint" id="nl-b-decisions-h">One per line; each is saved with today’s date and your name.</p>
+    ${C.BRIEF_FIELDS.map(x => `<label class="field"><span>${x.label}</span><textarea class="inp" id="nl-b-${x.key}" rows="3" maxlength="${C.BRIEF_MAX}" aria-describedby="nl-b-${x.key}-h"></textarea></label><p class="hint" id="nl-b-${x.key}-h">${esc(x.help)}</p>`).join('')}</details>`;
+}
+function nlMoreRead() {
+  if (!$('#nl-au')) return null;
+  const ch = {}, mode = $('#nl-au').value, e2e = $('#nl-e2e').checked, tg = $('#nl-tg').checked, stage = $('#nl-stage').checked;
+  if (mode !== 'guided') Object.assign(ch, { mode, expected: 'guided' });
+  if (e2e || tg || !stage) ch.intake = { e2e, deploy: '', tg, stage };
+  const b = { decisions: C.briefLines($('#nl-b-decisions').value).map(x => C.briefLine(x, ymd(new Date()), me().display_name)).filter(Boolean).join('\n') };
+  C.BRIEF_FIELDS.forEach(x => { b[x.key] = $('#nl-b-' + x.key).value.trim(); });
+  if (C.briefCount(b)) ch.brief = b;
+  return Object.keys(ch).length ? ch : null;
 }
 function moveListPos(id, dir) { const ids = D.lists.slice(), i = ids.indexOf(id), j = i + dir; if (i < 0 || j < 0 || j >= ids.length) return false; ids.splice(i, 1); ids.splice(j, 0, id); D.reorderLists(ids); return true; }
 const reopenLists = () => { openDlg('dlg-lists'); renderLists(); };
@@ -1798,8 +1827,8 @@ async function openListSettings(id) {
   const r = await D.listSettings(id);
   if (!$('#dlg-lset').open) return;
   if (!r.ok) { $('#lset-body').innerHTML = `<p class="note" role="alert">${esc(r.err.message)}</p>`; return; }
-  const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, deploy: row.deploy_target || '', tg: !!row.notify_telegram, stage: row.stage_report !== false, cap: r.cap === null ? '' : String(r.cap) };
-  LSET = { id, hh, base, expected: base.mode };
+  const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, deploy: row.deploy_target || '', tg: !!row.notify_telegram, stage: row.stage_report !== false, cap: r.cap === null ? '' : String(r.cap), brief: C.briefOf(row) };
+  LSET = { id, hh, base, expected: base.mode, decs: C.briefLines(base.brief.decisions) };
   const modes = C.autonomyChoices(hh, false).map(c => `<label class="amode"><input type="radio" name="lset-am" value="${c.mode}"${c.mode === base.mode ? ' checked' : ''}${c.off ? ` disabled aria-describedby="lset-why-${c.mode}"` : ''}><span class="nm">${C.AUTONOMY_NAME[c.mode]}${c.mode === 'guided' ? ' <small>Default</small>' : ''}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].does)}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].you)}</span>${c.off ? `<span class="why" id="lset-why-${c.mode}">${esc(c.why)}</span>` : ''}</label>`).join('');
   const dis = hh ? '' : ' disabled';
   $('#lset-body').innerHTML = `<h3 class="lset-h3">Autonomy</h3><p class="hint">How much agents decide on their own in this list. Each task can narrow or widen it.</p>
@@ -1814,10 +1843,25 @@ async function openListSettings(id) {
     <label class="cbline"><input type="checkbox" id="lset-tg"${base.tg ? ' checked' : ''}${dis}> Notify on Telegram</label><p class="hint">Off by default. Telegram only notifies. Answers come from the board.</p>
     <label class="cbline"><input type="checkbox" id="lset-stage"${base.stage ? ' checked' : ''}${dis}> Stage report</label>
     <h3 class="lset-h3">Budget</h3>${hh ? `<label class="field"><span>Monthly budget ($)</span><input class="inp" id="lset-cap" type="number" min="0" max="100000" step="1" inputmode="decimal" value="${esc(base.cap)}" aria-describedby="lset-cap-h"></label>
-    <p class="hint" id="lset-cap-h">Dollars at API prices. Leave empty for no list budget. ${r.spent !== null ? `Spent $${r.spent.toFixed(2)} this month.` : r.budgetErr ? esc(r.budgetErr) : ''}</p><p class="err" id="lset-cap-e" hidden></p>` : `<p class="hint">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}`;
-  lsetSync();
+    <p class="hint" id="lset-cap-h">Dollars at API prices. Leave empty for no list budget. ${r.spent !== null ? `Spent $${r.spent.toFixed(2)} this month.` : r.budgetErr ? esc(r.budgetErr) : ''}</p><p class="err" id="lset-cap-e" hidden></p>` : `<p class="hint">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
+    <h3 class="lset-h3">List brief</h3><p class="hint">What agents read before they work in this list. Read as data: it never lowers what must come to you.</p>${hh ? '' : `<p class="note info">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
+    <p class="flabel" id="lset-dec-l">Decisions</p><p class="hint">Accepted precedents and conventions, one line each, with date and who.</p><ul class="lsdecs" id="lset-decs" aria-labelledby="lset-dec-l"></ul>
+    ${hh ? '<div class="lsdecadd"><input class="inp" id="lset-dec-new" maxlength="500" autocomplete="off" aria-label="New decision" placeholder="Add a decision"><button type="button" class="btn" data-act="lset-dec-add">Add</button></div>' : ''}
+    ${C.BRIEF_FIELDS.map(x => `<label class="field"><span>${x.label}</span><textarea class="inp" id="lset-b-${x.key}" rows="3" maxlength="${C.BRIEF_MAX}" aria-describedby="lset-b-${x.key}-h"${hh ? '' : ' readonly'}>${esc(base.brief[x.key])}</textarea></label><p class="hint" id="lset-b-${x.key}-h">${esc(x.help)}</p>`).join('')}
+    <p class="hint">${row.brief_updated_at ? `Brief changed by ${esc(personName(row.brief_updated_by))} · ${ymd(new Date(row.brief_updated_at))}` : ''}</p>`;
+  lsetDecs(); lsetSync();
 }
-const lsetCur = () => ({ mode: (document.querySelector('[name="lset-am"]:checked') || {}).value || LSET.base.mode, e2e: $('#lset-e2e').checked, deploy: $('#lset-deploy').value, tg: $('#lset-tg').checked, stage: $('#lset-stage').checked, cap: $('#lset-cap') ? $('#lset-cap').value.trim() : LSET.base.cap });
+function lsetDecs() {
+  const d = LSET.decs, el = $('#lset-decs'); if (!el) return;
+  el.innerHTML = d.length ? d.map((x, i) => `<li><span>${esc(x)}</span>${LSET.hh ? `<button type="button" class="ib" data-act="lset-dec-x" data-i="${i}" aria-label="Remove decision ${i + 1}">${ic('x')}</button>` : ''}</li>`).join('') : '<li class="hint">No decisions yet.</li>';
+}
+function lsetDecAdd() {
+  const inp = $('#lset-dec-new'), l = C.briefLine(inp.value, ymd(new Date()), me().display_name);
+  if (!l) { inp.focus(); return; }
+  LSET.decs.push(l); inp.value = ''; lsetDecs(); lsetSync(); inp.focus();
+}
+const lsetCur = () => ({ mode: (document.querySelector('[name="lset-am"]:checked') || {}).value || LSET.base.mode, e2e: $('#lset-e2e').checked, deploy: $('#lset-deploy').value, tg: $('#lset-tg').checked, stage: $('#lset-stage').checked, cap: $('#lset-cap') ? $('#lset-cap').value.trim() : LSET.base.cap,
+  brief: Object.assign({ decisions: LSET.decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#lset-b-' + x.key) ? $('#lset-b-' + x.key).value.trim() : LSET.base.brief[x.key] }))) });
 function lsetSync() {
   if (!LSET || !$('#lset-e2e')) return;
   const c = lsetCur(), dirty = JSON.stringify(c) !== JSON.stringify(LSET.base);
@@ -1833,6 +1877,7 @@ async function saveListSettings() {
   if (c.mode !== b.mode) Object.assign(ch, { mode: c.mode, expected: LSET.expected });
   if (LSET.hh && (c.e2e !== b.e2e || c.deploy !== b.deploy || c.tg !== b.tg || c.stage !== b.stage)) ch.intake = { e2e: c.e2e, deploy: c.deploy, tg: c.tg, stage: c.stage };
   if (LSET.hh && c.cap !== b.cap) ch.cap = capN;
+  if (LSET.hh && JSON.stringify(c.brief) !== JSON.stringify(b.brief)) ch.brief = c.brief;
   LSET.saving = true; $('#lset-save').disabled = true; $('#lset-status').textContent = 'Saving…';
   const r = await D.saveListSettings(LSET.id, ch);
   LSET.saving = false;
@@ -2032,6 +2077,8 @@ document.addEventListener('click', async e => {
     }
     case 't-theirs': { const x = TS.theirs; $('#t-title').value = x.title; const d = showRaw(); d.value = x.notes; TS.notes0 = x.notes; TS.fn0 = d.value; TS.conflict = false; $('#t-conflict').hidden = true; TS.snap = snapTask(); $('#task-save').textContent = 'Save'; onTaskInput(); toast('Kept their version.'); break; }
     case 'lset-save': saveListSettings(); break;
+    case 'lset-dec-add': lsetDecAdd(); break;
+    case 'lset-dec-x': LSET.decs.splice(Number(b.dataset.i), 1); lsetDecs(); lsetSync(); { const n = document.querySelector('#lset-decs [data-act=lset-dec-x]'); (n || $('#lset-dec-new') || $('#lset-b-naming')).focus(); } break;
     case 't-au-reset': { const s = $('#t-au'); if (s) { s.value = 'inherit'; changeAutonomy('inherit'); } break; }
     case 't-decide': {
       /* the answer with every other change of the sheet in one versioned write, then close with Undo (web: the [data-dec] click) */

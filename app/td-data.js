@@ -1180,7 +1180,7 @@
     async function listSettings(id) {
       const hh = !!(me && me.is_household);
       const [row, targets, bud] = await Promise.all([
-        rest('GET', 'lists?select=id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report&id=eq.' + id),
+        rest('GET', 'lists?select=id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at&id=eq.' + id),
         hh ? rest('GET', 'deploy_targets?select=key,label&order=label') : Promise.resolve({ ok: true, json: [] }),
         hh ? rpc('budget_status', { p_list: id }) : Promise.resolve({ ok: true, json: [] }),
       ]);
@@ -1189,12 +1189,14 @@
       const cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
       return { ok: true, row: row.json[0], targets: targets.ok ? targets.json : [], cap: cap ? Number(cap.cap_usd) : null, spent: cap ? Number(cap.spent_usd || 0) : null, budgetErr: bud.ok ? null : bud.err.message };
     }
-    // saves only what changed: { mode, expected, intake: { e2e, deploy, tg, stage }, cap (number or null) }; returns the errors in order
+    // saves only what changed: { mode, expected, intake: { e2e, deploy, tg, stage }, cap (number or null), brief: { decisions, naming,
+    // instruction, concept } (T23, set_list_brief, household people) }; returns the errors in order. New list uses it too (expected guided)
     async function saveListSettings(id, ch) {
       const errs = [];
       if (ch.mode) { const r = await setAutonomy('list', id, ch.mode, ch.expected); if (!r.ok) errs.push(r.now ? 'Someone set the mode to ' + C.AUTONOMY_NAME[r.now] + ' meanwhile. Save again to replace it.' : r.err.message); }
       if (ch.intake) { const i = ch.intake, r = await rpc('set_intake', { p_kind: 'list', p_id: id, p_e2e_self: i.e2e, p_deploy_target: i.deploy || null, p_notify_telegram: i.tg, p_stage_report: i.stage }); if (!r.ok) errs.push(r.err.message); }
       if (ch.cap !== undefined) { const r = await rpc('set_budget', { p_list: id, p_period: 'month', p_cap: ch.cap }); if (!r.ok) errs.push(r.err.message); }
+      if (ch.brief) { const b = ch.brief, r = await rpc('set_list_brief', { p_list: id, p_decisions: b.decisions || '', p_naming: b.naming || '', p_instruction: b.instruction || '', p_concept: b.concept || '' }); if (!r.ok) errs.push(r.err.message); }
       return { ok: !errs.length, errs };
     }
     const api = {

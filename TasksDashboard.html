@@ -271,6 +271,8 @@ select{appearance:none;-webkit-appearance:none;min-height:30px;padding:0 30px 0 
 .card .done:hover{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#FFFFFF;box-shadow:0 0 16px -2px var(--glow)}
 .card .done .ic{width:14px;height:14px;stroke-width:2.6}
 .card .details{grid-column:1/-1;display:grid;gap:6px;padding:8px 2px 4px;border-top:1px solid var(--hair);margin-top:2px;color:var(--ink2);cursor:default;font-size:13px}
+.card .details.cz-top{border-top:0;border-bottom:1px solid var(--hair);margin:0 0 2px;padding:4px 2px 6px}
+.card .details.cz-bot{border-top-style:dashed}
 .card .details .row{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--ink3)}
 .card .details .tags{display:flex;gap:4px;flex-wrap:wrap}
 .card .details .tags button{font-size:12px;padding:0 8px;min-height:22px;border-radius:999px}
@@ -708,6 +710,68 @@ dialog legend,.welcome legend{padding:0 var(--s2);font:500 13px var(--ui);color:
 .cl-lists{display:grid;gap:var(--s2);padding-left:22px}
 .cl-lists .n{font-size:12px;color:var(--ink3)}
 @media (max-width:480px){.cl-grid{grid-template-columns:1fr}}
+/* harness configurations T17 (UI spec p3 (d)): Card layout tabs, zones with blocks, live preview; phone: preview above, zone select */
+dialog:has(form.cl2){width:min(1080px,calc(100vw - 32px));max-width:none}
+dialog form.cl2{width:auto;min-width:0}
+.cl2 .cl-sub{margin:-4px 0 var(--s3)}
+.cl-tabs{display:inline-flex;border:1px solid var(--hair2);border-radius:var(--r);overflow:hidden;margin-bottom:var(--s4)}
+.cl-tabs [role=tab]{border:0;border-right:1px solid var(--hair);border-radius:0;min-height:36px;padding:0 16px;font:500 14px var(--ui);background:transparent;color:var(--ink2)}
+.cl-tabs [role=tab]:last-child{border-right:0}
+.cl-tabs [role=tab][aria-selected="true"]{background:var(--accent-bg);color:var(--accent-ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.cl-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid var(--hair);border-radius:var(--r);max-height:min(62vh,640px);overflow:hidden}
+.cl-body[hidden],.cl-opts[hidden]{display:none}
+.cl-list{overflow:auto;padding:var(--s4) var(--s5);border-right:1px solid var(--hair)}
+.cl-prev{overflow:auto;padding:var(--s4) var(--s5);background:var(--well)}
+.cl-fixed{display:flex;align-items:center;gap:var(--s3);padding:8px 10px;border:1px dashed var(--hair2);border-radius:var(--r);color:var(--ink2);font:500 13px var(--ui)}
+.cl-fixed .lk{display:inline-flex;gap:6px;flex-wrap:wrap}
+.cl-fixed .lk span{padding:0 8px;line-height:22px;border:1px solid var(--hair2);border-radius:var(--r-sm);background:var(--solid)}
+.cl-zone{margin-top:var(--s4)}
+.cl-zh{font:500 14px var(--ui)}.cl-zh .n{font:400 12px var(--font);color:var(--ink3)}
+.cl-zl{list-style:none;margin:6px 0 0;padding:4px;min-height:48px;border:1px solid var(--hair);border-radius:var(--r)}
+.cl-zl.over{border-color:var(--accent);background:var(--accent-bg)}
+.cl-empty{display:flex;align-items:center;min-height:38px;padding:0 10px;color:var(--ink3);font-size:13px}
+.cl-blk{display:flex;align-items:center;gap:var(--s3);min-height:40px;padding:2px 4px 2px 6px;border-radius:var(--r);background:var(--solid);border:1px solid var(--hair);margin-top:4px;cursor:grab}
+.cl-blk:first-child{margin-top:0}
+.cl-blk:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.cl-blk.dragging{opacity:.45}
+.cl-blk.moved{box-shadow:inset 3px 0 0 var(--accent)}
+.cl-blk.off .bn{text-decoration:line-through;color:var(--ink3)}
+.cl-blk .grip{color:var(--ink3);flex:none}
+.cl-blk .bn{flex:1;min-width:0;font:500 14px var(--ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-blk button{min-height:32px;padding:0 8px;font-size:13px}
+.cl-blk .cl-mv{width:32px;padding:0}
+.cl-blk .cl-eye{width:74px}
+.cl-blk .cl-eye[aria-pressed="false"]{color:var(--ink3)}
+.cl-always{width:74px;text-align:center;font-size:12px;color:var(--ink3)}
+.cl-zsel{display:none}
+.cl-pvh{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin-bottom:var(--s3);font:500 14px var(--ui)}
+.cl-seg{display:inline-flex;border:1px solid var(--hair2);border-radius:var(--r);overflow:hidden}
+.cl-seg button{border:0;border-radius:0;min-height:30px;padding:0 12px;font-size:13px}
+.cl-seg button[aria-pressed="true"]{background:var(--accent-bg);color:var(--accent-ink)}
+.cl-pq{border-top:3px solid var(--c, var(--accent));padding:var(--s2) var(--s3) var(--s3);background:var(--solid);border-radius:var(--r)}
+.cl-pq[data-q=A]{--c:var(--qa)}.cl-pq[data-q=B]{--c:var(--qb)}.cl-pq[data-q=C]{--c:var(--qc)}.cl-pq[data-q=D]{--c:var(--qd)}
+.cl-pqh{font:500 13px var(--ui);color:var(--ink2)}
+.cl-ptask{background:var(--solid);border:1px solid var(--hair2);border-radius:var(--r-lg);padding:var(--s3) var(--s4)}
+.cl-ptask .fx{display:flex;gap:var(--s3);font:500 12px var(--ui);color:var(--ink3);padding-bottom:var(--s2);border-bottom:1px solid var(--hair)}
+.cl-ptask .fx span:last-child{margin-left:auto}
+.cl-pi{padding:6px 8px;margin-top:6px;border:1px solid var(--hair);border-radius:var(--r-sm);font-size:13px;color:var(--ink2)}
+.cl-pi.title{font:500 18px var(--serif);border:0;padding:6px 0;color:var(--ink)}
+.cl-pi.ph{border-style:dashed;color:var(--ink3)}
+.cl-pi.flash{border-color:var(--accent);background:var(--accent-bg)}
+.cl-pz{border-top:1px dashed var(--hair2);padding-bottom:6px}.cl-pz:empty{min-height:8px}
+.cl-st{font-size:12px;color:var(--warn-ink, var(--ink3));align-self:center}
+@media (max-width:700px){
+  .cl-body{display:flex;flex-direction:column;max-height:none;overflow:visible}
+  .cl-prev{order:-1;border-bottom:1px solid var(--hair)}
+  .cl-list{border-right:0;overflow:visible;padding:var(--s3)}
+  .cl-blk{min-height:48px;flex-wrap:wrap}
+  .cl-blk button,.cl-zsel{min-height:44px}
+  .cl-blk .cl-mv{width:44px}
+  .cl-zsel{display:block;flex:1 1 90px;min-width:0}
+  .cl-blk .bn{flex:1 1 calc(100% - 32px)}
+  .cl-blk .cl-eye,.cl-always{width:auto;min-width:64px}
+  .cl-kbd{display:none}
+}
 /* round 3, then version 3 (2026-10-29): the welcome card, pinned under the profile menu (which gets an accent ring while it is
    open); one long card with two forms: the body scrolls inside it, the action row stays at the bottom */
 .welcome{position:fixed;z-index:25;width:min(460px,calc(100vw - 16px));display:flex;flex-direction:column;background:var(--solid);border:1px solid var(--hair2);border-radius:var(--r-xl);
@@ -1440,6 +1504,18 @@ dialog label.am-mode .ln{color:var(--ink2)}
 dialog label.am-mode .why{color:var(--warn-ink);font:500 12px var(--ui)}
 dialog label.am-mode:has(input:checked){background:var(--accent-bg);border-color:var(--accent-line);box-shadow:inset 3px 0 0 var(--accent)}
 dialog label.am-mode:has(input:disabled){cursor:not-allowed;opacity:.7}
+.lsd .ls-lab{margin-top:var(--s4);font:500 14px var(--ui)}
+.lsd .ls-decs{list-style:none;margin:6px 0 0;padding:0;border:1px solid var(--hair);border-radius:var(--r)}
+.lsd .ls-decs li{display:flex;align-items:center;gap:var(--s3);padding:7px 8px 7px 12px;border-top:1px solid var(--hair);font-size:13px}
+.lsd .ls-decs li:first-child{border-top:0}
+.lsd .ls-decs li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.lsd .ls-decs .ls-decx{width:30px;min-height:30px;padding:0}
+.lsd .ls-decadd{display:flex;gap:var(--s3);margin-top:var(--s3)}
+.lsd .ls-decadd input{flex:1}
+.nl-more{margin-top:var(--s4);border:1px solid var(--hair);border-radius:var(--r);padding:0 var(--s4)}
+.nl-more summary{min-height:38px;display:flex;align-items:center;cursor:pointer;font:500 14px var(--ui)}
+.nl-more[open]{padding-bottom:var(--s4)}
+.nl-more textarea{width:100%;min-height:64px;padding:8px 12px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--solid);color:var(--ink);font:400 14px var(--font)}
 .lsd .money{display:flex;align-items:center;gap:6px;max-width:200px}
 .lsd .money input{flex:1}
 .lsd textarea{width:100%;min-height:76px;padding:8px 12px;border:1px solid var(--hair2);border-radius:var(--r);background:var(--solid);color:var(--ink);font:400 14px var(--font)}
@@ -1726,6 +1802,22 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     ai_brain: { does: 'Agents decide on their own and log every decision.', you: 'Only E0 comes to you.' },
   };
   const AUTONOMY_HOUSEHOLD = 'Only household members can set this.';
+  // harness configurations T23: the list brief (db/032 lists.brief_*, written only through set_list_brief by household people; homeos-agent
+  // reads it). Decisions: one line each, "yyyy-mm-dd · who · text", the newest last; a precedent becomes a line only through an ask-first card
+  const BRIEF_FIELDS = [
+    { key: 'naming', col: 'brief_naming', label: 'Naming convention', help: 'How tasks, branches and files in this list are named.' },
+    { key: 'instruction', col: 'brief_instruction', label: 'Base project instruction', help: 'What the list is for, what done means, rules to follow.' },
+    { key: 'concept', col: 'brief_concept', label: 'Concept of work', help: 'What agents may decide alone under AI Brain and Guided, and what always comes to you.' }];
+  const BRIEF_MAX = 8000;
+  const briefLines = text => String(text || '').split('\n').map(x => x.trim()).filter(Boolean);
+  // a new Decisions line: control characters and line breaks out, the day and who in front
+  function briefLine(text, day, who) {
+    const t = String(text || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
+    return t ? [day, String(who || '').replace(/[\u0000-\u001f\u007f·\s]+/g, ' ').trim() || 'someone', t].join(' · ') : '';
+  }
+  // the four texts set_list_brief takes, from a lists row
+  const briefOf = row => ({ decisions: (row && row.brief_decisions) || '', naming: (row && row.brief_naming) || '', instruction: (row && row.brief_instruction) || '', concept: (row && row.brief_concept) || '' });
+  const briefCount = b => briefLines(b.decisions).length + BRIEF_FIELDS.filter(x => String(b[x.key] || '').trim()).length;
   const listModeOf = l => l && AUTONOMY_MODES.includes(l.autonomy) ? l.autonomy : 'guided';
   const itemModeOf = t => t && AUTONOMY_MODES.includes(t.autonomy) ? t.autonomy : 'inherit';
   // what a task inherits: { mode, from: 'parent' | 'list', parent (the task it comes from) }. ctx: { parentOf: id -> parent id,
@@ -1990,8 +2082,17 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   // Round 4: source = the category badge on cards and Sources in the task window (off by default; never with one list selected)
   // task links: group (children under their parent; off by default), waiting (open predecessors), progress (n/m). No priority:
   // a task's priority is its position in its quadrant (priority by position, 2026-10-29)
+  // harness configurations T17: Card layout's tabs "On the board" and "Open task" place blocks in three zones, Top, Main and Bottom,
+  // in order, and hide some (off). Board card: facts, description and one block per tag list ('tl:<id>'; 'tl:*' marks where a new tag
+  // list goes); its fixed part is the header row (number, title, badges, done). Open task: the blocks between the fixed header (heading,
+  // position, title) and the fixed actions; the Decision section is never hidden. Same for all lists (prefs.cardLayout.zones)
+  const LAYOUT_ZONES = ['top', 'main', 'bottom'];
+  const LAYOUT_BLOCKS = { board: ['facts', 'description'], task: ['autonomy', 'decision', 'format', 'description', 'dates', 'tags', 'links', 'sources'] };
+  const LAYOUT_FIXED = { board: [], task: ['decision'] };
+  const LAYOUT_DEFAULTS = { board: { top: [], main: ['facts', 'tl:*', 'description'], bottom: [], off: [] },
+    task: { top: ['autonomy', 'decision', 'format'], main: ['description', 'dates', 'tags'], bottom: ['links', 'sources'], off: [] } };
   const CARD_LAYOUT_DEFAULTS = { description: true, number: true, arrow: true, end: true, created: false, creator: false, source: false,
-    group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100 };
+    group: false, waiting: true, progress: true, tags: 'all', tagLists: [], autoCollapse: 100, zones: LAYOUT_DEFAULTS };
   const CARD_FIELDS = ['description', 'number', 'arrow', 'end', 'created', 'creator', 'source', 'group', 'waiting', 'progress'];
   // tags round (2026-10-29): tagListOrder = my one free order of every tag list, own and shared (v2, tagListOrderV = TAG_LIST_ORDER_V;
   // before it: only the shared ones, migrated once by tagListPrefsMigrate); tagListFavs = my favourite (★) tag lists, any number, own
@@ -2075,7 +2176,62 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     const ids = tagListIds ? new Set(tagListIds) : null;
     if (strs(raw.tagLists)) c.tagLists = raw.tagLists.filter(id => !ids || ids.has(id));
     if (Number.isInteger(raw.autoCollapse) && raw.autoCollapse >= 0 && raw.autoCollapse <= 5000) c.autoCollapse = raw.autoCollapse;
+    if (isObj(raw.zones)) Object.keys(LAYOUT_BLOCKS).forEach(kind => { const z = readZones(raw.zones[kind], kind, ids); if (z) c.zones[kind] = z; });
     return c;
+  }
+  // T17: one kind's stored zones, checked for shape: known blocks only, each once; a tag list block only for a known tag list (when
+  // the caller knows them); null keeps the defaults
+  function readZones(raw, kind, tagListIds) {
+    if (!isObj(raw)) return null;
+    const known = new Set(LAYOUT_BLOCKS[kind]), seen = new Set(), out = { off: [] };
+    const ok = b => typeof b === 'string' && !seen.has(b) && (known.has(b) || (kind === 'board' && (b === 'tl:*' || (/^tl:[\w-]{1,64}$/.test(b) && (!tagListIds || tagListIds.has(b.slice(3)))))));
+    for (const k of LAYOUT_ZONES) { out[k] = []; if (!Array.isArray(raw[k])) return null; raw[k].forEach(b => { if (ok(b)) { seen.add(b); out[k].push(b); } }); }
+    out.off = Array.isArray(raw.off) ? raw.off.filter(b => typeof b === 'string' && seen.has(b) && b !== 'tl:*' && !LAYOUT_FIXED[kind].includes(b)) : [];
+    out.off = [...new Set(out.off)];
+    return out;
+  }
+  // T17: the zones to draw: stored order, every block of the kind once (a missing one at the end of its default zone), each tag list
+  // block (tagListIds: the lists Card layout offers) where 'tl:*' stands, else after the last tag list block, else at the end of Main
+  function layoutZones(layout, kind, tagListIds) {
+    const D = LAYOUT_DEFAULTS[kind], z = ((layout || CARD_LAYOUT_DEFAULTS).zones || {})[kind] || D;
+    const tls = kind === 'board' ? (tagListIds || []).map(id => 'tl:' + id) : [], live = new Set(LAYOUT_BLOCKS[kind].concat(tls));
+    const out = { top: [], main: [], bottom: [] }, seen = new Set();
+    let star = null;
+    LAYOUT_ZONES.forEach(k => (z[k] || []).forEach(b => {
+      if (b === 'tl:*') { if (!star) star = { k, i: out[k].length }; return; }
+      if (live.has(b) && !seen.has(b)) { seen.add(b); out[k].push(b); }
+    }));
+    LAYOUT_BLOCKS[kind].forEach(b => { if (!seen.has(b)) { const k = LAYOUT_ZONES.find(x => D[x].includes(b)) || 'main'; out[k].push(b); seen.add(b); } });
+    const rest = tls.filter(b => !seen.has(b));
+    if (rest.length) {
+      if (!star) LAYOUT_ZONES.forEach(k => out[k].forEach((b, i) => { if (/^tl:/.test(b)) star = { k, i: i + 1 }; }));
+      if (!star) star = { k: 'main', i: out.main.length };
+      out[star.k].splice(star.i, 0, ...rest); rest.forEach(b => seen.add(b));
+    }
+    const off = (z.off || []).filter(b => seen.has(b) && !LAYOUT_FIXED[kind].includes(b));
+    return { top: out.top, main: out.main, bottom: out.bottom, off };
+  }
+  // T17: zones drawn by layoutZones back to what is stored: a board keeps 'tl:*' after its last tag list block (new tag lists join them)
+  function layoutStore(zones, kind) {
+    const out = { top: zones.top.slice(), main: zones.main.slice(), bottom: zones.bottom.slice(), off: zones.off.filter(b => !LAYOUT_FIXED[kind].includes(b)) };
+    if (kind === 'board') {
+      let at = null; LAYOUT_ZONES.forEach(k => out[k].forEach((b, i) => { if (/^tl:/.test(b)) at = { k, i: i + 1 }; }));
+      if (!at) at = { k: 'main', i: out.main.indexOf('description') < 0 ? out.main.length : out.main.indexOf('description') };
+      out[at.k].splice(at.i, 0, 'tl:*');
+    }
+    return out;
+  }
+  // T17: move a block one step (up, down: within its zone, across a zone edge; left, right: to the end of the zone before or after) or
+  // to a zone before another block (to). Returns new zones; the input is not changed
+  function layoutMove(zones, b, dir, to) {
+    const z = { top: zones.top.slice(), main: zones.main.slice(), bottom: zones.bottom.slice(), off: zones.off.slice() };
+    const k = LAYOUT_ZONES.find(x => z[x].includes(b)); if (!k) return z;
+    const arr = z[k], i = arr.indexOf(b), zi = LAYOUT_ZONES.indexOf(k);
+    if (to) { arr.splice(i, 1); const t = z[to.zone], j = to.before ? t.indexOf(to.before) : -1; if (j < 0) t.push(b); else t.splice(j, 0, b); return z; }
+    if (dir === 'up') { if (i > 0) { arr.splice(i, 1); arr.splice(i - 1, 0, b); } else if (zi > 0) { arr.splice(i, 1); z[LAYOUT_ZONES[zi - 1]].push(b); } }
+    if (dir === 'down') { if (i < arr.length - 1) { arr.splice(i, 1); arr.splice(i + 1, 0, b); } else if (zi < 2) { arr.splice(i, 1); z[LAYOUT_ZONES[zi + 1]].unshift(b); } }
+    if (dir === 'left' || dir === 'right') { const nk = LAYOUT_ZONES[zi + (dir === 'left' ? -1 : 1)]; if (nk) { arr.splice(i, 1); z[nk].push(b); } }
+    return z;
   }
   // a card is expanded when the mode says so, unless flipped. Round 4, item 4: autoCollapse no longer collapses a card (it only
   // acted in Expanded mode, and the default is Collapsed); it cuts the description of an open card instead (descClip)
@@ -3155,7 +3311,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
@@ -3163,7 +3319,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     LIST_ROLES, TAG_LIST_ROLES, tagLabels, isMine, tagDiff, mergeTagRows, tagPollFilter, membershipActions, canEditTags, defaultAddList,
     ASSIGNEE_DEFAULT, isHomeosList, homeosAssigneeTag, assigneeOnListChange,
     createdList, listNameClash, freeListName, localStamp, backupLine, deleteLosers, isSystemList, LIST_PANEL_MAX, LIST_BAR_DEFAULT, readListBar, listBarOf, listPanels, listBarZone, listBarMove, listBarStep, listBarCount, listBarSetTwo, listBarOrder, VIEWS, dueSoon, mergeTagDefs, tagDefsFilter,
-    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
+    CARD_LAYOUT_DEFAULTS, CARD_FIELDS, readCardLayout, LAYOUT_ZONES, LAYOUT_BLOCKS, LAYOUT_FIXED, LAYOUT_DEFAULTS, readZones, layoutZones, layoutStore, layoutMove, cardExpanded, descClip, cardFacts, cardTagIds, showSource, cardLayoutTagLists,
     TAG_LIST_RIGHTS, tagListRights, moveTargets, tagGroups, tagFilterHit, dueMatch, DUE_KINDS, FILTERS_DEFAULTS, readFilters, readFilterBar, defaultFilterBar, mineSuggestions, noticeText, canShare, menuMove,
     tagListReorder, sortWrites, tagGroupOpen, tagSearch, TAG_LIST_ORDER_V, tagListOwnSorts, tagListPrefsMigrate,
     weekStart, isoWeek, weekFromKey, weekLabel, weekRange, WEEKS_MAX, weekSelect, reviewPeriod, reviewEntries, reviewGroups, reviewFileName,
@@ -4066,9 +4222,16 @@ function cardHtml(t, q, g) {
   const num = L.number ? '<button class="ref" data-copy="' + t.id + '" aria-label="Copy number ' + ref(t) + '">' + ref(t) + '</button>' : '<span></span>';
   const tagIds = cardTags(t);
   const facts = C.cardFacts(t, L).map(factText);
+  // harness configurations T17: the blocks in Card layout's zones and order ("On the board"); tags go in their tag list's block, a tag
+  // of a list Card layout does not offer follows the last tag list block
+  const Z = boardZones(), off = new Set(Z.off), byTl = {}, loose = [];
+  tagIds.forEach(x => { const k = 'tl:' + (TAG[x] && TAG[x].tag_list_id); if (Z.top.concat(Z.main, Z.bottom).includes(k)) (byTl[k] = byTl[k] || []).push(x); else loose.push(x); });
+  const lastTl = Z.top.concat(Z.main, Z.bottom).filter(b => /^tl:/.test(b)).pop();
+  const tagsOf = b => (byTl[b] || []).concat(b === lastTl || !lastTl && b === 'facts' ? loose : []);
   // round 4, item 5: a small card shows what Card layout switches on too: the number in front, then one thin line of facts and tags
   if (!expanded) {
-    const sub = facts.map(x => '<span>' + esc(x) + '</span>').join('') + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('');
+    const sub = C.LAYOUT_ZONES.flatMap(k => Z[k]).filter(b => !off.has(b)).map(b => (b === 'facts' ? facts.map(x => '<span>' + esc(x) + '</span>').join('') : '') +
+      (b === 'facts' || /^tl:/.test(b) ? tagsOf(b).map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') : '')).join('');
     return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + meta + arrow + done + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
   }
   // no "urgent (manual)" badge (Maksym, 2026-10-29: not needed). The pin (urgent_pin) is still set by a drag across the urgency
@@ -4076,16 +4239,21 @@ function cardHtml(t, q, g) {
   const pin = '<span></span>';
   // round 4, item 4: an open card shows the first paragraph of the description, cut at autoCollapse characters, then Show more (st.more, this session)
   const more = st.more.has(t.id), dsc = C.cardDesc(t.notes, L.autoCollapse, more);
-  const body = (facts.length ? '<div class="row">' + facts.map(x => '<span>' + esc(x) + '</span>').join('') + '</div>' : '') +
-    (tagIds.length ? '<div class="tags">' + tagIds.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '') +
-    (L.description && t.notes ? '<div class="md">' + C.renderMd(dsc.md) + '</div>' +
-      (dsc.hasMore ? '<button type="button" class="more" data-more="' + t.id + '" aria-expanded="' + more + '">' + (more ? 'Show less' : 'Show more') + '</button>' : '') : '');
-  return open + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
-    (body ? '<div class="details">' + body + '</div>' : '') + '</div>';
+  const blk = b => off.has(b) ? '' : b === 'facts' ? (facts.length ? '<div class="row">' + facts.map(x => '<span>' + esc(x) + '</span>').join('') + '</div>' : '') +
+      (!lastTl && loose.length ? '<div class="tags">' + loose.map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '')
+    : b === 'description' ? (L.description && t.notes ? '<div class="md">' + C.renderMd(dsc.md) + '</div>' +
+      (dsc.hasMore ? '<button type="button" class="more" data-more="' + t.id + '" aria-expanded="' + more + '">' + (more ? 'Show less' : 'Show more') + '</button>' : '') : '')
+    : tagsOf(b).length ? '<div class="tags" data-tl="' + esc(b.slice(3)) + '">' + tagsOf(b).map(x => '<span class="tagtxt">' + esc(LABEL[x]) + '</span>').join('') + '</div>' : '';
+  const zone = k => Z[k].map(blk).join('');
+  const top = zone('top'), body = zone('main'), bot = zone('bottom');
+  return open + (top ? '<div class="details cz-top">' + top + '</div>' : '') + num + '<span class="t">' + mdInline(t.title) + '</span>' + badges + pin + meta + arrow + done +
+    (body ? '<div class="details">' + body + '</div>' : '') + (bot ? '<div class="details cz-bot">' + bot + '</div>' : '') + '</div>';
 }
 // the faded parent of children whose parent is in another quadrant (not a card: no drag, not counted); it opens the parent
 const ghostHtml = p => '<button type="button" class="lk-ghost ' + p.q + '" data-open="' + p.id + '" aria-label="Parent: ' + esc(plain(p.title)) + ', in ' + QN[p.q] + '"><span aria-hidden="true">↑</span><span class="t">' + mdInline(p.title) + '</span><span class="gq">' + QN[p.q] + '</span></button>';
 let RLX = null; // the link index of the current render (linkIx)
+// T17: the board card's zones (Card layout "On the board") over the tag lists Card layout offers
+const boardZones = () => C.layoutZones(cardLayout, 'board', C.cardLayoutTagLists(TAG_LISTS, me && me.id).map(l => l.id));
 // priority by position: with Group by parent on, a quadrant's cards in the order the board draws them (C.groupedIds)
 const byShownOrder = cards => { if (!(cardLayout.group && RLX)) return cards; const by = {}; cards.forEach(t => { by[t.id] = t; }); return C.groupedIds(cards, RLX.ix, RLX.by).map(id => by[id]); };
 // the task window's previous / next: the card's quadrant in the board's shown order (filters, grouping)
@@ -4872,7 +5040,8 @@ function openTask(id, quad, opts) {
   // close it), a task awaiting its check (settle.js would read it as closed by hand), a read-only, done or new task, or a preview
   const doneOn = !!t && editable && !o.preview && !C.decisionOf(t) && t.status !== 'waiting' && !C.awaitingCheck(t) && !C.CLOSED.includes(t.status);
   const doneHtml = doneOn ? '<input type="checkbox" class="fdone" id="fdone" aria-label="Mark done" title="Mark done">' : '';
-  const formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml + '</div>' +
+  const TZ = C.layoutZones(cardLayout, 'task');
+  let formHtml = '<form method="dialog"><div class="tk-head"><div class="tk-tl"><h2 class="tk-h" id="tk-h" tabindex="-1">' + (t ? (editable ? 'Edit task' : 'Task') : 'New task') + '</h2>' + contHtml + '</div>' +
     '<span class="tk-pos" id="tk-pos"' + (t ? ' data-q="' + t.q + '"' : '') + (pos ? '' : ' hidden') + '>' + esc(pos || '') + '</span></div>' +
     (o.notice ? '<p class="note" role="status">' + esc(o.notice) + '</p>' : '') +
     (t && C.awaitingCheck(t) ? '<p class="note">Waits for your check: answer its check card.</p>' : '') +
@@ -4881,20 +5050,35 @@ function openTask(id, quad, opts) {
     '<div class="flabel" id="ft-l">Title</div><div class="ftrow"><div class="rt one" id="ft" contenteditable="' + editable + '" role="textbox" aria-labelledby="ft-l">' + mdInline(dr.title !== undefined ? dr.title : t ? t.title : '') + '</div>' + doneHtml + '</div><div class="err" id="fe" aria-live="polite">' + esc(o.error || '') + '</div>' +
     // one row (Anastasiia, 2026-11-07): formatting on the left, the quadrant buttons centred, the number and facts on the right; on a
     // decision card the quadrant buttons are on the Decision row instead
-    autoHtml + decHtml + '<div class="fbar has-q">' + fmtHtml + quadHtml + whoHtml + '</div>' +
-    '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
-    '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>' +
-    // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
-    // position in its quadrant (2026-10-29)
-    '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
+    tzone('top') + tzone('main') + tzone('bottom') +
+    '<div class="actions">';
+  // harness configurations T17: the window's blocks in Card layout's zones and order ("Open task"); a hidden block stays in the form
+  // (hidden), so Save reads it as before. The heading, position, title and actions are fixed
+  function tblock(b) {
+    switch (b) {
+      case 'autonomy': return autoHtml;
+      case 'decision': return decHtml;
+      case 'format': return '<div class="fbar has-q">' + fmtHtml + quadHtml + whoHtml + '</div>';
+      case 'description': return '<div class="flabel-row"><div class="flabel" id="fn-l">Description</div></div>' + readHtml +
+        '<textarea class="rt fraw" id="fn" rows="3" aria-labelledby="fn-l"' + (readFirst ? ' hidden' : '') + (editable ? '' : ' readonly') + '>' + esc(notesBase) + '</textarea>';
+      // List, Start and End share one row (stacked on a phone); Start is the Timeline's bar start. No Priority: a task's priority is its
+      // position in its quadrant (2026-10-29)
+      case 'dates': return '<div class="frow"><div><label>List<select id="fl"' + ro + '>' + listSel + '</select></label><div class="err" id="fle" aria-live="polite"></div></div>' +
     '<div><label>Start<input id="fsd" type="datetime-local"' + ro + ' value="' + dtl(start) + '"></label><div class="err" id="fsde" aria-live="polite"></div></div>' +
-    '<div><label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div></div></div>' +
-    // U1, U6, U8: no "Tags" label; a search box over the groups; the groups scroll inside a box of about 40% of the window's height
-    '<div class="tagpick"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' +
-    '<div class="tagbox" role="group" aria-label="Tags"></div></div>' +
-    (LINKS_READY ? '<div class="flabel" id="lk-l">Links</div><div class="links" id="lk" role="group" aria-labelledby="lk-l"></div>' : '') +
-    (t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '') +
-    '<div class="actions">' + (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) && !locked ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
+    '<div><label>End<input id="fd" type="datetime-local"' + ro + ' value="' + (dl ? new Date(dl.getTime() - dl.getTimezoneOffset() * 6e4).toISOString().slice(0, 16) : '') + '"></label><div class="err" id="fde" aria-live="polite"></div></div></div>';
+      // U1, U6, U8: no "Tags" label; a search box over the groups; the groups scroll inside a box of about 40% of the window's height
+      case 'tags': return '<div class="tagpick"><input id="tg-q" class="tg-q" type="text" role="searchbox" placeholder="Find a tag" aria-label="Find a tag" autocomplete="off" spellcheck="false" maxlength="40">' +
+    '<div class="tagbox" role="group" aria-label="Tags"></div></div>';
+      case 'links': return LINKS_READY ? '<div class="flabel" id="lk-l">Links</div><div class="links" id="lk" role="group" aria-labelledby="lk-l"></div>' : '';
+      case 'sources': return t && src ? '<div class="flabel">Sources</div><div class="srcs n" id="srcs">Loading…</div>' : '';
+    }
+    return '';
+  }
+  function tzone(k) {
+    const h = TZ[k].map(b => { const x = tblock(b); return x ? '<div class="tzb" data-tb="' + b + '"' + (TZ.off.includes(b) ? ' hidden' : '') + '>' + x + '</div>' : ''; }).join('');
+    return h ? '<div class="tz tz-' + k + '">' + h + '</div>' : '';
+  }
+  formHtml += (t && editable && !t.doneAt ? '<button type="button" id="fcancel" class="quiet">Mark cancelled</button>' : '') + (t && canDo('delete', t) && !locked ? '<button type="button" id="fdel" class="quiet danger">Delete</button>' : '') +
     '<span class="sp"></span><button value="cancel">' + (editable ? 'Cancel' : 'Close') + '</button>' + (editable ? '<button id="fs" value="save">Save</button>' : '') + '</div></form>';
   // the carousel's read-only copy of a neighbour (opts.preview = the panel): the same window, its tags and links as static chips,
   // no ids, nothing wired; the panel itself is inert and aria-hidden (deckOpen)
@@ -5910,12 +6094,115 @@ function openSettings(kind) {
 }
 
 // round 3, adjustment 13: Card layout (prefs.cardLayout and cards.mode). Defaults are today's card.
+// harness configurations T17 (UI spec p3, board-pieces-spec.md (d)): three tabs. "On the board" and "Open task" place blocks in the
+// zones Top, Main and Bottom (drag, the ↑/↓ buttons, Alt+arrows, or the zone select on a phone) and show or hide them, with a live
+// preview; "Options" holds the switches the window always had. Same for all lists; Save stores it all in prefs.cardLayout, Reset puts
+// every tab back to the defaults (kept only with Save)
+const CL_BLOCK = { board: { facts: 'Facts (end, created, by)', description: 'Description' },
+  task: { autonomy: 'Autonomy', decision: 'Decision section', format: 'Formatting, quadrant, number', description: 'Description', dates: 'List, start and end', tags: 'Tags', links: 'Links', sources: 'Sources' } };
+const CL_ZN = { top: 'Top', main: 'Main', bottom: 'Bottom' };
+const CL_GRIP = '<svg class="grip" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+const CL_LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 function openCardLayout() {
-  const dlg = dialogShell('<form method="dialog" class="settings cl"><strong>Card layout</strong>' + cardLayoutFields('') +
-    '<div class="actions"><button type="button" id="cl-reset">Reset</button><span class="sp"></span><button value="cancel">Cancel</button><button id="cl-save" value="save">Save</button></div></form>', '#profile');
-  const form = dlg.querySelector('form');
-  dlg.querySelector('#cl-reset').onclick = wireCardLayout(form);
-  dlg.querySelector('#cl-save').onclick = () => { applyCardLayout(readCardLayoutForm(form)); toast('Card layout saved'); };
+  const tlIds = C.cardLayoutTagLists(TAG_LISTS, me && me.id).map(l => l.id);
+  const name = (kind, b) => /^tl:/.test(b) ? 'Tags: ' + ((TAG_LISTS[b.slice(3)] || {}).name || 'tag list') : CL_BLOCK[kind][b] || b;
+  const Z = { board: C.layoutZones(cardLayout, 'board', tlIds), task: C.layoutZones(cardLayout, 'task') };
+  const cs = { pv: 'edit', moved: null };
+  const tab = (id, label) => '<button type="button" role="tab" id="cl-t-' + id + '" data-cltab="' + id + '" aria-controls="cl-p-' + id + '" aria-selected="' + (id === 'board') + '" tabindex="' + (id === 'board' ? 0 : -1) + '">' + label + '</button>';
+  const zonePanel = id => '<div class="cl-body" id="cl-p-' + id + '" role="tabpanel" aria-labelledby="cl-t-' + id + '"' + (id === 'board' ? '' : ' hidden') + '><div class="cl-list">' +
+    '<div class="cl-fixed">' + CL_LOCK + '<span class="lk">' + (id === 'board' ? '<span>Number</span><span>Title</span><span>Badges</span><span>Done</span>' : '<span>List</span><span>ID</span><span>Title</span><span>Close</span>') + '</span></div>' +
+    '<p class="s-hint">Fixed: ' + (id === 'board' ? 'the first row of the card stays as it is.' : 'the heading, the number, the title and the buttons stay in place.') + '</p><div class="cl-zones" data-kind="' + id + '"></div>' +
+    '<p class="s-hint cl-kbd">Drag a block, or focus it and press Alt+↑/↓ to reorder and Alt+←/→ to change zone.</p></div>' +
+    '<div class="cl-prev"><div class="cl-pvh"><strong id="cl-pvh-' + id + '">Preview</strong>' + (id === 'task' ? '<span class="cl-seg" role="group" aria-label="Preview window"><button type="button" data-clpv="edit" aria-pressed="true">Edit</button><button type="button" data-clpv="create" aria-pressed="false">Create</button></span>' : '') + '</div>' +
+    '<div class="cl-pv" data-pv="' + id + '"></div></div></div>';
+  const dlg = dialogShell('<form method="dialog" class="settings cl cl2"><strong>Card layout</strong><p class="s-hint cl-sub">Same for all lists.</p>' +
+    '<div class="cl-tabs" role="tablist" aria-label="Where the layout applies">' + tab('board', 'On the board') + tab('task', 'Open task') + tab('opts', 'Options') + '</div>' +
+    zonePanel('board') + zonePanel('task') + '<div class="cl-opts" id="cl-p-opts" role="tabpanel" aria-labelledby="cl-t-opts" hidden>' + cardLayoutFields('') + '</div>' +
+    '<p class="sr" id="cl-live" aria-live="polite"></p>' +
+    '<div class="actions"><button type="button" id="cl-reset">Reset</button><span class="cl-st" id="cl-st" aria-live="polite"></span><span class="sp"></span><button value="cancel">Cancel</button><button id="cl-save" value="save">Save</button></div></form>', '#profile');
+  const form = dlg.querySelector('form'), q = s => dlg.querySelector(s), resetOpts = wireCardLayout(form);
+  const dirty = () => { q('#cl-st').textContent = 'Unsaved changes'; };
+  const zonesEl = kind => q('.cl-zones[data-kind=' + kind + ']');
+  function draw(kind, focus) {
+    const z = Z[kind], off = new Set(z.off), fixed = C.LAYOUT_FIXED[kind], seq = C.LAYOUT_ZONES.flatMap(k => z[k]);
+    zonesEl(kind).innerHTML = C.LAYOUT_ZONES.map(k => '<section class="cl-zone" aria-labelledby="cl-z-' + kind + k + '"><div class="cl-zh" id="cl-z-' + kind + k + '">' + CL_ZN[k] + ' <span class="n">' + z[k].length + (z[k].length === 1 ? ' block' : ' blocks') + '</span></div>' +
+      '<ul class="cl-zl" data-zone="' + k + '">' + (z[k].length ? z[k].map((b, i) => {
+        const on = !off.has(b), nm = esc(name(kind, b));
+        return '<li class="cl-blk' + (on ? '' : ' off') + (cs.moved === b ? ' moved' : '') + '" draggable="true" tabindex="0" data-b="' + esc(b) + '" aria-label="' + nm + ', ' + CL_ZN[k] + ', ' + (i + 1) + ' of ' + z[k].length + (on ? '' : ', hidden') + '" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight">' + CL_GRIP +
+          '<span class="bn">' + nm + '</span>' +
+          '<select class="cl-zsel" data-zsel="' + esc(b) + '" aria-label="Zone of ' + nm + '">' + C.LAYOUT_ZONES.map(x => '<option value="' + x + '"' + (x === k ? ' selected' : '') + '>' + CL_ZN[x] + '</option>').join('') + '</select>' +
+          (fixed.includes(b) ? '<span class="cl-always">Always</span>' : '<button type="button" class="cl-eye" data-eye="' + esc(b) + '" aria-pressed="' + on + '" aria-label="Show ' + nm + '">' + (on ? 'Shown' : 'Hidden') + '</button>') +
+          '<button type="button" class="cl-mv" data-mv="up" data-b2="' + esc(b) + '" aria-label="Move ' + nm + ' up" title="Move up"' + (seq[0] === b ? ' disabled' : '') + '>↑</button>' +
+          '<button type="button" class="cl-mv" data-mv="down" data-b2="' + esc(b) + '" aria-label="Move ' + nm + ' down" title="Move down"' + (seq[seq.length - 1] === b ? ' disabled' : '') + '>↓</button></li>';
+      }).join('') : '<li class="cl-empty">Drop a block here</li>') + '</ul></section>').join('');
+    preview(kind);
+    if (focus) { const el = zonesEl(kind).querySelector(focus); if (el) el.focus(); }
+  }
+  function preview(kind) {
+    const el = q('.cl-pv[data-pv=' + kind + ']'), z = Z[kind], off = new Set(z.off);
+    if (kind === 'board') {
+      q('#cl-pvh-board').textContent = 'Preview: card on the board';
+      const open = x => !x.doneAt && !x.deleted && !!LIST[x.list], t = all().find(x => open(x) && inList(x) && x.notes) || all().find(x => open(x) && inList(x)) || all().find(open) || null; // this list first (one with a description), else any list
+      let card = '<p class="n">No open task to preview.</p>';
+      if (t) {
+        const keep = { L: cardLayout, mode: st.cardMode, flip: st.flip };
+        try {
+          cardLayout = Object.assign({}, cardLayout, { zones: Object.assign({}, cardLayout.zones, { board: C.layoutStore(z, 'board') }) }); st.cardMode = 'expanded'; st.flip = new Set();
+          card = '<div class="cl-pq" data-q="' + t.q + '"><div class="cl-pqh"><span class="ql">' + t.q + '</span> ' + QN[t.q] + '</div>' +
+            cardHtml(t, t.q).replace(/ (data-[a-z-]+|draggable|tabindex|id)="[^"]*"/g, '') + '</div>';
+        } catch (e) { card = '<p class="n">Preview unavailable.</p>'; } finally { cardLayout = keep.L; st.cardMode = keep.mode; st.flip = keep.flip; }
+      }
+      el.innerHTML = '<div inert>' + card + '</div>';
+    } else {
+      const create = cs.pv === 'create', none = create ? ['autonomy', 'decision', 'sources'] : [];
+      q('#cl-pvh-task').textContent = create ? 'Preview: New task' : 'Preview: Edit task';
+      el.innerHTML = '<div class="cl-ptask" inert><div class="fx"><span>' + esc((LIST[st.list] || {}).name || 'List') + '</span><span>' + (create ? 'New' : '#142') + '</span><span aria-hidden="true">✕</span></div>' +
+        '<div class="cl-pi title">' + (create ? 'Title' : 'Task title') + '</div>' +
+        C.LAYOUT_ZONES.map(k => '<div class="cl-pz">' + z[k].filter(b => !off.has(b) && !none.includes(b)).map(b => '<div class="cl-pi' + (create ? ' ph' : '') + (cs.moved === b ? ' flash' : '') + '">' + esc(name('task', b)) + '</div>').join('') + '</div>').join('') + '</div>';
+    }
+  }
+  function changed(kind, b, zones) {
+    Z[kind] = zones; cs.moved = b; dirty(); draw(kind, '.cl-blk[data-b="' + b + '"]');
+    const k = C.LAYOUT_ZONES.find(x => Z[kind][x].includes(b));
+    q('#cl-live').textContent = name(kind, b) + ' moved to ' + CL_ZN[k] + ', position ' + (Z[kind][k].indexOf(b) + 1) + ' of ' + Z[kind][k].length + '.';
+  }
+  dlg.querySelectorAll('.cl-zones').forEach(root => {
+    const kind = root.dataset.kind;
+    root.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.eye) { const k = b.dataset.eye, o = Z[kind].off; Z[kind] = Object.assign({}, Z[kind], { off: o.includes(k) ? o.filter(x => x !== k) : o.concat(k) }); dirty(); draw(kind, '[data-eye="' + k + '"]'); return; }
+      if (b.dataset.mv) { const k = b.dataset.b2, d = b.dataset.mv; changed(kind, k, C.layoutMove(Z[kind], k, d)); const nb = root.querySelector('[data-mv="' + d + '"][data-b2="' + k + '"]'); if (nb && !nb.disabled) nb.focus(); }
+    });
+    root.addEventListener('change', e => { const s = e.target.closest('[data-zsel]'); if (s) changed(kind, s.dataset.zsel, C.layoutMove(Z[kind], s.dataset.zsel, null, { zone: s.value })); });
+    root.addEventListener('keydown', e => {
+      const li = e.target.closest('.cl-blk'); if (!li || e.target !== li || !e.altKey) return;
+      const d = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key]; if (!d) return;
+      e.preventDefault(); changed(kind, li.dataset.b, C.layoutMove(Z[kind], li.dataset.b, d));
+    });
+    let drag = null;
+    root.addEventListener('dragstart', e => { const li = e.target.closest('.cl-blk'); if (!li) return; drag = li.dataset.b; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', drag); } catch (x) { /* some browsers refuse */ } });
+    root.addEventListener('dragend', () => { drag = null; root.querySelectorAll('.cl-zl').forEach(z => z.classList.remove('over')); });
+    root.addEventListener('dragover', e => { const zl = e.target.closest('.cl-zl'); if (!zl || !drag) return; e.preventDefault(); root.querySelectorAll('.cl-zl').forEach(z => z.classList.toggle('over', z === zl)); });
+    root.addEventListener('drop', e => {
+      const zl = e.target.closest('.cl-zl'); if (!zl || !drag) return; e.preventDefault();
+      const over = e.target.closest('.cl-blk'); let before = null;
+      if (over && over.dataset.b !== drag) { const r = over.getBoundingClientRect(); before = e.clientY < r.top + r.height / 2 ? over.dataset.b : (over.nextElementSibling && over.nextElementSibling.dataset.b) || null; }
+      const b = drag; drag = null; changed(kind, b, C.layoutMove(Z[kind], b, null, { zone: zl.dataset.zone, before: before === b ? null : before }));
+    });
+  });
+  const tabs = [...dlg.querySelectorAll('[data-cltab]')];
+  const pick = t => { tabs.forEach(x => { const on = x === t; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; q('#cl-p-' + x.dataset.cltab).hidden = !on; }); cs.moved = null; };
+  tabs.forEach((t, i) => { t.onclick = () => pick(t); t.onkeydown = e => { const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return; e.preventDefault(); const n = tabs[(i + d + tabs.length) % tabs.length]; pick(n); n.focus(); }; });
+  const seg = q('.cl-seg');
+  if (seg) seg.onclick = e => { const b = e.target.closest('[data-clpv]'); if (!b) return; cs.pv = b.dataset.clpv; seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); preview('task'); };
+  form.addEventListener('change', e => { if (e.target.closest('.cl-opts')) dirty(); });
+  draw('board'); draw('task');
+  q('#cl-reset').onclick = () => { resetOpts(); Z.board = C.layoutZones(null, 'board', tlIds); Z.task = C.layoutZones(null, 'task'); cs.moved = null; draw('board'); draw('task'); q('#cl-st').textContent = 'Reset to default. Save keeps it.'; };
+  q('#cl-save').onclick = () => {
+    const v = readCardLayoutForm(form);
+    v.layout = C.readCardLayout(Object.assign({}, v.layout, { zones: { board: C.layoutStore(Z.board, 'board'), task: C.layoutStore(Z.task, 'task') } }), Object.keys(TAG_LISTS));
+    applyCardLayout(v); toast('Card layout saved');
+  };
 }
 
 // round 3, adjustment 12, then 2026-10-29 (version 3): a welcome card once per person and version (prefs.welcomeVersion <
@@ -6008,6 +6295,7 @@ function openNewList() {
   const hh = !!me.is_household;
   const dlg = dialogShell('<form method="dialog"><strong>New list</strong><label>Name<input id="nl-name" maxlength="60" autocomplete="off"></label><div class="err" id="nl-e" aria-live="polite"></div><div class="actions nl-x" id="nl-x" hidden></div>' +
     (hh ? '<label class="cb"><input id="nl-shared" type="checkbox" checked> Share with the household and the HomeOS agent</label>' : '<p class="sh-note">Only you see it until you share it (list menu, Share).</p>') +
+    (hh && me.kind === 'human' ? newListMoreHtml() : '') +
     '<div class="actions"><button value="cancel">Cancel</button><button id="nl-go" value="create">Create</button></div></form>', '#newlist');
   const name = dlg.querySelector('#nl-name'), err = dlg.querySelector('#nl-e'), go = dlg.querySelector('#nl-go'), x = dlg.querySelector('#nl-x');
   // my archived lists, read while the person types (they are not in LIST)
@@ -6024,6 +6312,7 @@ function openNewList() {
     const r = await createListRow(n, hh && dlg.querySelector('#nl-shared').checked);
     // a same-name list the page did not know about (another tab made it): look again, so the message below can name it
     if (!r.ok && r.err.kind === 'duplicate') await readArchived();
+    if (r.ok && dlg.querySelector('#nl-more')) { const bad = await newListMoreSave(dlg, r.list.id); if (bad.length) toast('List created; not saved: ' + bad.join(' ')); }
     return r;
   };
   const run = async (n, ignoreArchived) => {
@@ -6058,6 +6347,35 @@ function openNewList() {
   };
   // round 3 P1, F1: Enter in the name (or on the check box) is Create; the form's first button is Cancel, which Enter would press
   dlg.querySelector('form').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); go.click(); } });
+}
+// harness configurations T23: New list asks, optionally, what List settings edit: Autonomy (default Guided), intake defaults and the list
+// brief (Decisions one per line, each saved with today's date and the person's name; Naming convention; Base project instruction; Concept
+// of work). Household people only (the RPCs refuse anyone else); saved after the list exists, each through its RPC
+function newListMoreHtml() {
+  return '<details class="nl-more" id="nl-more"><summary>Autonomy and list brief (optional)</summary>' +
+    '<label>Autonomy<select id="nl-au">' + C.autonomyChoices(true, false).map(c => '<option value="' + c.mode + '"' + (c.mode === 'guided' ? ' selected' : '') + '>' + C.AUTONOMY_NAME[c.mode] + (c.mode === 'guided' ? ' (default)' : '') + '</option>').join('') + '</select></label>' +
+    '<label class="cb"><input type="checkbox" id="nl-e2e"> Agent runs end-to-end tests</label><label class="cb"><input type="checkbox" id="nl-tg"> Notify on Telegram</label><label class="cb"><input type="checkbox" id="nl-stage" checked> Stage report</label>' +
+    '<label>Decisions<textarea id="nl-b-decisions" maxlength="' + C.BRIEF_MAX + '" aria-describedby="nl-b-decisions-h"></textarea></label><p class="s-hint" id="nl-b-decisions-h">One per line; each is saved with today\'s date and your name.</p>' +
+    C.BRIEF_FIELDS.map(x => '<label>' + x.label + '<textarea id="nl-b-' + x.key + '" maxlength="' + C.BRIEF_MAX + '" aria-describedby="nl-b-' + x.key + '-h"></textarea></label><p class="s-hint" id="nl-b-' + x.key + '-h">' + esc(x.help) + '</p>').join('') + '</details>';
+}
+async function newListMoreSave(dlg, id) {
+  const q = s => dlg.querySelector(s), bad = [], day = C.localStamp(new Date().toISOString()).slice(0, 10);
+  const mode = q('#nl-au').value, e2e = q('#nl-e2e').checked, tg = q('#nl-tg').checked, stage = q('#nl-stage').checked;
+  if (mode !== 'guided') {
+    const a = await rest('POST', 'rpc/set_autonomy', { p_kind: 'list', p_id: id, p_mode: mode, p_expected: 'guided' });
+    if (a.ok) LIST[id] = Object.assign({}, LIST[id], { autonomy: mode }); else bad.push('Autonomy (' + a.err.message + ').');
+  }
+  if (e2e || tg || !stage) {
+    const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: e2e, p_deploy_target: null, p_notify_telegram: tg, p_stage_report: stage });
+    if (!a.ok) bad.push('intake (' + a.err.message + ').');
+  }
+  const b = { decisions: C.briefLines(q('#nl-b-decisions').value).map(x => C.briefLine(x, day, me.display_name)).filter(Boolean).join('\n') };
+  C.BRIEF_FIELDS.forEach(x => { b[x.key] = q('#nl-b-' + x.key).value.trim(); });
+  if (C.briefCount(b)) {
+    const a = await rest('POST', 'rpc/set_list_brief', { p_list: id, p_decisions: b.decisions, p_naming: b.naming, p_instruction: b.instruction, p_concept: b.concept });
+    if (!a.ok) bad.push('the brief (' + a.err.message + ').');
+  }
+  return bad;
 }
 // create_list_row, put in locally from the answer and selected at once (New list, the Lists window). The list waits under +N
 async function createListRow(n, shared) {
@@ -6117,8 +6435,9 @@ async function restoreList(id) {
 // the Lists window (owner or editor, people only). Reads the list's settings fresh on open (db/032 columns and budget_status) and saves
 // only what changed, each through its RPC: rename (PATCH, owners), set_autonomy with the mode it showed (40001: changed meanwhile),
 // set_intake and set_budget (household only). A guest sees AI Brain and Project rules off with the reason, intake off, no budget.
-// The list brief is task T23 (a later section in this window)
-const LS_COLS = 'id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report';
+// T23: the List brief section (Decisions, Naming convention, Base project instruction, Concept of work) saved through set_list_brief
+// (household people; a guest reads it)
+const LS_COLS = 'id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at';
 const canSetList = id => !!me && me.kind === 'human' && (ROLE[id] === 'owner' || ROLE[id] === 'editor') && !!LIST[id]; // system lists too: the harness runs in them
 async function openListSettings(id, opener) {
   if (!LIST[id] || !canSetList(id)) return;
@@ -6137,7 +6456,8 @@ async function openListSettings(id, opener) {
   if (!row.ok || !row.json.length) { scroll.innerHTML = '<p class="note">' + esc(row.ok ? 'This list is gone.' : row.err.message) + '</p>'; foot.innerHTML = '<span class="sp"></span><button value="close">Close</button>'; return; }
   const r = row.json[0], cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
   const saved = { name: r.name, mode: C.listModeOf(r), e2e: !!r.e2e_self, deploy: r.deploy_target || '', tg: !!r.notify_telegram, stage: r.stage_report !== false,
-    cap: cap ? String(Number(cap.cap_usd)) : '' };
+    cap: cap ? String(Number(cap.cap_usd)) : '', brief: C.briefOf(r) };
+  let decs = C.briefLines(saved.brief.decisions);
   let expected = saved.mode, base = Object.assign({}, saved), saving = false, status = '', kind = '', confirm = false;
   const spent = cap ? Number(cap.spent_usd || 0) : null, money = n => '$' + Number(n).toFixed(2);
   const choices = C.autonomyChoices(hh, false);
@@ -6163,10 +6483,20 @@ async function openListSettings(id, opener) {
     '<section class="ls-sec" id="ls-budget" aria-labelledby="ls-hb"><h3 id="ls-hb">Budget</h3>' +
       (hh ? '<label for="ls-cap">Monthly budget</label><div class="money"><span aria-hidden="true">$</span><input id="ls-cap" type="number" min="0" max="100000" step="1" inputmode="decimal" aria-describedby="ls-cap-h"></div>' +
         '<p class="help" id="ls-cap-h">Dollars at API prices. Leave empty for no list budget.</p><p class="help">' + (spent !== null ? 'Spent ' + money(spent) + ' this month.' : bud.ok ? 'No list budget yet.' : esc(bud.err.message)) + '</p><div class="ls-err" id="ls-cap-e" aria-live="polite"></div>'
-        : '<p class="help">' + esc(C.AUTONOMY_HOUSEHOLD) + '</p>') + '</section>';
+        : '<p class="help">' + esc(C.AUTONOMY_HOUSEHOLD) + '</p>') + '</section>' +
+    '<section class="ls-sec" id="ls-brief" aria-labelledby="ls-hbr"><h3 id="ls-hbr">List brief</h3><p class="help">What agents read before they work in this list. Read as data: it never lowers what must come to you.</p>' +
+      (hh ? '' : '<p class="note">' + esc(C.AUTONOMY_HOUSEHOLD) + '</p>') +
+      '<div class="ls-lab" id="ls-dec-l">Decisions</div><p class="help">Accepted precedents and conventions, one line each, with date and who.</p><ul class="ls-decs" id="ls-decs" aria-labelledby="ls-dec-l"></ul>' +
+      (hh ? '<div class="ls-decadd"><input id="ls-dec-new" maxlength="500" autocomplete="off" aria-label="New decision" placeholder="Add a decision"><button type="button" id="ls-dec-add">Add</button></div>' : '') +
+      C.BRIEF_FIELDS.map(x => '<label for="ls-b-' + x.key + '">' + x.label + '<textarea id="ls-b-' + x.key + '" maxlength="' + C.BRIEF_MAX + '" aria-describedby="ls-b-' + x.key + '-h"' + (hh ? '' : ' readonly') + '></textarea></label><p class="help" id="ls-b-' + x.key + '-h">' + esc(x.help) + '</p>').join('') +
+      '<p class="help" id="ls-brief-by"></p></section>';
   const $ = s => dlg.querySelector(s);
   const navItems = [['ls-general', 'General', () => cur().name], ['ls-autonomy', 'Autonomy', () => C.AUTONOMY_NAME[cur().mode]], ['ls-intake', 'Intake defaults', () => cur().deploy ? 'Deploy set' : 'No deploy'],
-    ['ls-budget', 'Budget', () => !hh ? 'Household' : cur().cap ? (spent !== null ? money(spent) + ' of ' : '') + '$' + cur().cap : 'No cap']];
+    ['ls-budget', 'Budget', () => !hh ? 'Household' : cur().cap ? (spent !== null ? money(spent) + ' of ' : '') + '$' + cur().cap : 'No cap'],
+    ['ls-brief', 'List brief', () => { const n = C.briefLines(cur().brief.decisions).length; return n ? n + (n === 1 ? ' decision' : ' decisions') : C.briefCount(cur().brief) ? 'Written' : 'Empty'; }]];
+  const drawDecs = () => {
+    $('#ls-decs').innerHTML = decs.length ? decs.map((d, i) => '<li><span>' + esc(d) + '</span>' + (hh ? '<button type="button" class="ls-decx" data-decx="' + i + '" aria-label="Remove decision ' + (i + 1) + '">✕</button>' : '') + '</li>').join('') : '<li class="n">No decisions yet.</li>';
+  };
   const drawNav = () => { nav.innerHTML = navItems.map(([s, n, v], i) => '<a href="#' + s + '" data-sec="' + s + '"' + (i === 0 ? ' aria-current="true"' : '') + '>' + n + '<small>' + esc(v()) + '</small></a>').join(''); };
   const fill = v => {
     $('#ls-name').value = v.name;
@@ -6174,9 +6504,12 @@ async function openListSettings(id, opener) {
     ['#ls-e2e', '#ls-tg', '#ls-stage'].forEach((s, i) => { $(s).checked = [v.e2e, v.tg, v.stage][i]; $(s).disabled = !hh; });
     $('#ls-deploy').value = v.deploy; $('#ls-deploy').disabled = !hh;
     if ($('#ls-cap')) $('#ls-cap').value = v.cap;
+    decs = C.briefLines(v.brief.decisions); drawDecs();
+    C.BRIEF_FIELDS.forEach(x => { $('#ls-b-' + x.key).value = v.brief[x.key]; });
   };
   const cur = () => ({ name: $('#ls-name').value.trim(), mode: (dlg.querySelector('[name="am"]:checked') || {}).value || base.mode, e2e: $('#ls-e2e').checked,
-    deploy: $('#ls-deploy').value, tg: $('#ls-tg').checked, stage: $('#ls-stage').checked, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap });
+    deploy: $('#ls-deploy').value, tg: $('#ls-tg').checked, stage: $('#ls-stage').checked, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap,
+    brief: Object.assign({ decisions: decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#ls-b-' + x.key).value.trim() }))) });
   const dirty = () => JSON.stringify(cur()) !== JSON.stringify(base);
   const setBy = () => { $('#ls-set-by').textContent = r.autonomy_set_at ? 'Set by ' + personName(r.autonomy_set_by) + ' · ' + longDay(Date.parse(r.autonomy_set_at)) : 'Not set yet: Guided is the default.'; };
   const sync = () => {
@@ -6225,6 +6558,10 @@ async function openListSettings(id, opener) {
       const a = await rest('POST', 'rpc/set_budget', { p_list: id, p_period: 'month', p_cap: capN });
       if (a.ok) base.cap = c.cap; else errs.push(a.err.message);
     }
+    if (hh && JSON.stringify(c.brief) !== JSON.stringify(base.brief)) {
+      const a = await rest('POST', 'rpc/set_list_brief', { p_list: id, p_decisions: c.brief.decisions, p_naming: c.brief.naming, p_instruction: c.brief.instruction, p_concept: c.brief.concept });
+      if (a.ok) { base.brief = c.brief; r.brief_updated_by = me.id; r.brief_updated_at = new Date().toISOString(); briefBy(); } else errs.push(a.err.message);
+    }
     saving = false;
     if (!dlg.isConnected) return;
     const msgs = errs.filter(x => x !== 'name');
@@ -6233,7 +6570,11 @@ async function openListSettings(id, opener) {
     if (!errs.length) toast('List settings saved: ' + label(id));
     render(); sync();
   };
-  fill(saved); drawNav(); setBy(); sync();
+  const briefBy = () => { $('#ls-brief-by').textContent = r.brief_updated_at ? 'Brief changed by ' + personName(r.brief_updated_by) + ' · ' + longDay(Date.parse(r.brief_updated_at)) : ''; };
+  fill(saved); drawNav(); setBy(); briefBy(); sync();
+  const addDec = () => { const inp = $('#ls-dec-new'), l = C.briefLine(inp.value, C.localStamp(new Date().toISOString()).slice(0, 10), me.display_name); if (!l) { inp.focus(); return; } decs.push(l); inp.value = ''; drawDecs(); status = ''; sync(); inp.focus(); };
+  if ($('#ls-dec-add')) { $('#ls-dec-add').onclick = addDec; $('#ls-dec-new').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addDec(); } }); }
+  $('#ls-decs').addEventListener('click', e => { const b = e.target.closest('[data-decx]'); if (!b) return; decs.splice(Number(b.dataset.decx), 1); drawDecs(); status = ''; sync(); const n = $('#ls-decs [data-decx]'); (n || $('#ls-dec-new') || $('#ls-b-naming')).focus(); });
   dlg.addEventListener('input', () => { status = ''; sync(); });
   dlg.addEventListener('change', () => { status = ''; sync(); });
   $('#ls-e0').onclick = () => { const b = $('#ls-e0box'), o = b.hidden; b.hidden = !o; $('#ls-e0').setAttribute('aria-expanded', String(o)); };
