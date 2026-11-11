@@ -189,13 +189,14 @@
     if (!S.data) { p.appendChild(skel()); return; }
     if (!S.data.board) { p.appendChild(banner('The board could not be read' + (S.data.board_error ? ': ' + S.data.board_error : '') + '. Modes are shown once it can.')); }
     hostNote(p);
+    var wrap = el('div', 'cfg-au'), side = el('aside', 'cfg-au-side'); side.setAttribute('aria-label', 'What each mode means'); var host = p; p = el('div', 'cfg-au-main'); wrap.appendChild(p); wrap.appendChild(side); host.appendChild(wrap);
     var ls = lists(), cards = el('div', 'cfg-cards'); cards.setAttribute('role', 'group'); cards.setAttribute('aria-label', 'Filter by mode');
     var shown = ORDER.concat(ls.some(function (l) { return l.effective === 'manual'; }) ? ['manual'] : []);
     [['all', 'All lists']].concat(shown.map(function (m) { return [m, MODES[m].n]; })).forEach(function (x) {
       var n = x[0] === 'all' ? ls.length : ls.filter(function (l) { return l.effective === x[0]; }).length;
       var b = el('button', 'cfg-card'); b.type = 'button'; b.setAttribute('aria-pressed', S.filter === x[0] ? 'true' : 'false');
       if (x[0] !== 'all') b.appendChild(modeMark(x[0])); b.appendChild(el('b', null, String(n))); b.appendChild(el('span', null, x[1]));
-      b.onclick = function () { S.filter = x[0]; renderAutonomy(p); }; cards.appendChild(b);
+      b.onclick = function () { S.filter = x[0]; renderAutonomy(host); }; cards.appendChild(b);
     });
     p.appendChild(cards);
     var msg = el('p', 'cfg-msg'); msg.id = 'cfg-au-msg'; msg.setAttribute('role', 'status');
@@ -223,10 +224,10 @@
     if (rows.length) p.appendChild(t); else { var e = el('div', 'cfg-empty'); e.appendChild(el('b', null, 'No list is in this mode.')); p.appendChild(e); }
     p.appendChild(msg);
     p.appendChild(el('p', 'cfg-note', 'Saved with your own sign-in on the board (localhost:8788), as in the list’s settings on the board and in the phone app: the same three places. AI Brain and Project rules only by a household person. A task inherits from its parent, then its list. To stop a list on this device, untick it in Workload.'));
-    var e0 = el('section', 'cfg-e0'); e0.setAttribute('aria-labelledby', 'cfg-e0h'); var h = el('h3', null, 'E0: always the person’s, in every mode'); h.id = 'cfg-e0h'; e0.appendChild(h);
+    var e0 = el('section', 'cfg-e0'); e0.setAttribute('aria-labelledby', 'cfg-e0h'); var h = el('h3', null, 'Always the person’s, in every mode'); h.id = 'cfg-e0h'; e0.appendChild(h);
     e0.appendChild(el('p', null, 'No mode, precedent, project rule or list brief makes these an agent’s decision.'));
     var u = el('ul'); ((S.data.board && S.data.board.e0) || []).forEach(function (x) { u.appendChild(el('li', null, x)); }); e0.appendChild(u); p.appendChild(e0);
-    var dl = el('dl', 'cfg-modes'); ORDER.forEach(function (m) { var d = el('div'), dt = el('dt'); dt.appendChild(modeEl(m)); d.appendChild(dt); d.appendChild(el('dd', null, MODES[m].does)); d.appendChild(el('dd', null, MODES[m].you)); dl.appendChild(d); }); p.appendChild(dl);
+    var dl = el('dl', 'cfg-modes'); ORDER.forEach(function (m) { var d = el('div'), dt = el('dt'); dt.appendChild(modeEl(m)); d.appendChild(dt); d.appendChild(el('dd', null, MODES[m].does)); d.appendChild(el('dd', null, MODES[m].you)); dl.appendChild(d); }); side.appendChild(dl);
   }
   function banner(text) { var d = el('div', 'cfg-banner'); d.setAttribute('role', 'alert'); d.appendChild(el('p', null, text)); return d; }
 

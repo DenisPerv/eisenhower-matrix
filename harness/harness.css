@@ -1004,7 +1004,7 @@ html.amb-live .amb-dw{opacity:var(--dlvl,.5)}
 .cfg-tabs button[aria-disabled=true]{color:#7d889d}
 .cfg-tn{font-size:14px;white-space:nowrap}
 .cfg-ts{font-size:12px;color:var(--muted);white-space:nowrap}
-.cfg-p{padding-top:16px}
+.cfg-p{padding-top:16px}.pbody.cfg>.cfg-p,.pbody.cfg>.cfg-tabs{max-width:none}
 .cfg-p:focus{outline:none}
 .cfg-sec{margin-top:22px}.cfg-sec:first-child{margin-top:0}
 .cfg-sec>h3{font:500 16px/1.25 var(--font);margin-bottom:6px}
@@ -1036,6 +1036,10 @@ html.amb-live .amb-dw{opacity:var(--dlvl,.5)}
 .cfg-e0 ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 24px;margin-top:8px;font-size:13.5px}
 .cfg-e0 li{padding:3px 0 3px 14px;position:relative}
 .cfg-e0 li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:6px;border:1px solid var(--gate);transform:rotate(45deg)}
+.cfg-p:has(.cfg-au){container-type:inline-size}
+.cfg-au{display:grid;grid-template-columns:1fr;gap:24px;align-items:start}
+.cfg-au-side .cfg-modes{grid-template-columns:1fr;margin-top:0}
+@container (min-width:760px){.cfg-au{grid-template-columns:minmax(0,1fr) 250px}.cfg-au-side .cfg-modes{position:sticky;top:0}}
 .cfg-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px;font-size:13.5px;margin-top:18px}
 .cfg-modes dt{font:500 14px/1.3 var(--font)}
 .cfg-modes dd{color:var(--muted)}
