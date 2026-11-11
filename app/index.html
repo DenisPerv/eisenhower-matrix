@@ -389,7 +389,7 @@ dialog.alert form .field{margin:0 0 6px}
 /* the done checkbox before the title in the task sheet (2026-11-07) */
 .ttrow{display:flex;align-items:flex-end;gap:10px}.ttrow .field{flex:1;min-width:0}
 .tsec{margin:0 0 4px}.tsec-h{margin:6px 0 8px;font:600 12px/1.2 var(--ui);letter-spacing:.04em;text-transform:uppercase;color:var(--ink2)}
-.fclose{display:flex;align-items:center;gap:10px;margin:0 0 16px;font:600 14px/1.2 var(--ui);min-height:44px}.fid{display:flex;flex-wrap:wrap;gap:6px 12px;margin:0 0 12px}
+.fclose{display:flex;align-items:center;gap:10px;margin:0 0 16px;font:600 14px/1.2 var(--ui);min-height:44px;flex-wrap:wrap}.fclose.off{opacity:.55}.fclose .why{flex-basis:100%;font:400 12px/1.3 var(--ui);color:var(--ink3,var(--ink2))}.fid{display:flex;flex-wrap:wrap;gap:6px 12px;margin:0 0 12px}
 .tdone{flex:none;width:28px;height:28px;margin:0 0 18px;accent-color:var(--accent)}
 /* the quadrant buttons in the task sheet (2026-11-07): an outline in the quadrant's colour, the current one filled */
 .tquad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 12px}
@@ -1510,7 +1510,7 @@ function openTask(id, swap, draft) {
      changes with it (TDData.saveTask decision), marks the task done and closes the sheet with Undo. Applied, or read only: off */
   const dec = C.decisionOf(t), decOn = !!dec && !ro && !dec.applied_at;
   /* the done checkbox before the title (web: openTask doneOn): not on a decision card, a task awaiting its check, a read-only or closed task */
-  const doneOn = !ro && !closed && !dec && t.status !== 'waiting' && !C.awaitingCheck(t);
+  const doneWhy = C.doneBlock(t, { editable: !ro }), doneOn = !doneWhy;   // web: openTask doneWhy (shown everywhere, off with the reason)
   const decWho = h => !h ? '' : me() && h === me().handle ? 'you' : D.handleNames[h] || h;
   const decDay = s => { const ms = Date.parse(s || ''); return isNaN(ms) ? '' : ymd(new Date(ms)); };
   const decState = !dec ? '' : dec.applied_at ? 'Applied ' + decDay(dec.applied_at) + (dec.applied_result ? ' · ' + dec.applied_result : '')
@@ -1527,7 +1527,7 @@ function openTask(id, swap, draft) {
     <p class="err" id="t-title-err" hidden></p>
     ${dec ? '' : quadHtml}
     <div class="picked" id="t-picked" aria-live="polite" style="margin:0 0 14px"></div>`,
-    close: doneOn ? '<label class="fclose"><input type="checkbox" class="tdone" id="t-done" style="margin:0"><span>Mark done</span></label>' : '',
+    close: '<label class="fclose' + (doneOn ? '' : ' off') + '"' + (doneOn ? '' : ' title="' + esc(doneWhy) + '"') + '><input type="checkbox" class="tdone" id="t-done" style="margin:0"' + (doneOn ? '' : ' disabled aria-describedby="t-done-why"' + (t.status === 'done' ? ' checked' : '')) + '><span>Mark done</span>' + (doneOn ? '' : '<small class="why" id="t-done-why">' + esc(doneWhy) + '</small>') + '</label>',
     id: info ? `<p class="info fid">${info}</p>` : '',
     autonomy: `${autoRowHtml(t)}`,
     decision: `${decHtml}`,
@@ -1568,7 +1568,7 @@ function openTask(id, swap, draft) {
   $('#task-save').hidden = ro; $('#task-save').disabled = true; $('#task-save').textContent = 'Save';
   hideAsk(); renderTTags(); renderLinks(); drawAutoRow();
   const au = $('#t-au'); if (au) au.onchange = () => changeAutonomy(au.value);
-  const dn = $('#t-done'); if (dn) dn.onchange = () => { if (dn.checked) doneFromSheet(); };
+  const dn = $('#t-done'); if (dn && !dn.disabled) dn.onchange = () => { if (dn.checked) doneFromSheet(); };
   TS.notes0 = notesBase; TS.fn0 = $('#t-desc').value; TS.check = C.decisionKind(t) === 'check';
   TS.dates = dateInputs(); TS.snap = draft ? null : snapTask();
   if (draft) onTaskInput();

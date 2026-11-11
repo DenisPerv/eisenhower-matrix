@@ -1141,6 +1141,8 @@ dialog:has(#cf-ok) form > strong:first-child{font:500 21px/1.3 var(--serif);max-
 .tzb[data-tb=close]{justify-self:end;container-type:normal} /* no size containment: it is drawn at its own width */
 .tzb .fref{margin-top:2px}
 /* the Done block (round 3): the done checkbox with its label */
+dialog label.fdone-l.off{opacity:.45;cursor:not-allowed}dialog label.fdone-l.off .fdone{cursor:not-allowed}
+.card .done.off{opacity:.4;cursor:not-allowed}.card .done.off:hover{background:transparent;border-color:var(--hair2);color:transparent;box-shadow:none}
 dialog label.fdone-l{display:inline-flex;align-items:center;gap:6px;margin:0;min-height:34px;font:500 13px var(--ui);color:var(--ink2);white-space:nowrap;cursor:pointer}
 /* the Title block is the window's heading (round 2): no label, no box until hovered or focused, two lines at most; editable in place */
 .rt.one.tk-title{margin-top:0;padding:2px 6px;border-color:transparent;background:transparent;font:500 24px/1.25 var(--serif);color:var(--ink);max-height:calc(2 * 1.25em + 6px)}
@@ -1877,6 +1879,18 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     const details = plainDetails(t.details);
     details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
     return { details, status: 'done' };
+  }
+  // the Done control (Max 2026-11-11): shown on every task, off with a reason when completing by hand would be wrong; '' = may complete.
+  // The same rule for the board card's button and the task window's checkbox
+  function doneBlock(t, o) {
+    const x = o || {};
+    if (!t) return 'A new task is completed after it is saved.';
+    if (x.editable === false) return 'You cannot change this task.';
+    if (CLOSED.includes(t.status)) return t.status === 'done' ? 'Already done.' : 'Cancelled. Restore it from the archive first.';
+    if (decisionOf(t)) return 'A decision card: answer it, the answer closes it.';
+    if (awaitingCheck(t)) return 'Waits for your check: answer its check card.';
+    if (t.status === 'waiting') return 'Waiting for an answer or another task.';
+    return '';
   }
   const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
 
@@ -3630,7 +3644,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
@@ -4530,7 +4544,9 @@ function cardHtml(t, q, g) {
   const cls = 'card ' + q + (overdue(t) ? ' overdue' : '') + (soon(t) ? ' soon' : '') + (upcoming(t) ? ' upcoming' : '') + (expanded ? ' full' : ' compact') + (lowConf(t) ? ' lowc' : '') + (g && g.depth ? ' lk-kid' + (g.last ? ' lk-last' : '') : '');
   const open = '<div class="' + cls + '"' + (g && g.depth ? ' style="--lk-d:' + g.depth + '"' : '') + ' data-card="' + t.id + '"' + (editable ? ' draggable="true"' : '') + ' tabindex="0" aria-label="' + esc(plain(t.title)) + '">';
   const meta = t.deadline ? '<span class="meta"' + (soon(t) ? ' title="Due soon: less than ' + settings.threshold + '% of the ' + settings.windowDays + '-day urgency window left"' : '') + '>' + rel(t) + (soon(t) ? '<span class="sr">, due soon</span>' : '') + '</span>' : '<span></span>';
-  const done = editable ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>' : '<span></span>';
+  const doneWhy = C.doneBlock(t, { editable });
+  const done = !doneWhy ? '<button class="done" data-done="' + t.id + '" aria-label="Complete ' + esc(plain(t.title)) + '">' + I.check + '</button>'
+    : '<button class="done off" type="button" aria-disabled="true" title="' + esc(doneWhy) + '" aria-label="Complete ' + esc(plain(t.title)) + ': ' + esc(doneWhy) + '">' + I.check + '</button>';
   // task links: Waiting for N (open predecessors), a parent's done/total (Card layout waiting, progress)
   const lx = RLX, wt = L.waiting && lx ? C.waitingFor(t, lx.ix, lx.by) : [], pg = L.progress && lx ? C.subtaskProgress(t, lx.ix, lx.by) : null;
   const linkBadges = (wt.length ? '<span class="tb wt" title="Waiting for ' + esc(wt.map(x => ref(x) + ' ' + plain(x.title)).join(', ')) + '"><span class="wl">Waiting for&nbsp;</span><span class="ws" aria-hidden="true">Wait&nbsp;</span>' + wt.length + '</span>' : '') +
@@ -5361,9 +5377,9 @@ function openTask(id, quad, opts) {
   // the done checkbox at the right end of the title row (2026-11-07, Anastasiia): a tick saves the window's edits with status done in one write, toast
   // "Completed" with Undo, then the next task of the shown order (none: the window closes). Not on a decision card (its answer buttons
   // close it), a task awaiting its check (settle.js would read it as closed by hand), a read-only, done or new task, or a preview
-  const doneOn = !!t && editable && !o.preview && !C.decisionOf(t) && t.status !== 'waiting' && !C.awaitingCheck(t) && !C.CLOSED.includes(t.status);
+  const doneWhy = o.preview ? 'A preview: open the task to complete it.' : C.doneBlock(t, { editable }), doneOn = !doneWhy;
   // round 3 (Max): the 'close' block of Card layout is this checkbox, labelled Done (the window closes with Cancel, Escape and the zones)
-  const doneHtml = doneOn ? '<label class="fdone-l"><input type="checkbox" class="fdone" id="fdone" aria-label="Mark done" title="Mark done">Done</label>' : '';
+  const doneHtml = '<label class="fdone-l' + (doneOn ? '' : ' off') + '" title="' + esc(doneOn ? 'Mark done' : doneWhy) + '"><input type="checkbox" class="fdone" id="fdone" aria-label="' + esc(doneOn ? 'Mark done' : 'Done: ' + doneWhy) + '"' + (doneOn ? '' : ' disabled' + (t && t.status === 'done' ? ' checked' : '')) + '>Done</label>';
   // Card layout v3 (2026-11-11): the window's blocks in the person's sections and columns; one tag picker per tag list ('tl:<id>')
   const TV = C.taskLayoutView(cardLayout, taskTagLists(), tagListFavs, tagListOrder, t ? 'edit' : 'create');
   const tlAny = TV.sections.some(s => s.cells.some(c => c.some(b => /^tl:/.test(b) && TAG_LISTS[b.slice(3)]))); // Find a tag shows only with a tag list block to filter
@@ -5803,7 +5819,7 @@ function openTask(id, quad, opts) {
   let decide = null; // the decision button clicked (1 or 0): Save sends the answer with the other changes, then the window closes
   let doneTick = false; // the done checkbox was ticked: Save sends status done with the other changes, then the next task
   const fdone = dlg.querySelector('#fdone');
-  if (fdone) fdone.onchange = () => { if (!fdone.checked || !fs) return; doneTick = true; after = nav.next ? 'next' : null; fs.click(); if (saveBad) { doneTick = false; after = null; fdone.checked = false; } };
+  if (fdone && !fdone.disabled) fdone.onchange = () => { if (!fdone.checked || !fs) return; doneTick = true; after = nav.next ? 'next' : null; fs.click(); if (saveBad) { doneTick = false; after = null; fdone.checked = false; } };
   dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = nav.next ? 'next' : null; fs.click(); if (saveBad) { decide = null; after = null; } }; }); // an answer moves on to the next task; with none the window closes
   // ---- T14: the Autonomy row ----
   const autoEl = dlg.querySelector('#fau');

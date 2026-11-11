@@ -219,6 +219,18 @@
     details.decision = Object.assign({}, details.decision, { answer: value, answered_by: who || null, answered_at: nowIso });
     return { details, status: 'done' };
   }
+  // the Done control (Max 2026-11-11): shown on every task, off with a reason when completing by hand would be wrong; '' = may complete.
+  // The same rule for the board card's button and the task window's checkbox
+  function doneBlock(t, o) {
+    const x = o || {};
+    if (!t) return 'A new task is completed after it is saved.';
+    if (x.editable === false) return 'You cannot change this task.';
+    if (CLOSED.includes(t.status)) return t.status === 'done' ? 'Already done.' : 'Cancelled. Restore it from the archive first.';
+    if (decisionOf(t)) return 'A decision card: answer it, the answer closes it.';
+    if (awaitingCheck(t)) return 'Waits for your check: answer its check card.';
+    if (t.status === 'waiting') return 'Waiting for an answer or another task.';
+    return '';
+  }
   const decisionKind = t => { const d = t && isPlain(t.details) && isPlain(t.details.decision) ? t.details.decision : null; return d && typeof d.kind === 'string' ? d.kind : null; };
 
   // ---- harness configurations (HomeOS plan T14-T16, db/032): Autonomy modes and the Decision section ----
@@ -1971,7 +1983,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,

@@ -87,3 +87,13 @@ test('answerRounds: earlier answers newest first', () => {
   const md = 'Task\n\n## Answer (read 2026-11-08)\nYes\n\n## Answer (read 2026-11-09)\n\nTelegram\nmore';
   assert.deepEqual(C.answerRounds(md), [{ date: '2026-11-09', text: 'Telegram' }, { date: '2026-11-08', text: 'Yes' }]);
 });
+
+test('doneBlock: the Done control is off with a reason on decision cards, checks, waiting, closed, read-only and new tasks', () => {
+  const t = { id: 'a', status: 'open', details: {}, ai: {} };
+  assert.equal(C.doneBlock(t, { editable: true }), '');
+  assert.match(C.doneBlock(null), /new task/);
+  assert.match(C.doneBlock(t, { editable: false }), /cannot change/);
+  assert.match(C.doneBlock({ ...t, status: 'done' }, {}), /Already done/);
+  assert.match(C.doneBlock({ ...t, status: 'cancelled' }, {}), /Cancelled/);
+  assert.match(C.doneBlock({ ...t, status: 'waiting' }, {}), /Waiting|check/);
+});

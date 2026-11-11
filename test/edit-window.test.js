@@ -72,19 +72,20 @@ test('the task window: four quadrant buttons under the title, wired on Save thro
   assert.match(app, /if \(st\.q !== st\.q0\) f\.q = st\.q;/);
 });
 
-test('the done checkbox: the Done block of the task layout, hidden on decision cards, awaiting checks, waiting, closed, read-only and new tasks; one write', () => {
+test('the done checkbox: the Done block of the task layout, shown everywhere, off with the reason (core doneBlock) on decision cards, awaiting checks, waiting, closed, read-only and new tasks; one write', () => {
   const fs = require('node:fs'), path = require('node:path');
   const html = fs.readFileSync(path.join(__dirname, '..', 'TasksDashboard.html'), 'utf8');
-  assert.match(html, /const doneOn = !!t && editable && !o\.preview && !C\.decisionOf\(t\) && t\.status !== 'waiting' && !C\.awaitingCheck\(t\) && !C\.CLOSED\.includes\(t\.status\);/);
+  assert.match(html, /const doneWhy = o\.preview \? '[^']+' : C\.doneBlock\(t, \{ editable \}\), doneOn = !doneWhy;/);
+  assert.match(html, /const doneWhy = C\.doneBlock\(t, \{ editable \}\);/, 'the board card button follows the same rule');
   // Card layout round 3 (Max): the done checkbox is the layout's 'close' block, labelled Done; the title row holds only the title
   assert.match(html, /case 'close': return doneHtml;/);
-  assert.match(html, /const doneHtml = doneOn \? '<label class="fdone-l"><input type="checkbox" class="fdone" id="fdone" aria-label="Mark done"[^\n]*>Done<\/label>'/);
+  assert.match(html, /const doneHtml = '<label class="fdone-l' \+ \(doneOn \? '' : ' off'\)[^\n]*>Done<\/label>';/);
   assert.match(html, /<div class="ftrow"><div class="rt one tk-title" id="ft"[^\n]*'<\/div><\/div><div class="err" id="fe"/);
   assert.match(html, /if \(doneTick\) x\.status = 'done';/, 'status done in the window\'s one versioned write');
   assert.match(html, /doneTick = true; after = nav\.next \? 'next' : null; fs\.click\(\);/, 'then the next task, else the window closes');
   const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'index.html'), 'utf8');
-  assert.match(app, /const doneOn = !ro && !closed && !dec && t\.status !== 'waiting' && !C\.awaitingCheck\(t\);/);
+  assert.match(app, /const doneWhy = C\.doneBlock\(t, \{ editable: !ro \}\), doneOn = !doneWhy;/);
   // the phone sheet draws it as the Close block of the task layout (cardLayout.zones.task)
-  assert.match(app, /close: doneOn \? '<label class="fclose"><input type="checkbox" class="tdone" id="t-done"/);
+  assert.match(app, /close: '<label class="fclose' \+ \(doneOn \? '' : ' off'\)[^\n]*id="t-done"/);
   assert.match(app, /ids = navIds\(task\(st\.id\)\)/, 'the next task is read before the save');
 });
