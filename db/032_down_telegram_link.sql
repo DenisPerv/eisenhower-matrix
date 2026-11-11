@@ -2,7 +2,7 @@
 -- db/ in file order runs it first as a no-op. Drops what 032 adds; keeps the list "HomeOS - Global" and its members
 -- (a household list with items; remove it from the app if wanted) and the bot's membership of default lists (remove it
 -- in the app's Share dialog) and the ops tables (below). The bucket is emptied only through the Storage API; this file drops its policies and,
--- when it is empty, the bucket.
+-- when it is empty, the bucket. public.items leaves the supabase_realtime publication only if 032 added it.
 
 do $$
 begin
@@ -41,4 +41,13 @@ drop function if exists public.telegram_login_id();
 -- The ops tables (links, claims, tokens) are kept with their data: a set-up that runs db/ in file order runs this file
 -- before 032 again, and must not lose the links. Nothing can reach them once the functions are gone. To drop them for
 -- good, by hand: drop table ops.telegram_link_tokens, ops.telegram_claims, ops.telegram_links;
-delete from ops.settings where key in ('telegram_link_minutes', 'telegram_link_tokens_per_hour');
+-- Realtime: take public.items out of supabase_realtime only when 032 put it there (marker in ops.settings)
+do $$
+begin
+  if exists (select 1 from ops.settings where key = 'telegram_realtime_added' and value = 1)
+     and exists (select 1 from pg_publication_tables
+                 where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'items') then
+    alter publication supabase_realtime drop table public.items;
+  end if;
+end $$;
+delete from ops.settings where key in ('telegram_link_minutes', 'telegram_link_tokens_per_hour', 'telegram_realtime_added');

@@ -8,7 +8,7 @@
 -- proof moves the link); L11 the claim: forms, refusals, clearing; L12 the claim on a new access-request task;
 -- L13 my_telegram_link, unlink takes the bot out, a new link brings it back past the opt-out; L14 rights (anon, internal
 -- functions, ops tables, definer and search_path); L15 HomeOS - Global (live household only); L16 the material bucket:
--- the bot uploads only, homeos-agent reads and deletes, people nothing (where Storage is installed).
+-- the bot uploads only, homeos-agent reads and deletes, people nothing (where Storage is installed); L17 public.items in the supabase_realtime publication.
 -- Fixtures: H (household person), G (approved Google guest), P (pending Google guest), Q (Google guest with a claim);
 -- B the telegram login and A homeos-agent (the live profiles, or fixtures on a database without them).
 -- Run after 032, 003, 011, the 012 policy block, 026, 030, 031 and 900-914.
@@ -272,6 +272,15 @@ begin
   end if;
 
   perform public._tl_as(null);
+
+  -- L17 Realtime: items is in the supabase_realtime publication
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    perform public._tl_chk('L17 items in supabase_realtime', (select count(*)::text from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'items'), '1');
+  else
+    perform public._tl_chk('L17 skipped: no Realtime publication', 'skip', 'skip');
+  end if;
+
   raise exception 'SELFTEST % of % passed (rolled back). Failures: %',
     current_setting('tl.total')::int - current_setting('tl.nf')::int,
     current_setting('tl.total'), coalesce(nullif(current_setting('tl.f'), ''), 'none');

@@ -17,6 +17,9 @@
 --   - The private Storage bucket workorder-material: the telegram login may only upload, homeos-agent may read and
 --     delete (D31).
 --   - A trigger that adds the claimed Telegram as a line to a new access-request task.
+--   - Realtime: public.items joins the publication supabase_realtime, so the bot can listen for "done" on the tasks it
+--     created instead of polling. RLS still decides what Realtime delivers: the telegram login gets changes only of
+--     items in lists it is a member of (its default lists and HomeOS - Global), like a REST read.
 -- Error codes: 42501 not allowed, 22023 bad value or bad token, 54000 limit reached.
 -- Order after this file: 003_rls.sql, 011_multiuser_rls.sql, the 012 policy block, 026, 030, 031, then 900-915
 -- (915_selftest_telegram_link.sql covers this file). Re-runnable. Rollback: db/032_down_telegram_link.sql.
@@ -308,6 +311,23 @@ begin
     using (bucket_id = 'workorder-material' and public.is_homeos_agent());
   create policy workorder_material_delete on storage.objects for delete to authenticated
     using (bucket_id = 'workorder-material' and public.is_homeos_agent());
+end $$;
+
+-- ---------- Realtime: items in the supabase_realtime publication ----------
+
+-- Postgres changes of public.items reach Realtime subscribers, filtered by the subscriber's RLS (items_read): the
+-- telegram login hears only items of lists it is a member of. Idempotent: skipped when items is already a member or
+-- the publication does not exist (no Supabase Realtime). The marker in ops.settings says that 032 added it, so the
+-- rollback removes it only then and never takes away a publication someone set up before.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then return; end if;
+  if exists (select 1 from pg_publication_tables
+             where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'items') then return; end if;
+  alter publication supabase_realtime add table public.items;
+  insert into ops.settings (key, value, note)
+  values ('telegram_realtime_added', 1, '032 added public.items to supabase_realtime (the rollback removes it only then)')
+  on conflict (key) do update set value = 1;
 end $$;
 
 -- ---------- grants ----------

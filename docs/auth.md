@@ -88,6 +88,8 @@ The household Telegram bot signs in as the agent login `telegram-bot` and learns
 
 Unlink (`telegram_unlink`) removes the link and the bot's membership of "My tasks". The bot never gets an email address.
 
+**Realtime.** 032 adds `public.items` to the publication `supabase_realtime`, so the bot can subscribe to item changes (for example a task it created turning `done`) with its own access token instead of polling. Realtime applies the subscriber's RLS: the telegram login receives changes only of items in lists it is a member of (the "My tasks" lists shared with it and HomeOS - Global), the same rows a REST read returns. Live apply and rollback: `db/apply-032.md`.
+
 ## Agents
 
 Agent logins (`kind = agent`) sign in with a password only ("This login signs in with a password only." if one tries Google). They see only lists they are members of and never delete or restore. **Household:** `homeos-agent` (HomeOS skills and scripts) and `telegram-bot`.
