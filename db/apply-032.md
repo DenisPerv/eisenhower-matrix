@@ -1,6 +1,8 @@
 # Live apply: db/032_telegram_link.sql
 
-The ordered procedure to put the Telegram link (`db/032_telegram_link.sql`, HomeOS telegram-v2 D18, D21, D29, D31 and the Realtime step) on the live TasksDashboardDB, check it and roll it back. Written 2026-11-11 for the master session, which runs it. Nobody has applied it yet.
+The ordered procedure to put the Telegram link (`db/032_telegram_link.sql`, HomeOS telegram-v2 D18, D21, D29, D31 and the Realtime step) on the live TasksDashboardDB, check it and roll it back. Written 2026-11-11 for the master session, which runs it. **Applied live 2026-11-11** (HomeOS commit fb906f8f); `915_selftest_telegram_link.sql` passes. Kept as the record and for a rollback.
+
+Two files share the number 032 (`032_telegram_link.sql`, `032_autonomy.sql`) and two share 915 (`915_selftest_telegram_link.sql`, `915_selftest_autonomy.sql`). All four are applied live and kept under these names: renaming an applied file would make the repo disagree with what the database ran (HomeOS plan joyful-jingling-cerf, review finding R5). The next free number is 035.
 
 - **Who runs it:** the HomeOS master session, after a person has tested `development_maxden` locally (http://localhost:8788). Nothing is released or deployed by this procedure.
 - **How:** every SQL step runs from the HomeOS root with `node scripts/tasksdb/tasksdb.js apply-sql <files…>`. That command uses admin SQL through the Management API with the PAT from `localConfigs/.env`, never a service-role key. The files are read from the mounted checkout `Views/TasksDashboard`, which must be on `development_maxden` at or after the commit that added this file.

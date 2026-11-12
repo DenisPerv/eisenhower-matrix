@@ -235,7 +235,7 @@
 
   // ---- harness configurations (HomeOS plan T14-T16, db/032): Autonomy modes and the Decision section ----
   // a list's mode is never inherit (default guided); a task's is inherit unless a person set it (set_autonomy). A task that inherits
-  // takes its parent's chain first, then its list's. The list is the ceiling: wider on a task only counts when the household owner set it
+  // takes its parent's chain first, then its list's. A task's own mode is what agents use (2026-11-11: no list ceiling)
   const AUTONOMY_MODES = ['manual', 'project_rules', 'guided', 'ai_brain'];
   const AUTONOMY_NAME = { inherit: 'Inherit', manual: 'Manual (old)', project_rules: 'Project rules', guided: 'Mixed', ai_brain: 'AI Brain' };
   // the modes a person picks (Maksym 2026-11-11): Project rules, Mixed ('guided' in the DB) and AI Brain. Manual stays readable for old rows
@@ -243,7 +243,7 @@
   const AUTONOMY_RANK = { manual: 0, project_rules: 1, guided: 2, ai_brain: 3 };
   const AUTONOMY_INFO = {
     manual: { does: 'Agents ask before every step.', you: 'You answer each question on the board.' },
-    project_rules: { does: 'Agents follow the list brief and decide inside it.', you: 'Anything the brief does not cover comes to you.' },
+    project_rules: { does: "Agents follow this project's own CLAUDE.md, rules, permissions and hooks.", you: 'Where they say nothing, it comes to you.' },
     guided: { does: 'Agents decide small things and ask about the rest.', you: 'Data, security and side tasks come to you.' },
     ai_brain: { does: 'Agents decide on their own and log every decision.', you: 'Only E0 comes to you.' },
   };
@@ -292,15 +292,25 @@
     const off = !household && !['inherit', 'guided'].includes(m);
     return { mode: m, off, why: off ? AUTONOMY_HOUSEHOLD : '' };
   });
-  // the warning under a task's choice: wider than its list (the ceiling) or than the parent it would inherit from; '' when none
-  function autonomyWarning(choice, inherited, listMode) {
-    if (!choice || choice === 'inherit' || !(choice in AUTONOMY_RANK)) return '';
-    const lm = listMode in AUTONOMY_RANK ? listMode : 'guided';
-    if (AUTONOMY_RANK[choice] > AUTONOMY_RANK[lm])
-      return 'This list is ' + AUTONOMY_NAME[lm] + '. Agents take this task at ' + AUTONOMY_NAME[choice] + ' only if the household list owner set it.';
-    if (inherited && inherited.from === 'parent' && AUTONOMY_RANK[choice] > AUTONOMY_RANK[inherited.mode])
-      return 'The parent is ' + AUTONOMY_NAME[inherited.mode] + '. This task is wider than its parent.';
-    return '';
+  // the neutral hint under a task's choice (2026-11-11, no ceiling): the mode the task runs as and its list's, only when they differ; '' else
+  function autonomyHint(choice, inherited, listMode) {
+    const lm = AUTONOMY_NAME[listMode] && listMode !== 'inherit' ? listMode : 'guided';
+    const runs = !choice || choice === 'inherit' ? (inherited && AUTONOMY_NAME[inherited.mode] ? inherited.mode : lm) : choice;
+    if (!AUTONOMY_NAME[runs] || runs === 'inherit' || runs === lm) return '';
+    return 'Runs as ' + AUTONOMY_NAME[runs] + '; its list is ' + AUTONOMY_NAME[lm] + '.';
+  }
+  // the project folder of a list (db/034 lists.project_dir, set_project_dir): '' or an absolute Windows or POSIX path of at most 260
+  // characters without a .. segment; returns { dir, error }
+  const PROJECT_DIR_MAX = 260;
+  const PROJECT_DIR_HINT = 'Empty = HomeOS. Without CLAUDE.md, rules or hooks there, Project rules acts as Mixed.';
+  function projectDirCheck(text) {
+    const dir = String(text == null ? '' : text).trim();
+    if (!dir) return { dir: '', error: '' };
+    if (dir.length > PROJECT_DIR_MAX) return { dir, error: 'At most ' + PROJECT_DIR_MAX + ' characters.' };
+    if (!/^([A-Za-z]:[\\/]|\/)/.test(dir) || dir.length < 2) return { dir, error: 'Use an absolute path, like D:\\Projects\\App or /home/me/app.' };
+    if (/(^|[\\/])\.\.([\\/]|$)/.test(dir)) return { dir, error: 'No .. in the path.' };
+    if (/[\u0000-\u001f\u007f]/.test(dir)) return { dir, error: 'No control characters.' };
+    return { dir, error: '' };
   }
 
   // the Delegate card's text (HomeOS claim.js cardText, card contract 5): the last "## Delegate · <date>" block up to its "---" line or
@@ -1999,7 +2009,7 @@
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, E0_ITEMS, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, delegateQuestions, decisionHint, overallCapLine, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, E0_ITEMS, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyHint, PROJECT_DIR_MAX, PROJECT_DIR_HINT, projectDirCheck, delegateCard, delegateQuestions, decisionHint, overallCapLine, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,

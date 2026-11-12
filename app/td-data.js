@@ -1185,7 +1185,7 @@
     async function listSettings(id) {
       const hh = !!(me && me.is_household);
       const [row, targets, bud] = await Promise.all([
-        rest('GET', 'lists?select=id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at&id=eq.' + id),
+        rest('GET', 'lists?select=id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at,project_dir&id=eq.' + id),
         hh ? rest('GET', 'deploy_targets?select=key,label&order=label') : Promise.resolve({ ok: true, json: [] }),
         hh ? rpc('budget_status', { p_list: id }) : Promise.resolve({ ok: true, json: [] }),
       ]);
@@ -1196,7 +1196,8 @@
         overall: C.overallCapLine(bud.ok ? bud.json : []) };
     }
     // saves only what changed: { mode, expected, intake: { e2e, deploy, tg, stage }, cap (number or null), brief: { decisions, naming,
-    // instruction, concept } (T23, set_list_brief, household people) }; returns the errors in order. New list uses it too (expected guided)
+    // instruction, concept } (T23, set_list_brief, household people), dir: { dir, expected } (db/034, set_project_dir, household people) };
+    // returns the errors in order (with dir: dirErr and dirNow, the folder someone else set meanwhile). New list uses it too (expected guided)
     async function saveListSettings(id, ch) {
       const errs = [];
       if (ch.mode) { const r = await setAutonomy('list', id, ch.mode, ch.expected); if (!r.ok) errs.push(r.now ? 'Someone set the mode to ' + C.AUTONOMY_NAME[r.now] + ' meanwhile. Save again to replace it.' : r.err.message); }
@@ -1205,7 +1206,18 @@
       let capErr = null;
       if (ch.cap !== undefined) { const r = await rpc('set_budget', { p_list: id, p_period: 'month', p_cap: ch.cap }); if (!r.ok) { errs.push(r.err.message); capErr = r.err.message; } }
       if (ch.brief) { const b = ch.brief, r = await rpc('set_list_brief', { p_list: id, p_decisions: b.decisions || '', p_naming: b.naming || '', p_instruction: b.instruction || '', p_concept: b.concept || '' }); if (!r.ok) errs.push(r.err.message); }
-      return { ok: !errs.length, errs, capErr };
+      let dir = null;
+      if (ch.dir) {
+        const r = await rpc('set_project_dir', { p_list: id, p_dir: ch.dir.dir || null, p_expected: ch.dir.expected || null });
+        if (r.ok) dir = { dirErr: null };
+        else {
+          const m = r.err.code === '40001' ? (String(r.err.message).match(/\(now (.*)\)\.?\s*$/) || [])[1] : undefined;
+          const now = m === undefined ? undefined : m === 'not set' ? '' : m;
+          const msg = r.err.code === '40001' ? 'Someone changed the project folder meanwhile' + (m ? ' to ' + m : '') + '. Your folder is kept: save again to replace it.' : r.err.message;
+          errs.push(msg); dir = { dirErr: msg, dirNow: now };
+        }
+      }
+      return Object.assign({ ok: !errs.length, errs, capErr }, dir || {});
     }
     const api = {
       setAutonomy, flushSettings, pendingAutonomy, listSettings, saveListSettings,

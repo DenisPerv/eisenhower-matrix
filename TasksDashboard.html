@@ -1896,7 +1896,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
 
   // ---- harness configurations (HomeOS plan T14-T16, db/032): Autonomy modes and the Decision section ----
   // a list's mode is never inherit (default guided); a task's is inherit unless a person set it (set_autonomy). A task that inherits
-  // takes its parent's chain first, then its list's. The list is the ceiling: wider on a task only counts when the household owner set it
+  // takes its parent's chain first, then its list's. A task's own mode is what agents use (2026-11-11: no list ceiling)
   const AUTONOMY_MODES = ['manual', 'project_rules', 'guided', 'ai_brain'];
   const AUTONOMY_NAME = { inherit: 'Inherit', manual: 'Manual (old)', project_rules: 'Project rules', guided: 'Mixed', ai_brain: 'AI Brain' };
   // the modes a person picks (Maksym 2026-11-11): Project rules, Mixed ('guided' in the DB) and AI Brain. Manual stays readable for old rows
@@ -1904,7 +1904,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   const AUTONOMY_RANK = { manual: 0, project_rules: 1, guided: 2, ai_brain: 3 };
   const AUTONOMY_INFO = {
     manual: { does: 'Agents ask before every step.', you: 'You answer each question on the board.' },
-    project_rules: { does: 'Agents follow the list brief and decide inside it.', you: 'Anything the brief does not cover comes to you.' },
+    project_rules: { does: "Agents follow this project's own CLAUDE.md, rules, permissions and hooks.", you: 'Where they say nothing, it comes to you.' },
     guided: { does: 'Agents decide small things and ask about the rest.', you: 'Data, security and side tasks come to you.' },
     ai_brain: { does: 'Agents decide on their own and log every decision.', you: 'Only E0 comes to you.' },
   };
@@ -1953,15 +1953,25 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     const off = !household && !['inherit', 'guided'].includes(m);
     return { mode: m, off, why: off ? AUTONOMY_HOUSEHOLD : '' };
   });
-  // the warning under a task's choice: wider than its list (the ceiling) or than the parent it would inherit from; '' when none
-  function autonomyWarning(choice, inherited, listMode) {
-    if (!choice || choice === 'inherit' || !(choice in AUTONOMY_RANK)) return '';
-    const lm = listMode in AUTONOMY_RANK ? listMode : 'guided';
-    if (AUTONOMY_RANK[choice] > AUTONOMY_RANK[lm])
-      return 'This list is ' + AUTONOMY_NAME[lm] + '. Agents take this task at ' + AUTONOMY_NAME[choice] + ' only if the household list owner set it.';
-    if (inherited && inherited.from === 'parent' && AUTONOMY_RANK[choice] > AUTONOMY_RANK[inherited.mode])
-      return 'The parent is ' + AUTONOMY_NAME[inherited.mode] + '. This task is wider than its parent.';
-    return '';
+  // the neutral hint under a task's choice (2026-11-11, no ceiling): the mode the task runs as and its list's, only when they differ; '' else
+  function autonomyHint(choice, inherited, listMode) {
+    const lm = AUTONOMY_NAME[listMode] && listMode !== 'inherit' ? listMode : 'guided';
+    const runs = !choice || choice === 'inherit' ? (inherited && AUTONOMY_NAME[inherited.mode] ? inherited.mode : lm) : choice;
+    if (!AUTONOMY_NAME[runs] || runs === 'inherit' || runs === lm) return '';
+    return 'Runs as ' + AUTONOMY_NAME[runs] + '; its list is ' + AUTONOMY_NAME[lm] + '.';
+  }
+  // the project folder of a list (db/034 lists.project_dir, set_project_dir): '' or an absolute Windows or POSIX path of at most 260
+  // characters without a .. segment; returns { dir, error }
+  const PROJECT_DIR_MAX = 260;
+  const PROJECT_DIR_HINT = 'Empty = HomeOS. Without CLAUDE.md, rules or hooks there, Project rules acts as Mixed.';
+  function projectDirCheck(text) {
+    const dir = String(text == null ? '' : text).trim();
+    if (!dir) return { dir: '', error: '' };
+    if (dir.length > PROJECT_DIR_MAX) return { dir, error: 'At most ' + PROJECT_DIR_MAX + ' characters.' };
+    if (!/^([A-Za-z]:[\\/]|\/)/.test(dir) || dir.length < 2) return { dir, error: 'Use an absolute path, like D:\\Projects\\App or /home/me/app.' };
+    if (/(^|[\\/])\.\.([\\/]|$)/.test(dir)) return { dir, error: 'No .. in the path.' };
+    if (/[\u0000-\u001f\u007f]/.test(dir)) return { dir, error: 'No control characters.' };
+    return { dir, error: '' };
   }
 
   // the Delegate card's text (HomeOS claim.js cardText, card contract 5): the last "## Delegate · <date>" block up to its "---" line or
@@ -3660,7 +3670,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   }
 
   return { QS, URGENT, IMPORTANT, DAY, STATUSES, CLOSED, readAppConfig, telegramClaim, telegramDeepLink, headers, sessionFromGrant, needsRefresh, restError, PROFILE_COLUMNS,
-    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, E0_ITEMS, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyWarning, delegateCard, delegateQuestions, decisionHint, overallCapLine, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
+    rowToTask, taskToPatch, FIELD_COLUMNS, inverseOf, mergeDetails, decisionOf, answerDecision, decisionKind, doneBlock, AUTONOMY_MODES, AUTONOMY_PICK, AUTONOMY_NAME, AUTONOMY_RANK, AUTONOMY_INFO, AUTONOMY_HOUSEHOLD, E0_ITEMS, BRIEF_FIELDS, BRIEF_MAX, briefLines, briefLine, briefOf, briefCount, listModeOf, itemModeOf, autonomyInherited, autonomyOf, autonomyChoices, autonomyHint, PROJECT_DIR_MAX, PROJECT_DIR_HINT, projectDirCheck, delegateCard, delegateQuestions, decisionHint, overallCapLine, answerRounds, decisionAnswerText, ANSWER_HEADING, ANSWER_PROMPT, renderInline, renderMd, answerSection, setAnswer, mdBlocks, cardView, cardViewHtml, firstParagraph, cardDesc, awaitingCheck, readOnlyTask, continueLink, SETTINGS_DEFAULTS, PREFS_DEFAULTS, WELCOME_VERSION, welcomeDue, readSettings, prefsFromRow, rowFromPrefs,
     deriveQuadrant, quadPick, groupedIds, placeGrouped, navNeighbours, deckNav, deckSequence, deckAct, swipeDir, deckPos, TASK_SWITCHERS, COVERFLOW, deckTransform, deckGeo, dotWindow, groupingNotice, byOrder, SPACING, sortBetween, gapTooSmall, renumber, mergePoll, POLL_OVERLAP_MS, pollFilter, PAGE, pageParams,
     isOpen, overdueItems, topDo, can,
     isHostedOrigin, loginRefused, REFUSED_AT_KEY, refusedBounce, refusedHandover, SIGNIN_NEXT, signinRedirect, VERSION_PATHS, versionSwitchUrl, SIGNIN_AUTH_KEY, SIGNIN_STAY_KEY, signinHandover, sessionEndedText, b64url, pkceVerifier, pkceChallenge, authorizeUrl, pkceBody, readCallback, oauthMessage,
@@ -5848,7 +5858,7 @@ function openTask(id, quad, opts) {
     const io = autoEl.querySelector('option[value=inherit]'); if (io) io.textContent = 'Inherit (' + C.AUTONOMY_NAME[inh.mode] + ')';
     autoEl.title = v === 'inherit' ? 'Inherit ' + from : v === autoShown && t.autonomySetAt ? C.AUTONOMY_NAME[v] + ' · set here by ' + personName(t.autonomySetBy) + ' · ' + fmtDay(t.autonomySetAt) : C.AUTONOMY_NAME[v] + ' · set here when you save';
     dlg.querySelector('#fau-reset').hidden = v === 'inherit';
-    const warn = C.autonomyWarning(v, inh, C.listModeOf(LIST[t.list]));
+    const warn = C.autonomyHint(v, inh, C.listModeOf(LIST[t.list]));
     w.textContent = warn; w.hidden = !warn;
   };
   if (autoEl) {
@@ -6926,8 +6936,9 @@ async function restoreList(id) {
 // only what changed, each through its RPC: rename (PATCH, owners), set_autonomy with the mode it showed (40001: changed meanwhile),
 // set_intake and set_budget (household only). A guest sees AI Brain and Project rules off with the reason, intake off, no budget.
 // T23: the List brief section (Decisions, Naming convention, Base project instruction, Concept of work) saved through set_list_brief
-// (household people; a guest reads it)
-const LS_COLS = 'id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at';
+// (household people; a guest reads it). db/034: the Project folder (lists.project_dir) saved through set_project_dir with the value it showed
+// (40001: changed meanwhile); household people only
+const LS_COLS = 'id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at,project_dir';
 const canSetList = id => !!me && me.kind === 'human' && (ROLE[id] === 'owner' || ROLE[id] === 'editor') && !!LIST[id]; // system lists too: the harness runs in them
 async function openListSettings(id, opener) {
   if (!LIST[id] || !canSetList(id)) return;
@@ -6946,9 +6957,9 @@ async function openListSettings(id, opener) {
   if (!row.ok || !row.json.length) { scroll.innerHTML = '<p class="note">' + esc(row.ok ? 'This list is gone.' : row.err.message) + '</p>'; foot.innerHTML = '<span class="sp"></span><button value="close">Close</button>'; return; }
   const r = row.json[0], cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
   const saved = { name: r.name, mode: C.listModeOf(r), e2e: !!r.e2e_self, deploy: r.deploy_target || '', tg: !!r.notify_telegram, stage: r.stage_report !== false,
-    cap: cap ? String(Number(cap.cap_usd)) : '', brief: C.briefOf(r) };
+    cap: cap ? String(Number(cap.cap_usd)) : '', brief: C.briefOf(r), dir: r.project_dir || '' };
   let decs = C.briefLines(saved.brief.decisions);
-  let expected = saved.mode, base = Object.assign({}, saved), saving = false, status = '', kind = '', confirm = false;
+  let expected = saved.mode, expectedDir = saved.dir, base = Object.assign({}, saved), saving = false, status = '', kind = '', confirm = false;
   const spent = cap ? Number(cap.spent_usd || 0) : null, money = n => '$' + Number(n).toFixed(2);
   const choices = C.autonomyChoices(hh, false, saved.mode);
   const modeRow = c => '<label class="am-mode"><input type="radio" name="am" value="' + c.mode + '"' + (c.off ? ' disabled aria-describedby="why-' + c.mode + '"' : '') + '>' +
@@ -6967,7 +6978,9 @@ async function openListSettings(id, opener) {
     '<section class="ls-sec" id="ls-intake" aria-labelledby="ls-hi"><h3 id="ls-hi">Intake defaults</h3><p class="help">Asked once for the list, not for every task.</p>' +
       (hh ? '' : '<p class="note">' + esc(C.AUTONOMY_HOUSEHOLD) + '</p>') +
       '<label class="cb"><input type="checkbox" id="ls-e2e"> Agent runs end-to-end tests</label>' +
-      '<label for="ls-deploy">Deploy target<select id="ls-deploy" aria-describedby="ls-deploy-h"><option value="">No deploy</option>' + tgOpts + '</select></label><p class="help" id="ls-deploy-h">TasksDashboard always stops at local test.</p>' +
+      '<label for="ls-deploy">Deploy target<select id="ls-deploy" aria-describedby="ls-deploy-h"><option value="">No deploy</option>' + tgOpts + '</select></label><p class="help" id="ls-deploy-h">TasksDashboard deploys only under AI Brain, after its tests pass and the deploy-readiness judge says ready.</p>' +
+      '<label for="ls-dir">Project folder<input id="ls-dir" maxlength="' + C.PROJECT_DIR_MAX + '" autocomplete="off" spellcheck="false" placeholder="D:\\Projects\\App" aria-describedby="ls-dir-h ls-dir-e"></label>' +
+      '<p class="help" id="ls-dir-h">' + esc(C.PROJECT_DIR_HINT) + '</p><div class="ls-err" id="ls-dir-e" aria-live="polite"></div>' +
       '<label class="cb"><input type="checkbox" id="ls-tg"> Notify on Telegram</label><p class="help">Off by default. Telegram only notifies. Answers come from the board.</p>' +
       '<label class="cb"><input type="checkbox" id="ls-stage"> Stage report</label></section>' +
     '<section class="ls-sec" id="ls-budget" aria-labelledby="ls-hb"><h3 id="ls-hb">Budget</h3>' +
@@ -6993,13 +7006,14 @@ async function openListSettings(id, opener) {
     dlg.querySelectorAll('[name="am"]').forEach(x => { x.checked = x.value === v.mode; });
     ['#ls-e2e', '#ls-tg', '#ls-stage'].forEach((s, i) => { $(s).checked = [v.e2e, v.tg, v.stage][i]; $(s).disabled = !hh; });
     $('#ls-deploy').value = v.deploy; $('#ls-deploy').disabled = !hh;
+    $('#ls-dir').value = v.dir; $('#ls-dir').disabled = !hh;
     if ($('#ls-cap')) $('#ls-cap').value = v.cap;
     decs = C.briefLines(v.brief.decisions); drawDecs();
     C.BRIEF_FIELDS.forEach(x => { $('#ls-b-' + x.key).value = v.brief[x.key]; });
   };
   const cur = () => ({ name: $('#ls-name').value.trim(), mode: (dlg.querySelector('[name="am"]:checked') || {}).value || base.mode, e2e: $('#ls-e2e').checked,
     deploy: $('#ls-deploy').value, tg: $('#ls-tg').checked, stage: $('#ls-stage').checked, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap,
-    brief: Object.assign({ decisions: decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#ls-b-' + x.key).value.trim() }))) });
+    brief: Object.assign({ decisions: decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#ls-b-' + x.key).value.trim() }))), dir: $('#ls-dir').value.trim() });
   const dirty = () => JSON.stringify(cur()) !== JSON.stringify(base);
   const setBy = () => { $('#ls-set-by').textContent = r.autonomy_set_at ? 'Set by ' + personName(r.autonomy_set_by) + ' · ' + longDay(Date.parse(r.autonomy_set_at)) : 'Not set yet: Mixed is the default.'; };
   const sync = () => {
@@ -7025,10 +7039,12 @@ async function openListSettings(id, opener) {
   };
   const save = async () => {
     const c = cur(), errs = [];
-    $('#ls-name-e').textContent = ''; if ($('#ls-cap-e')) $('#ls-cap-e').textContent = '';
+    $('#ls-name-e').textContent = ''; $('#ls-dir-e').textContent = ''; if ($('#ls-cap-e')) $('#ls-cap-e').textContent = '';
     if (!c.name) { $('#ls-name-e').textContent = 'A list needs a name.'; $('#ls-name').focus(); return; }
     const capN = c.cap === '' ? null : Number(c.cap);
     if (c.cap !== '' && (!isFinite(capN) || capN < 0 || capN > 100000)) { $('#ls-cap-e').textContent = 'A budget is 0 to 100000 dollars, or empty.'; $('#ls-cap').focus(); return; }
+    const dirChk = C.projectDirCheck(c.dir);
+    if (hh && c.dir !== base.dir && dirChk.error) { $('#ls-dir-e').textContent = dirChk.error; $('#ls-dir').focus(); return; }
     saving = true; status = ''; drawFoot();
     if (c.name !== base.name && owner) { if (await renameList(id, c.name)) base.name = c.name; else errs.push('name'); }
     if (c.mode !== base.mode) {
@@ -7043,6 +7059,16 @@ async function openListSettings(id, opener) {
     if (hh && (c.e2e !== base.e2e || c.deploy !== base.deploy || c.tg !== base.tg || c.stage !== base.stage)) {
       const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: c.e2e, p_deploy_target: c.deploy || null, p_notify_telegram: c.tg, p_stage_report: c.stage });
       if (a.ok) Object.assign(base, { e2e: c.e2e, deploy: c.deploy, tg: c.tg, stage: c.stage }); else errs.push(a.err.message);
+    }
+    if (hh && c.dir !== base.dir) {
+      const a = await rest('POST', 'rpc/set_project_dir', { p_list: id, p_dir: c.dir || null, p_expected: expectedDir || null });
+      if (a.ok) { base.dir = expectedDir = c.dir; LIST[id] = Object.assign({}, LIST[id], { project_dir: c.dir || null }); }
+      else if (a.err.code === '40001') {
+        const m = (String(a.err.message).match(/\(now (.*)\)\.?\s*$/) || [])[1];
+        if (m) expectedDir = m === 'not set' ? '' : m;
+        const msg = 'Someone changed the project folder meanwhile' + (m ? ' to ' + m : '') + '. Your folder is kept: save again to replace it.';
+        errs.push(msg); $('#ls-dir-e').textContent = msg;
+      } else { errs.push(a.err.message); $('#ls-dir-e').textContent = a.err.message; }
     }
     if (hh && c.cap !== base.cap) {
       const a = await rest('POST', 'rpc/set_budget', { p_list: id, p_period: 'month', p_cap: capN });

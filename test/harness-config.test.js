@@ -39,10 +39,14 @@ test('autonomy: three modes to pick (Project rules, Mixed, AI Brain), guests Mix
   assert.equal(C.autonomyChoices(true, false, 'guided').length, 3);
   assert.equal(g.find(x => x.mode === 'ai_brain').why, C.AUTONOMY_HOUSEHOLD);
   assert.equal(C.autonomyChoices(true, false).some(x => x.off || x.mode === 'inherit'), false);
-  assert.match(C.autonomyWarning('ai_brain', { mode: 'guided', from: 'list' }, 'guided'), /This list is Mixed/);
-  assert.match(C.autonomyWarning('guided', { mode: 'manual', from: 'parent' }, 'ai_brain'), /parent is Manual/);
-  assert.equal(C.autonomyWarning('manual', { mode: 'guided', from: 'list' }, 'guided'), '');
-  assert.equal(C.autonomyWarning('inherit', null, 'manual'), '');
+  // 2026-11-11: no list ceiling; a neutral hint only when the task runs as another mode than its list
+  assert.equal(C.autonomyWarning, undefined, 'the ceiling warning is gone');
+  assert.equal(C.autonomyHint('ai_brain', { mode: 'guided', from: 'list' }, 'guided'), 'Runs as AI Brain; its list is Mixed.');
+  assert.equal(C.autonomyHint('inherit', { mode: 'project_rules', from: 'parent' }, 'ai_brain'), 'Runs as Project rules; its list is AI Brain.');
+  assert.equal(C.autonomyHint('guided', { mode: 'guided', from: 'list' }, 'guided'), '', 'same as the list: no hint');
+  assert.equal(C.autonomyHint('inherit', { mode: 'guided', from: 'list' }, 'guided'), '');
+  assert.equal(C.autonomyHint('inherit', null, 'manual'), '');
+  assert.doesNotMatch(C.autonomyHint('ai_brain', null, 'guided'), /only if|wider|owner/);
 });
 
 test('rowToTask reads autonomy read only; taskToPatch never writes it', () => {
@@ -96,4 +100,19 @@ test('doneBlock: the Done control is off with a reason on decision cards, checks
   assert.match(C.doneBlock({ ...t, status: 'done' }, {}), /Already done/);
   assert.match(C.doneBlock({ ...t, status: 'cancelled' }, {}), /Cancelled/);
   assert.match(C.doneBlock({ ...t, status: 'waiting' }, {}), /Waiting|check/);
+});
+
+test('Project rules follows the project folder; the folder field checks an absolute path (db/034)', () => {
+  assert.equal(C.AUTONOMY_INFO.project_rules.does, "Agents follow this project's own CLAUDE.md, rules, permissions and hooks.");
+  assert.equal(C.AUTONOMY_INFO.project_rules.you, 'Where they say nothing, it comes to you.');
+  assert.equal(C.PROJECT_DIR_HINT, 'Empty = HomeOS. Without CLAUDE.md, rules or hooks there, Project rules acts as Mixed.');
+  assert.deepEqual(C.projectDirCheck('  '), { dir: '', error: '' });
+  assert.deepEqual(C.projectDirCheck(' D:\\Claude\\Personal\\EventBoard '), { dir: 'D:\\Claude\\Personal\\EventBoard', error: '' });
+  assert.equal(C.projectDirCheck('D:/Claude/x').error, '');
+  assert.equal(C.projectDirCheck('/home/me/app').error, '');
+  assert.match(C.projectDirCheck('Claude\\x').error, /absolute path/);
+  assert.match(C.projectDirCheck('D:\\a\\..\\b').error, /No \.\./);
+  assert.match(C.projectDirCheck('D:/' + 'a'.repeat(C.PROJECT_DIR_MAX)).error, /At most 260/);
+  assert.match(C.projectDirCheck('D:/a\tb').error, /control/);
+  assert.equal(C.projectDirCheck('D:/a..b').error, '', 'two dots inside a name are fine');
 });

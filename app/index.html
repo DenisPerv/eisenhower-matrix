@@ -1916,8 +1916,8 @@ async function openListSettings(id) {
   const r = await D.listSettings(id);
   if (!$('#dlg-lset').open) return;
   if (!r.ok) { $('#lset-body').innerHTML = `<p class="note" role="alert">${esc(r.err.message)}</p>`; return; }
-  const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, deploy: row.deploy_target || '', tg: !!row.notify_telegram, stage: row.stage_report !== false, cap: r.cap === null ? '' : String(r.cap), brief: C.briefOf(row) };
-  LSET = { id, hh, base, expected: base.mode, decs: C.briefLines(base.brief.decisions) };
+  const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, deploy: row.deploy_target || '', tg: !!row.notify_telegram, stage: row.stage_report !== false, cap: r.cap === null ? '' : String(r.cap), brief: C.briefOf(row), dir: row.project_dir || '' };
+  LSET = { id, hh, base, expected: base.mode, expectedDir: base.dir, decs: C.briefLines(base.brief.decisions) };
   const modes = C.autonomyChoices(hh, false, base.mode).map(c => `<label class="amode"><input type="radio" name="lset-am" value="${c.mode}"${c.mode === base.mode ? ' checked' : ''}${c.off ? ` disabled aria-describedby="lset-why-${c.mode}"` : ''}><span class="nm">${C.AUTONOMY_NAME[c.mode]}${c.mode === 'guided' ? ' <small>Default</small>' : ''}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].does)}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].you)}</span>${c.off ? `<span class="why" id="lset-why-${c.mode}">${esc(c.why)}</span>` : ''}</label>`).join('');
   const dis = hh ? '' : ' disabled';
   $('#lset-body').innerHTML = `<h3 class="lset-h3">Autonomy</h3><p class="hint">How much agents decide on their own in this list. Each task can narrow or widen it.</p>
@@ -1928,7 +1928,9 @@ async function openListSettings(id) {
     <h3 class="lset-h3">Intake defaults</h3><p class="hint">Asked once for the list, not for every task.</p>${hh ? '' : `<p class="note info">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
     <label class="cbline"><input type="checkbox" id="lset-e2e"${base.e2e ? ' checked' : ''}${dis}> Agent runs end-to-end tests</label>
     <label class="field"><span>Deploy target</span><select class="inp" id="lset-deploy"${dis}><option value="">No deploy</option>${r.targets.map(x => `<option value="${esc(x.key)}"${x.key === base.deploy ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
-    <p class="hint">TasksDashboard always stops at local test.</p>
+    <p class="hint">TasksDashboard deploys only under AI Brain, after its tests pass and the deploy-readiness judge says ready.</p>
+    <label class="field"><span>Project folder</span><input class="inp" id="lset-dir" maxlength="${C.PROJECT_DIR_MAX}" autocomplete="off" spellcheck="false" placeholder="D:\\Projects\\App" value="${esc(base.dir)}" aria-describedby="lset-dir-h"${dis}></label>
+    <p class="hint" id="lset-dir-h">${esc(C.PROJECT_DIR_HINT)}</p><p class="err" id="lset-dir-e" hidden></p>
     <label class="cbline"><input type="checkbox" id="lset-tg"${base.tg ? ' checked' : ''}${dis}> Notify on Telegram</label><p class="hint">Off by default. Telegram only notifies. Answers come from the board.</p>
     <label class="cbline"><input type="checkbox" id="lset-stage"${base.stage ? ' checked' : ''}${dis}> Stage report</label>
     <h3 class="lset-h3">Budget</h3>${hh ? `<label class="field"><span>Monthly budget ($)</span><input class="inp" id="lset-cap" type="number" min="0" max="100000" step="1" inputmode="decimal" value="${esc(base.cap)}" aria-describedby="lset-cap-h"></label>
@@ -1950,7 +1952,7 @@ function lsetDecAdd() {
   LSET.decs.push(l); inp.value = ''; lsetDecs(); lsetSync(); inp.focus();
 }
 const lsetCur = () => ({ mode: (document.querySelector('[name="lset-am"]:checked') || {}).value || LSET.base.mode, e2e: $('#lset-e2e').checked, deploy: $('#lset-deploy').value, tg: $('#lset-tg').checked, stage: $('#lset-stage').checked, cap: $('#lset-cap') ? $('#lset-cap').value.trim() : LSET.base.cap,
-  brief: Object.assign({ decisions: LSET.decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#lset-b-' + x.key) ? $('#lset-b-' + x.key).value.trim() : LSET.base.brief[x.key] }))) });
+  brief: Object.assign({ decisions: LSET.decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#lset-b-' + x.key) ? $('#lset-b-' + x.key).value.trim() : LSET.base.brief[x.key] }))), dir: $('#lset-dir') ? $('#lset-dir').value.trim() : LSET.base.dir });
 function lsetSync() {
   if (!LSET || !$('#lset-e2e')) return;
   const c = lsetCur(), dirty = JSON.stringify(c) !== JSON.stringify(LSET.base);
@@ -1961,22 +1963,26 @@ function lsetSync() {
 }
 async function saveListSettings() {
   const c = lsetCur(), b = LSET.base, ch = {};
-  { const ce = $('#lset-cap-e'); if (ce) ce.hidden = true; }
+  { const ce = $('#lset-cap-e'); if (ce) ce.hidden = true; const de = $('#lset-dir-e'); if (de) de.hidden = true; }
+  if (LSET.hh && c.dir !== b.dir) { const chk = C.projectDirCheck(c.dir); if (chk.error) { const e = $('#lset-dir-e'); e.textContent = chk.error; e.hidden = false; $('#lset-dir').focus(); return; } }
   const capN = c.cap === '' ? null : Number(c.cap);
   if (c.cap !== '' && (!isFinite(capN) || capN < 0 || capN > 100000)) { const e = $('#lset-cap-e'); e.textContent = 'A budget is 0 to 100000 dollars, or empty.'; e.hidden = false; $('#lset-cap').focus(); return; }
   if (c.mode !== b.mode) Object.assign(ch, { mode: c.mode, expected: LSET.expected });
   if (LSET.hh && (c.e2e !== b.e2e || c.deploy !== b.deploy || c.tg !== b.tg || c.stage !== b.stage)) ch.intake = { e2e: c.e2e, deploy: c.deploy, tg: c.tg, stage: c.stage };
   if (LSET.hh && c.cap !== b.cap) ch.cap = capN;
+  if (LSET.hh && c.dir !== b.dir) ch.dir = { dir: c.dir, expected: LSET.expectedDir };
   if (LSET.hh && JSON.stringify(c.brief) !== JSON.stringify(b.brief)) ch.brief = c.brief;
   LSET.saving = true; $('#lset-save').disabled = true; $('#lset-status').textContent = 'Saving…';
   const r = await D.saveListSettings(LSET.id, ch);
   LSET.saving = false;
   const st = $('#lset-status');
-  if (r.ok) { LSET.base = c; LSET.expected = c.mode; st.dataset.done = 'Saved'; st.dataset.kind = ' ok'; toast(`List settings saved: ${lname(LSET.id)}`); }
-  else { const lm = L(LSET.id); if (lm && lm.autonomy) LSET.expected = lm.autonomy; st.dataset.done = r.errs.join(' '); st.dataset.kind = ' bad'; if (r.capErr && $('#lset-cap-e')) { $('#lset-cap-e').textContent = r.capErr; $('#lset-cap-e').hidden = false; } }
+  if (r.ok) { LSET.base = c; LSET.expected = c.mode; LSET.expectedDir = c.dir; st.dataset.done = 'Saved'; st.dataset.kind = ' ok'; toast(`List settings saved: ${lname(LSET.id)}`); }
+  else { const lm = L(LSET.id); if (lm && lm.autonomy) LSET.expected = lm.autonomy; st.dataset.done = r.errs.join(' '); st.dataset.kind = ' bad'; if (r.capErr && $('#lset-cap-e')) { $('#lset-cap-e').textContent = r.capErr; $('#lset-cap-e').hidden = false; }
+    if (r.dirErr === null) { LSET.base = Object.assign({}, LSET.base, { dir: c.dir }); LSET.expectedDir = c.dir; }
+    if (r.dirErr && $('#lset-dir-e')) { if (r.dirNow !== undefined) LSET.expectedDir = r.dirNow; $('#lset-dir-e').textContent = r.dirErr; $('#lset-dir-e').hidden = false; } }
   lsetSync(); renderAll();
 }
-// the task's Autonomy row: what it inherits (parent chain, then list), a warning when wider, Reset to inherit
+// the task's Autonomy row: what it inherits (parent chain, then list), a hint when it runs as another mode than its list, Reset to inherit
 function autoRowHtml(t) {
   const r = role(t.list);
   if (!me() || me().kind !== 'human' || (r !== 'owner' && r !== 'editor') || isClosed(t)) return '';
@@ -1994,7 +2000,7 @@ function drawAutoRow() {
   sel.title = (v === 'inherit' ? 'Inherit ' + (inh.from === 'parent' ? `from parent ${ref(inh.parent)}: ${C.AUTONOMY_NAME[inh.mode]}` : `from list: ${C.AUTONOMY_NAME[inh.mode]}`)
     : C.AUTONOMY_NAME[v] + (t.autonomySetAt ? ` · set here by ${personName(t.autonomySetBy)} · ${ymd(t.autonomySetAt)}` : ' · set here')) + (D.pendingAutonomy().some(x => x.id === t.id) ? ' · waits to be sent' : '');
   document.querySelector('[data-act="t-au-reset"]').hidden = v === 'inherit';
-  const w = C.autonomyWarning(v, inh, C.listModeOf(L(t.list))); $('#t-au-w').textContent = w; $('#t-au-w').hidden = !w;
+  const w = C.autonomyHint(v, inh, C.listModeOf(L(t.list))); $('#t-au-w').textContent = w; $('#t-au-w').hidden = !w;
 }
 async function changeAutonomy(mode) {
   const t = task(TS && TS.id); if (!t) return;

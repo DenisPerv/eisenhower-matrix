@@ -1728,6 +1728,34 @@ async function gHarness() {
         check(G, 'list brief (T23): Save stores the naming and a Decisions line "yyyy-mm-dd · Maksym… · text" through set_list_brief (updated by Maksym)',
           !!br && /^\d{4}-\d{2}-\d{2} · .+ · .+keep two backups$/m.test(br.brief_decisions || '') && br.brief_updated_by === MK.uid, JSON.stringify(br));
       }
+      // db/034: the Project folder field in Intake defaults (household), saved through set_project_dir, cleared again
+      const pdf = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd'),i=d.querySelector('#ls-intake #ls-dir'),h=d.querySelector('#ls-dir-h');return {there:!!i,on:!!i&&!i.disabled,hint:h?h.textContent:''}})()`);
+      check(G, 'Project folder (db/034): a field in Intake defaults, on for the household, with the hint "Empty = HomeOS…"',
+        pdf.there && pdf.on && pdf.hint === 'Empty = HomeOS. Without CLAUDE.md, rules or hooks there, Project rules acts as Mixed.', JSON.stringify(pdf));
+      if (pdf.there) {
+        const setDir = v => T.ev(`(()=>{const d=document.querySelector('dialog.lsd'),i=d.querySelector('#ls-dir');d.querySelector('#ls-intake').scrollIntoView();i.value=${JSON.stringify(v)};i.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+        await setDir('relative\\folder'); await T.click('dialog.lsd #ls-save'); await sleep(300);
+        const bad = await T.ev(`document.querySelector('dialog.lsd #ls-dir-e').textContent`);
+        check(G, 'Project folder: a relative path is refused in the window before any call', /absolute path/.test(bad), bad);
+        const dir = 'D:/e2e/' + RUN;
+        await setDir(dir); await sleep(300);
+        await T.shot('list-settings-project-folder-1440x900');
+        await T.size(390, 844); await sleep(400);
+        await T.ev(`document.querySelector('dialog.lsd #ls-dir').scrollIntoView({block:'center'}),true`); await sleep(200);
+        const pw = await T.ev(`(()=>{const d=document.querySelector('dialog.lsd'),i=d.querySelector('#ls-dir').getBoundingClientRect();return {fits:i.left>=0&&i.right<=innerWidth+1&&document.documentElement.scrollWidth<=innerWidth}})()`);
+        check(G, 'Project folder (390 px): the field fits the sheet, no horizontal scroll', pw.fits, JSON.stringify(pw));
+        await T.shot('list-settings-project-folder-390x844');
+        await T.size(1440, 900); await sleep(300);
+        await T.click('dialog.lsd #ls-save');
+        const pd = await until(async () => { const r = (await MK.rest('GET', 'lists?select=project_dir&id=eq.' + ST.id)).json[0]; return r && r.project_dir === dir ? r : null; });
+        check(G, 'Project folder: Save stores it through set_project_dir', !!pd, JSON.stringify(pd));
+        await T.wait(`document.querySelector('dialog.lsd #ls-status')?.textContent==='Saved'`, 5000);
+        await setDir(''); await T.click('dialog.lsd #ls-save');
+        const pc = await until(async () => { const r = (await MK.rest('GET', 'lists?select=project_dir&id=eq.' + ST.id)).json[0]; return r && r.project_dir === null ? r : null; });
+        check(G, 'Project folder: an empty field clears it (HomeOS)', !!pc, JSON.stringify(pc));
+        const rp = await MK.rest('PATCH', 'lists?id=eq.' + ST.id, { project_dir: 'D:/x' }, { Prefer: 'return=representation' });
+        check(G, 'Project folder: a direct PATCH of lists.project_dir is refused (no column grant)', !rp.ok, rp.ok ? rp.json.length + ' rows' : '');
+      }
       await closeDialogs(T);
     }
     // V14: homeos-agent reads the brief but cannot write it (set_list_brief refuses agents; no column grant for brief_*)
@@ -1856,7 +1884,7 @@ async function gHarness() {
         await closeDialogs(T);
       }
     }
-    // the task's Autonomy row: the child inherits Manual from its parent, Guided is wider than the parent
+    // the task's Autonomy row: the child inherits Manual from its parent; Guided shows the neutral hint when its list has another mode
     const par = await mkItem('autonomy parent', { sort_key: 9100001 }), kid = await mkItem('autonomy child', { sort_key: 9100002 });
     await MK.rest('POST', 'item_links', { from_item: kid.id, to_item: par.id, kind: 'parent' }, { Prefer: 'return=minimal' });
     const sa = await MK.rest('POST', 'rpc/set_autonomy', { p_kind: 'item', p_id: par.id, p_mode: 'manual', p_expected: 'inherit' });
@@ -1867,9 +1895,13 @@ async function gHarness() {
     check(G, 'task window: Autonomy shows "Inherit (Manual (old))" and no caption line; where it comes from is the dropdown title ("from parent #… : Manual"); no Reset', !!cap && cap.v === 'inherit' && cap.opt === 'Inherit (Manual (old))' && /^Inherit from parent .+: Manual \(old\)$/.test(cap.title) && !cap.cap && cap.reset, JSON.stringify(cap));
     if (ao) {
       await T.ev(`(()=>{const s=document.querySelector('${W} #fau');s.value='guided';s.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
-      const w = await T.ev(`(()=>{const d=document.querySelector('${W}'),n=d.querySelector('#fau-w');return {warn:!n.hidden&&/parent is Manual|This list is (Manual|Project rules)/.test(n.textContent),reset:!d.querySelector('#fau-reset').hidden}})()`);
-      check(G, 'task window: Guided under a Manual parent (or list) warns and offers Reset to inherit', w.warn && w.reset, JSON.stringify(w));
+      const lm = ((await MK.rest('GET', 'lists?select=autonomy&id=eq.' + ST.id)).json[0] || {}).autonomy;
+      const w = await T.ev(`(()=>{const d=document.querySelector('${W}'),n=d.querySelector('#fau-w');return {shown:!n.hidden,text:n.textContent,reset:!d.querySelector('#fau-reset').hidden}})()`);
+      const want = lm === 'guided' ? '' : 'Runs as Mixed; its list is ' + ({ manual: 'Manual (old)', project_rules: 'Project rules', ai_brain: 'AI Brain' })[lm] + '.';
+      check(G, 'task window: Guided shows "Runs as Mixed; its list is …" only when the list differs, no ceiling wording; Reset to inherit offered',
+        (want ? w.shown && w.text === want : !w.shown) && !/only if|wider|owner set/.test(w.text) && w.reset, JSON.stringify({ lm, w }));
       await sleep(600); await T.shot('task-autonomy-1440x900');
+      await T.size(390, 844); await sleep(400); await T.shot('task-autonomy-390x844'); await T.size(1440, 900); await sleep(300);
       await T.click(W + ' #fs');
       const k = await until(async () => { const x = await item(kid.id); return x && x.autonomy === 'guided' ? x : null; });
       check(G, 'task window: Save sets the task to Guided through set_autonomy (items.version unchanged by it)', !!k && k.version === kid.version, k ? 'version ' + k.version + ' was ' + kid.version : 'not set');
@@ -1890,7 +1922,12 @@ async function gHarness() {
       const lsOk = await P.ev(`(()=>{if(typeof openListSettings!=='function')return false;openListSettings(${JSON.stringify(ST.id)});return true})()`) && await P.wait('!!document.querySelector("#dlg-lset[open] [name=lset-am]")', 8000);
       const pl = lsOk ? await P.ev(`(()=>{const d=document.querySelector('#dlg-lset');return {modes:d.querySelectorAll('[name=lset-am]').length,save:d.querySelector('#lset-save').disabled,status:d.querySelector('#lset-status').textContent,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
       check(G, 'phone: list settings sheet with three modes, Save off with "No changes", no horizontal scroll', !!pl && pl.modes === 3 && pl.save && pl.status === 'No changes' && !pl.wide, JSON.stringify(pl));
-      if (lsOk) { await sleep(700); await P.shot('list-settings-app-375x812'); }
+      if (lsOk) {
+        const pf = await P.ev(`(()=>{const d=document.querySelector('#dlg-lset'),i=d.querySelector('#lset-dir');return {there:!!i,on:!!i&&!i.disabled,hint:(d.querySelector('#lset-dir-h')||{}).textContent,fits:!!i&&i.getBoundingClientRect().right<=innerWidth+1}})()`);
+        check(G, 'phone list sheet (db/034): a Project folder field with the hint, on for the household, inside the screen', pf.there && pf.on && /^Empty = HomeOS\./.test(pf.hint || '') && pf.fits, JSON.stringify(pf));
+        await sleep(700); await P.shot('list-settings-app-375x812');
+        await P.ev(`document.querySelector('#lset-dir')?.scrollIntoView({block:'center'}),true`); await sleep(300); await P.shot('list-settings-app-folder-375x812');
+      }
     } finally { await P.close().catch(() => {}); }
     // the Decision section on a Delegate card (the text HomeOS claim.js cardText writes)
     const CARDTXT = ['Original task text', '', '---', '', '## Delegate · 2026-11-11 10:00', 'Session: **do-142 · e2e**', '', '### Questions', '**1. Keep how many remote backups?**', 'A) 2', 'B) 4', 'C) 8', 'Recommended: A) 2', '',

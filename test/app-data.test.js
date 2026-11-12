@@ -965,6 +965,24 @@ test('T23: saveListSettings sends the list brief through set_list_brief with all
   assert.equal(r.ok, false); assert.equal(r.errs.length, 1, 'the refusal is told');
 });
 
+test('db/034: saveListSettings sends the project folder through set_project_dir with the value it showed; 40001 gives the new value', async () => {
+  const sent = [];
+  let reply = () => [200, 'D:/Projects/App'];
+  const f = fakeSupabase([['POST', /^\/rest\/v1\/rpc\/set_project_dir/, (m, body) => { sent.push(body); return reply(); }]]);
+  const d = make(f);
+  await signIn(d, true);
+  await d.loadAll();
+  assert.deepEqual(await d.saveListSettings(LIST, { dir: { dir: 'D:/Projects/App', expected: '' } }), { ok: true, errs: [], capErr: null, dirErr: null });
+  assert.deepEqual(sent.pop(), { p_list: LIST, p_dir: 'D:/Projects/App', p_expected: null });
+  reply = () => [409, { code: '40001', message: 'the project folder changed meanwhile (now /srv/other)' }];
+  const r = await d.saveListSettings(LIST, { dir: { dir: '', expected: 'D:/Projects/App' } });
+  assert.deepEqual(sent.pop(), { p_list: LIST, p_dir: null, p_expected: 'D:/Projects/App' }, 'an empty folder is sent as null (HomeOS)');
+  assert.equal(r.ok, false); assert.equal(r.dirNow, '/srv/other'); assert.match(r.dirErr, /changed the project folder meanwhile to \/srv\/other/);
+  reply = () => [409, { code: '40001', message: 'the project folder changed meanwhile (now not set)' }];
+  assert.equal((await d.saveListSettings(LIST, { dir: { dir: 'D:/x', expected: '/srv/other' } })).dirNow, '');
+  assert.deepEqual(await d.saveListSettings(LIST, {}), { ok: true, errs: [], capErr: null }, 'no folder change: no dir keys');
+});
+
 test('db/033: a list cap above the overall cap comes back with the database text as capErr; listSettings gives the overall cap line', async () => {
   const f = fakeSupabase([
     ['POST', /^\/rest\/v1\/rpc\/set_budget/, () => [400, { code: '22023', message: 'a list cap may not be above the overall cap ($100)' }]],
