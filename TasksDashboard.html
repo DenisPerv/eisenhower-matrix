@@ -5301,7 +5301,7 @@ async function saveAutonomy(t, mode, expected) {
     const x = find(t.id); if (x) Object.assign(x, { autonomy: mode, autonomySetBy: me.id, autonomySetAt: new Date() });
     toast('Autonomy: ' + C.AUTONOMY_NAME[mode] + ' · ' + plain(t.title)); render(); return true;
   }
-  const now = r.err.code === '40001' && (String(r.err.message).match(/now (\w+)/) || [])[1];
+  const now = (r.err.code === 'PT409' || r.err.code === '40001') && (String(r.err.message).match(/now (\w+)/) || [])[1];
   if (now) { const x = find(t.id); if (x) x.autonomy = now; }
   toast(now ? 'Autonomy not saved: someone set it to ' + C.AUTONOMY_NAME[now] + ' meanwhile.' : 'Autonomy not saved: ' + r.err.message);
   return false;
@@ -7050,7 +7050,7 @@ async function openListSettings(id, opener) {
     if (c.mode !== base.mode) {
       const a = await rest('POST', 'rpc/set_autonomy', { p_kind: 'list', p_id: id, p_mode: c.mode, p_expected: expected });
       if (a.ok) { base.mode = expected = c.mode; LIST[id] = Object.assign({}, LIST[id], { autonomy: c.mode }); r.autonomy_set_by = me.id; r.autonomy_set_at = new Date().toISOString(); setBy(); }
-      else if (a.err.code === '40001') {
+      else if ((a.err.code === 'PT409' || a.err.code === '40001')) {
         const m = (String(a.err.message).match(/now (\w+)/) || [])[1];
         if (m) { expected = m; LIST[id] = Object.assign({}, LIST[id], { autonomy: m }); }
         errs.push('Someone changed the mode meanwhile' + (m ? ' to ' + C.AUTONOMY_NAME[m] : '') + '. Your choice is kept: save again to replace it.');
@@ -7063,7 +7063,7 @@ async function openListSettings(id, opener) {
     if (hh && c.dir !== base.dir) {
       const a = await rest('POST', 'rpc/set_project_dir', { p_list: id, p_dir: c.dir || null, p_expected: expectedDir || null });
       if (a.ok) { base.dir = expectedDir = c.dir; LIST[id] = Object.assign({}, LIST[id], { project_dir: c.dir || null }); }
-      else if (a.err.code === '40001') {
+      else if ((a.err.code === 'PT409' || a.err.code === '40001')) {
         const m = (String(a.err.message).match(/\(now (.*)\)\.?\s*$/) || [])[1];
         if (m) expectedDir = m === 'not set' ? '' : m;
         const msg = 'Someone changed the project folder meanwhile' + (m ? ' to ' + m : '') + '. Your folder is kept: save again to replace it.';

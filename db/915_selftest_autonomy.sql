@@ -97,7 +97,7 @@ begin
   -- ---------- E: people ----------
   perform public._au_as(h1);
   perform public._au_chk('E1 owner sets the list to AI Brain', public._au(format('select public.set_autonomy(%L, %L, %L, %L)', 'list', l1, 'ai_brain', 'guided')), 'ai_brain');
-  perform public._au_chk('E2 a stale expected mode is refused', public._au(format('select public.set_autonomy(%L, %L, %L, %L)', 'list', l1, 'guided', 'guided')), 'ERR 40001%');
+  perform public._au_chk('E2 a stale expected mode is refused', public._au(format('select public.set_autonomy(%L, %L, %L, %L)', 'list', l1, 'guided', 'guided')), 'ERR PT409%');
   perform public._au_chk('E3 a list never inherits', public._au(format('select public.set_autonomy(%L, %L, %L, %L)', 'list', l1, 'inherit', 'ai_brain')), 'ERR 22023%');
   perform public._au_chk('E4 an unknown mode', public._au(format('select public.set_autonomy(%L, %L, %L, %L)', 'list', l1, 'yolo', 'ai_brain')), 'ERR 22023%');
   perform public._au_chk('E5 no expected mode', public._au(format('select public.set_autonomy(%L, %L, %L, null)', 'list', l1, 'guided')), 'ERR 22023%');

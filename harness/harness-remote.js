@@ -1,7 +1,8 @@
 /* The Eisenhower Harness page on the web (/harness/, HomeOS task #45 plan v4). The other four files of this folder are byte-equal copies
    of HomeOS-TasksBoardHarness/viewer/ (tools/copy-viewer-to-app.js there); this file is the only app-only one. It sets
    window.HarnessTransport before harness.js runs, so the page asks TasksDashboardDB instead of a local server:
-     getJson   /api/runs, /api/runs/<ts>, /api/runs/<ts>/feed/<name>, /api/budget, /api/limits  -> selects on harness_heads / harness_parts (db/031)
+     getJson   /api/runs, /api/runs/<ts>, /api/runs/<ts>/feed/<name>, /api/budget, /api/limits, /api/config  -> selects on harness_heads / harness_parts (db/031);
+               /api/config is the household part's `config` (harness-web.js), or a { web: { state } } stand-in for a guest or before the first publish
      postJson  /api/action, /api/limits  -> rpc/harness_request, then the command's state until the PC that owns the run reports it
      events    polls the head's seq every 5 s while the page is visible (60 s hidden) and calls the page's change / runs handlers
      can       greys what the web cannot carry out now (decisions 2 and 5): "Run local version" with the reason
@@ -53,6 +54,10 @@
   // the limits a whole-form Save changes, one command per scope (decision 2): [{ scope_list, payload, base_hash }]
   function limitScopes(view, form) {
     var out = [], same = function (a, b) { return JSON.stringify(a) === JSON.stringify(b); };
+    if (form && form.scope === 'machine') {   // Workload "mothers at once" (db/036): always one command, the local page's POST body as { machine }
+      var n = form.payload && form.payload.max_mothers;
+      return [{ scope: 'machine', scope_list: null, payload: { machine: { max_mothers: n } }, base_hash: form.base_hash || (view.base_hash || {}).machine }];
+    }
     var pick = function (r) { return { enabled: r.enabled, max_sessions: r.max_sessions, max_agents_per_session: r.max_agents_per_session }; };
     if (!same(view.defaults, form.defaults)) out.push({ scope: 'defaults', scope_list: null, payload: { defaults: form.defaults }, base_hash: (view.base_hash || {}).defaults });
     (view.rows || []).forEach(function (r) {
@@ -64,8 +69,8 @@
   // may this reader press this control now? null = yes, else the reason after "Run local version" (decisions 2 and 5)
   function verdict(ctx, action, s, extra) {
     var dev = ctx.device, label = dev ? dev.label : 'the PC';
-    if (action === 'claude') return 'opens the Claude app on ' + label;
-    if (action === 'copy') return 'run it on ' + label + ', in the repo folder';
+    if (action === 'claude') return 'needs this computer (run the local page)';
+    if (action === 'copy') return null;   // the command text is in the published model; copying it needs no PC
     if (!dev) return 'no PC publishes this run';
     var silent = !dev.beat_at || ctx.now - Date.parse(dev.beat_at) > SILENT_MS || dev.state !== 'running';
     if (silent) return label + ' is silent';
@@ -73,6 +78,7 @@
     var ownsPc = dev.owner_id && dev.owner_id === ctx.me, ownsList = function (id) { return !!id && ctx.roles[id] === 'owner'; };
     if (action === 'limits') {
       var sc = extra && extra.scope;
+      if (sc === 'machine') return ownsPc ? null : 'only the owner of ' + label + ' may change mothers at once';
       if (sc === 'defaults') return ownsPc ? null : 'only the owner of ' + label + ' may change the default limits';
       if (sc && sc.indexOf('list:') === 0) { var row = (ctx.limits && ctx.limits.rows || []).filter(function (r) { return 'list:' + r.slug === sc; })[0]; return ownsList(row && row.list_id) ? null : 'only the owners of this list may change its limits'; }
       return ownsPc || (ctx.limits && ctx.limits.rows || []).some(function (r) { return ownsList(r.list_id); }) ? null : 'only the owners of a list may change limits';
@@ -83,8 +89,18 @@
     return ownsList(id) ? null : 'only the owners of ' + (s && s.list ? s.list : 'this list') + ' may';
   }
 
+  // what GET /api/config answers on the web: rows = the household part's config select ([] = not readable: a guest), label = the PC's name
+  function configAnswer(rows, label, hasRun) {
+    var stand = function (state, text) { return { web: { state: state, text: text, label: label }, device: label, limits: null, board: null, board_error: null, board_at: null, machine: null, published_at: null }; };
+    if (!hasRun) return stand('waiting', 'Waiting for the PC to publish: no PC publishes a run to the web yet.');
+    if (!rows || !rows.length) return stand('guest', 'The configuration of ' + label + ' shows to the household only. Run the local version on that PC.');
+    var c = rows[0].v;
+    if (!c || typeof c !== 'object') return stand('waiting', 'Waiting for ' + label + ' to publish its configuration (about a minute after the page is opened there or a run starts).');
+    return Object.assign({}, c, { device: c.device || label });
+  }
+
   // ---------- the browser side ----------
-  if (typeof window === 'undefined' || !window.document) { if (typeof module === 'object') module.exports = { merge: merge, mergeFeed: mergeFeed, sessionLists: sessionLists, limitScopes: limitScopes, verdict: verdict }; return; }
+  if (typeof window === 'undefined' || !window.document) { if (typeof module === 'object') module.exports = { merge: merge, mergeFeed: mergeFeed, sessionLists: sessionLists, limitScopes: limitScopes, verdict: verdict, configAnswer: configAnswer }; return; }
   var W = window, CFG = null, session = null, me = null, device = null, devices = {}, heads = [], roles = {}, lastLimits = null, sessionList = {}, headAt = {};
   var store = function (s) { try { return s(); } catch (e) { return null; } };
   var ls = { get: function (k) { return store(function () { return localStorage.getItem(k); }); }, set: function (k, v) { store(function () { localStorage.setItem(k, v); }); } };
@@ -180,7 +196,7 @@
       Object.assign(sessionList, sessionLists(rows));
       var m = merge(parts);
       if (m.limits_view) lastLimits = m.limits_view;
-      delete m.budget; delete m.limits_view;
+      delete m.budget; delete m.limits_view; delete m.config;   // config: GET /api/config reads it on its own
       m.ts = m.ts || ts; m.at = h && h.head ? h.head.at || null : null; headAt[ts] = h ? h.seq : null;
       if (!rows.length) throw new Error('no data of this run on the web yet');
       return m;
@@ -208,6 +224,17 @@
       }
       if ((m = /^\/api\/runs\/([0-9a-z_-]+)\/feed\/([a-z0-9_-]+)(?:\?after=(-?\d+))?$/.exec(u))) return readFeed(m[1], m[2], m[3] ? Number(m[3]) : -1);
       if ((m = /^\/api\/runs\/([0-9a-z_-]+)$/.exec(u))) return readRun(m[1]);
+      if (u === '/api/config' || u === '/api/config?fresh=1') {
+        return (u === '/api/config' ? Promise.resolve() : loadHeads()).then(function () {
+          var label = (devices[device] || {}).label || device || 'the PC', head = myHeads()[0];
+          if (!head) return configAnswer(null, label, false);
+          return rest('harness_parts?select=v:body->config&device=eq.' + q(device) + '&run_ts=eq.' + q(head.run_ts) + '&part=eq.household').then(function (rows) {
+            var a = configAnswer(rows, label, true);
+            if (a.limits && !lastLimits) lastLimits = a.limits;
+            return a;
+          });
+        });
+      }
       throw new Error('not on the web: ' + u);
     });
   }

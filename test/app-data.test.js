@@ -942,7 +942,7 @@ test('T15: Autonomy goes through set_autonomy with the shown mode; offline it wa
   assert.equal(JSON.parse(d.opts.storage.local.getItem(D.SETTINGS_KEY)).length, 1);
   assert.equal(d.pendingAutonomy().length, 1);
   f.offline = false;
-  reply = () => [409, { code: '40001', message: 'the mode changed meanwhile (now manual)' }];
+  reply = () => [409, { code: 'PT409', message: 'the mode changed meanwhile (now manual)' }];
   const toasts = []; d.on('toast', x => toasts.push(x.msg));
   await d.flushAll();
   assert.deepEqual(sent.pop(), { p_kind: 'list', p_id: LIST, p_mode: 'ai_brain', p_expected: 'guided' }, 'the queued change carries its expected mode');
@@ -974,7 +974,7 @@ test('db/034: saveListSettings sends the project folder through set_project_dir 
   await d.loadAll();
   assert.deepEqual(await d.saveListSettings(LIST, { dir: { dir: 'D:/Projects/App', expected: '' } }), { ok: true, errs: [], capErr: null, dirErr: null });
   assert.deepEqual(sent.pop(), { p_list: LIST, p_dir: 'D:/Projects/App', p_expected: null });
-  reply = () => [409, { code: '40001', message: 'the project folder changed meanwhile (now /srv/other)' }];
+  reply = () => [409, { code: 'PT409', message: 'the project folder changed meanwhile (now /srv/other)' }];
   const r = await d.saveListSettings(LIST, { dir: { dir: '', expected: 'D:/Projects/App' } });
   assert.deepEqual(sent.pop(), { p_list: LIST, p_dir: null, p_expected: 'D:/Projects/App' }, 'an empty folder is sent as null (HomeOS)');
   assert.equal(r.ok, false); assert.equal(r.dirNow, '/srv/other'); assert.match(r.dirErr, /changed the project folder meanwhile to \/srv\/other/);

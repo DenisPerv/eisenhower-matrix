@@ -1160,7 +1160,7 @@
     async function sendAutonomy(e) {
       const r = await rpc('set_autonomy', { p_kind: e.kind, p_id: e.id, p_mode: e.mode, p_expected: e.expected });
       if (r.ok) return { ok: true };
-      const now = r.err.code === '40001' ? (String(r.err.message).match(/now (\w+)/) || [])[1] || null : null;
+      const now = (r.err.code === 'PT409' || r.err.code === '40001') ? (String(r.err.message).match(/now (\w+)/) || [])[1] || null : null;
       return { ok: false, err: r.err, now, network: r.err.kind === 'network' };
     }
     async function setAutonomy(kind, id, mode, expected) {
@@ -1211,9 +1211,9 @@
         const r = await rpc('set_project_dir', { p_list: id, p_dir: ch.dir.dir || null, p_expected: ch.dir.expected || null });
         if (r.ok) dir = { dirErr: null };
         else {
-          const m = r.err.code === '40001' ? (String(r.err.message).match(/\(now (.*)\)\.?\s*$/) || [])[1] : undefined;
+          const m = (r.err.code === 'PT409' || r.err.code === '40001') ? (String(r.err.message).match(/\(now (.*)\)\.?\s*$/) || [])[1] : undefined;
           const now = m === undefined ? undefined : m === 'not set' ? '' : m;
-          const msg = r.err.code === '40001' ? 'Someone changed the project folder meanwhile' + (m ? ' to ' + m : '') + '. Your folder is kept: save again to replace it.' : r.err.message;
+          const msg = (r.err.code === 'PT409' || r.err.code === '40001') ? 'Someone changed the project folder meanwhile' + (m ? ' to ' + m : '') + '. Your folder is kept: save again to replace it.' : r.err.message;
           errs.push(msg); dir = { dirErr: msg, dirNow: now };
         }
       }

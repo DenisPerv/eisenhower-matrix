@@ -69,7 +69,7 @@ begin
   perform public._pd_chk('P1 owner sets a Windows folder',
     public._pd(format('select public.set_project_dir(%L, %L, null)', l1, 'D:\Claude\Personal\EventBoard')), 'D:_Claude_Personal_EventBoard');
   perform public._pd_chk('P2 a stale expected value is refused',
-    public._pd(format('select public.set_project_dir(%L, %L, null)', l1, 'D:/Other')), 'ERR 40001%');
+    public._pd(format('select public.set_project_dir(%L, %L, null)', l1, 'D:/Other')), 'ERR PT409%');
   perform public._pd_chk('P3 a relative path is refused',
     public._pd(format('select public.set_project_dir(%L, %L, %L)', l1, 'Claude\x', 'D:\Claude\Personal\EventBoard')), 'ERR 22023%');
   perform public._pd_chk('P4 a path with .. is refused',

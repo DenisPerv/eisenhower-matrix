@@ -48,12 +48,19 @@ test('limitScopes: one command per changed scope, each with its base hash and li
   assert.deepEqual(s[2].payload.row, { enabled: false, max_sessions: 1, max_agents_per_session: 0 });
 });
 
-test('verdict: Continue in Claude and Copy always greyed; silent, controls off, owners of the list, the PC owner for the master and defaults', () => {
+test('limitScopes: the Workload machine scope (mothers at once, db/036) is one command with no list', () => {
+  const view = { defaults: { max_sessions: 2, max_agents_per_session: 2 }, base_hash: { defaults: 'd0', machine: 'm0' }, rows: [] };
+  assert.deepEqual(R.limitScopes(view, { scope: 'machine', payload: { max_mothers: 3 }, base_hash: 'm1' }),
+    [{ scope: 'machine', scope_list: null, payload: { machine: { max_mothers: 3 } }, base_hash: 'm1' }]);
+  assert.equal(R.limitScopes(view, { scope: 'machine', payload: { max_mothers: 2 }, base_hash: null })[0].base_hash, 'm0', 'falls back to the view hash');
+});
+
+test('verdict: Continue in Claude greyed, Copy allowed; silent, controls off, owners of the list, the PC owner for the master and defaults', () => {
   const now = Date.parse('2026-11-09T12:00:00Z');
   const dev = { label: 'Laptop', owner_id: 'me', beat_at: new Date(now - 30000).toISOString(), state: 'running', controls: true };
   const ctx = { device: dev, me: 'me', roles: { [L1]: 'owner', [L2]: 'editor' }, sessionList: { 'do-a-1': L1, 'do-b-1': L2 }, limits: { rows: [{ slug: 'a', list_id: L1 }, { slug: 'b', list_id: L2 }] }, now };
-  assert.match(R.verdict(ctx, 'claude', { name: 'do-a-1' }), /Claude app on Laptop/);
-  assert.match(R.verdict(ctx, 'copy', { name: 'do-a-1' }), /Laptop/);
+  assert.match(R.verdict(ctx, 'claude', { name: 'do-a-1' }), /needs this computer/);
+  assert.equal(R.verdict(ctx, 'copy', { name: 'do-a-1' }), null);
   assert.equal(R.verdict(ctx, 'stop', { name: 'do-a-1', list: 'a' }), null);
   assert.match(R.verdict(ctx, 'stop', { name: 'do-b-1', list: 'b' }), /only the owners of b/);
   assert.equal(R.verdict(ctx, 'continue', { name: 'master', role: 'master' }), null);
@@ -64,6 +71,34 @@ test('verdict: Continue in Claude and Copy always greyed; silent, controls off, 
   assert.equal(R.verdict(ctx, 'limits', null, { scope: 'list:a' }), null);
   assert.match(R.verdict(ctx, 'limits', null, { scope: 'list:b' }), /owners of this list/);
   assert.equal(R.verdict(ctx, 'limits', null, { scope: 'defaults' }), null);
+  assert.equal(R.verdict(ctx, 'limits', null, { scope: 'machine' }), null, 'the PC owner sets mothers at once');
+  assert.match(R.verdict({ ...ctx, me: 'other' }, 'limits', null, { scope: 'machine' }), /only the owner of Laptop may change mothers at once/);
+  assert.match(R.verdict({ ...ctx, me: 'other', roles: { [L2]: 'owner' } }, 'limits', null, { scope: 'machine' }), /owner of Laptop/, 'a list owner is not the PC owner');
+  assert.match(R.verdict({ ...ctx, device: { ...dev, controls: false } }, 'limits', null, { scope: 'machine' }), /remote control is off/);
   assert.match(R.verdict({ ...ctx, me: 'x', roles: {} }, 'limits', null, { scope: 'any' }), /owners of a list/);
   assert.match(R.verdict({ ...ctx, device: null }, 'stop', { name: 'do-a-1' }), /no PC/);
+});
+
+test('verdict: Copy is allowed on the web (the command is in the published model); Continue in Claude needs this computer', () => {
+  const now = Date.parse('2026-11-09T12:00:00Z');
+  const ctx = { device: { label: 'Laptop', owner_id: 'me', beat_at: new Date(now - 30000).toISOString(), state: 'running', controls: true }, me: 'x', roles: {}, sessionList: {}, limits: null, now };
+  assert.equal(R.verdict(ctx, 'copy', { name: 'do-a-1' }), null);
+  assert.equal(R.verdict({ ...ctx, device: null }, 'copy', { name: 'do-a-1' }), null, 'even with no PC');
+  assert.equal(R.verdict(ctx, 'claude', { name: 'do-a-1' }), 'needs this computer (run the local page)');
+});
+
+test('configAnswer: /api/config from the household part, a guest state and a waiting state', () => {
+  const cfg = { device: 'MDENYSIUK-PERS', limits: { rows: [] }, board: { lists: [], routing: { base: {} } }, board_error: null, board_at: 'x', machine: { host: 'h' }, published_at: '2026-11-12T00:00:00Z' };
+  const a = R.configAnswer([{ v: cfg }], 'PC', true);
+  assert.equal(a.published_at, cfg.published_at);
+  assert.deepEqual(a.board, cfg.board);
+  assert.equal(a.web, undefined);
+  const g = R.configAnswer([], 'PC', true);
+  assert.equal(g.web.state, 'guest');
+  assert.match(g.web.text, /household only/);
+  assert.equal(g.board, null);
+  const w = R.configAnswer([{ v: null }], 'PC', true);
+  assert.equal(w.web.state, 'waiting');
+  assert.match(w.web.text, /Waiting for PC to publish/);
+  assert.equal(R.configAnswer(null, 'PC', false).web.state, 'waiting');
 });

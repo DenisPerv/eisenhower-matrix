@@ -74,7 +74,7 @@ begin
   -- ---------- P: push ----------
   perform public._hw_as(ag);
   perform public._hw_chk('P1 the writer pushes', public._hw(format('select public.harness_push(%L, %L, 0, true, %L::jsonb, %L::jsonb)', 'st-hw-dev1', ts, head, put)), '1');
-  perform public._hw_chk('P2 a stale seq is refused', public._hw(format('select public.harness_push(%L, %L, 0, true, %L::jsonb, %L::jsonb)', 'st-hw-dev1', ts, head, '{}')), 'ERR 40001%');
+  perform public._hw_chk('P2 a stale seq is refused', public._hw(format('select public.harness_push(%L, %L, 0, true, %L::jsonb, %L::jsonb)', 'st-hw-dev1', ts, head, '{}')), 'ERR PT409%');
   perform public._hw_chk('P3 the next seq', public._hw(format('select public.harness_push(%L, %L, 1, true, %L::jsonb, %L::jsonb, %L::text[])', 'st-hw-dev1', ts, head, '{}', '{}')), '2');
   perform public._hw_chk('P4 a part of a list the agent has no role on', public._hw(format('select public.harness_push(%L, %L, 2, true, %L::jsonb, %L::jsonb)', 'st-hw-dev1', ts, head,
     jsonb_build_object('list:' || l3, jsonb_build_object('list_id', l3, 'hash', 'x', 'body', '{}'::jsonb)))), 'ERR 42501%');

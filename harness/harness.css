@@ -1094,3 +1094,12 @@ html.amb-live .amb-dw{opacity:var(--dlvl,.5)}
 
 /* Replay the Day: one frame without transitions, so the old moment disappears at once */
 html.snap #stage,html.snap #stage *{transition:none!important;animation:none!important}
+
+/* Configurations: the web copy's publish line, Model routing facts (web plan #4) */
+.cfg-pub{color:var(--muted);font-size:12.5px;margin:4px 0 10px}
+.cfg-t td.cfg-chg{color:var(--warn)}
+.cfg-facts{margin:0;display:grid;gap:8px}
+.cfg-facts>div{display:grid;grid-template-columns:130px 1fr;gap:12px;font-size:14px}
+.cfg-facts dt{color:var(--muted)}
+.cfg-facts dd{margin:0}
+@media (max-width:759px){.cfg-facts>div{grid-template-columns:1fr;gap:2px}}
