@@ -237,7 +237,7 @@ function readPos(){posDirty=false;var rb=$('ringbox');if(!rb)return;var r=rb.get
   POS.routine=rectC($('orb-routine'));var OSR={};MOTHERS.forEach(function(n){var os=$('os-'+n);if(os&&os.offsetWidth&&ORB[n]){var q=os.getBoundingClientRect();POS[n]={x:q.left+q.width/2,y:q.top+q.height/2};ORB[n].sc=q.width/(2*ORB[n].R);OSR[os.id]={l:q.left,t:q.top,sc:ORB[n].sc,L:ORB[n]}}else POS[n]=rectC($('orb-'+n))});
   /* a planet's place is computed from its system (orbitPlace keeps it in L.loc), so the page is not asked for one rect per planet */
   var inSys=function(e,key){var o=e.parentNode&&OSR[e.parentNode.id],p=o&&o.L.loc&&o.L.loc[key];return p?{x:o.l+p.x*o.sc,y:o.t+p.y*o.sc}:null};
-  Object.keys(ODEL).forEach(function(r){var e=ODEL[r],p=e.isConnected&&inSys(e,'t:'+r);if(p)DP[r]=p;else if(e.isConnected&&e.offsetParent)DP[r]=rectC(e);else delete DP[r]});Object.keys(SLOT).forEach(function(n){var p=inSys(SLOT[n],n);if(p)POS[n]=p;else if(SLOT[n].offsetParent)POS[n]=rectC(SLOT[n]);else delete POS[n]});TASKS.forEach(function(k){if(k._b&&k._b.classList.contains('on')&&k._b.offsetParent)CHP[k.ref]=rectC(k._b);else delete CHP[k.ref]})}
+  Object.keys(ODEL).forEach(function(r){var e=ODEL[r],ok=e.isConnected&&!!e.closest('.qborn'),p=ok&&inSys(e,'t:'+r);if(p)DP[r]=p;else if(ok&&e.offsetParent)DP[r]=rectC(e);else delete DP[r]});Object.keys(SLOT).forEach(function(n){var p=inSys(SLOT[n],n);if(p)POS[n]=p;else if(SLOT[n].offsetParent)POS[n]=rectC(SLOT[n]);else delete POS[n]});TASKS.forEach(function(k){if(k._b&&k._b.classList.contains('on')&&k._b.offsetParent)CHP[k.ref]=rectC(k._b);else delete CHP[k.ref]})}
 /* the stage zooms out until everything fits (CSS zoom, so every rect the canvas reads is already scaled); the person can zoom
    in or out on top of that (buttons, Ctrl or pinch + wheel), kept per viewer. Not in the phone layout or the classic view. */
 var ZM={k:1,fit:1,user:1,min:1,tw:0,ft:0},ZB={l:null,r:null,t:null,b:null};try{ZM.user=Math.max(1,Math.min(4,+localStorage.getItem('eis-zoom')||1))}catch(e){}
@@ -486,7 +486,7 @@ function orbSway(at){if(!STAGE.classList.contains('orbmode')||!OA.anch||!OA.anch
 function drawOrbits(amb,at){var mv=MANIM;MANIM=false;var swd=amb&&orbSway(at);if(!swd&&mv)orbAnchor(MOTHERS.map(function(n,i){return $('q'+i)}));if((swd||mv)&&!(AMB.spin>0))readPos();STAGE.classList.toggle('spinning',!!(amb&&AMB.spin>0));elimWatch();drawEfx();if((amb&&AMB.spin>0)||OANIM){OANIM=false;MOTHERS.forEach(function(n){orbitPlace(n,amb?at:0)});readPos()}
   MOTHERS.forEach(function(n){var L=ORB[n],p=POS[n];if(!L||!L.sc||!p)return;var qa=target('ob'+n,(M.sess[n]||{}).born);if(qa<=0)return;
     for(var o=1;o<=L.maxO;o++){var al=(amb?.07+.08*wave(at,13000+o*2300,hash01(n)+o*.23):.1)*qa;cx.beginPath();cx.arc(p.x,p.y,o*L.r1*L.sc,0,Math.PI*2);cx.strokeStyle='rgba(168,176,194,'+al.toFixed(3)+')';cx.lineWidth=ZS;cx.stroke()}});
-  Object.keys(DP).forEach(function(r){var d=DP[r];sp(cx,'#f4ad4e',d.x,d.y,7,.32*(amb?.75+.25*wave(at,3800,hash01(r)):1))})}
+  Object.keys(DP).forEach(function(r){var d=DP[r],e=ODEL[r];if(!e||!e.isConnected||!e.closest('.qborn'))return;sp(cx,'#f4ad4e',d.x,d.y,7,.32*(amb?.75+.25*wave(at,3800,hash01(r)):1))})}
 
 function tint(hex,k){var key=hex+k;if(tintC[key])return tintC[key];var n=parseInt(hex.slice(1),16),f=function(v){return Math.round(v+(255-v)*k)};return tintC[key]='#'+((1<<24)+(f(n>>16)<<16)+(f((n>>8)&255)<<8)+f(n&255)).toString(16).slice(1)}
 function desat(hex){if(desatC[hex])return desatC[hex];var n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255,l=.3*r+.59*g+.11*b,k=.62;

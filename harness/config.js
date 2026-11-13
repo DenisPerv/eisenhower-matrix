@@ -52,7 +52,7 @@
     var d = S.data; if (!d) return '';
     if (WEBST()) return WEBST().state === 'guest' ? 'household only' : 'waiting';
     if (id === 'routing') { var R = d.board && d.board.routing; return R ? 'read only' : 'not read'; }
-    if (id === 'workload') { var live = 0, max = 0; limRows().forEach(function (r) { live += r.live || 0; if (r.enabled !== false) max += r.max_sessions || 0; }); return live + ' of ' + max + ' sessions live'; }
+    if (id === 'workload') { var live = 0, max = 0; limRows().forEach(function (r) { live += r.live || 0; if (r.enabled === true) max += r.max_sessions || 0; }); return live + ' of ' + max + ' sessions live'; }
     if (id === 'lists') { var b = lists().filter(function (l) { return l.effective === 'ai_brain'; }).length; return lists().length ? lists().length + ' lists' + (b ? ', ' + b + ' on AI Brain' : '') : 'board not read'; }
     return 'TBD';
   }
@@ -96,7 +96,7 @@
     if (!S.data) { p.appendChild(skel()); return; }
     if (webState(p)) return;
     var rows = limRows(), live = 0, max = 0, L = S.data.limits || {}, MX = L.max || {}, DEF = L.defaults || {};
-    rows.forEach(function (r) { live += r.live || 0; if (r.enabled !== false) max += r.max_sessions || 0; });
+    rows.forEach(function (r) { live += r.live || 0; if (r.enabled === true) max += r.max_sessions || 0; });
     var sec = el('section', 'cfg-sec'); sec.appendChild(el('h3', null, 'This device'));
     var t = table('This device and its sessions', [['Device'], ['Runs sessions'], ['Live / limit']]), tr = el('tr');
     var c1 = cell(tr, 'Device', 'h'); c1.appendChild(el('span', null, (S.data.device || 'this device') + ' (this device)')); c1.appendChild(el('span', 'cfg-st', max ? 'Online' : 'Off: takes no new sessions'));
@@ -128,12 +128,12 @@
     var collect = function () { return [].map.call(t2.tBodies[0].rows, function (tr2) { var q = function (f) { return tr2.querySelector('[data-f="' + f + '"]'); }; return { slug: tr2.dataset.slug, enabled: q('enabled').checked, max_sessions: q('max_sessions').value, max_agents_per_session: q('max_agents_per_session').value }; }); };
     var changed = function () { clearTimeout(wlTimer); wlTimer = setTimeout(function () { saveLists(collect(), msg); }, 500); };
     rows.forEach(function (r) {
-      var tr2 = el('tr'); tr2.dataset.slug = r.slug; if (r.enabled === false) tr2.className = 'muted';
+      var tr2 = el('tr'); tr2.dataset.slug = r.slug; if (r.enabled !== true) tr2.className = 'muted';
       var nm = cell(tr2, 'List', 'h', r.name || r.slug); if (r.on_board === false) nm.appendChild(el('span', 'cfg-st', 'not on the board'));
-      var cb = el('input'); cb.type = 'checkbox'; cb.checked = r.enabled !== false; cb.dataset.f = 'enabled'; cb.setAttribute('aria-label', (r.name || r.slug) + ' on'); cb.onchange = changed; cell(tr2, 'On').appendChild(cb);
+      var cb = el('input'); cb.type = 'checkbox'; cb.checked = r.enabled === true; cb.dataset.f = 'enabled'; cb.setAttribute('aria-label', (r.name || r.slug) + ' on'); cb.onchange = changed; cell(tr2, 'On').appendChild(cb);
       var i1 = numIn(r.max_sessions, MX.max_sessions || 10, (r.name || r.slug) + ' max sessions'); i1.dataset.f = 'max_sessions'; i1.onchange = changed; cell(tr2, 'Sessions', 'n').appendChild(i1);
       var i2 = numIn(r.max_agents_per_session, MX.max_agents_per_session || 10, (r.name || r.slug) + ' max subagents'); i2.dataset.f = 'max_agents_per_session'; i2.onchange = changed; cell(tr2, 'Subagents', 'n').appendChild(i2);
-      cell(tr2, 'Live / limit').appendChild(meter(r.live || 0, r.enabled === false ? 0 : r.max_sessions || 0));
+      cell(tr2, 'Live / limit').appendChild(meter(r.live || 0, r.enabled !== true ? 0 : r.max_sessions || 0));
       var g = gateOf('list:' + r.slug); if (g) [cb, i1, i2].forEach(function (x) { x.disabled = true; x.title = g; });
       t2.tBodies[0].appendChild(tr2);
     });
@@ -142,7 +142,7 @@
     rb.title = 'Every list on, with the default sessions and subagents of this device';
     rb.onclick = function () {
       if (!window.confirm('Reset every list on this device to on, ' + DEF.max_sessions + ' sessions and ' + DEF.max_agents_per_session + ' subagents?')) return;
-      clearTimeout(wlTimer); saveLists(rows.map(function (r) { return { slug: r.slug, enabled: true, max_sessions: String(DEF.max_sessions), max_agents_per_session: String(DEF.max_agents_per_session) }; }), msg, 'Every list reset to the defaults.');
+      clearTimeout(wlTimer); saveLists(rows.map(function (r) { return { slug: r.slug, enabled: false, max_sessions: String(DEF.max_sessions), max_agents_per_session: String(DEF.max_agents_per_session) }; }), msg, 'Every list reset to the defaults.');
     };
     if (!rows.length || gateOf('any')) rb.disabled = true;
     acts.appendChild(rb); s2.appendChild(acts); s2.appendChild(msg);
