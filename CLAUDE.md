@@ -87,7 +87,7 @@ Rule since 2026-10-29: the deployed and local versions had drifted apart, each w
 - **The person tests locally first.** Nothing is merged into `release_maxden` and nothing is deployed until the person has tested the change on the local version and said so in chat. A plan puts "local test by <person>" before its release task, and its release and deploy tasks depend on it. A worker stops at "ready for local test", reports the sha and leaves the release and deploy rows pending.
 - **Release and deploy only follow development.** `release_maxden` only ever receives merges from `development_maxden`. A fix made directly on `release_maxden` (avoid it) is merged back into `development_maxden` in the same task. Deploys come only from `release_maxden`. So the hosted page is never ahead of the local version.
 - **Database changes follow the same order.** A `db/` file that the released page needs is applied live before the person's local test, because the local page runs against the live database too.
-- **Exception: AI Brain.** Under AI Brain (set by a household person) a task whose list intake names the `tasksdashboard` deploy target may merge `development_maxden` into `release_maxden` and deploy, only after unit tests and e2e pass on a preview and the deploy-readiness judge says ready; outside AI Brain local first is unchanged.
+- **Exception: AI Brain.** Under AI Brain (set by a household person) a task whose approved plan carries a ## Deploy block copied from this file's "Local first" and deployment sections may merge `development_maxden` into `release_maxden` and deploy, only after unit tests and e2e pass on a preview and the deploy-readiness judge says ready; outside AI Brain local first is unchanged.
 
 ## Code
 
