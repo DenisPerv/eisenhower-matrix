@@ -1181,27 +1181,26 @@
       }
     }
     const pendingAutonomy = () => settingsQ().filter(x => me && x.uid === me.id);
-    // the list's settings, read fresh (web: openListSettings): the row, deploy targets and this month's budget (household only)
+    // the list's settings, read fresh (web: openListSettings): the row and this month's budget (household only)
     async function listSettings(id) {
       const hh = !!(me && me.is_household);
-      const [row, targets, bud] = await Promise.all([
-        rest('GET', 'lists?select=id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at,project_dir&id=eq.' + id),
-        hh ? rest('GET', 'deploy_targets?select=key,label&order=label') : Promise.resolve({ ok: true, json: [] }),
+      const [row, bud] = await Promise.all([
+        rest('GET', 'lists?select=id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at,project_dir&id=eq.' + id),
         hh ? rpc('budget_status', { p_list: id }) : Promise.resolve({ ok: true, json: [] }),
       ]);
       if (!row.ok) return row;
       if (!row.json.length) return { ok: false, err: { message: 'This list is gone.' } };
       const cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
-      return { ok: true, row: row.json[0], targets: targets.ok ? targets.json : [], cap: cap ? Number(cap.cap_usd) : null, spent: cap ? Number(cap.spent_usd || 0) : null, budgetErr: bud.ok ? null : bud.err.message,
+      return { ok: true, row: row.json[0], cap: cap ? Number(cap.cap_usd) : null, spent: cap ? Number(cap.spent_usd || 0) : null, budgetErr: bud.ok ? null : bud.err.message,
         overall: C.overallCapLine(bud.ok ? bud.json : []) };
     }
-    // saves only what changed: { mode, expected, intake: { e2e, deploy, tg, stage }, cap (number or null), brief: { decisions, naming,
+    // saves only what changed: { mode, expected, intake: { e2e, tg, stage }, cap (number or null), brief: { decisions, naming,
     // instruction, concept } (T23, set_list_brief, household people), dir: { dir, expected } (db/034, set_project_dir, household people) };
     // returns the errors in order (with dir: dirErr and dirNow, the folder someone else set meanwhile). New list uses it too (expected guided)
     async function saveListSettings(id, ch) {
       const errs = [];
       if (ch.mode) { const r = await setAutonomy('list', id, ch.mode, ch.expected); if (!r.ok) errs.push(r.now ? 'Someone set the mode to ' + C.AUTONOMY_NAME[r.now] + ' meanwhile. Save again to replace it.' : r.err.message); }
-      if (ch.intake) { const i = ch.intake, r = await rpc('set_intake', { p_kind: 'list', p_id: id, p_e2e_self: i.e2e, p_deploy_target: i.deploy || null, p_notify_telegram: i.tg, p_stage_report: i.stage }); if (!r.ok) errs.push(r.err.message); }
+      if (ch.intake) { const i = ch.intake, r = await rpc('set_intake', { p_kind: 'list', p_id: id, p_e2e_self: i.e2e, p_deploy_target: null, p_notify_telegram: i.tg, p_stage_report: i.stage }); if (!r.ok) errs.push(r.err.message); }
       // db/033: a list cap above the overall cap is refused; the database's text comes back as capErr (and in errs)
       let capErr = null;
       if (ch.cap !== undefined) { const r = await rpc('set_budget', { p_list: id, p_period: 'month', p_cap: ch.cap }); if (!r.ok) { errs.push(r.err.message); capErr = r.err.message; } }

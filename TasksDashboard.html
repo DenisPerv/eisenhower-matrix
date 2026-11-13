@@ -6946,7 +6946,7 @@ async function restoreList(id) {
 // T23: the List brief section (Decisions, Naming convention, Base project instruction, Concept of work) saved through set_list_brief
 // (household people; a guest reads it). db/034: the Project folder (lists.project_dir) saved through set_project_dir with the value it showed
 // (40001: changed meanwhile); household people only
-const LS_COLS = 'id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,deploy_target,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at,project_dir';
+const LS_COLS = 'id,name,owner_id,autonomy,autonomy_set_by,autonomy_set_at,e2e_self,notify_telegram,stage_report,brief_decisions,brief_naming,brief_instruction,brief_concept,brief_updated_by,brief_updated_at,project_dir';
 const canSetList = id => !!me && me.kind === 'human' && (ROLE[id] === 'owner' || ROLE[id] === 'editor') && !!LIST[id]; // system lists too: the harness runs in them
 async function openListSettings(id, opener) {
   if (!LIST[id] || !canSetList(id)) return;
@@ -6956,15 +6956,14 @@ async function openListSettings(id, opener) {
     '<div class="ls-foot" id="ls-foot"></div></form>', opener || '#profile');
   dlg.classList.add('lsd'); dlg.setAttribute('aria-labelledby', 'ls-h');
   const scroll = dlg.querySelector('#ls-scroll'), nav = dlg.querySelector('#ls-nav'), foot = dlg.querySelector('#ls-foot');
-  const [row, targets, bud] = await Promise.all([
+  const [row, bud] = await Promise.all([
     rest('GET', 'lists?select=' + LS_COLS + '&id=eq.' + id),
-    hh ? rest('GET', 'deploy_targets?select=key,label&order=label') : Promise.resolve({ ok: true, json: [] }),
     hh ? rest('POST', 'rpc/budget_status', { p_list: id }) : Promise.resolve({ ok: true, json: [] }),
   ]);
   if (!dlg.isConnected) return;
   if (!row.ok || !row.json.length) { scroll.innerHTML = '<p class="note">' + esc(row.ok ? 'This list is gone.' : row.err.message) + '</p>'; foot.innerHTML = '<span class="sp"></span><button value="close">Close</button>'; return; }
   const r = row.json[0], cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
-  const saved = { name: r.name, mode: C.listModeOf(r), e2e: !!r.e2e_self, deploy: r.deploy_target || '', tg: !!r.notify_telegram, stage: r.stage_report == null ? null : r.stage_report,
+  const saved = { name: r.name, mode: C.listModeOf(r), e2e: !!r.e2e_self, tg: !!r.notify_telegram, stage: r.stage_report == null ? null : r.stage_report,
     cap: cap ? String(Number(cap.cap_usd)) : '', brief: C.briefOf(r), dir: r.project_dir || '' };
   let decs = C.briefLines(saved.brief.decisions);
   let expected = saved.mode, expectedDir = saved.dir, base = Object.assign({}, saved), saving = false, status = '', kind = '', confirm = false;
@@ -6973,7 +6972,6 @@ async function openListSettings(id, opener) {
   const modeRow = c => '<label class="am-mode"><input type="radio" name="am" value="' + c.mode + '"' + (c.off ? ' disabled aria-describedby="why-' + c.mode + '"' : '') + '>' +
     '<span class="nm">' + C.AUTONOMY_NAME[c.mode] + (c.mode === 'guided' ? '<span class="def">Default</span>' : '') + '</span><span class="ln">' + esc(C.AUTONOMY_INFO[c.mode].does) + '</span><span class="ln">' + esc(C.AUTONOMY_INFO[c.mode].you) + '</span>' +
     (c.off ? '<span class="why" id="why-' + c.mode + '">' + esc(c.why) + '</span>' : '') + '</label>';
-  const tgOpts = (targets.ok ? targets.json : []).map(x => '<option value="' + esc(x.key) + '">' + esc(x.label) + '</option>').join('');
   scroll.innerHTML =
     '<section class="ls-sec" id="ls-general" aria-labelledby="ls-hg"><h3 id="ls-hg">General</h3><label for="ls-name">Name<input id="ls-name" maxlength="60" autocomplete="off"' + (owner ? '' : ' disabled aria-describedby="ls-name-h"') + '></label>' +
       (owner ? '' : '<p class="help" id="ls-name-h">' + (C.isSystemList(LIST[id]) ? 'A system list: scripts use it, so its name stays.' : 'Only the owner renames it.') + '</p>') + '<div class="ls-err" id="ls-name-e" aria-live="polite"></div></section>' +
@@ -6986,7 +6984,6 @@ async function openListSettings(id, opener) {
     '<section class="ls-sec" id="ls-intake" aria-labelledby="ls-hi"><h3 id="ls-hi">Intake defaults</h3><p class="help">Asked once for the list, not for every task.</p>' +
       (hh ? '' : '<p class="note">' + esc(C.AUTONOMY_HOUSEHOLD) + '</p>') +
       '<label class="cb"><input type="checkbox" id="ls-e2e"> Agent runs end-to-end tests</label>' +
-      '<label for="ls-deploy">Deploy target<select id="ls-deploy" aria-describedby="ls-deploy-h"><option value="">No deploy</option>' + tgOpts + '</select></label><p class="help" id="ls-deploy-h">TasksDashboard deploys only under AI Brain, after its tests pass and the deploy-readiness judge says ready.</p>' +
       '<label for="ls-dir">Project folder<input id="ls-dir" maxlength="' + C.PROJECT_DIR_MAX + '" autocomplete="off" spellcheck="false" placeholder="D:\\Projects\\App" aria-describedby="ls-dir-h ls-dir-e"></label>' +
       '<p class="help" id="ls-dir-h">' + esc(C.PROJECT_DIR_HINT) + '</p><div class="ls-err" id="ls-dir-e" aria-live="polite"></div>' +
       '<label class="cb"><input type="checkbox" id="ls-tg"> Notify on Telegram</label><p class="help">Off by default. Telegram only notifies. Answers come from the board.</p>' +
@@ -7002,7 +6999,7 @@ async function openListSettings(id, opener) {
       C.BRIEF_FIELDS.map(x => '<label for="ls-b-' + x.key + '">' + x.label + '<textarea id="ls-b-' + x.key + '" maxlength="' + C.BRIEF_MAX + '" aria-describedby="ls-b-' + x.key + '-h"' + (hh ? '' : ' readonly') + '></textarea></label><p class="help" id="ls-b-' + x.key + '-h">' + esc(x.help) + '</p>').join('') +
       '<p class="help" id="ls-brief-by"></p></section>';
   const $ = s => dlg.querySelector(s);
-  const navItems = [['ls-general', 'General', () => cur().name], ['ls-autonomy', 'Autonomy', () => C.AUTONOMY_NAME[cur().mode]], ['ls-intake', 'Intake defaults', () => cur().deploy ? 'Deploy set' : 'No deploy'],
+  const navItems = [['ls-general', 'General', () => cur().name], ['ls-autonomy', 'Autonomy', () => C.AUTONOMY_NAME[cur().mode]], ['ls-intake', 'Intake defaults', () => cur().e2e ? 'Tests on' : 'Tests off'],
     ['ls-budget', 'Budget', () => !hh ? 'Household' : cur().cap ? (spent !== null ? money(spent) + ' of ' : '') + '$' + cur().cap : 'No cap'],
     ['ls-brief', 'List brief', () => { const n = C.briefLines(cur().brief.decisions).length; return n ? n + (n === 1 ? ' decision' : ' decisions') : C.briefCount(cur().brief) ? 'Written' : 'Empty'; }]];
   const drawDecs = () => {
@@ -7013,14 +7010,13 @@ async function openListSettings(id, opener) {
     $('#ls-name').value = v.name;
     dlg.querySelectorAll('[name="am"]').forEach(x => { x.checked = x.value === v.mode; });
     ['#ls-e2e', '#ls-tg'].forEach((s, i) => { $(s).checked = [v.e2e, v.tg][i]; $(s).disabled = !hh; });
-    $('#ls-deploy').value = v.deploy; $('#ls-deploy').disabled = !hh;
     $('#ls-dir').value = v.dir; $('#ls-dir').disabled = !hh;
     if ($('#ls-cap')) $('#ls-cap').value = v.cap;
     decs = C.briefLines(v.brief.decisions); drawDecs();
     C.BRIEF_FIELDS.forEach(x => { $('#ls-b-' + x.key).value = v.brief[x.key]; });
   };
   const cur = () => ({ name: $('#ls-name').value.trim(), mode: (dlg.querySelector('[name="am"]:checked') || {}).value || base.mode, e2e: $('#ls-e2e').checked,
-    deploy: $('#ls-deploy').value, tg: $('#ls-tg').checked, stage: base.stage, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap,
+    tg: $('#ls-tg').checked, stage: base.stage, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap,
     brief: Object.assign({ decisions: decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#ls-b-' + x.key).value.trim() }))), dir: $('#ls-dir').value.trim() });
   const dirty = () => JSON.stringify(cur()) !== JSON.stringify(base);
   const setBy = () => { $('#ls-set-by').textContent = r.autonomy_set_at ? 'Set by ' + personName(r.autonomy_set_by) + ' · ' + longDay(Date.parse(r.autonomy_set_at)) : 'Not set yet: Mixed is the default.'; };
@@ -7064,9 +7060,9 @@ async function openListSettings(id, opener) {
         errs.push('Someone changed the mode meanwhile' + (m ? ' to ' + C.AUTONOMY_NAME[m] : '') + '. Your choice is kept: save again to replace it.');
       } else errs.push(a.err.message);
     }
-    if (hh && (c.e2e !== base.e2e || c.deploy !== base.deploy || c.tg !== base.tg)) {
-      const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: c.e2e, p_deploy_target: c.deploy || null, p_notify_telegram: c.tg, p_stage_report: c.stage });
-      if (a.ok) Object.assign(base, { e2e: c.e2e, deploy: c.deploy, tg: c.tg }); else errs.push(a.err.message);
+    if (hh && (c.e2e !== base.e2e || c.tg !== base.tg)) {
+      const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: c.e2e, p_deploy_target: null, p_notify_telegram: c.tg, p_stage_report: c.stage });
+      if (a.ok) Object.assign(base, { e2e: c.e2e, tg: c.tg }); else errs.push(a.err.message);
     }
     if (hh && c.dir !== base.dir) {
       const a = await rest('POST', 'rpc/set_project_dir', { p_list: id, p_dir: c.dir || null, p_expected: expectedDir || null });

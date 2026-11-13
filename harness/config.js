@@ -1,7 +1,7 @@
 /* Eisenhower harness viewer: the Configurations page (harness-configurations-plan.md T11, UI spec references/homeos/harness-configurations/ui/
    configurations-page-spec.md, winner p1 with the p2 changes). Tabs Workload, Lists, Model routing (read only: config/routing.json);
    Notifications and Machine removed and the mothers cap moved to Workload (Maksym, 2026-11-11). Lists (2026-11-13) holds the board's
-   List settings except Stage report - Autonomy, Intake (e2e, deploy target, project folder, Telegram), monthly budget and the list brief -
+   List settings except Stage report - Autonomy, Intake (e2e, project folder, Telegram), monthly budget and the list brief -
    written through the same RPCs as the board (set_autonomy, set_intake, set_project_dir, set_list_brief, set_budget); it replaced the
    Autonomy and Budgets tabs. Workload limits are the person's own DB row (db/041); each PC syncs it into its limits file.
    Reads GET /api/config. Writes this device's limits file through the page's own POST /api/limits (Workload: mothers, lists, Reset all), and
@@ -200,8 +200,8 @@
   function listChanges(l, f, monthCap) {
     var out = [], it = l.intake || {}, bt = l.brief_texts || {};
     if (f.mode !== l.mode) out.push(['set_autonomy', { p_kind: 'list', p_id: l.id, p_mode: f.mode, p_expected: l.mode }]);
-    if (!!f.e2e !== !!it.e2e_self || (f.deploy || null) !== (it.deploy_target || null) || !!f.tg !== !!it.notify_telegram)
-      out.push(['set_intake', { p_kind: 'list', p_id: l.id, p_e2e_self: !!f.e2e, p_deploy_target: f.deploy || null, p_notify_telegram: !!f.tg, p_stage_report: null }]);
+    if (!!f.e2e !== !!it.e2e_self || !!f.tg !== !!it.notify_telegram)
+      out.push(['set_intake', { p_kind: 'list', p_id: l.id, p_e2e_self: !!f.e2e, p_deploy_target: null, p_notify_telegram: !!f.tg, p_stage_report: null }]);
     var dir = String(f.dir || '').trim();
     if (dir !== (l.project_dir || '')) out.push(['set_project_dir', { p_list: l.id, p_dir: dir, p_expected: l.project_dir || null }]);
     if (LIST_BRIEF.some(function (k) { return (f.brief[k[0]] || '') !== (bt[k[0]] || ''); }))
@@ -216,7 +216,7 @@
     if (/(^|[\\/])\.\.([\\/]|$)/.test(d) || /[\u0000-\u001f]/.test(d)) return 'The project folder may not contain ".." or control characters.';
     return '';
   }
-  function listForm(l, targets) {
+  function listForm(l) {
     var cap = capOf(l.slug), spent = spentOf(l.slug), it = l.intake || {}, bt = l.brief_texts || {};
     var d = el('details', 'cfg-lf'); d.dataset.slug = l.slug; var sm = el('summary');
     sm.appendChild(el('b', null, l.name)); sm.appendChild(modeEl(l.mode)); sm.appendChild(el('span', 'cfg-st', cap != null ? money(spent) + ' of ' + moneyShort(cap) + ' this month' : 'no budget'));
@@ -228,10 +228,6 @@
     ORDER.concat(ORDER.indexOf(l.mode) < 0 ? [l.mode] : []).forEach(function (m) { var o = el('option', null, (MODES[m] || MODES.guided).n + (m === 'guided' ? ' (default)' : '')); o.value = m; if (m === l.mode) o.selected = true; if (ORDER.indexOf(m) < 0) o.disabled = true; sel.appendChild(o); });
     field('Autonomy', sel, l.effective !== l.mode ? 'Runs as ' + (MODES[l.effective] || MODES.guided).n + ': ' + (l.why || []).join('; ') : (l.set_by ? 'Set by ' + l.set_by : 'Default'));
     var e2e = field('Agent runs e2e', box(it.e2e_self)); e2e.dataset.f = 'e2e';
-    var dep = el('select', 'cfg-sel'); dep.dataset.f = 'deploy'; var none = el('option', null, 'None'); none.value = ''; dep.appendChild(none);
-    var keys = targets.map(function (t) { return t.key; }); if (it.deploy_target && keys.indexOf(it.deploy_target) < 0) targets = targets.concat([{ key: it.deploy_target, label: it.deploy_target }]);
-    targets.forEach(function (t) { var o = el('option', null, t.label || t.key); o.value = t.key; if (t.key === it.deploy_target) o.selected = true; dep.appendChild(o); });
-    field('Deploy target', dep, 'TasksDashboard deploys only under AI Brain, after its tests pass and the deploy-readiness judge says ready.');
     var tg = field('Notify on Telegram', box(it.notify_telegram)); tg.dataset.f = 'tg';
     var dir = el('input'); dir.type = 'text'; dir.maxLength = 260; dir.placeholder = 'Empty = HomeOS'; dir.value = l.project_dir || ''; dir.dataset.f = 'dir';
     field('Project folder', dir, 'Empty = HomeOS. Without CLAUDE.md, rules or hooks there, Project rules acts as Mixed.');
@@ -242,9 +238,9 @@
     d.appendChild(g);
     var acts = el('div', 'cfg-acts'), save = el('button', 'btn', 'Save'), msg = el('span', 'cfg-msg', 'No changes'); save.type = 'button'; save.disabled = true; msg.setAttribute('role', 'status');
     acts.appendChild(save); acts.appendChild(msg); d.appendChild(acts);
-    var inputs = [sel, e2e, dep, tg, dir, capIn].concat(LIST_BRIEF.map(function (k) { return tas[k[0]]; }));
+    var inputs = [sel, e2e, tg, dir, capIn].concat(LIST_BRIEF.map(function (k) { return tas[k[0]]; }));
     if (!l.id) inputs.forEach(function (x) { x.disabled = true; x.title = 'Restart the page server: it does not send list ids yet.'; });
-    var form = function () { var b = {}; LIST_BRIEF.forEach(function (k) { b[k[0]] = tas[k[0]].value; }); return { mode: sel.value, e2e: e2e.checked, deploy: dep.value || null, tg: tg.checked, dir: dir.value, cap: capIn.value.trim() === '' ? null : Number(capIn.value), brief: b }; };
+    var form = function () { var b = {}; LIST_BRIEF.forEach(function (k) { b[k[0]] = tas[k[0]].value; }); return { mode: sel.value, e2e: e2e.checked, tg: tg.checked, dir: dir.value, cap: capIn.value.trim() === '' ? null : Number(capIn.value), brief: b }; };
     var dirty = function () { var n = l.id ? listChanges(l, form(), cap).length : 0; save.disabled = !n; msg.className = 'cfg-msg'; msg.textContent = n ? 'Unsaved changes' : 'No changes'; };
     g.addEventListener('input', dirty); g.addEventListener('change', dirty);
     save.onclick = function () {
@@ -253,7 +249,7 @@
       save.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Saving with your board sign-in…'; writeStart();
       calls.reduce(function (pr, c) { return pr.then(function () { return boardRpc(c[0], c[1]); }); }, Promise.resolve()).then(function () {
         l.mode = f.mode; if (!l.why || !l.why.length) l.effective = f.mode; S.opt.mode[l.id] = { mode: f.mode, at: Date.now() };
-        l.intake = { e2e_self: f.e2e, deploy_target: f.deploy, notify_telegram: f.tg }; l.project_dir = f.dir.trim() || null; l.brief_texts = f.brief;
+        l.intake = { e2e_self: f.e2e, notify_telegram: f.tg }; l.project_dir = f.dir.trim() || null; l.brief_texts = f.brief;
         if (f.cap !== cap) { setCap(l.slug, l.id, f.cap); S.opt.cap[l.slug] = { cap: f.cap, list_id: l.id, at: Date.now() }; cap = f.cap; }
         writeEnd(); msg.textContent = l.name + ': saved on the board.';
       }, function (e) {
@@ -284,8 +280,7 @@
     main.appendChild(ov);
     var ls = lists(), sec = el('section', 'cfg-sec'); sec.appendChild(el('h3', null, 'Lists'));
     if (!ls.length) { var e = el('div', 'cfg-empty'); e.appendChild(el('b', null, 'No lists yet.')); e.appendChild(document.createTextNode(' A list shows here after the board is read.')); sec.appendChild(e); }
-    var targets = (S.data.board && S.data.board.deploy_targets) || [];
-    ls.forEach(function (l) { sec.appendChild(listForm(l, targets)); });
+    ls.forEach(function (l) { sec.appendChild(listForm(l)); });
     main.appendChild(sec);
     main.appendChild(el('p', 'cfg-note', 'The same settings as List settings on the board and in the phone app, saved with your own board sign-in' + (web() ? '' : ' (localhost:8788)') + ' through the same calls. AI Brain, Project rules, intake, the brief and budgets only by a household person who owns or edits the list. A list’s cap may not be above the overall cap. To stop a list on one PC, untick it in Workload.'));
     var e0 = el('section', 'cfg-e0'); e0.setAttribute('aria-labelledby', 'cfg-e0h'); var h = el('h3', null, 'Always the person’s, in every mode'); h.id = 'cfg-e0h'; e0.appendChild(h);

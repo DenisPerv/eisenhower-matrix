@@ -988,7 +988,6 @@ test('db/033: a list cap above the overall cap comes back with the database text
     ['POST', /^\/rest\/v1\/rpc\/set_budget/, () => [400, { code: '22023', message: 'a list cap may not be above the overall cap ($100)' }]],
     ['POST', /^\/rest\/v1\/rpc\/budget_status/, () => [200, [{ scope: 'overall', list_id: null, period: 'month', cap_usd: 100, spent_usd: 3, reserved_usd: 0 }, { scope: 'list', list_id: LIST, period: 'month', cap_usd: 40, spent_usd: 1.5, reserved_usd: 0 }]]],
     ['GET', /^\/rest\/v1\/lists\?select=id,name,owner_id,autonomy/, () => [200, [{ id: LIST, name: 'L', owner_id: UID, autonomy: 'guided' }]]],
-    ['GET', /^\/rest\/v1\/deploy_targets/, () => [200, []]],
   ]);
   const d = make(f);
   await signIn(d, true);

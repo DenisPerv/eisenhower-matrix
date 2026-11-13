@@ -1899,7 +1899,7 @@ function nlMoreRead() {
   if (!$('#nl-au')) return null;
   const ch = {}, mode = $('#nl-au').value, e2e = $('#nl-e2e').checked, tg = $('#nl-tg').checked;
   if (mode !== 'guided') Object.assign(ch, { mode, expected: 'guided' });
-  if (e2e || tg) ch.intake = { e2e, deploy: '', tg, stage: null };
+  if (e2e || tg) ch.intake = { e2e, tg, stage: null };
   const b = { decisions: C.briefLines($('#nl-b-decisions').value).map(x => C.briefLine(x, ymd(new Date()), me().display_name)).filter(Boolean).join('\n') };
   C.BRIEF_FIELDS.forEach(x => { b[x.key] = $('#nl-b-' + x.key).value.trim(); });
   if (C.briefCount(b)) ch.brief = b;
@@ -1922,7 +1922,7 @@ async function openListSettings(id) {
   const r = await D.listSettings(id);
   if (!$('#dlg-lset').open) return;
   if (!r.ok) { $('#lset-body').innerHTML = `<p class="note" role="alert">${esc(r.err.message)}</p>`; return; }
-  const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, deploy: row.deploy_target || '', tg: !!row.notify_telegram, stage: row.stage_report == null ? null : row.stage_report, cap: r.cap === null ? '' : String(r.cap), brief: C.briefOf(row), dir: row.project_dir || '' };
+  const row = r.row, base = { mode: C.listModeOf(row), e2e: !!row.e2e_self, tg: !!row.notify_telegram, stage: row.stage_report == null ? null : row.stage_report, cap: r.cap === null ? '' : String(r.cap), brief: C.briefOf(row), dir: row.project_dir || '' };
   LSET = { id, hh, base, expected: base.mode, expectedDir: base.dir, decs: C.briefLines(base.brief.decisions) };
   const modes = C.autonomyChoices(hh, false, base.mode).map(c => `<label class="amode"><input type="radio" name="lset-am" value="${c.mode}"${c.mode === base.mode ? ' checked' : ''}${c.off ? ` disabled aria-describedby="lset-why-${c.mode}"` : ''}><span class="nm">${C.AUTONOMY_NAME[c.mode]}${c.mode === 'guided' ? ' <small>Default</small>' : ''}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].does)}</span><span class="ln">${esc(C.AUTONOMY_INFO[c.mode].you)}</span>${c.off ? `<span class="why" id="lset-why-${c.mode}">${esc(c.why)}</span>` : ''}</label>`).join('');
   const dis = hh ? '' : ' disabled';
@@ -1933,8 +1933,6 @@ async function openListSettings(id) {
     <p class="hint">${row.autonomy_set_at ? `Set by ${esc(personName(row.autonomy_set_by))} · ${ymd(new Date(row.autonomy_set_at))}` : 'Not set yet: Mixed is the default.'}</p>
     <h3 class="lset-h3">Intake defaults</h3><p class="hint">Asked once for the list, not for every task.</p>${hh ? '' : `<p class="note info">${esc(C.AUTONOMY_HOUSEHOLD)}</p>`}
     <label class="cbline"><input type="checkbox" id="lset-e2e"${base.e2e ? ' checked' : ''}${dis}> Agent runs end-to-end tests</label>
-    <label class="field"><span>Deploy target</span><select class="inp" id="lset-deploy"${dis}><option value="">No deploy</option>${r.targets.map(x => `<option value="${esc(x.key)}"${x.key === base.deploy ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
-    <p class="hint">TasksDashboard deploys only under AI Brain, after its tests pass and the deploy-readiness judge says ready.</p>
     <label class="field"><span>Project folder</span><input class="inp" id="lset-dir" maxlength="${C.PROJECT_DIR_MAX}" autocomplete="off" spellcheck="false" placeholder="D:\\Projects\\App" value="${esc(base.dir)}" aria-describedby="lset-dir-h"${dis}></label>
     <p class="hint" id="lset-dir-h">${esc(C.PROJECT_DIR_HINT)}</p><p class="err" id="lset-dir-e" hidden></p>
     <label class="cbline"><input type="checkbox" id="lset-tg"${base.tg ? ' checked' : ''}${dis}> Notify on Telegram</label><p class="hint">Off by default. Telegram only notifies. Answers come from the board.</p>
@@ -1956,7 +1954,7 @@ function lsetDecAdd() {
   if (!l) { inp.focus(); return; }
   LSET.decs.push(l); inp.value = ''; lsetDecs(); lsetSync(); inp.focus();
 }
-const lsetCur = () => ({ mode: (document.querySelector('[name="lset-am"]:checked') || {}).value || LSET.base.mode, e2e: $('#lset-e2e').checked, deploy: $('#lset-deploy').value, tg: $('#lset-tg').checked, stage: LSET.base.stage, cap: $('#lset-cap') ? $('#lset-cap').value.trim() : LSET.base.cap,
+const lsetCur = () => ({ mode: (document.querySelector('[name="lset-am"]:checked') || {}).value || LSET.base.mode, e2e: $('#lset-e2e').checked, tg: $('#lset-tg').checked, stage: LSET.base.stage, cap: $('#lset-cap') ? $('#lset-cap').value.trim() : LSET.base.cap,
   brief: Object.assign({ decisions: LSET.decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#lset-b-' + x.key) ? $('#lset-b-' + x.key).value.trim() : LSET.base.brief[x.key] }))), dir: $('#lset-dir') ? $('#lset-dir').value.trim() : LSET.base.dir });
 function lsetSync() {
   if (!LSET || !$('#lset-e2e')) return;
@@ -1973,7 +1971,7 @@ async function saveListSettings() {
   const capN = c.cap === '' ? null : Number(c.cap);
   if (c.cap !== '' && (!isFinite(capN) || capN < 0 || capN > 100000)) { const e = $('#lset-cap-e'); e.textContent = 'A budget is 0 to 100000 dollars, or empty.'; e.hidden = false; $('#lset-cap').focus(); return; }
   if (c.mode !== b.mode) Object.assign(ch, { mode: c.mode, expected: LSET.expected });
-  if (LSET.hh && (c.e2e !== b.e2e || c.deploy !== b.deploy || c.tg !== b.tg)) ch.intake = { e2e: c.e2e, deploy: c.deploy, tg: c.tg, stage: b.stage };
+  if (LSET.hh && (c.e2e !== b.e2e || c.tg !== b.tg)) ch.intake = { e2e: c.e2e, tg: c.tg, stage: b.stage };
   if (LSET.hh && c.cap !== b.cap) ch.cap = capN;
   if (LSET.hh && c.dir !== b.dir) ch.dir = { dir: c.dir, expected: LSET.expectedDir };
   if (LSET.hh && JSON.stringify(c.brief) !== JSON.stringify(b.brief)) ch.brief = c.brief;

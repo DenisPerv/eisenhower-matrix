@@ -3,7 +3,7 @@
    window.HarnessTransport before harness.js runs, so the page asks TasksDashboardDB instead of a local server:
      getJson   /api/runs, /api/runs/<ts>, /api/runs/<ts>/feed/<name>, /api/budget  -> selects on harness_heads / harness_parts (db/031);
                /api/config and /api/limits (db/041, 2026-11-13): the person's own harness row (rpc/harness_prefs_read), the board's lists,
-               budgets and deploy targets read now with their sign-in, and what a PC last published (harness_configs, household only);
+               budgets read now with their sign-in, and what a PC last published (harness_configs, household only);
                it never waits for a PC or a run head
      postJson  /api/action  -> rpc/harness_request, then the command's state until the PC that owns the run reports it;
                /api/limits -> rpc/harness_prefs_write on the person's own row (PT409 stale: read again, retried once); each PC syncs it
@@ -113,14 +113,13 @@
     if (form && form.lists) Object.keys(form.lists).forEach(function (x) { p.lists[x] = form.lists[x]; });
     return p;
   }
-  // what GET /api/config answers on the web. pub: a harness_configs row or null; fresh: { row, lists, budgets, deploy_targets, device, error, at }
+  // what GET /api/config answers on the web. pub: a harness_configs row or null; fresh: { row, lists, budgets, device, error, at }
   function configAnswer(pub, fresh, label) {
     var c = (pub && pub.config) || {}, b = Object.assign({}, c.board || {}), f = fresh || {}, old = {};
     ((c.board && c.board.lists) || []).forEach(function (l) { old[l.id] = l; });
     if (f.lists) b.lists = f.lists.map(function (l) { var o = old[l.id] || {}, same = o.mode === l.mode; return Object.assign({}, l, { effective: same && o.effective ? o.effective : l.mode, why: same ? o.why || [] : [], overrides: o.overrides || 0, set_by: o.set_by || null, owner: o.owner || null }); });
     else if (!b.lists) b.lists = [];
     if (f.budgets) b.budgets = Object.assign({}, b.budgets || {}, { rows: f.budgets });
-    if (f.deploy_targets) b.deploy_targets = f.deploy_targets;
     var mine = f.row && f.row.prefs && f.row.prefs.devices && f.device ? f.row.prefs.devices[f.device] : null;
     var machine = Object.assign({}, c.machine || {}, mine && mine.max_mothers != null ? { max_mothers_set: mine.max_mothers } : {});
     return { device: c.device || label, limits: limitsFromRow(f.row, b.lists, c.limits && c.limits.rows), board: b, board_error: f.error || null, board_at: f.at || c.board_at || null, machine: machine, published_at: pub ? pub.published_at : null };
@@ -250,7 +249,7 @@
   }
 
   // db/041: the person's own row, the board read now, and what a PC last published; no PC or run head needed
-  var LCOLS = 'id,slug,name,owner_id,autonomy,e2e_self,deploy_target,notify_telegram,project_dir,brief_decisions,brief_naming,brief_instruction,brief_concept';
+  var LCOLS = 'id,slug,name,owner_id,autonomy,e2e_self,notify_telegram,project_dir,brief_decisions,brief_naming,brief_instruction,brief_concept';
   var readRow = function () { return rpc('harness_prefs_read', {}); };
   function myDevice() {
     if (device) return device;
@@ -264,15 +263,13 @@
       rest('harness_configs?select=device,config,published_at&order=published_at.desc').catch(function () { return []; }),
       readRow().catch(function () { return null; }),
       rest('lists?select=' + LCOLS + '&archived_at=is.null&order=name').catch(function (e) { f.error = friendly(e); return null; }),
-      rest('deploy_targets?select=key,label&order=label').catch(function () { return []; }),
       rpc('budget_status', { p_list: null }).catch(function () { return null; })
     ]).then(function (x) {
       var pubs = x[0] || [], pub = pubs.filter(function (p) { return p.device === f.device; })[0] || pubs[0] || null;
       f.row = x[1];
-      f.lists = x[2] ? x[2].map(function (l) { return { id: l.id, slug: l.slug, name: l.name, owner_id: l.owner_id, mode: l.autonomy || 'guided', intake: { e2e_self: l.e2e_self, deploy_target: l.deploy_target, notify_telegram: l.notify_telegram }, project_dir: l.project_dir || null,
+      f.lists = x[2] ? x[2].map(function (l) { return { id: l.id, slug: l.slug, name: l.name, owner_id: l.owner_id, mode: l.autonomy || 'guided', intake: { e2e_self: l.e2e_self, notify_telegram: l.notify_telegram }, project_dir: l.project_dir || null,
         brief_texts: { decisions: l.brief_decisions || '', naming: l.brief_naming || '', instruction: l.brief_instruction || '', concept: l.brief_concept || '' } }; }) : null;
-      f.deploy_targets = x[3] || [];
-      var overall = x[4];
+      var overall = x[3];
       var per = overall && f.lists ? Promise.all(f.lists.map(function (l) { return rpc('budget_status', { p_list: l.id }).catch(function () { return []; }); })) : Promise.resolve([]);
       return per.then(function (lists) {
         if (overall) {

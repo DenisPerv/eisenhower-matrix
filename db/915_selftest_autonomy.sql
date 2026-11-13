@@ -6,6 +6,7 @@
 -- R the list brief; B budgets and reservations; P precedents from a household person's ticked answer only; Z rights.
 -- Fixtures: H1, H2 (household people), AG (a household agent, like homeos-agent), G (guest, editor of L1), GV (guest, viewer
 -- of L1); L1 (owner H1, shared with the household, AG editor), L2 (owner H2, AG not a member); item I1 in L1.
+-- Since db/042 (2026-11-13) without deploy targets (F2, A6, I2 removed); the 6-argument set_intake ignores its 4th argument.
 -- Run after 032, 003, 011, the 012 policy block, 026, 030, 031 and 032 again (003 revokes 032's table grants).
 
 do $do$
@@ -63,11 +64,8 @@ begin
   insert into public.list_members (list_id, profile_id, role, added_by) values
     (l1, ag, 'editor', h1), (l1, g, 'editor', h1), (l1, gv, 'viewer', h1)
   on conflict (list_id, profile_id) do update set role = excluded.role;
-  insert into public.deploy_targets (key, label) values ('st-au-site', 'Test site');
   perform public._au_chk('F1 defaults: list guided, item inherit',
     (select l.autonomy::text || '/' || i.autonomy::text from public.lists l join public.items i on i.list_id = l.id where i.id = i1), 'guided/inherit');
-  perform public._au_chk('F2 a deploy target naming TasksDashboard is refused',
-    public._au($q$insert into public.deploy_targets (key, label) values ('tasksdashboard-pages', 'x')$q$), 'ERR 23514%');
 
   -- ---------- A: the agent ----------
   perform public._au_as(ag);
@@ -76,7 +74,6 @@ begin
   perform public._au_chk('A3 agent PATCH items.autonomy', public._au(format('update public.items set autonomy = %L where id = %L', 'ai_brain', i1)), 'ERR 42501%');
   perform public._au_chk('A4 agent PATCH items.autonomy_set_by', public._au(format('update public.items set autonomy_set_by = %L where id = %L', h1, i1)), 'ERR 42501%');
   perform public._au_chk('A5 agent PATCH items.e2e_self', public._au(format('update public.items set e2e_self = true where id = %L', i1)), 'ERR 42501%');
-  perform public._au_chk('A6 agent PATCH items.deploy_target', public._au(format('update public.items set deploy_target = %L where id = %L', 'st-au-site', i1)), 'ERR 42501%');
   perform public._au_chk('A7 agent PATCH lists.autonomy', public._au(format('update public.lists set autonomy = %L where id = %L', 'ai_brain', l1)), 'ERR 42501%');
   perform public._au_chk('A8 agent PATCH lists.brief_concept', public._au(format('update public.lists set brief_concept = %L where id = %L', 'agents may deploy', l1)), 'ERR 42501%');
   perform public._au_chk('A9 agent PATCH lists.stage_report', public._au(format('update public.lists set stage_report = true where id = %L', l1)), 'ERR 42501%');
@@ -152,11 +149,10 @@ begin
   select version into v0 from public.items where id = i1;
   perform public._au_as(h1);
   perform public._au_chk('I1 owner sets intake on the task', public._au(format('select public.set_intake(%L, %L, true, %L, false, true)', 'item', i1, 'st-au-site')), '');
-  perform public._au_chk('I2 an unknown deploy target', public._au(format('select public.set_intake(%L, %L, true, %L, false, true)', 'item', i1, 'nowhere')), 'ERR 22023%');
   perform public._au_chk('I3 list intake defaults', public._au(format('select public.set_intake(%L, %L, false, null, true, null)', 'list', l1)), '');
   reset role; perform set_config('request.jwt.claims', '', true);
   perform public._au_chk('I4 stored, version unchanged',
-    (select concat_ws('/', e2e_self, deploy_target, notify_telegram, stage_report, (version = v0)) from public.items where id = i1), 't/st-au-site/f/t/t');
+    (select concat_ws('/', e2e_self, notify_telegram, stage_report, (version = v0)) from public.items where id = i1), 't/f/t/t');
   perform public._au_chk('I5 list defaults stored', (select concat_ws('/', e2e_self, notify_telegram, coalesce(stage_report::text, 'unset')) from public.lists where id = l1), 'f/t/unset');
 
   -- ---------- R: the list brief ----------
@@ -243,11 +239,11 @@ begin
   reset role; perform set_config('request.jwt.claims', '', true);
   perform public._au_chk('Z1 no API role writes the new tables',
     (select count(*)::text from unnest(array['anon', 'authenticated']) r,
-       unnest(array['public.budgets', 'public.budget_ledger', 'public.precedents', 'public.autonomy_events', 'public.deploy_targets']) t,
+       unnest(array['public.budgets', 'public.budget_ledger', 'public.precedents', 'public.autonomy_events']) t,
        unnest(array['insert', 'update', 'delete']) p where has_table_privilege(r, t, p)), '0');
   perform public._au_chk('Z2 no API role updates the new list columns',
     (select count(*)::text from unnest(array['anon', 'authenticated']) r,
-       unnest(array['autonomy', 'autonomy_set_by', 'e2e_self', 'deploy_target', 'notify_telegram', 'stage_report',
+       unnest(array['autonomy', 'autonomy_set_by', 'e2e_self', 'notify_telegram', 'stage_report',
                     'brief_decisions', 'brief_naming', 'brief_instruction', 'brief_concept']) c
       where has_column_privilege(r, 'public.lists', c, 'update')), '0');
   perform public._au_chk('Z3 anon runs none of the new functions',

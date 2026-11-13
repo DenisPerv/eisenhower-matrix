@@ -4,7 +4,7 @@
 -- Cases: P set_project_dir (household owner, compare-and-set, path rules, clear, log, guest, agent, direct PATCH, archived);
 -- O household_list_order (agent and person read a household person's listOrder and listBar only; null for a guest, an agent
 -- or no preferences; a guest caller is refused); M a moved task inherits again (also when it was set, not on other edits; a
--- REST move that sets a mode itself is still refused); D deploy_targets keys; Z rights.
+-- REST move that sets a mode itself is still refused); D removed with db/042; Z rights.
 -- Fixtures: H1, H2 (household people; H2 has no preferences row), AG (a household agent, like homeos-agent), G (guest, editor
 -- of L1); L1 and L2 owned by H1 (AG and G editors of L1); item I1 in L1.
 -- Run after 034 (and after 003 and its followers, like every selftest).
@@ -141,24 +141,7 @@ begin
   perform public._pd_chk('P19 an archived list''s folder is not changed',
     public._pd(format('select public.set_project_dir(%L, %L, null)', l2, 'D:/x')), 'ERR 42501%');
 
-  -- ---------- D: deploy_targets keys ----------
-  reset role; perform set_config('request.jwt.claims', '', true);
-  delete from public.deploy_targets where key in ('recipes', 'repo-branch', 'landing', 'tasksdashboard', 'tasksdb-migrations', 'access-mail')
-    and not exists (select 1 from public.lists where deploy_target = key) and not exists (select 1 from public.items where deploy_target = key);
-  perform public._pd_chk('D1 the six planned keys are allowed', public._pd(
-    $q$insert into public.deploy_targets (key, label) values ('recipes', 't'), ('repo-branch', 't'), ('landing', 't'), ('tasksdashboard', 't'),
-       ('tasksdb-migrations', 't'), ('access-mail', 't') on conflict (key) do nothing$q$), 'ok:%');
-  perform public._pd_chk('D2 they are all there',
-    (select count(*)::text from public.deploy_targets where key in ('recipes', 'repo-branch', 'landing', 'tasksdashboard', 'tasksdb-migrations', 'access-mail')), '6');
-  perform public._pd_chk('D3 another key naming TasksDashboard is still refused',
-    public._pd($q$insert into public.deploy_targets (key, label) values ('tasksdashboard-pages', 'x')$q$), 'ERR 23514%');
-  perform public._pd_chk('D4 the app host name is still refused',
-    public._pd($q$insert into public.deploy_targets (key, label) values ('eisenhower-agentic-planner-app', 'x')$q$), 'ERR 23514%');
-  perform public._pd_chk('D5 the format is unchanged', public._pd($q$insert into public.deploy_targets (key, label) values ('Bad_Key', 'x')$q$), 'ERR 23514%');
-  perform public._pd_as(h1);
-  perform public._pd_chk('D6 a person cannot insert a target', public._pd($q$insert into public.deploy_targets (key, label) values ('st-pd-x', 'x')$q$), 'ERR 42501%');
-  perform public._pd_chk('D7 a household person sets intake to tasksdashboard',
-    public._pd(format('select public.set_intake(%L, %L, true, %L, null, null)::text', 'list', l1, 'tasksdashboard')), '');
+  -- D (deploy_targets keys) removed with db/042 (2026-11-13): the table is gone.
 
   -- ---------- Z: rights ----------
   reset role; perform set_config('request.jwt.claims', '', true);

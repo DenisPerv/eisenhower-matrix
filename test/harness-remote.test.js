@@ -87,15 +87,15 @@ test('verdict: Copy is allowed on the web (the command is in the published model
   assert.equal(R.verdict(ctx, 'claude', { name: 'do-a-1' }), 'needs this computer (run the local page)');
 });
 
-test('configAnswer (db/041): no waiting state; fresh lists, budgets and targets over the published copy; limits from the own row', () => {
+test('configAnswer (db/041): no waiting state; fresh lists and budgets over the published copy; limits from the own row', () => {
   const pub = { device: 'PC1', published_at: '2026-11-13T10:00:00Z', config: { device: 'MDENYSIUK-PERS', board: { lists: [{ id: 'l1', slug: 'a', mode: 'guided', effective: 'guided', why: [], overrides: 2, owner: 'maksym' }], routing: { base: {} } }, machine: { host: 'h' }, limits: { rows: [{ slug: 'a', live: 1 }] } } };
   const row = { prefs: { defaults: { max_sessions: 1, max_agents_per_session: 1 }, lists: { a: { enabled: false, max_sessions: 2, max_agents_per_session: 0 } }, devices: { PC1: { max_mothers: 3 } } }, version: 4 };
-  const fresh = { row, device: 'PC1', lists: [{ id: 'l1', slug: 'a', name: 'A', mode: 'ai_brain', intake: {}, project_dir: null, brief_texts: {} }, { id: 'l2', slug: 'b', name: 'B', mode: 'guided' }], budgets: [{ scope: 'overall', period: 'month', cap_usd: 10 }], deploy_targets: [{ key: 'recipes', label: 'Recipes' }] };
+  const fresh = { row, device: 'PC1', lists: [{ id: 'l1', slug: 'a', name: 'A', mode: 'ai_brain', intake: {}, project_dir: null, brief_texts: {} }, { id: 'l2', slug: 'b', name: 'B', mode: 'guided' }], budgets: [{ scope: 'overall', period: 'month', cap_usd: 10 }] };
   const a = R.configAnswer(pub, fresh, 'PC');
   assert.equal(a.web, undefined);
   assert.deepEqual(a.board.lists.map((l) => [l.slug, l.mode, l.effective, l.overrides]), [['a', 'ai_brain', 'ai_brain', 2], ['b', 'guided', 'guided', 0]], 'a mode changed since the publish shows the board\'s value');
   assert.deepEqual(a.board.routing, { base: {} });
-  assert.equal(a.board.deploy_targets[0].key, 'recipes');
+  assert.equal(a.board.deploy_targets, undefined);
   assert.equal(a.machine.max_mothers_set, 3);
   assert.deepEqual(a.limits.rows.map((r) => [r.slug, r.enabled, r.max_sessions, r.live, r.source]), [['a', false, 2, 1, 'list'], ['b', true, 1, 0, 'defaults']]);
   const none = R.configAnswer(null, { row: null, lists: [{ id: 'l1', slug: 'a', name: 'A', mode: 'guided' }] }, 'PC');
