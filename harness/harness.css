@@ -1103,3 +1103,20 @@ html.snap #stage,html.snap #stage *{transition:none!important;animation:none!imp
 .cfg-facts dt{color:var(--muted)}
 .cfg-facts dd{margin:0}
 @media (max-width:759px){.cfg-facts>div{grid-template-columns:1fr;gap:2px}}
+/* Delegate triangles appear when the replay reaches the moment the scans first saw the task (bug round 2026-11-13); harness.js delSeen gates them */
+@keyframes odel-in{from{opacity:0}to{opacity:.95}}
+.osys .odel{animation:odel-in .35s ease both}
+@media (prefers-reduced-motion:reduce){.osys .odel{animation:none}}
+/* Configurations: Lists tab (2026-11-13), one form per list like the board's List settings, Stage report excepted */
+.cfg-lf{border:1px solid var(--line-2);border-radius:6px;margin-top:8px;background:var(--ground-2)}
+.cfg-lf>summary{display:flex;gap:6px 14px;align-items:center;flex-wrap:wrap;padding:10px 14px;cursor:pointer;min-height:44px}
+.cfg-lf>summary b{font-weight:500}
+.cfg-lf-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px;padding:6px 14px 4px}
+.cfg-lf-f{display:flex;flex-direction:column;gap:4px;font-size:13.5px;min-width:0}
+.cfg-lf-f.wide{grid-column:1/-1}
+.cfg-lf-f small{color:var(--muted);font-size:12.5px}
+.cfg-lf-f input[type=checkbox]{width:20px;height:20px;align-self:flex-start}
+.cfg-lf-f textarea,.cfg-lf-f input[type=text]{background:var(--ground);border:1px solid var(--line-2);border-radius:4px;padding:6px 8px;color:var(--ink);font:inherit;width:100%;box-sizing:border-box;min-height:36px}
+.cfg-lf-f textarea{resize:vertical}
+.cfg-lf>.cfg-acts{padding:4px 14px 12px;align-items:center}
+@media (max-width:759px){.cfg-lf-g{grid-template-columns:1fr}.cfg-lf-f input[type=text],.cfg-lf-f textarea{min-height:44px}}

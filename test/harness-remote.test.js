@@ -87,18 +87,30 @@ test('verdict: Copy is allowed on the web (the command is in the published model
   assert.equal(R.verdict(ctx, 'claude', { name: 'do-a-1' }), 'needs this computer (run the local page)');
 });
 
-test('configAnswer: /api/config from the household part, a guest state and a waiting state', () => {
-  const cfg = { device: 'MDENYSIUK-PERS', limits: { rows: [] }, board: { lists: [], routing: { base: {} } }, board_error: null, board_at: 'x', machine: { host: 'h' }, published_at: '2026-11-12T00:00:00Z' };
-  const a = R.configAnswer([{ v: cfg }], 'PC', true);
-  assert.equal(a.published_at, cfg.published_at);
-  assert.deepEqual(a.board, cfg.board);
+test('configAnswer (db/041): no waiting state; fresh lists, budgets and targets over the published copy; limits from the own row', () => {
+  const pub = { device: 'PC1', published_at: '2026-11-13T10:00:00Z', config: { device: 'MDENYSIUK-PERS', board: { lists: [{ id: 'l1', slug: 'a', mode: 'guided', effective: 'guided', why: [], overrides: 2, owner: 'maksym' }], routing: { base: {} } }, machine: { host: 'h' }, limits: { rows: [{ slug: 'a', live: 1 }] } } };
+  const row = { prefs: { defaults: { max_sessions: 1, max_agents_per_session: 1 }, lists: { a: { enabled: false, max_sessions: 2, max_agents_per_session: 0 } }, devices: { PC1: { max_mothers: 3 } } }, version: 4 };
+  const fresh = { row, device: 'PC1', lists: [{ id: 'l1', slug: 'a', name: 'A', mode: 'ai_brain', intake: {}, project_dir: null, brief_texts: {} }, { id: 'l2', slug: 'b', name: 'B', mode: 'guided' }], budgets: [{ scope: 'overall', period: 'month', cap_usd: 10 }], deploy_targets: [{ key: 'recipes', label: 'Recipes' }] };
+  const a = R.configAnswer(pub, fresh, 'PC');
   assert.equal(a.web, undefined);
-  const g = R.configAnswer([], 'PC', true);
-  assert.equal(g.web.state, 'guest');
-  assert.match(g.web.text, /household only/);
-  assert.equal(g.board, null);
-  const w = R.configAnswer([{ v: null }], 'PC', true);
-  assert.equal(w.web.state, 'waiting');
-  assert.match(w.web.text, /Waiting for PC to publish/);
-  assert.equal(R.configAnswer(null, 'PC', false).web.state, 'waiting');
+  assert.deepEqual(a.board.lists.map((l) => [l.slug, l.mode, l.effective, l.overrides]), [['a', 'ai_brain', 'ai_brain', 2], ['b', 'guided', 'guided', 0]], 'a mode changed since the publish shows the board\'s value');
+  assert.deepEqual(a.board.routing, { base: {} });
+  assert.equal(a.board.deploy_targets[0].key, 'recipes');
+  assert.equal(a.machine.max_mothers_set, 3);
+  assert.deepEqual(a.limits.rows.map((r) => [r.slug, r.enabled, r.max_sessions, r.live, r.source]), [['a', false, 2, 1, 'list'], ['b', true, 1, 0, 'defaults']]);
+  const none = R.configAnswer(null, { row: null, lists: [{ id: 'l1', slug: 'a', name: 'A', mode: 'guided' }] }, 'PC');
+  assert.equal(none.published_at, null);
+  assert.equal(none.board.lists.length, 1, 'no PC published: the lists still show');
+  assert.equal(none.limits.state, 'ok');
+  assert.deepEqual(none.limits.defaults, { max_sessions: 2, max_agents_per_session: 2 });
+});
+
+test('rowAfterSave (db/041): the whole form keeps other lists; mothers at once is per PC', () => {
+  const prev = { defaults: { max_sessions: 1, max_agents_per_session: 1 }, lists: { x: { enabled: true, max_sessions: 1, max_agents_per_session: 1 } }, devices: { Laptop: { max_mothers: 1 } } };
+  const p = R.rowAfterSave(prev, { defaults: prev.defaults, lists: { a: { enabled: false, max_sessions: 0, max_agents_per_session: 0 } } }, 'PC1');
+  assert.deepEqual(Object.keys(p.lists).sort(), ['a', 'x']);
+  const m = R.rowAfterSave(prev, { scope: 'machine', payload: { max_mothers: 4 } }, 'PC1');
+  assert.deepEqual(m.devices, { Laptop: { max_mothers: 1 }, PC1: { max_mothers: 4 } });
+  assert.throws(() => R.rowAfterSave(prev, { scope: 'machine', payload: { max_mothers: 4 } }, null), /no PC/);
+  assert.deepEqual(prev.devices, { Laptop: { max_mothers: 1 } }, 'the input is not changed');
 });

@@ -1,9 +1,12 @@
 /* The Eisenhower Harness page on the web (/harness/, HomeOS task #45 plan v4). The other four files of this folder are byte-equal copies
    of HomeOS-TasksBoardHarness/viewer/ (tools/copy-viewer-to-app.js there); this file is the only app-only one. It sets
    window.HarnessTransport before harness.js runs, so the page asks TasksDashboardDB instead of a local server:
-     getJson   /api/runs, /api/runs/<ts>, /api/runs/<ts>/feed/<name>, /api/budget, /api/limits, /api/config  -> selects on harness_heads / harness_parts (db/031);
-               /api/config is the household part's `config` (harness-web.js), or a { web: { state } } stand-in for a guest or before the first publish
-     postJson  /api/action, /api/limits  -> rpc/harness_request, then the command's state until the PC that owns the run reports it
+     getJson   /api/runs, /api/runs/<ts>, /api/runs/<ts>/feed/<name>, /api/budget  -> selects on harness_heads / harness_parts (db/031);
+               /api/config and /api/limits (db/041, 2026-11-13): the person's own harness row (rpc/harness_prefs_read), the board's lists,
+               budgets and deploy targets read now with their sign-in, and what a PC last published (harness_configs, household only);
+               it never waits for a PC or a run head
+     postJson  /api/action  -> rpc/harness_request, then the command's state until the PC that owns the run reports it;
+               /api/limits -> rpc/harness_prefs_write on the person's own row (PT409 stale: read again, retried once); each PC syncs it
      events    polls the head's seq every 5 s while the page is visible (60 s hidden) and calls the page's change / runs handlers
      can       greys what the web cannot carry out now (decisions 2 and 5): "Run local version" with the reason
    Sign-in: the board's session (td.auth, Web Lock td.refresh, BroadcastChannel td.auth); signed out on a hosted origin it goes to
@@ -89,18 +92,42 @@
     return ownsList(id) ? null : 'only the owners of ' + (s && s.list ? s.list : 'this list') + ' may';
   }
 
-  // what GET /api/config answers on the web: rows = the household part's config select ([] = not readable: a guest), label = the PC's name
-  function configAnswer(rows, label, hasRun) {
-    var stand = function (state, text) { return { web: { state: state, text: text, label: label }, device: label, limits: null, board: null, board_error: null, board_at: null, machine: null, published_at: null }; };
-    if (!hasRun) return stand('waiting', 'Waiting for the PC to publish: no PC publishes a run to the web yet.');
-    if (!rows || !rows.length) return stand('guest', 'The configuration of ' + label + ' shows to the household only. Run the local version on that PC.');
-    var c = rows[0].v;
-    if (!c || typeof c !== 'object') return stand('waiting', 'Waiting for ' + label + ' to publish its configuration (about a minute after the page is opened there or a run starts).');
-    return Object.assign({}, c, { device: c.device || label });
+  // ---------- pure: Workload limits from the person's own row (db/041) ----------
+  var LIMIT_DEFAULTS = { max_sessions: 2, max_agents_per_session: 2 }, LIMIT_MAX = { max_sessions: 10, max_agents_per_session: 20 };
+  // row: { prefs, version, updated_at } or null; lists: the board's lists; pubRows: the live counts a PC last published
+  function limitsFromRow(row, lists, pubRows) {
+    var p = (row && row.prefs) || {}, def = p.defaults || LIMIT_DEFAULTS, own = p.lists || {}, live = {}, by = {};
+    (pubRows || []).forEach(function (r) { live[r.slug] = r.live || 0; });
+    (lists || []).forEach(function (l) { by[l.slug] = l; });
+    var slugs = (lists || []).map(function (l) { return l.slug; });
+    Object.keys(own).forEach(function (x) { if (slugs.indexOf(x) < 0) slugs.push(x); });
+    return { state: 'ok', source: 'db', version: row ? row.version : null, updated_at: row ? row.updated_at : null, errors: [], file: '', board: 'ok', defaults: def, max: LIMIT_MAX, base_hash: {}, ignored: [],
+      rows: slugs.map(function (x) { var r = own[x] || def, l = by[x]; return { slug: x, name: l ? l.name : x, list_id: l ? l.id : null, on_board: !!l, source: own[x] ? 'list' : 'defaults', enabled: r.enabled !== false, max_sessions: r.max_sessions, max_agents_per_session: r.max_agents_per_session, live: live[x] || 0 }; }) };
+  }
+  // the row after a Workload save: { defaults, lists } (the whole form; other lists kept) or { scope: 'machine', payload: { max_mothers } } for one PC
+  function rowAfterSave(prefs, form, device) {
+    var p = JSON.parse(JSON.stringify(prefs || {}));
+    p.version = 1; p.defaults = p.defaults || LIMIT_DEFAULTS; p.lists = p.lists || {}; p.devices = p.devices || {};
+    if (form && form.scope === 'machine') { if (!device) throw new Error('no PC of yours is known yet: run the harness on it once'); p.devices[device] = Object.assign({}, p.devices[device], { max_mothers: form.payload && form.payload.max_mothers }); return p; }
+    if (form && form.defaults) p.defaults = form.defaults;
+    if (form && form.lists) Object.keys(form.lists).forEach(function (x) { p.lists[x] = form.lists[x]; });
+    return p;
+  }
+  // what GET /api/config answers on the web. pub: a harness_configs row or null; fresh: { row, lists, budgets, deploy_targets, device, error, at }
+  function configAnswer(pub, fresh, label) {
+    var c = (pub && pub.config) || {}, b = Object.assign({}, c.board || {}), f = fresh || {}, old = {};
+    ((c.board && c.board.lists) || []).forEach(function (l) { old[l.id] = l; });
+    if (f.lists) b.lists = f.lists.map(function (l) { var o = old[l.id] || {}, same = o.mode === l.mode; return Object.assign({}, l, { effective: same && o.effective ? o.effective : l.mode, why: same ? o.why || [] : [], overrides: o.overrides || 0, set_by: o.set_by || null, owner: o.owner || null }); });
+    else if (!b.lists) b.lists = [];
+    if (f.budgets) b.budgets = Object.assign({}, b.budgets || {}, { rows: f.budgets });
+    if (f.deploy_targets) b.deploy_targets = f.deploy_targets;
+    var mine = f.row && f.row.prefs && f.row.prefs.devices && f.device ? f.row.prefs.devices[f.device] : null;
+    var machine = Object.assign({}, c.machine || {}, mine && mine.max_mothers != null ? { max_mothers_set: mine.max_mothers } : {});
+    return { device: c.device || label, limits: limitsFromRow(f.row, b.lists, c.limits && c.limits.rows), board: b, board_error: f.error || null, board_at: f.at || c.board_at || null, machine: machine, published_at: pub ? pub.published_at : null };
   }
 
   // ---------- the browser side ----------
-  if (typeof window === 'undefined' || !window.document) { if (typeof module === 'object') module.exports = { merge: merge, mergeFeed: mergeFeed, sessionLists: sessionLists, limitScopes: limitScopes, verdict: verdict, configAnswer: configAnswer }; return; }
+  if (typeof window === 'undefined' || !window.document) { if (typeof module === 'object') module.exports = { merge: merge, mergeFeed: mergeFeed, sessionLists: sessionLists, limitScopes: limitScopes, verdict: verdict, configAnswer: configAnswer, limitsFromRow: limitsFromRow, rowAfterSave: rowAfterSave }; return; }
   var W = window, CFG = null, session = null, me = null, device = null, devices = {}, heads = [], roles = {}, lastLimits = null, sessionList = {}, headAt = {};
   var store = function (s) { try { return s(); } catch (e) { return null; } };
   var ls = { get: function (k) { return store(function () { return localStorage.getItem(k); }); }, set: function (k, v) { store(function () { localStorage.setItem(k, v); }); } };
@@ -214,28 +241,48 @@
       var m;
       if (u === '/api/runs') return loadHeads().then(function () { return myHeads().map(function (h) { return Object.assign({ ts: h.run_ts }, (h.head && h.head.run) || {}, { ts: h.run_ts, device: (devices[h.device] || {}).label || h.device }); }); });
       if (u === '/api/budget') { var n = myHeads()[0]; return n ? household(n.run_ts, 'budget').then(function (b) { return b || {}; }) : Promise.resolve({}); }
-      if (u === '/api/limits') {
-        var nn = myHeads()[0];
-        return (nn ? household(nn.run_ts, 'limits_view') : Promise.resolve(null)).then(function (v) {
-          if (v) { lastLimits = v; return v; }
-          var label = (devices[device] || {}).label || 'this PC';
-          return { state: 'missing', errors: ['The limits of ' + label + ' show to the household only. Run the local version.'], file: '', board: 'ok', updated_at: null, defaults: { max_sessions: 2, max_agents_per_session: 2 }, max: {}, rows: [], ignored: [], base_hash: {} };
-        });
-      }
+      if (u === '/api/limits') return webConfig().then(function (c) { return c.limits; });
       if ((m = /^\/api\/runs\/([0-9a-z_-]+)\/feed\/([a-z0-9_-]+)(?:\?after=(-?\d+))?$/.exec(u))) return readFeed(m[1], m[2], m[3] ? Number(m[3]) : -1);
       if ((m = /^\/api\/runs\/([0-9a-z_-]+)$/.exec(u))) return readRun(m[1]);
-      if (u === '/api/config' || u === '/api/config?fresh=1') {
-        return (u === '/api/config' ? Promise.resolve() : loadHeads()).then(function () {
-          var label = (devices[device] || {}).label || device || 'the PC', head = myHeads()[0];
-          if (!head) return configAnswer(null, label, false);
-          return rest('harness_parts?select=v:body->config&device=eq.' + q(device) + '&run_ts=eq.' + q(head.run_ts) + '&part=eq.household').then(function (rows) {
-            var a = configAnswer(rows, label, true);
-            if (a.limits && !lastLimits) lastLimits = a.limits;
-            return a;
-          });
-        });
-      }
+      if (u === '/api/config' || u === '/api/config?fresh=1') return webConfig();
       throw new Error('not on the web: ' + u);
+    });
+  }
+
+  // db/041: the person's own row, the board read now, and what a PC last published; no PC or run head needed
+  var LCOLS = 'id,slug,name,owner_id,autonomy,e2e_self,deploy_target,notify_telegram,project_dir,brief_decisions,brief_naming,brief_instruction,brief_concept';
+  var readRow = function () { return rpc('harness_prefs_read', {}); };
+  function myDevice() {
+    if (device) return device;
+    var own = Object.keys(devices).filter(function (k) { return devices[k].owner_id === me; });
+    return own[0] || null;
+  }
+  function webConfig() {
+    return ready.then(function () {
+    var f = { device: myDevice(), at: new Date().toISOString() }, label = (devices[f.device] || {}).label || f.device || 'the PC';
+    return Promise.all([
+      rest('harness_configs?select=device,config,published_at&order=published_at.desc').catch(function () { return []; }),
+      readRow().catch(function () { return null; }),
+      rest('lists?select=' + LCOLS + '&archived_at=is.null&order=name').catch(function (e) { f.error = friendly(e); return null; }),
+      rest('deploy_targets?select=key,label&order=label').catch(function () { return []; }),
+      rpc('budget_status', { p_list: null }).catch(function () { return null; })
+    ]).then(function (x) {
+      var pubs = x[0] || [], pub = pubs.filter(function (p) { return p.device === f.device; })[0] || pubs[0] || null;
+      f.row = x[1];
+      f.lists = x[2] ? x[2].map(function (l) { return { id: l.id, slug: l.slug, name: l.name, owner_id: l.owner_id, mode: l.autonomy || 'guided', intake: { e2e_self: l.e2e_self, deploy_target: l.deploy_target, notify_telegram: l.notify_telegram }, project_dir: l.project_dir || null,
+        brief_texts: { decisions: l.brief_decisions || '', naming: l.brief_naming || '', instruction: l.brief_instruction || '', concept: l.brief_concept || '' } }; }) : null;
+      f.deploy_targets = x[3] || [];
+      var overall = x[4];
+      var per = overall && f.lists ? Promise.all(f.lists.map(function (l) { return rpc('budget_status', { p_list: l.id }).catch(function () { return []; }); })) : Promise.resolve([]);
+      return per.then(function (lists) {
+        if (overall) {
+          var rows = overall.filter(function (r) { return r.scope === 'overall'; }).slice();
+          lists.forEach(function (rs, i) { (rs || []).filter(function (r) { return r.list_id === f.lists[i].id; }).forEach(function (r) { rows.push(Object.assign({}, r, { slug: f.lists[i].slug })); }); });
+          f.budgets = rows;
+        }
+        var a = configAnswer(pub, f, label); lastLimits = a.limits; return a;
+      });
+    });
     });
   }
 
@@ -266,19 +313,13 @@
         }, function (e) { return { ok: false, status: 400, json: { error: friendly(e) } }; });
       }
       if (u === '/api/limits') {
-        var view = lastLimits || { rows: [], base_hash: {} }, scopes = limitScopes(view, body);
-        if (!scopes.length) return { ok: true, status: 200, json: view };
-        return scopes.reduce(function (p, s) {
-          return p.then(function (acc) {
-            return request({ p_run_ts: (myHeads()[0] || {}).run_ts, p_action: 'limits', p_payload: s.payload, p_scope_list: s.scope_list, p_base_hash: s.base_hash || '0' })
-              .then(function (x) { acc.push(x.state === 'done' ? null : s.scope + ': ' + x.state + (x.result ? ' (' + x.result + ')' : '')); return acc; }, function (e) { acc.push(s.scope + ': ' + friendly(e)); return acc; });
-          });
-        }, Promise.resolve([])).then(function (errs) {
-          errs = errs.filter(Boolean);
-          return new Promise(function (ok) { setTimeout(ok, errs.length ? 0 : 6000); }).then(function () { return getJson('/api/limits'); }).then(function (v) {
-            return errs.length ? { ok: false, status: 409, json: { error: 'not saved on ' + label, errors: errs } } : { ok: true, status: 200, json: v };
-          });
-        });
+        var write = function (again) {
+          return readRow().then(function (row) {
+            return rpc('harness_prefs_write', { p_prefs: rowAfterSave(row && row.prefs, body, myDevice()), p_expected: row ? row.version : null });
+          }).catch(function (e) { if (!again && (e.status === 409 || e.code === 'PT409')) return write(true); throw e; });
+        };
+        return write(false).then(function () { return getJson('/api/limits'); }).then(function (v) { return { ok: true, status: 200, json: v }; },
+          function (e) { return { ok: false, status: e.status || 400, json: { error: 'not saved', errors: [friendly(e)] } }; });
       }
       return { ok: false, status: 404, json: { error: 'not on the web' } };
     });
@@ -310,6 +351,7 @@
   }
 
   function can(action, s, extra) {
+    if (action === 'limits') return me ? { ok: true } : { ok: false, why: 'sign in on the board' };   // db/041: the reader's own row
     var why = verdict({ device: devices[device] || null, me: me, roles: roles, sessionList: sessionList, limits: lastLimits, now: Date.now() }, action, s, extra);
     return why ? { ok: false, why: why } : { ok: true };
   }

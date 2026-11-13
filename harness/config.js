@@ -1,6 +1,9 @@
 /* Eisenhower harness viewer: the Configurations page (harness-configurations-plan.md T11, UI spec references/homeos/harness-configurations/ui/
-   configurations-page-spec.md, winner p1 with the p2 changes). Tabs Workload, Autonomy, Budgets, Model routing (read only: config/routing.json);
-   Notifications and Machine removed and the mothers cap moved to Workload (Maksym, 2026-11-11).
+   configurations-page-spec.md, winner p1 with the p2 changes). Tabs Workload, Lists, Model routing (read only: config/routing.json);
+   Notifications and Machine removed and the mothers cap moved to Workload (Maksym, 2026-11-11). Lists (2026-11-13) holds the board's
+   List settings except Stage report - Autonomy, Intake (e2e, deploy target, project folder, Telegram), monthly budget and the list brief -
+   written through the same RPCs as the board (set_autonomy, set_intake, set_project_dir, set_list_brief, set_budget); it replaced the
+   Autonomy and Budgets tabs. Workload limits are the person's own DB row (db/041); each PC syncs it into its limits file.
    Reads GET /api/config. Writes this device's limits file through the page's own POST /api/limits (Workload: mothers, lists, Reset all), and
    Autonomy and budgets with the person's own board sign-in: set_autonomy and set_budget through the board bridge (a hidden frame of
    http://localhost:8788/harness/bridge.html), or straight through HarnessTransport.rpc on the web copy (never the bridge there). homeos-agent never
@@ -20,7 +23,7 @@
     ai_brain: { n: 'AI Brain', does: 'Agent does: plans, side questions and checks, with your past answers.', you: 'Comes to you: security, data structure and E0.' }
   };
   var ORDER = ['project_rules', 'guided', 'ai_brain'];   // the modes a person picks (Maksym 2026-11-11: Project rules, Mixed, AI Brain); 'guided' is Mixed in the DB
-  var TABS = [['workload', 'Workload'], ['autonomy', 'Autonomy'], ['budgets', 'Budgets'], ['routing', 'Model routing']];
+  var TABS = [['workload', 'Workload'], ['lists', 'Lists'], ['routing', 'Model routing']];
   var S = { tab: 'workload', filter: 'all', series: 'overall', range: 'month', data: null, error: null, cursor: null, opt: { mode: {}, cap: {} } };
   var web = function () { return !!(window.HarnessTransport && typeof window.HarnessTransport.rpc === 'function'); };
   var WEBST = function () { return S.data && S.data.web && S.data.web.state ? S.data.web : null; };
@@ -50,8 +53,7 @@
     if (WEBST()) return WEBST().state === 'guest' ? 'household only' : 'waiting';
     if (id === 'routing') { var R = d.board && d.board.routing; return R ? 'read only' : 'not read'; }
     if (id === 'workload') { var live = 0, max = 0; limRows().forEach(function (r) { live += r.live || 0; if (r.enabled !== false) max += r.max_sessions || 0; }); return live + ' of ' + max + ' sessions live'; }
-    if (id === 'autonomy') { var b = lists().filter(function (l) { return l.effective === 'ai_brain'; }).length; return lists().length ? (b ? b + ' on AI Brain' : 'all Mixed or narrower') : 'board not read'; }
-    if (id === 'budgets') { var rows = (d.board && d.board.budgets && d.board.budgets.rows) || []; if (!rows.length) return 'no budget set'; var at = rows.filter(function (r) { return r.reached; }).length; return at ? at + ' at cap' : 'below caps'; }
+    if (id === 'lists') { var b = lists().filter(function (l) { return l.effective === 'ai_brain'; }).length; return lists().length ? lists().length + ' lists' + (b ? ', ' + b + ' on AI Brain' : '') : 'board not read'; }
     return 'TBD';
   }
 
@@ -74,7 +76,6 @@
     tabBtns.forEach(function (b) { var on = b.id === 'cfgt-' + id; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); });
     Object.keys(panels).forEach(function (k) { panels[k].hidden = k !== id; });
     try { localStorage.setItem('eis-cfg-tab', id); } catch (e) { /* a convenience only */ }
-    if (id === 'budgets') drawChart();
   }
 
   /* ---------- Workload (edited in place, saved on change; Maksym 2026-11-11) ---------- */
@@ -86,7 +87,7 @@
     var listsOut = {}; rowsOut.forEach(function (r) { listsOut[r.slug] = { enabled: r.enabled, max_sessions: n(r.max_sessions), max_agents_per_session: n(r.max_agents_per_session) }; });
     msg.className = 'cfg-msg'; msg.textContent = 'Saving…';
     return postJson('/api/limits', { defaults: L.defaults, lists: listsOut, base_hash: L.base_hash }).then(function (r) {
-      if (r.ok) { S.data.limits = r.json; renderAll(); var m2 = $('cfg-wl-msg'); if (m2) m2.textContent = okText || 'Saved to this device.'; }
+      if (r.ok) { S.data.limits = r.json; renderAll(); var m2 = $('cfg-wl-msg'); if (m2) m2.textContent = okText || 'Saved.'; }
       else { msg.className = 'cfg-msg bad'; msg.textContent = ((r.json && (r.json.errors || [r.json.error])) || ['Not saved.']).join('; ') + ' Nothing was saved.'; }
     }).catch(function () { msg.className = 'cfg-msg bad'; msg.textContent = 'The server did not answer. Nothing was saved.'; });
   }
@@ -102,7 +103,7 @@
     cell(tr, 'Runs sessions', null, max ? 'On' : 'Off');
     cell(tr, 'Live / limit').appendChild(meter(live, max));
     t.tBodies[0].appendChild(tr); sec.appendChild(t);
-    sec.appendChild(el('p', 'cfg-note', 'Limits are per device (D57): the other device sets its own on its own page.'));
+    sec.appendChild(el('p', 'cfg-note', 'Limits are yours, kept in the database: every PC that runs your harness reads them within a minute or two. Mothers at once is per PC.'));
     p.appendChild(sec);
     // mothers at once (was the Machine tab)
     var M = S.data.machine || {}, sm = el('section', 'cfg-sec'); sm.appendChild(el('h3', null, 'Mother sessions on this device'));
@@ -115,7 +116,7 @@
       var v = Number(mi.value); if (!(v >= 1 && v <= 10 && Math.round(v) === v)) { mmsg.className = 'cfg-msg bad'; mmsg.textContent = 'A whole number from 1 to 10.'; mi.value = M.max_mothers_set != null ? M.max_mothers_set : 2; return; }
       mmsg.className = 'cfg-msg'; mmsg.textContent = 'Saving…';
       postJson('/api/limits', { scope: 'machine', payload: { max_mothers: v }, base_hash: (L.base_hash && L.base_hash.machine) || null })
-        .then(function (r) { if (r.ok) { mmsg.textContent = 'Saved to this device.'; load(); } else { mmsg.className = 'cfg-msg bad'; mmsg.textContent = 'Could not write the limits file. Not saved.'; } })
+        .then(function (r) { if (r.ok) { mmsg.textContent = 'Saved.'; load(); } else { mmsg.className = 'cfg-msg bad'; mmsg.textContent = 'Could not write the limits file. Not saved.'; } })
         .catch(function () { mmsg.className = 'cfg-msg bad'; mmsg.textContent = 'Could not write the limits file. Not saved.'; });
     };
     p.appendChild(sm);
@@ -189,53 +190,108 @@
     });
   }
 
-  /* ---------- Autonomy (edited here too, Maksym 2026-11-11: harness page, board and phone) ---------- */
-  function renderAutonomy(p) {
+  /* ---------- Lists (2026-11-13): the board's List settings minus Stage report, through the same RPCs; replaced Autonomy and Budgets ---------- */
+  var LIST_BRIEF = [['instruction', 'Instruction'], ['concept', 'Concept'], ['decisions', 'Decisions'], ['naming', 'Naming']];
+  function budgetRows() { return (S.data && S.data.board && S.data.board.budgets && S.data.board.budgets.rows) || []; }
+  function monthRow(key) { return budgetRows().filter(function (r) { return r.period === 'month' && (key === 'overall' ? r.scope === 'overall' : r.slug === key); })[0] || null; }
+  function capOf(key) { var r = monthRow(key); return r && r.cap_usd != null ? Number(r.cap_usd) : null; }
+  function spentOf(key) { var r = monthRow(key); return r ? Number(r.spent_usd) || 0 : 0; }
+  // pure: the RPC calls a list's form needs, only for what changed (the board's Save does the same)
+  function listChanges(l, f, monthCap) {
+    var out = [], it = l.intake || {}, bt = l.brief_texts || {};
+    if (f.mode !== l.mode) out.push(['set_autonomy', { p_kind: 'list', p_id: l.id, p_mode: f.mode, p_expected: l.mode }]);
+    if (!!f.e2e !== !!it.e2e_self || (f.deploy || null) !== (it.deploy_target || null) || !!f.tg !== !!it.notify_telegram)
+      out.push(['set_intake', { p_kind: 'list', p_id: l.id, p_e2e_self: !!f.e2e, p_deploy_target: f.deploy || null, p_notify_telegram: !!f.tg, p_stage_report: null }]);
+    var dir = String(f.dir || '').trim();
+    if (dir !== (l.project_dir || '')) out.push(['set_project_dir', { p_list: l.id, p_dir: dir, p_expected: l.project_dir || null }]);
+    if (LIST_BRIEF.some(function (k) { return (f.brief[k[0]] || '') !== (bt[k[0]] || ''); }))
+      out.push(['set_list_brief', { p_list: l.id, p_decisions: f.brief.decisions || '', p_naming: f.brief.naming || '', p_instruction: f.brief.instruction || '', p_concept: f.brief.concept || '' }]);
+    if ((f.cap == null ? null : f.cap) !== (monthCap == null ? null : monthCap)) out.push(['set_budget', { p_list: l.id, p_period: 'month', p_cap: f.cap }]);
+    return out;
+  }
+  function dirError(d) {
+    d = String(d || '').trim(); if (!d) return '';
+    if (d.length > 260) return 'The project folder is longer than 260 characters.';
+    if (!/^([A-Za-z]:[\\/]|\/)/.test(d)) return 'The project folder must be an absolute path (D:\\… or /…).';
+    if (/(^|[\\/])\.\.([\\/]|$)/.test(d) || /[\u0000-\u001f]/.test(d)) return 'The project folder may not contain ".." or control characters.';
+    return '';
+  }
+  function listForm(l, targets) {
+    var cap = capOf(l.slug), spent = spentOf(l.slug), it = l.intake || {}, bt = l.brief_texts || {};
+    var d = el('details', 'cfg-lf'); d.dataset.slug = l.slug; var sm = el('summary');
+    sm.appendChild(el('b', null, l.name)); sm.appendChild(modeEl(l.mode)); sm.appendChild(el('span', 'cfg-st', cap != null ? money(spent) + ' of ' + moneyShort(cap) + ' this month' : 'no budget'));
+    d.appendChild(sm);
+    var g = el('div', 'cfg-lf-g');
+    var field = function (label, input, hint, wide) { var w = el('label', 'cfg-lf-f' + (wide ? ' wide' : '')); w.appendChild(el('span', null, label)); w.appendChild(input); if (hint) w.appendChild(el('small', null, hint)); g.appendChild(w); return input; };
+    var box = function (on) { var c = el('input'); c.type = 'checkbox'; c.checked = !!on; return c; };
+    var sel = el('select', 'cfg-sel'); sel.dataset.f = 'mode';
+    ORDER.concat(ORDER.indexOf(l.mode) < 0 ? [l.mode] : []).forEach(function (m) { var o = el('option', null, (MODES[m] || MODES.guided).n + (m === 'guided' ? ' (default)' : '')); o.value = m; if (m === l.mode) o.selected = true; if (ORDER.indexOf(m) < 0) o.disabled = true; sel.appendChild(o); });
+    field('Autonomy', sel, l.effective !== l.mode ? 'Runs as ' + (MODES[l.effective] || MODES.guided).n + ': ' + (l.why || []).join('; ') : (l.set_by ? 'Set by ' + l.set_by : 'Default'));
+    var e2e = field('Agent runs e2e', box(it.e2e_self)); e2e.dataset.f = 'e2e';
+    var dep = el('select', 'cfg-sel'); dep.dataset.f = 'deploy'; var none = el('option', null, 'None'); none.value = ''; dep.appendChild(none);
+    var keys = targets.map(function (t) { return t.key; }); if (it.deploy_target && keys.indexOf(it.deploy_target) < 0) targets = targets.concat([{ key: it.deploy_target, label: it.deploy_target }]);
+    targets.forEach(function (t) { var o = el('option', null, t.label || t.key); o.value = t.key; if (t.key === it.deploy_target) o.selected = true; dep.appendChild(o); });
+    field('Deploy target', dep, 'TasksDashboard deploys only under AI Brain, after its tests pass and the deploy-readiness judge says ready.');
+    var tg = field('Notify on Telegram', box(it.notify_telegram)); tg.dataset.f = 'tg';
+    var dir = el('input'); dir.type = 'text'; dir.maxLength = 260; dir.placeholder = 'Empty = HomeOS'; dir.value = l.project_dir || ''; dir.dataset.f = 'dir';
+    field('Project folder', dir, 'Empty = HomeOS. Without CLAUDE.md, rules or hooks there, Project rules acts as Mixed.');
+    var capIn = el('input', 'cfg-num cfg-money'); capIn.type = 'number'; capIn.min = '0'; capIn.max = '100000'; capIn.step = '1'; capIn.placeholder = 'Not set'; capIn.value = cap != null ? String(cap) : ''; capIn.dataset.f = 'cap';
+    field('Monthly budget, $', capIn, money(spent) + ' spent this month. Empty = no cap.');
+    var tas = {};
+    LIST_BRIEF.forEach(function (k) { var ta = el('textarea'); ta.rows = 3; ta.maxLength = 8000; ta.value = bt[k[0]] || ''; ta.dataset.f = 'brief-' + k[0]; tas[k[0]] = ta; field('Brief: ' + k[1], ta, null, true); });
+    d.appendChild(g);
+    var acts = el('div', 'cfg-acts'), save = el('button', 'btn', 'Save'), msg = el('span', 'cfg-msg', 'No changes'); save.type = 'button'; save.disabled = true; msg.setAttribute('role', 'status');
+    acts.appendChild(save); acts.appendChild(msg); d.appendChild(acts);
+    var inputs = [sel, e2e, dep, tg, dir, capIn].concat(LIST_BRIEF.map(function (k) { return tas[k[0]]; }));
+    if (!l.id) inputs.forEach(function (x) { x.disabled = true; x.title = 'Restart the page server: it does not send list ids yet.'; });
+    var form = function () { var b = {}; LIST_BRIEF.forEach(function (k) { b[k[0]] = tas[k[0]].value; }); return { mode: sel.value, e2e: e2e.checked, deploy: dep.value || null, tg: tg.checked, dir: dir.value, cap: capIn.value.trim() === '' ? null : Number(capIn.value), brief: b }; };
+    var dirty = function () { var n = l.id ? listChanges(l, form(), cap).length : 0; save.disabled = !n; msg.className = 'cfg-msg'; msg.textContent = n ? 'Unsaved changes' : 'No changes'; };
+    g.addEventListener('input', dirty); g.addEventListener('change', dirty);
+    save.onclick = function () {
+      var f = form(), calls = listChanges(l, f, cap), err = dirError(f.dir) || budgetError(l.slug, f.cap, capOf);
+      if (err) { msg.className = 'cfg-msg bad'; msg.textContent = err + ' Not saved.'; return; }
+      save.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Saving with your board sign-in…'; writeStart();
+      calls.reduce(function (pr, c) { return pr.then(function () { return boardRpc(c[0], c[1]); }); }, Promise.resolve()).then(function () {
+        l.mode = f.mode; if (!l.why || !l.why.length) l.effective = f.mode; S.opt.mode[l.id] = { mode: f.mode, at: Date.now() };
+        l.intake = { e2e_self: f.e2e, deploy_target: f.deploy, notify_telegram: f.tg }; l.project_dir = f.dir.trim() || null; l.brief_texts = f.brief;
+        if (f.cap !== cap) { setCap(l.slug, l.id, f.cap); S.opt.cap[l.slug] = { cap: f.cap, list_id: l.id, at: Date.now() }; cap = f.cap; }
+        writeEnd(); msg.textContent = l.name + ': saved on the board.';
+      }, function (e) {
+        writeEnd(); save.disabled = false; msg.className = 'cfg-msg bad';
+        msg.textContent = l.name + ' not saved: ' + (/not allowed|household people/.test(e.message) ? 'only its owner or an editor who is a household person may change these' + (l.owner ? ' (owner: ' + l.owner + ')' : '') : e.message) + '. What was saved before the error stays.';
+      });
+    };
+    return d;
+  }
+  function renderLists(p) {
     p.textContent = '';
     if (!S.data) { p.appendChild(skel()); return; }
-    if (webState(p)) return;
-    if (!S.data.board) { p.appendChild(banner('The board could not be read' + (S.data.board_error ? ': ' + S.data.board_error : '') + '. Modes are shown once it can.')); }
+    if (!S.data.board) p.appendChild(banner('The board could not be read' + (S.data.board_error ? ': ' + S.data.board_error : '') + '. Lists show once it can.'));
     hostNote(p);
-    var wrap = el('div', 'cfg-au'), side = el('aside', 'cfg-au-side'); side.setAttribute('aria-label', 'What each mode means'); var host = p; p = el('div', 'cfg-au-main'); wrap.appendChild(p); wrap.appendChild(side); host.appendChild(wrap);
-    var ls = lists(), cards = el('div', 'cfg-cards'); cards.setAttribute('role', 'group'); cards.setAttribute('aria-label', 'Filter by mode');
-    var shown = ORDER.concat(ls.some(function (l) { return l.effective === 'manual'; }) ? ['manual'] : []);
-    [['all', 'All lists']].concat(shown.map(function (m) { return [m, MODES[m].n]; })).forEach(function (x) {
-      var n = x[0] === 'all' ? ls.length : ls.filter(function (l) { return l.effective === x[0]; }).length;
-      var b = el('button', 'cfg-card'); b.type = 'button'; b.setAttribute('aria-pressed', S.filter === x[0] ? 'true' : 'false');
-      if (x[0] !== 'all') b.appendChild(modeMark(x[0])); b.appendChild(el('b', null, String(n))); b.appendChild(el('span', null, x[1]));
-      b.onclick = function () { S.filter = x[0]; renderAutonomy(host); }; cards.appendChild(b);
-    });
-    p.appendChild(cards);
-    var msg = el('p', 'cfg-msg'); msg.id = 'cfg-au-msg'; msg.setAttribute('role', 'status');
-    var rows = ls.filter(function (l) { return S.filter === 'all' || l.effective === S.filter; });
-    var t = table('Lists and their Autonomy mode', [['List'], ['Mode'], ['Set by'], ['Tasks with own mode', 'n']]);
-    rows.forEach(function (l) {
-      var tr = el('tr'); cell(tr, 'List', 'h', l.name);
-      var cm = cell(tr, 'Mode'), sel = el('select', 'cfg-sel'); sel.setAttribute('aria-label', 'Autonomy mode of ' + l.name);
-      ORDER.concat(ORDER.indexOf(l.mode) < 0 ? [l.mode] : []).forEach(function (m) { var o = el('option', null, (MODES[m] || MODES.guided).n + (m === 'guided' ? ' (default)' : '')); o.value = m; if (m === l.mode) o.selected = true; if (ORDER.indexOf(m) < 0) o.disabled = true; sel.appendChild(o); });
-      if (!l.id) { sel.disabled = true; sel.title = 'Restart the page server: it does not send list ids yet.'; }
-      sel.onchange = function () {
-        var want = sel.value, was = l.mode; sel.disabled = true; msg.className = 'cfg-msg'; writeStart();
-        msg.textContent = WR.pend > 1 ? 'Saving ' + WR.pend + ' changes with your board sign-in…' : 'Saving ' + l.name + ' with your board sign-in…';
-        l.mode = want; l.effective = want;   // shown at once; the read after the last write confirms it
-        boardRpc('set_autonomy', { p_kind: 'list', p_id: l.id, p_mode: want, p_expected: was }).then(function () {
-          S.opt.mode[l.id] = { mode: want, at: Date.now() };
-          sel.disabled = false; writeEnd(); msg.textContent = WR.pend ? 'Saved ' + l.name + '; ' + WR.pend + ' more saving…' : l.name + ': ' + MODES[want].n + '. Saved on the board.';
-        }, function (e) { l.mode = was; l.effective = was; sel.disabled = false; sel.value = was; writeEnd(); msg.className = 'cfg-msg bad'; msg.textContent = l.name + ' not saved: ' + (/not allowed/.test(e.message) ? 'only its owner or an editor may change its mode' + (l.owner ? ' (owner: ' + l.owner + '); ask them to share it with you as editor' : '') : e.message); });
-      };
-      cm.appendChild(sel);
-      if (l.effective !== l.mode) cm.appendChild(el('span', 'cfg-st', 'Runs as ' + (MODES[l.effective] || MODES.guided).n + ': ' + (l.why || []).join('; ')));
-      cell(tr, 'Set by', null, l.set_by ? l.set_by : 'Default');
-      cell(tr, 'Tasks with own mode', 'n', String(l.overrides || 0));
-      t.tBodies[0].appendChild(tr);
-    });
-    if (rows.length) p.appendChild(t); else { var e = el('div', 'cfg-empty'); e.appendChild(el('b', null, 'No list is in this mode.')); p.appendChild(e); }
-    p.appendChild(msg);
-    p.appendChild(el('p', 'cfg-note', 'Saved with your own sign-in on the board' + (web() ? '' : ' (localhost:8788)') + ', as in the list’s settings on the board and in the phone app: the same three places. AI Brain and Project rules only by a household person. A task inherits from its parent, then its list. To stop a list on this device, untick it in Workload.'));
+    var wrap = el('div', 'cfg-au'), side = el('aside', 'cfg-au-side'), main = el('div', 'cfg-au-main'); side.setAttribute('aria-label', 'What each mode means');
+    wrap.appendChild(main); wrap.appendChild(side); p.appendChild(wrap);
+    var ov = el('section', 'cfg-sec'); ov.appendChild(el('h3', null, 'Overall monthly budget'));
+    var orow = el('div', 'cfg-inline'), ol = el('label', null, 'Cap per month, $ '), oi = el('input', 'cfg-num cfg-money'), omsg = el('span', 'cfg-msg');
+    oi.type = 'number'; oi.min = '0'; oi.max = '100000'; oi.step = '1'; oi.id = 'cfg-ocap'; ol.htmlFor = 'cfg-ocap'; oi.placeholder = 'Not set'; oi.value = capOf('overall') != null ? String(capOf('overall')) : ''; omsg.setAttribute('role', 'status');
+    orow.appendChild(ol); orow.appendChild(oi); orow.appendChild(el('span', 'cfg-st', money(spentOf('overall')) + ' spent this month')); orow.appendChild(omsg); ov.appendChild(orow);
+    oi.onchange = function () {
+      var v = oi.value.trim() === '' ? null : Number(oi.value), err = budgetError('overall', v, capOf);
+      if (err) { omsg.className = 'cfg-msg bad'; omsg.textContent = err + ' Not saved.'; oi.value = capOf('overall') != null ? String(capOf('overall')) : ''; return; }
+      oi.disabled = true; omsg.className = 'cfg-msg'; omsg.textContent = 'Saving…'; writeStart();
+      boardRpc('set_budget', { p_list: null, p_period: 'month', p_cap: v }).then(function () { setCap('overall', null, v); S.opt.cap.overall = { cap: v, list_id: null, at: Date.now() }; oi.disabled = false; writeEnd(); omsg.textContent = 'Saved on the board.'; },
+        function (e) { oi.disabled = false; writeEnd(); omsg.className = 'cfg-msg bad'; omsg.textContent = 'Not saved: ' + e.message; });
+    };
+    main.appendChild(ov);
+    var ls = lists(), sec = el('section', 'cfg-sec'); sec.appendChild(el('h3', null, 'Lists'));
+    if (!ls.length) { var e = el('div', 'cfg-empty'); e.appendChild(el('b', null, 'No lists yet.')); e.appendChild(document.createTextNode(' A list shows here after the board is read.')); sec.appendChild(e); }
+    var targets = (S.data.board && S.data.board.deploy_targets) || [];
+    ls.forEach(function (l) { sec.appendChild(listForm(l, targets)); });
+    main.appendChild(sec);
+    main.appendChild(el('p', 'cfg-note', 'The same settings as List settings on the board and in the phone app, saved with your own board sign-in' + (web() ? '' : ' (localhost:8788)') + ' through the same calls. AI Brain, Project rules, intake, the brief and budgets only by a household person who owns or edits the list. A list’s cap may not be above the overall cap. To stop a list on one PC, untick it in Workload.'));
     var e0 = el('section', 'cfg-e0'); e0.setAttribute('aria-labelledby', 'cfg-e0h'); var h = el('h3', null, 'Always the person’s, in every mode'); h.id = 'cfg-e0h'; e0.appendChild(h);
     e0.appendChild(el('p', null, 'No mode, precedent, project rule or list brief makes these an agent’s decision.'));
-    var u = el('ul'); ((S.data.board && S.data.board.e0) || []).forEach(function (x) { u.appendChild(el('li', null, x)); }); e0.appendChild(u); p.appendChild(e0);
-    var dl = el('dl', 'cfg-modes'); ORDER.forEach(function (m) { var d = el('div'), dt = el('dt'); dt.appendChild(modeEl(m)); d.appendChild(dt); d.appendChild(el('dd', null, MODES[m].does)); d.appendChild(el('dd', null, MODES[m].you)); dl.appendChild(d); }); side.appendChild(dl);
+    var u = el('ul'); ((S.data.board && S.data.board.e0) || []).forEach(function (x) { u.appendChild(el('li', null, x)); }); e0.appendChild(u); main.appendChild(e0);
+    var dl = el('dl', 'cfg-modes'); ORDER.forEach(function (m) { var dd = el('div'), dt = el('dt'); dt.appendChild(modeEl(m)); dd.appendChild(dt); dd.appendChild(el('dd', null, MODES[m].does)); dd.appendChild(el('dd', null, MODES[m].you)); dl.appendChild(dd); }); side.appendChild(dl);
   }
   function banner(text) { var d = el('div', 'cfg-banner'); d.setAttribute('role', 'alert'); d.appendChild(el('p', null, text)); return d; }
 
@@ -276,85 +332,6 @@
     return el('p', 'cfg-pub', 'Published ' + hh + ' by ' + (d.device || 'the PC') + '. The PC republishes within about a minute' + (pend ? '; your ' + pend + ' saved change' + (pend > 1 ? 's show' : ' shows') + ' here until then.' : '.'));
   }
 
-  /* ---------- Budgets ---------- */
-  function budgetRows() { return (S.data && S.data.board && S.data.board.budgets && S.data.board.budgets.rows) || []; }
-  function seriesOf(key) {
-    var spend = (S.data && S.data.board && S.data.board.budgets && S.data.board.budgets.spend) || {};
-    var cum = spend[key] || [], now = Date.now(), start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
-    var a = start.getTime(), pts = [[a, 0]], prev = 0, sum = 0;
-    cum.forEach(function (x) { var t = Date.parse(x.day + 'T12:00:00'), inc = x.usd - prev; prev = x.usd; if (t >= a) { sum += inc; pts.push([t, Math.round(sum * 100) / 100]); } });
-    pts.push([now, sum]);
-    var row = budgetRows().filter(function (r) { return r.period === 'month' && (key === 'overall' ? r.scope === 'overall' : r.slug === key); })[0] || null;
-    var cap = row ? row.cap_usd : null, reserved = row ? row.reserved_usd : 0, perDay = sum / Math.max(1, (now - a) / DAY), fc = { kind: 'none' };
-    if (cap) {
-      if (sum + reserved >= cap) fc = { kind: 'reached', at: now };
-      else if (perDay > 0) { var at = now + (cap - sum) / perDay * DAY, end = new Date(start); end.setMonth(end.getMonth() + 1); fc = at < end.getTime() ? { kind: 'forecast', at: at } : { kind: 'below', end: end.getTime(), val: sum + perDay * (end.getTime() - now) / DAY }; }
-    }
-    var name = key === 'overall' ? 'Overall' : ((lists().filter(function (l) { return l.slug === key; })[0] || {}).name || key);
-    return { key: key, name: name, cap: cap, pts: pts, spent: sum, fc: fc, a: a };
-  }
-  function capText(s) {
-    if (!s.cap) return 'No budget set. Set it in the table below.';
-    if (s.fc.kind === 'forecast') return 'Cap reached around ' + ymd(s.fc.at, true);
-    if (s.fc.kind === 'reached') return 'Cap reached. New sessions in this list are paused.';
-    if (s.fc.kind === 'below') return 'Cap not reached this month.';
-    return 'No forecast yet.';
-  }
-  function renderBudgets(p) {
-    p.textContent = '';
-    if (!S.data) { p.appendChild(skel()); return; }
-    if (webState(p)) return;
-    hostNote(p);
-    var keys = ['overall'].concat(lists().map(function (l) { return l.slug; }));
-    var bar = el('div', 'cfg-toolbar'), lab = el('label', null, 'Budget'), sel = el('select', 'cfg-sel'); sel.id = 'cfg-bsel'; lab.htmlFor = 'cfg-bsel';
-    keys.forEach(function (k) { var o = el('option', null, seriesOf(k).name); o.value = k; if (k === S.series) o.selected = true; sel.appendChild(o); });
-    sel.onchange = function () { S.series = sel.value; S.cursor = null; renderBudgets(p); };
-    bar.appendChild(lab); bar.appendChild(sel); p.appendChild(bar);
-    var s = seriesOf(S.series), k = el('div', 'cfg-kpis'), big = el('div', 'cfg-big', money(s.spent)); if (s.cap) big.appendChild(el('small', null, 'of ' + moneyShort(s.cap) + ' this month'));
-    k.appendChild(big); var hl = el('p', 'cfg-kcap' + (s.fc.kind === 'reached' ? ' reached' : '')); hl.appendChild(el('b', null, capText(s))); k.appendChild(hl); p.appendChild(k);
-    var w = el('div', 'cfg-chartw'), svg = sv('svg', { id: 'cfg-chart', role: 'img', tabindex: '0', 'aria-describedby': 'cfg-chart-sum' }); w.appendChild(svg);
-    var tip = el('div', 'cfg-ctip'); tip.id = 'cfg-ctip'; w.appendChild(tip); p.appendChild(w);
-    var lg = el('p', 'cfg-legend'); lg.appendChild(el('span', null, 'Blue: spent at API prices; dashed: forecast. Gold: the cap. The vertical line is the moment the cap is (or will be) reached.')); p.appendChild(lg);
-    var sum = el('p', 'vh'); sum.id = 'cfg-chart-sum'; p.appendChild(sum); var live = el('p', 'vh'); live.id = 'cfg-chart-live'; live.setAttribute('aria-live', 'polite'); p.appendChild(live);
-    var t = table('Budgets per list', [['List'], ['Spent this month', 'n'], ['Cap per month, $', 'n'], ['Cap reached']]);
-    var msg = el('p', 'cfg-msg'); msg.id = 'cfg-bu-msg'; msg.setAttribute('role', 'status');
-    var idOf = function (key) { return key === 'overall' ? null : ((lists().filter(function (l) { return l.slug === key; })[0] || {}).id || undefined); };
-    var capOf = function (key) { return seriesOf(key).cap || null; };
-    keys.forEach(function (key) {
-      var x = seriesOf(key), tr = el('tr'); if (key === 'overall') tr.className = 'sum';
-      var b = el('button', 'lk', x.name); b.type = 'button'; b.onclick = function () { S.series = key; renderBudgets(p); var c = $('cfg-chart'); if (c) c.focus(); }; cell(tr, 'List', 'h').appendChild(b);
-      cell(tr, 'Spent this month', 'n', money(x.spent));
-      var inp = el('input', 'cfg-num cfg-money'); inp.type = 'number'; inp.min = '0'; inp.step = '1'; inp.max = '100000'; inp.placeholder = 'Not set';
-      inp.value = x.cap ? String(x.cap) : ''; inp.setAttribute('aria-label', 'Monthly cap of ' + x.name + ' in dollars, empty for none');
-      if (idOf(key) === undefined) { inp.disabled = true; inp.title = 'Restart the page server: it does not send list ids yet.'; }
-      inp.onchange = function () {
-        var v = inp.value.trim() === '' ? null : Number(inp.value), err = budgetError(key, v, capOf);
-        if (err) { msg.className = 'cfg-msg bad'; msg.textContent = err + ' Not saved.'; inp.value = x.cap ? String(x.cap) : ''; return; }
-        inp.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Saving ' + x.name + ' with your board sign-in…';
-        writeStart();
-        boardRpc('set_budget', { p_list: idOf(key), p_period: 'month', p_cap: v }).then(function () { setCap(key, idOf(key), v); S.opt.cap[key] = { cap: v, list_id: idOf(key), at: Date.now() }; inp.disabled = false; writeEnd(); msg.textContent = x.name + ': ' + (v == null ? 'no cap' : moneyShort(v) + ' a month') + '. Saved on the board.'; },
-          function (e) { inp.disabled = false; inp.value = x.cap ? String(x.cap) : ''; writeEnd(); msg.className = 'cfg-msg bad'; msg.textContent = x.name + ' not saved: ' + (/not allowed/.test(e.message) ? 'only its owner or an editor who is a household person may set its cap' : e.message); });
-      };
-      cell(tr, 'Cap per month, $', 'n').appendChild(inp);
-      cell(tr, 'Cap reached', null, !x.cap ? 'No budget set' : x.fc.kind === 'forecast' ? 'Around ' + ymd(x.fc.at, true) : x.fc.kind === 'reached' ? 'Reached. New sessions paused.' : x.fc.kind === 'below' ? 'Not this month' : 'No forecast yet');
-      t.tBodies[0].appendChild(tr);
-    });
-    p.appendChild(t);
-    var acts = el('div', 'cfg-acts'), rb = el('button', 'btn', 'Reset all'); rb.type = 'button';
-    var set = keys.filter(function (k) { return capOf(k); });
-    rb.disabled = !set.length; rb.title = 'Removes every monthly cap: lists first, then the overall one';
-    rb.onclick = function () {
-      if (!window.confirm('Remove all ' + set.length + ' monthly caps? Nothing then stops new sessions for money until a cap is set again.')) return;
-      rb.disabled = true; msg.className = 'cfg-msg'; msg.textContent = 'Removing the caps…';
-      var order = set.filter(function (k) { return k !== 'overall'; }).concat(set.indexOf('overall') >= 0 ? ['overall'] : []);
-      writeStart();
-      order.reduce(function (pr, k) { return pr.then(function () { return boardRpc('set_budget', { p_list: idOf(k), p_period: 'month', p_cap: null }).then(function () { setCap(k, idOf(k), null); S.opt.cap[k] = { cap: null, list_id: idOf(k), at: Date.now() }; }); }); }, Promise.resolve())
-        .then(function () { writeEnd(); msg.textContent = 'Every monthly cap removed.'; }, function (e) { writeEnd(); msg.className = 'cfg-msg bad'; msg.textContent = 'Stopped: ' + e.message; });
-    };
-    acts.appendChild(rb); p.appendChild(acts); p.appendChild(msg);
-    p.appendChild(el('p', 'cfg-note', 'Set a cap for the whole harness (Overall), for a list, or both; empty means no cap. A list’s cap may not be above the overall cap. Saved with your own board sign-in, household people only, and shared by every device. At API prices. A cap stops new starts in its list (no card, no try counted); running sessions finish their step. It never lifts the 90% token pause.'));
-    drawChart();
-  }
   // a new cap for key is refused when a list's cap is above the overall cap, or the overall cap would go below a list's
   function budgetError(key, v, capOf) {
     if (v != null && !(v >= 0 && v <= 100000)) return 'A cap is a number from 0 to 100000.';
@@ -363,41 +340,6 @@
     var over = lists().filter(function (l) { var c = capOf(l.slug); return c != null && c > v; }).map(function (l) { return l.name + ' ' + moneyShort(capOf(l.slug)); });
     return over.length ? 'The overall cap may not be below a list’s cap: ' + over.join(', ') + '.' : '';
   }
-  function drawChart() {
-    if (!$) return; var svg = $('cfg-chart'); if (!svg || !panels.budgets || panels.budgets.hidden) return;
-    svg.textContent = '';
-    var s = seriesOf(S.series), W = svg.clientWidth || 800, H = svg.clientHeight || 280; svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    var end = new Date(s.a); end.setMonth(end.getMonth() + 1); var A = s.a, Bt = end.getTime(), now = Date.now();
-    var m = { l: 46, r: 14, t: 30, b: 26 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
-    var f = s.fc.kind === 'forecast' ? [[now, s.spent], [s.fc.at, s.cap]] : s.fc.kind === 'below' ? [[now, s.spent], [s.fc.end, s.fc.val]] : null;
-    var maxV = Math.max(s.cap || 0, s.spent, f ? f[1][1] : 0, 1), step = maxV > 100 ? 20 : maxV > 40 ? 10 : maxV > 10 ? 5 : 1, yMax = Math.ceil(maxV * 1.12 / step) * step;
-    var x = function (t) { return m.l + (t - A) / (Bt - A) * iw; }, y = function (v) { return m.t + ih - v / yMax * ih; };
-    var g = sv('g'); svg.appendChild(g);
-    for (var v = 0; v <= yMax; v += step) { g.appendChild(sv('line', { x1: m.l, x2: m.l + iw, y1: y(v), y2: y(v), stroke: 'rgba(255,255,255,.07)' })); g.appendChild(sv('text', { x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end' }, '$' + v)); }
-    var tick = iw < 520 ? 10 * DAY : 5 * DAY;
-    for (var t = A; t <= Bt; t += tick) g.appendChild(sv('text', { x: x(t), y: H - 6, 'text-anchor': t === A ? 'start' : (t + tick > Bt ? 'end' : 'middle') }, ymd(t).slice(5)));
-    var clip = sv('clipPath', { id: 'cfg-cp' }); clip.appendChild(sv('rect', { x: m.l, y: 0, width: iw, height: H })); svg.appendChild(clip);
-    var plot = sv('g', { 'clip-path': 'url(#cfg-cp)' }); svg.appendChild(plot);
-    plot.appendChild(sv('line', { x1: x(now), x2: x(now), y1: m.t, y2: m.t + ih, stroke: '#4b5b7a', 'stroke-dasharray': '2 3' })); g.appendChild(sv('text', { x: x(now) + 4, y: m.t + ih - 6 }, 'Now'));
-    if (s.cap) { plot.appendChild(sv('line', { x1: m.l, x2: m.l + iw, y1: y(s.cap), y2: y(s.cap), stroke: '#f3cf7a', 'stroke-width': 1.5 })); g.appendChild(sv('text', { x: m.l + 4, y: y(s.cap) - 6, 'class': 'lbl', style: 'fill:#f3cf7a' }, 'Cap ' + moneyShort(s.cap))); }
-    plot.appendChild(sv('path', { d: s.pts.map(function (q, i) { return (i ? 'L' : 'M') + x(q[0]).toFixed(1) + ' ' + y(q[1]).toFixed(1); }).join(''), fill: 'none', stroke: '#86a9ff', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
-    if (f) plot.appendChild(sv('path', { d: 'M' + x(f[0][0]) + ' ' + y(f[0][1]) + 'L' + x(f[1][0]) + ' ' + y(f[1][1]), fill: 'none', stroke: '#86a9ff', 'stroke-width': 2, 'stroke-dasharray': '6 5' }));
-    var note = '';
-    if (s.cap && (s.fc.kind === 'forecast' || s.fc.kind === 'reached')) {
-      var at = s.fc.at, reached = s.fc.kind === 'reached', col = reached ? '#ff8a7c' : '#f4ad4e', txt = (reached ? 'Cap reached ' : 'Cap reached around ') + ymd(at, true);
-      if (at >= A && at <= Bt) { var vx = x(at), right = vx > m.l + iw * 0.62; plot.appendChild(sv('line', { x1: vx, x2: vx, y1: m.t - 4, y2: m.t + ih, stroke: col, 'stroke-width': reached ? 2 : 1.5, 'stroke-dasharray': reached ? 'none' : '5 4' })); plot.appendChild(sv('circle', { cx: vx, cy: y(s.cap), r: 4, fill: col })); g.appendChild(sv('text', { x: right ? vx - 6 : vx + 6, y: m.t - 12, 'text-anchor': right ? 'end' : 'start', 'class': 'lbl', style: 'fill:' + col }, txt)); }
-      else note = ' ' + txt + (at > Bt ? ', after this range.' : ', before this range.');
-    }
-    if (!s.cap) g.appendChild(sv('text', { x: m.l + iw / 2, y: m.t + 14, 'text-anchor': 'middle', 'class': 'lbl', style: 'fill:#eef2fa' }, 'No budget set. Set it in the table below.'));
-    var sumEl = $('cfg-chart-sum'); if (sumEl) sumEl.textContent = 'Chart: ' + s.name + ', spent ' + money(s.spent) + ' this month' + (s.cap ? ' against a cap of ' + moneyShort(s.cap) + '. ' : '. ') + capText(s) + note;
-    var tip = $('cfg-ctip'), cur = sv('g', { visibility: 'hidden' }); cur.appendChild(sv('line', { y1: m.t, y2: m.t + ih, stroke: '#eef2fa', 'stroke-opacity': 0.5 })); cur.appendChild(sv('circle', { r: 4, fill: '#eef2fa' })); svg.appendChild(cur);
-    var valueAt = function (tm) { var all = s.pts.slice(); if (f) all.push(f[1]); if (tm < all[0][0]) return null; for (var i = 1; i < all.length; i++) if (tm <= all[i][0]) { var p0 = all[i - 1], p1 = all[i]; return p1[0] === p0[0] ? p1[1] : p0[1] + (p1[1] - p0[1]) * (tm - p0[0]) / (p1[0] - p0[0]); } return null; };
-    var show = function (tm, announce) { var val = valueAt(tm); if (val == null) { cur.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; return; } var cx = x(tm), cy = y(val); cur.setAttribute('visibility', 'visible'); cur.firstChild.setAttribute('x1', cx); cur.firstChild.setAttribute('x2', cx); cur.lastChild.setAttribute('cx', cx); cur.lastChild.setAttribute('cy', cy); var label = ymd(tm) + ': ' + money(val) + (tm > now ? ' forecast' : ' spent'); tip.textContent = label; tip.style.display = 'block'; tip.style.left = Math.max(4, Math.min(svg.clientWidth - tip.offsetWidth + 4, cx - tip.offsetWidth / 2 + 8)) + 'px'; tip.style.top = Math.max(4, cy - 34) + 'px'; if (announce) $('cfg-chart-live').textContent = label; };
-    svg.onmousemove = function (e) { var r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width), tm = Math.round((A + (px - m.l) / iw * (Bt - A)) / DAY) * DAY; if (tm < A || tm > Bt) return; S.cursor = tm; show(tm); };
-    svg.onmouseleave = svg.onblur = function () { cur.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; };
-    svg.onkeydown = function (e) { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; e.preventDefault(); var tm = S.cursor == null ? Math.min(now, Bt) : S.cursor + (e.key === 'ArrowRight' ? DAY : -DAY); tm = Math.max(A, Math.min(Bt, tm)); S.cursor = tm; show(tm, true); };
-  }
-
   /* ---------- Model routing (read only: config/routing.json, as lib/routing.js route() reads it; config/models.json is the old table) ---------- */
   function tierText(t) { var x = String(t || '').split('/'); return x[0] ? x[0].charAt(0).toUpperCase() + x[0].slice(1) + (x[1] ? ' · ' + x[1] : '') : '-'; }
   // the tier a role starts on under each list policy, as route() does before the risk floor, a retry or an override
@@ -442,7 +384,7 @@
     }
   }
 
-  var RENDER = { workload: renderWorkload, autonomy: renderAutonomy, budgets: renderBudgets, routing: renderRouting };
+  var RENDER = { workload: renderWorkload, lists: renderLists, routing: renderRouting };
   function renderAll() {
     Object.keys(panels).forEach(function (k) { RENDER[k](panels[k]); });
     tabBtns.forEach(function (b) { var id = b.id.slice(5); b.lastChild.textContent = status(id); });
@@ -474,6 +416,5 @@
     load();
     return head;
   };
-  window.__cfgTest = { policyTier: policyTier, tierText: tierText, renderRouting: renderRouting, setCap: setCap, applyOpt: applyOpt, S: S, use: function (U) { el = U.el; $ = U.$; } };   // test/config.test.js
-  var rz; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(drawChart, 120); });
+  window.__cfgTest = { policyTier: policyTier, tierText: tierText, renderRouting: renderRouting, renderLists: renderLists, listChanges: listChanges, setCap: setCap, applyOpt: applyOpt, S: S, use: function (U) { el = U.el; $ = U.$; } };   // test/config.test.js
 }());

@@ -411,10 +411,12 @@ function orbArrange(qs){STAGE.classList.add('orbmode');STAGE.style.gridTemplateC
   var Rs=OA.sunR||SUN_MIN,Rf=Rs,cf=Math.round(2*Rf+24);
   if(Math.abs(cf-OA.sun)>6)OA.sun=cf;cf=OA.sun;if(core){core.style.left=(cxm-cf/2)+'px';core.style.top=(cym-cf/2)+'px';core.style.width=cf+'px';core.style.height=cf+'px'}if(rb){rb.style.width=cf+'px';rb.style.height=cf+'px'}
   MG=null;return true}
-function orbitSync(){STAGE.classList.toggle('early',!MOTHERS.some(function(n){return(M.sess[n]||{}).born}));var k=S.filter(function(x){return(M.sess[x.name]||{}).born}).map(function(x){return x.name}).join()+'|'+TASKS.filter(function(t){return t.quadrant==='C'}).map(function(t){return t.ref}).join();if(k!==orbKey){orbKey=k;orbitLayout();OANIM=true;posDirty=true;if(STAGE.classList.contains('orbmode')){if(orbClash()){OA.key='';layoutMothers()}else{OA.swing=swingMax();orbAnchor(MOTHERS.map(function(n,i){return $('q'+i)}))}qFollow(reduce.matches?0:650)}}}
+/* a Delegate task shows on its mother's orbit only from the replay moment the scans first saw it (bug round 2026-11-13: none at T0) */
+function delSeen(t){return t.quadrant==='C'&&!!(t.hist&&t.hist.length)&&Date.parse(t.hist[0].at)<=state.t}
+function orbitSync(){STAGE.classList.toggle('early',!MOTHERS.some(function(n){return(M.sess[n]||{}).born}));var k=S.filter(function(x){return(M.sess[x.name]||{}).born}).map(function(x){return x.name}).join()+'|'+TASKS.filter(delSeen).map(function(t){return t.ref}).join();if(k!==orbKey){orbKey=k;orbitLayout();OANIM=true;posDirty=true;if(STAGE.classList.contains('orbmode')){if(orbClash()){OA.key='';layoutMothers()}else{OA.swing=swingMax();orbAnchor(MOTHERS.map(function(n,i){return $('q'+i)}))}qFollow(reduce.matches?0:650)}}}
 function orbitLayout(){MOTHERS.forEach(function(n){var os=$('os-'+n);if(!os)return;var ms=byName[n];
   var kids=childrenOf(n).filter(function(x){return x.role!=='eliminate'&&(M.sess[x.name]||{}).born}).sort(function(a,b){return a.t0-b.t0});
-  var del=TASKS.filter(function(t){return t.list===ms.list&&t.quadrant==='C'});/* the board's Delegate quadrant, nothing inherited (T5, runs.js delegated) */
+  var del=TASKS.filter(function(t){return t.list===ms.list&&delSeen(t)});/* the board's Delegate quadrant, nothing inherited (T5, runs.js delegated) */
   del.forEach(function(t){if(DORD[t.ref]==null)DORD[t.ref]=DSEQ++});del.sort(function(a,b){return DORD[a.ref]-DORD[b.ref]});var st1=R1S[n]&&R1S[n].ds===ODS?R1S[n].r:0;var D=del.length,r1=Math.max(st1,O_R1,Math.max(15,20*ODS),D*O_DSP/(2*Math.PI));R1S[n]={ds:ODS,r:r1};var occ={},cnt={},items={},maxO=D?1:0,planAt={},planKids={},un=0;
   var cap=function(o){return Math.max(6,Math.floor(2*Math.PI*o*r1/O_SP))},full=function(o){return(cnt[o]||0)>=Math.floor(cap(o)*O_FILL)};
   var take=function(o,i){var c=cap(o);i=((i%c)+c)%c;(occ[o]=occ[o]||[])[i]=1;cnt[o]=(cnt[o]||0)+1;if(o>maxO)maxO=o;return{o:o,i:i,c:c}};
@@ -434,6 +436,8 @@ function orbitLayout(){MOTHERS.forEach(function(n){var os=$('os-'+n);if(!os)retu
     (onO[o]=onO[o]||[]).push(frac);if(o>maxO)maxO=o;items[x.name]={o:o,i:frac,c:1}});
   maxO=Math.max(2,maxO);var R=maxO*r1+10,ocnt={};Object.keys(items).forEach(function(k2){var o2=items[k2].o;ocnt[o2]=(ocnt[o2]||0)+1});var nIt=Object.keys(items).length;GF[n]=Math.max(.3,Math.min(1,1/(1+Math.max(0,nIt-8)/10+Math.max(0,maxO-2)*.15)));var pv=ORB[n];ORB[n]={r1:r1,maxO:maxO,R:R,items:items,cnt:ocnt,ph:hash01(n),cur:pv&&pv.cur,seen:pv&&pv.seen,lt:pv&&pv.lt};os.style.width=os.style.height=Math.round(2*R)+'px';
   kids.forEach(function(x){var b=SLOT[x.name];if(b&&b.parentNode!==os)os.appendChild(b)});
+  /* a child not born at this replay moment leaves the orbit (it came back after rebuild() with its old place): appended again once born */
+  childrenOf(n).forEach(function(x){var b=SLOT[x.name];if(b&&b.parentNode===os&&kids.indexOf(x)<0)os.removeChild(b)});
   var keep={};del.forEach(function(t){keep[t.ref]=1;if(!ODEL[t.ref]){var e=el('span','odel');e.setAttribute('aria-hidden','true');e.innerHTML=glyph('waits_for_person',9);e.title='#'+t.num+' '+t.title+' - in Delegate, waits for you';ODEL[t.ref]=e}if(ODEL[t.ref].parentNode!==os)os.appendChild(ODEL[t.ref])});
   Object.keys(ODEL).forEach(function(r){var e=ODEL[r];if(e.parentNode===os&&!keep[r])os.removeChild(e)});
   orbitPlace(n,0)})}
