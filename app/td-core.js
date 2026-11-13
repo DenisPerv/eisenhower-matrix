@@ -316,6 +316,7 @@
   // the Delegate card's text (HomeOS claim.js cardText, card contract 5): the last "## Delegate · <date>" block up to its "---" line or
   // the next level-2 heading. Display only: the stored text is never rewritten, the answer goes under ## Your answer (setAnswer)
   const OPTION_LINE = /^(?:[A-Z][).:]|[-*])\s+\S/;
+  const OWN_OPTION = /^(?:(?:[A-Z][).:]|[-*])\s+)?(?:\*\*)?(?:something else|other|own answer|your own answer|write (?:it|your own))\b/i;
   function delegateCard(md) {
     const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
     let at = -1;
@@ -352,7 +353,11 @@
     out.questions.forEach(x => {
       if (!x.options.length && /\?$/.test(x.q) && x.more.length > 1 && x.more.every(s => s.length <= 80)) { x.options = x.more; x.more = []; }
       const r = x.recommend, head = s => s.split(/\s/)[0];
+      // a "Something else: write it" option is not an option: the Own answer row (always last) takes its place
+      x.options = x.options.filter(o => !OWN_OPTION.test(o));
       x.recIndex = r ? x.options.findIndex(o => o === r || o.startsWith(r) || (/^[A-Z][).:]$/.test(head(r)) && head(o) === head(r))) : -1;
+      const lets = x.options.map(o => (o.match(/^([A-Z])[).:]\s/) || [])[1]).filter(Boolean);
+      x.ownLetter = String.fromCharCode((lets.length ? Math.max(...lets.map(c => c.charCodeAt(0))) - 64 : x.options.length) + 65);
     });
     return out;
   }

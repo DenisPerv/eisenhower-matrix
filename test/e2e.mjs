@@ -1548,6 +1548,43 @@ async function gCard() {
   check(G, 'a task of an archived list opens read only, rendered, from the Lists window', az && !(await T.has('.ro-task #fs')) && !(await T.has('.ro-task input, .ro-task textarea')));
   await sleep(500); await T.shot('card-archived-1280x800');
   await T.size(375, 812); await sleep(400); await T.shot('card-archived-375x812'); await T.size(1280, 800);
+  // the Decision section with long options: one option per full-width row, the text wraps inside it, and a "Something else" option
+  // becomes the last row "D) Own answer", which opens the text box in place (screenshots at 1440 and 390)
+  const LONG = 'a long option text that keeps going so that it must wrap inside its own row and never push the window wider than the screen';
+  const DLONG = ['Original task text', '', '---', '', '## Delegate · 2026-11-13 10:00', 'Session: **do-1 · e2e**', '', '### Questions', '**1. Which way should the long option go?**',
+    'A) First, ' + LONG, 'B) Second, ' + LONG, 'C) Something else: write it', 'Recommended: B', '', 'Class: E3 · data organisation and structure', '', '---', '', '## Your answer', core.ANSWER_PROMPT].join('\n');
+  const dl = await mkItem('card decision long', { body_md: DLONG, quadrant: 'C', sort_key: 9000005, details: { decision: { v: 1, kind: 'delegate', label_1: 'Accept', label_0: 'Decline', answer: null }, e2e: RUN } });
+  await closeDialogs(T); await T.size(1440, 900); await T.reload(); await T.ready(); await pick(T, ST.id);
+  await T.wait('!!document.querySelector(\'[data-card="' + dl.id + '"]\')', 15000);
+  const dlOpen = await openCard(T, dl.id, W + ' #fdx .dq');
+  const rowsOf = sel => `(()=>{const f=document.querySelector('${sel}');const ls=[...f.querySelectorAll('label.chip, .dq-chip')],fr=f.getBoundingClientRect();return {n:ls.length,last:(ls[ls.length-1]||{}).textContent,full:ls.every(l=>l.getBoundingClientRect().width>=fr.width*0.9),stacked:ls.every((l,i)=>!i||l.getBoundingClientRect().top>=ls[i-1].getBoundingClientRect().bottom-1),inside:ls.every(l=>l.scrollWidth<=l.clientWidth+1),own:!!f.querySelector('[data-dqn],[data-act="t-dq-own"]'),page:document.documentElement.scrollWidth<=innerWidth}})()`;
+  const dr = dlOpen ? await T.ev(rowsOf(W + ' #fdx fieldset.dq')) : null;
+  check(G, 'Decision long options (1440): one full-width row each, text wraps inside, last row "C) Own answer", no separate Own answer button',
+    !!dr && dr.n === 3 && /^C\) Own answer/.test(dr.last.trim()) && dr.full && dr.stacked && dr.inside && !dr.own && dr.page, JSON.stringify(dr));
+  if (dlOpen) {
+    await T.ev(`(()=>{document.querySelector('${W} #fdx input[name="dq-0"][value="own"]').click();return true})()`);
+    check(G, 'Decision: pressing the Own answer row opens the text box in place, under that row', await T.ev(`(()=>{const f=document.querySelector('${W} #fdx fieldset.dq'),o=f.querySelector('#dqo-0');return !!o&&o.closest('.chips')===f.querySelector('.chips')&&document.activeElement===o})()`));
+    await sleep(400); await T.shot('decision-long-1440x900');
+    await T.size(390, 844); await sleep(500);
+    const dr2 = await T.ev(rowsOf(W + ' #fdx fieldset.dq'));
+    check(G, 'Decision long options (390): rows stay full width, text wraps inside, no horizontal scroll', dr2.full && dr2.stacked && dr2.inside && dr2.page, JSON.stringify(dr2));
+    await T.shot('decision-long-390x844');
+    await T.size(1280, 800); await sleep(300);
+  }
+  // Card layout: Save writes prefs.cardLayout, and a reload shows the saved values (desktop)
+  await closeDialogs(T);
+  const prefsOf = async () => { const r = (await MK.rest('GET', 'preferences?select=prefs&app=eq.tasksdashboard&profile_id=eq.' + MK.uid)).json[0]; return r && r.prefs || {}; };
+  const cl0 = (await prefsOf()).cardLayout || {};
+  const want = { creator: !cl0.creator, autoCollapse: cl0.autoCollapse === 777 ? 778 : 777 };
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+  await T.ev(`(()=>{const d=document.querySelector('dialog[open]');const c=d.querySelector('[data-cl=creator]');c.checked=${want.creator};c.dispatchEvent(new Event('change',{bubbles:true}));const a=d.querySelector('#cl-auto');a.value='${want.autoCollapse}';a.dispatchEvent(new Event('input',{bubbles:true}));d.querySelector('#cl-save').click();return true})()`);
+  const stored = await until(async () => { const c = (await prefsOf()).cardLayout || {}; return c.creator === want.creator && c.autoCollapse === want.autoCollapse ? c : null; });
+  check(G, 'Card layout (board): Save stores prefs.cardLayout in the database', !!stored, JSON.stringify(want));
+  await T.reload(); await T.ready();
+  await T.click('#profile'); await T.click('[data-menu=cardlayout]'); await T.wait('!!document.getElementById("cl-save")');
+  const clBack = await T.ev(`(()=>{const d=document.querySelector('dialog[open]');return {creator:d.querySelector('[data-cl=creator]').checked,auto:Number(d.querySelector('#cl-auto').value)}})()`);
+  check(G, 'Card layout (board): after a reload the window shows the saved values', clBack.creator === want.creator && clBack.auto === want.autoCollapse, JSON.stringify(clBack));
+  await closeDialogs(T);
   await closeDialogs(T); await T.close().catch(() => {});
   // the phone app
   const P = await tab(B, await ctx(B), { width: 375, height: 812 });
@@ -1592,6 +1629,17 @@ async function gCard() {
   await P.click('[data-act="alist-open"][data-id="' + za.id + '"]');
   check(G, 'phone: a task of an archived list opens read only, rendered', await P.wait('!!document.querySelector("#dlg-ro[open] .fmd table")', 8000) && !(await P.has('#dlg-ro textarea')));
   await sleep(500); await P.shot('card-phone-archived-375x812');
+  // Card layout on the phone: a switch writes prefs.cardLayout, and a reload shows it; then the person's values are put back
+  await P.ev('document.querySelectorAll("dialog[open]").forEach(d=>d.close()),true');
+  await P.ev("openPage('pg-cards'),true"); await P.wait('!!document.querySelector(\'[data-cl="creator"]\')', 8000);
+  const pw = !want.creator;
+  await P.ev(`(()=>{const c=document.querySelector('[data-cl="creator"]');c.checked=${pw};c.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
+  const pStored = await until(async () => { const c = (await prefsOf()).cardLayout || {}; return c.creator === pw && c.autoCollapse === want.autoCollapse ? c : null; });
+  check(G, 'Card layout (phone): a switch stores prefs.cardLayout in the database and keeps the other values', !!pStored, JSON.stringify({ pw }));
+  await P.reload(); await P.wait('S.ready', 20000);
+  await P.ev("openPage('pg-cards'),true"); await P.wait('!!document.querySelector(\'[data-cl="creator"]\')', 8000);
+  check(G, 'Card layout (phone): after a reload the page shows the saved value', await P.ev(`document.querySelector('[data-cl="creator"]').checked===${pw}`));
+  { const p0 = await prefsOf(); await MK.rest('PATCH', 'preferences?profile_id=eq.' + MK.uid + '&app=eq.tasksdashboard', { prefs: Object.assign({}, p0, { cardLayout: Object.assign({}, p0.cardLayout, { creator: !!cl0.creator, autoCollapse: cl0.autoCollapse === undefined ? p0.cardLayout.autoCollapse : cl0.autoCollapse }) }) }); }
   await P.close().catch(() => {});
 }
 
@@ -1938,14 +1986,14 @@ async function gHarness() {
     const dOpen = await openCard(T, dc.id, W + ' #fdx .dq');
     const ds = dOpen ? await T.ev(`(()=>{const d=document.querySelector('${W}'),f=d.querySelector('#fdx');return {qs:f.querySelectorAll('fieldset.dq').length,chips:f.querySelectorAll('fieldset.dq')[0].querySelectorAll('label.chip').length,rec:(f.querySelector('.rec')||{}).parentNode?.textContent||'',cls:(f.querySelector('.dbadge.cls')||{}).textContent,wait:!!f.querySelector('.dbadge.wait'),acc:f.querySelector('[data-dec="1"]').disabled,fans:!!d.querySelector('#fans'),strip:(f.querySelector('.dec-strip')||{}).textContent||'',above:!!(f.compareDocumentPosition(d.querySelector('#fn'))&Node.DOCUMENT_POSITION_FOLLOWING)}})()`) : null;
     check(G, 'Decision section: two numbered questions with chips, A) 2 Recommended, class E3, Waiting, Accept off, the strip, no separate answer box, above the description',
-      !!ds && ds.qs === 2 && ds.chips === 3 && /A\) 2/.test(ds.rec) && /^E3/.test(ds.cls) && ds.wait && ds.acc && !ds.fans && /If no answer/.test(ds.strip) && ds.above, JSON.stringify(ds) + ' ' + T.errors.slice(-2).join(' / '));
+      !!ds && ds.qs === 2 && ds.chips === 4 && /A\) 2/.test(ds.rec) && /^E3/.test(ds.cls) && ds.wait && ds.acc && !ds.fans && /If no answer/.test(ds.strip) && ds.above, JSON.stringify(ds) + ' ' + T.errors.slice(-2).join(' / '));
     if (dOpen) {
       await sleep(600); await T.shot('decision-section-1440x900');
       await T.size(390, 844); await sleep(400);
       check(G, 'Decision section (390 px): fits, no horizontal scroll', await T.ev(`(()=>{const f=document.querySelector('${W} #fdx').getBoundingClientRect();return f.left>=0&&f.right<=innerWidth+1&&document.documentElement.scrollWidth<=innerWidth})()`));
       await T.shot('decision-section-390x844');
       await T.size(1440, 900); await sleep(300);
-      await T.ev(`(()=>{const f=document.querySelector('${W} #fdx');f.querySelector('input[name="dq-0"]').click();f.querySelector('[data-dqn="1"]').click();const o=f.querySelector('#dqo-1');o.value='e2e own answer';o.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+      await T.ev(`(()=>{const f=document.querySelector('${W} #fdx');f.querySelector('input[name="dq-0"]').click();f.querySelector('input[name="dq-1"][value="own"]').click();const o=f.querySelector('#dqo-1');o.value='e2e own answer';o.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
       check(G, 'Decision section: an option plus an own answer turn Accept on', await T.ev(`!document.querySelector('${W} #fdx [data-dec="1"]').disabled`));
       await T.click(W + ' #fdx [data-dec="1"]');
       const a = await until(async () => { const x = await item(dc.id); return x && x.status === 'done' && x.details.decision.answer === 1 ? x : null; });
@@ -1966,10 +2014,10 @@ async function gHarness() {
       if (pq) { await P2.ev(`(document.querySelectorAll("dialog[open]").forEach(d=>d.close()),openTask(${JSON.stringify(dc2.id)}),true)`); pq = await P2.wait('!!document.querySelector("#dlg-task[open] #t-dq fieldset.dq")', 8000); }
       const pd = pq ? await P2.ev(`(()=>{const d=document.querySelector('#dlg-task'),f=d.querySelector('#t-dq');return {qs:f.querySelectorAll('fieldset.dq').length,chips:f.querySelectorAll('fieldset.dq')[0].querySelectorAll('.dq-chip').length,rec:(f.querySelector('.rec')||{}).parentNode?.textContent||'',acc:f.querySelector('[data-act="t-dq-send"]').disabled,ans:!!d.querySelector('#t-ans'),done:d.querySelector('#t-done')?.disabled,wide:document.documentElement.scrollWidth>innerWidth}})()`) : null;
       check(G, 'phone Decision section: two numbered questions with chips, A) 2 Recommended, Accept off, no free answer box, Done off, no horizontal scroll',
-        !!pd && pd.qs === 2 && pd.chips === 3 && /A\) 2/.test(pd.rec) && pd.acc && !pd.ans && pd.done !== false && !pd.wide, JSON.stringify(pd) + ' ' + P2.errors.slice(-2).join(' / '));
+        !!pd && pd.qs === 2 && pd.chips === 4 && /A\) 2/.test(pd.rec) && pd.acc && !pd.ans && pd.done !== false && !pd.wide, JSON.stringify(pd) + ' ' + P2.errors.slice(-2).join(' / '));
       if (pq) {
         await sleep(500); await P2.shot('decision-section-app-375x812');
-        await P2.ev(`(()=>{const f=document.querySelector('#t-dq');f.querySelector('input[name="t-dq-0"]').click();f.querySelector('[data-act="t-dq-own"][data-i="1"]').click();const o=f.querySelector('#t-dqo-1');o.value='e2e phone answer';o.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+        await P2.ev(`(()=>{const f=document.querySelector('#t-dq');f.querySelector('input[name="t-dq-0"]').click();f.querySelector('input[name="t-dq-1"][value="own"]').click();const o=f.querySelector('#t-dqo-1');o.value='e2e phone answer';o.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
         check(G, 'phone Decision section: an option plus an own answer turn Accept on', await P2.ev(`!document.querySelector('#t-dq [data-act="t-dq-send"]').disabled`));
         await P2.click('#t-dq [data-act="t-dq-send"]');
         const a2 = await until(async () => { const x = await item(dc2.id); return x && x.status === 'done' && x.details.decision.answer === 1 ? x : null; });

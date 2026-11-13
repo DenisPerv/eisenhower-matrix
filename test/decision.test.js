@@ -89,3 +89,12 @@ test('mergeDetails: per key, one level into decision; clash only where both chan
   // odd inputs count as {}
   assert.deepEqual(C.mergeDetails(null, { a: 1 }, undefined), { value: { a: 1 }, clash: [] });
 });
+
+test('Delegate card: a "Something else: write it" option is dropped and the Own answer row takes the next letter', () => {
+  const md = ['x', '', '## Delegate · 2026-11-13 10:00', '', '### Questions', '**1. Which?**', 'A) First option with a long text that must wrap inside its own row', 'B) Second', 'C) Something else: write it', 'Recommended: B', '', '**2. Plain?**', 'A) Yes', 'B) No', '', '## Your answer', C.ANSWER_PROMPT].join('\n');
+  const q = C.delegateCard(md).questions;
+  assert.deepEqual(q[0].options.map(o => o[0]), ['A', 'B']);
+  assert.equal(q[0].ownLetter, 'C');
+  assert.equal(q[0].recIndex, 1);
+  assert.equal(q[1].ownLetter, 'C');
+});

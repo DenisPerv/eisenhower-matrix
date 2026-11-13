@@ -1614,15 +1614,16 @@ dialog .fauto select{width:100%;min-width:0;margin-top:var(--s2)}
 dialog fieldset.dq{border:0;padding:0;margin:var(--s4) 0 0;display:block}
 dialog fieldset.dq legend{padding:0;font:600 15px/1.4 var(--font);color:var(--ink)}
 .dq .more{margin:2px 0 0;color:var(--ink2);font:400 13px var(--font)}
-.dq .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:var(--s3)}
-dialog .dq label.chip{display:inline-flex;align-items:center;gap:6px;margin:0;min-height:32px;padding:0 12px;border:1px solid var(--hair2);border-radius:var(--r);cursor:pointer;color:var(--ink);font:500 14px var(--font)}
+.dq .chips{display:flex;flex-direction:column;gap:6px;align-items:stretch;margin-top:var(--s3)}
+dialog .dq label.chip{display:flex;align-items:flex-start;gap:6px;margin:0;min-height:32px;padding:6px 12px;box-sizing:border-box;width:100%;min-width:0;line-height:1.4;white-space:normal;overflow-wrap:anywhere;border:1px solid var(--hair2);border-radius:var(--r);cursor:pointer;color:var(--ink);font:500 14px var(--font)}
+dialog .dq label.chip span{min-width:0;overflow-wrap:anywhere}
 dialog .dq label.chip input{position:absolute;opacity:0;width:1px;min-height:1px;pointer-events:none}
 dialog .dq label.chip:has(input:checked){background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 dialog .dq label.chip:has(input:checked)::before{content:"✓"}
 dialog .dq label.chip:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
 .dq .rec{font:500 12px var(--ui);color:var(--accent-ink)}
 .dq label.chip:has(input:checked) .rec{color:inherit}
-.dq .own{display:flex;gap:var(--s3);align-items:center;margin-top:var(--s3)}
+.dq .own{display:flex;gap:var(--s3);align-items:center;margin-top:0}
 dialog .dq .own input{flex:1;margin:0}
 .dec details{margin-top:var(--s3);font:400 13px/1.45 var(--font)}
 .dec details summary{cursor:pointer;font:500 13px var(--ui);color:var(--ink2)}
@@ -1977,6 +1978,7 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
   // the Delegate card's text (HomeOS claim.js cardText, card contract 5): the last "## Delegate · <date>" block up to its "---" line or
   // the next level-2 heading. Display only: the stored text is never rewritten, the answer goes under ## Your answer (setAnswer)
   const OPTION_LINE = /^(?:[A-Z][).:]|[-*])\s+\S/;
+  const OWN_OPTION = /^(?:(?:[A-Z][).:]|[-*])\s+)?(?:\*\*)?(?:something else|other|own answer|your own answer|write (?:it|your own))\b/i;
   function delegateCard(md) {
     const lines = String(md || '').replace(/\r\n/g, '\n').split('\n');
     let at = -1;
@@ -2013,7 +2015,11 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     out.questions.forEach(x => {
       if (!x.options.length && /\?$/.test(x.q) && x.more.length > 1 && x.more.every(s => s.length <= 80)) { x.options = x.more; x.more = []; }
       const r = x.recommend, head = s => s.split(/\s/)[0];
+      // a "Something else: write it" option is not an option: the Own answer row (always last) takes its place
+      x.options = x.options.filter(o => !OWN_OPTION.test(o));
       x.recIndex = r ? x.options.findIndex(o => o === r || o.startsWith(r) || (/^[A-Z][).:]$/.test(head(r)) && head(o) === head(r))) : -1;
+      const lets = x.options.map(o => (o.match(/^([A-Z])[).:]\s/) || [])[1]).filter(Boolean);
+      x.ownLetter = String.fromCharCode((lets.length ? Math.max(...lets.map(c => c.charCodeAt(0))) - 64 : x.options.length) + 65);
     });
     return out;
   }
@@ -5900,11 +5906,13 @@ function openTask(id, quad, opts) {
       body += (strip ? '<div class="dec-strip">' + strip + '</div>' : '') + (dqCard.preamble ? '<p class="help">' + esc(dqCard.preamble) + '</p>' : '');
       if (!answered && canAnswer) {
         body += qs.map((x, i) => '<fieldset class="dq"><legend>' + (qs.length > 1 ? (i + 1) + '. ' : '') + esc(x.q) + '</legend>' + x.more.map(m => '<p class="more">' + esc(m) + '</p>').join('') +
-          (DS.ownOpen[i] || !x.options.length
-            ? '<div class="own"><label class="sr" for="dqo-' + i + '">Own answer to question ' + (i + 1) + '</label><input id="dqo-' + i + '" data-dqo="' + i + '" value="' + esc(DS.own[i] || '') + '" placeholder="Write your answer" maxlength="500" autocomplete="off">' +
-              (x.options.length ? '<button type="button" class="quiet" data-dqc="' + i + '">Use the options</button>' : '') + '</div>'
-            : '<div class="chips">' + x.options.map((op, k) => '<label class="chip"><input type="radio" name="dq-' + i + '" value="' + k + '"' + (DS.ans[i] === op ? ' checked' : '') + '><span>' + esc(op) + (k === x.recIndex ? ' <span class="rec">Recommended</span>' : '') + '</span></label>').join('') +
-              '<button type="button" class="linkbtn" data-dqn="' + i + '">Own answer</button></div>') + '</fieldset>').join('');
+          (() => {
+            const own = '<div class="own"><label class="sr" for="dqo-' + i + '">Own answer to question ' + (i + 1) + '</label><input id="dqo-' + i + '" data-dqo="' + i + '" value="' + esc(DS.own[i] || '') + '" placeholder="Write your answer" maxlength="500" autocomplete="off"></div>';
+            if (!x.options.length) return own;
+            // one option per full-width row; the last row is always "<letter>) Own answer", which opens the text box in place
+            return '<div class="chips">' + x.options.map((op, k) => '<label class="chip"><input type="radio" name="dq-' + i + '" value="' + k + '"' + (!DS.ownOpen[i] && DS.ans[i] === op ? ' checked' : '') + '><span>' + esc(op) + (k === x.recIndex ? ' <span class="rec">Recommended</span>' : '') + '</span></label>').join('') +
+              '<label class="chip dq-ownrow"><input type="radio" name="dq-' + i + '" value="own"' + (DS.ownOpen[i] ? ' checked' : '') + '><span>' + esc(x.ownLetter || 'Z') + ') Own answer</span></label>' + (DS.ownOpen[i] ? own : '') + '</div>';
+          })() + '</fieldset>').join('');
         if (dqCard.facts.length) body += '<details><summary>Facts</summary><ul>' + dqCard.facts.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></details>';
         if (dec && me && me.is_household && C.decisionKind(t) === 'delegate') body += '<label class="cbrow"><input type="checkbox" id="dq-prec"' + (decPrec ? ' checked' : '') + '> Use as precedent for similar questions</label>';
       } else if (answered) {
@@ -5948,7 +5956,7 @@ function openTask(id, quad, opts) {
     drawDec();
     fdx.addEventListener('change', e => {
       const x = e.target;
-      if (x.name && x.name.startsWith('dq-')) { const i = Number(x.name.slice(3)); DS.ans[i] = qs[i].options[Number(x.value)]; refreshReady(); }
+      if (x.name && x.name.startsWith('dq-')) { const i = Number(x.name.slice(3)); if (x.value === 'own') { DS.ownOpen[i] = true; drawDec('#dqo-' + i); } else { const was = DS.ownOpen[i]; DS.ownOpen[i] = false; DS.ans[i] = qs[i].options[Number(x.value)]; if (was) drawDec('[name="dq-' + i + '"][value="' + x.value + '"]'); else refreshReady(); } }
       if (x.id === 'dq-prec') decPrec = x.checked;
     }, sig);
     fdx.addEventListener('input', e => {
@@ -6854,19 +6862,19 @@ function openNewList() {
 function newListMoreHtml() {
   return '<details class="nl-more" id="nl-more"><summary>Autonomy and list brief (optional)</summary>' +
     '<label>Autonomy<select id="nl-au">' + C.autonomyChoices(true, false).map(c => '<option value="' + c.mode + '"' + (c.mode === 'guided' ? ' selected' : '') + '>' + C.AUTONOMY_NAME[c.mode] + (c.mode === 'guided' ? ' (default)' : '') + '</option>').join('') + '</select></label>' +
-    '<label class="cb"><input type="checkbox" id="nl-e2e"> Agent runs end-to-end tests</label><label class="cb"><input type="checkbox" id="nl-tg"> Notify on Telegram</label><label class="cb"><input type="checkbox" id="nl-stage" checked> Stage report</label>' +
+    '<label class="cb"><input type="checkbox" id="nl-e2e"> Agent runs end-to-end tests</label><label class="cb"><input type="checkbox" id="nl-tg"> Notify on Telegram</label>' +
     '<label>Decisions<textarea id="nl-b-decisions" maxlength="' + C.BRIEF_MAX + '" aria-describedby="nl-b-decisions-h"></textarea></label><p class="s-hint" id="nl-b-decisions-h">One per line; each is saved with today\'s date and your name.</p>' +
     C.BRIEF_FIELDS.map(x => '<label>' + x.label + '<textarea id="nl-b-' + x.key + '" maxlength="' + C.BRIEF_MAX + '" aria-describedby="nl-b-' + x.key + '-h"></textarea></label><p class="s-hint" id="nl-b-' + x.key + '-h">' + esc(x.help) + '</p>').join('') + '</details>';
 }
 async function newListMoreSave(dlg, id) {
   const q = s => dlg.querySelector(s), bad = [], day = C.localStamp(new Date().toISOString()).slice(0, 10);
-  const mode = q('#nl-au').value, e2e = q('#nl-e2e').checked, tg = q('#nl-tg').checked, stage = q('#nl-stage').checked;
+  const mode = q('#nl-au').value, e2e = q('#nl-e2e').checked, tg = q('#nl-tg').checked;
   if (mode !== 'guided') {
     const a = await rest('POST', 'rpc/set_autonomy', { p_kind: 'list', p_id: id, p_mode: mode, p_expected: 'guided' });
     if (a.ok) LIST[id] = Object.assign({}, LIST[id], { autonomy: mode }); else bad.push('Autonomy (' + a.err.message + ').');
   }
-  if (e2e || tg || !stage) {
-    const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: e2e, p_deploy_target: null, p_notify_telegram: tg, p_stage_report: stage });
+  if (e2e || tg) {
+    const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: e2e, p_deploy_target: null, p_notify_telegram: tg, p_stage_report: null });
     if (!a.ok) bad.push('intake (' + a.err.message + ').');
   }
   const b = { decisions: C.briefLines(q('#nl-b-decisions').value).map(x => C.briefLine(x, day, me.display_name)).filter(Boolean).join('\n') };
@@ -6956,7 +6964,7 @@ async function openListSettings(id, opener) {
   if (!dlg.isConnected) return;
   if (!row.ok || !row.json.length) { scroll.innerHTML = '<p class="note">' + esc(row.ok ? 'This list is gone.' : row.err.message) + '</p>'; foot.innerHTML = '<span class="sp"></span><button value="close">Close</button>'; return; }
   const r = row.json[0], cap = (bud.ok ? bud.json : []).find(b => b.scope === 'list' && b.period === 'month');
-  const saved = { name: r.name, mode: C.listModeOf(r), e2e: !!r.e2e_self, deploy: r.deploy_target || '', tg: !!r.notify_telegram, stage: r.stage_report !== false,
+  const saved = { name: r.name, mode: C.listModeOf(r), e2e: !!r.e2e_self, deploy: r.deploy_target || '', tg: !!r.notify_telegram, stage: r.stage_report == null ? null : r.stage_report,
     cap: cap ? String(Number(cap.cap_usd)) : '', brief: C.briefOf(r), dir: r.project_dir || '' };
   let decs = C.briefLines(saved.brief.decisions);
   let expected = saved.mode, expectedDir = saved.dir, base = Object.assign({}, saved), saving = false, status = '', kind = '', confirm = false;
@@ -6982,7 +6990,7 @@ async function openListSettings(id, opener) {
       '<label for="ls-dir">Project folder<input id="ls-dir" maxlength="' + C.PROJECT_DIR_MAX + '" autocomplete="off" spellcheck="false" placeholder="D:\\Projects\\App" aria-describedby="ls-dir-h ls-dir-e"></label>' +
       '<p class="help" id="ls-dir-h">' + esc(C.PROJECT_DIR_HINT) + '</p><div class="ls-err" id="ls-dir-e" aria-live="polite"></div>' +
       '<label class="cb"><input type="checkbox" id="ls-tg"> Notify on Telegram</label><p class="help">Off by default. Telegram only notifies. Answers come from the board.</p>' +
-      '<label class="cb"><input type="checkbox" id="ls-stage"> Stage report</label></section>' +
+      '</section>' +
     '<section class="ls-sec" id="ls-budget" aria-labelledby="ls-hb"><h3 id="ls-hb">Budget</h3>' +
       (hh ? '<label for="ls-cap">Monthly budget</label><div class="money"><span aria-hidden="true">$</span><input id="ls-cap" type="number" min="0" max="100000" step="1" inputmode="decimal" aria-describedby="ls-cap-h"></div>' +
         '<p class="help" id="ls-cap-h">Dollars at API prices. Leave empty for no list budget.' + (C.overallCapLine(bud.ok ? bud.json : []) ? ' ' + esc(C.overallCapLine(bud.json)) + '.' : '') + '</p><p class="help">' + (spent !== null ? 'Spent ' + money(spent) + ' this month.' : bud.ok ? 'No list budget yet.' : esc(bud.err.message)) + '</p><div class="ls-err" id="ls-cap-e" aria-live="polite"></div>'
@@ -7004,7 +7012,7 @@ async function openListSettings(id, opener) {
   const fill = v => {
     $('#ls-name').value = v.name;
     dlg.querySelectorAll('[name="am"]').forEach(x => { x.checked = x.value === v.mode; });
-    ['#ls-e2e', '#ls-tg', '#ls-stage'].forEach((s, i) => { $(s).checked = [v.e2e, v.tg, v.stage][i]; $(s).disabled = !hh; });
+    ['#ls-e2e', '#ls-tg'].forEach((s, i) => { $(s).checked = [v.e2e, v.tg][i]; $(s).disabled = !hh; });
     $('#ls-deploy').value = v.deploy; $('#ls-deploy').disabled = !hh;
     $('#ls-dir').value = v.dir; $('#ls-dir').disabled = !hh;
     if ($('#ls-cap')) $('#ls-cap').value = v.cap;
@@ -7012,7 +7020,7 @@ async function openListSettings(id, opener) {
     C.BRIEF_FIELDS.forEach(x => { $('#ls-b-' + x.key).value = v.brief[x.key]; });
   };
   const cur = () => ({ name: $('#ls-name').value.trim(), mode: (dlg.querySelector('[name="am"]:checked') || {}).value || base.mode, e2e: $('#ls-e2e').checked,
-    deploy: $('#ls-deploy').value, tg: $('#ls-tg').checked, stage: $('#ls-stage').checked, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap,
+    deploy: $('#ls-deploy').value, tg: $('#ls-tg').checked, stage: base.stage, cap: $('#ls-cap') ? $('#ls-cap').value.trim() : base.cap,
     brief: Object.assign({ decisions: decs.join('\n') }, ...C.BRIEF_FIELDS.map(x => ({ [x.key]: $('#ls-b-' + x.key).value.trim() }))), dir: $('#ls-dir').value.trim() });
   const dirty = () => JSON.stringify(cur()) !== JSON.stringify(base);
   const setBy = () => { $('#ls-set-by').textContent = r.autonomy_set_at ? 'Set by ' + personName(r.autonomy_set_by) + ' · ' + longDay(Date.parse(r.autonomy_set_at)) : 'Not set yet: Mixed is the default.'; };
@@ -7056,9 +7064,9 @@ async function openListSettings(id, opener) {
         errs.push('Someone changed the mode meanwhile' + (m ? ' to ' + C.AUTONOMY_NAME[m] : '') + '. Your choice is kept: save again to replace it.');
       } else errs.push(a.err.message);
     }
-    if (hh && (c.e2e !== base.e2e || c.deploy !== base.deploy || c.tg !== base.tg || c.stage !== base.stage)) {
+    if (hh && (c.e2e !== base.e2e || c.deploy !== base.deploy || c.tg !== base.tg)) {
       const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: c.e2e, p_deploy_target: c.deploy || null, p_notify_telegram: c.tg, p_stage_report: c.stage });
-      if (a.ok) Object.assign(base, { e2e: c.e2e, deploy: c.deploy, tg: c.tg, stage: c.stage }); else errs.push(a.err.message);
+      if (a.ok) Object.assign(base, { e2e: c.e2e, deploy: c.deploy, tg: c.tg }); else errs.push(a.err.message);
     }
     if (hh && c.dir !== base.dir) {
       const a = await rest('POST', 'rpc/set_project_dir', { p_list: id, p_dir: c.dir || null, p_expected: expectedDir || null });
