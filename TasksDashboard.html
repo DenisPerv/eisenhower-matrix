@@ -1888,7 +1888,10 @@ dialog .dec .cbrow input{width:16px;min-height:16px;margin:0;accent-color:var(--
     if (!t) return 'A new task is completed after it is saved.';
     if (x.editable === false) return 'You cannot change this task.';
     if (CLOSED.includes(t.status)) return t.status === 'done' ? 'Already done.' : 'Cancelled. Restore it from the archive first.';
-    if (decisionOf(t)) return 'A decision card: answer it, the answer closes it.';
+    // only while an answer is still possible: once applied_at is set answerDecision refuses and the answer buttons are off, so the Done
+    // control is the only way left to close a card the harness answered, applied and returned to the board (2026-11-14, #28)
+    const dec = decisionOf(t);
+    if (dec && !dec.applied_at) return 'A decision card: answer it, the answer closes it.';
     if (awaitingCheck(t)) return 'Waits for your check: answer its check card.';
     if (t.status === 'waiting') return 'Waiting for an answer or another task.';
     return '';

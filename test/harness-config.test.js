@@ -102,6 +102,17 @@ test('doneBlock: the Done control is off with a reason on decision cards, checks
   assert.match(C.doneBlock({ ...t, status: 'waiting' }, {}), /Waiting|check/);
 });
 
+// a Delegate or check card the harness answered, applied and returned to the board: its answer buttons are off (applied_at), so the
+// only way to close it is the Done control. Before 2026-11-14 doneBlock still called it a decision card and the card could never be
+// closed from the board or the phone (homeos-self-improvements#28)
+test('doneBlock: an applied decision card no longer blocks Done; an unanswered or unapplied one still does', () => {
+  const dec = (d) => ({ id: 'a', status: 'open', details: { decision: { v: 1, label_1: 'Accept', label_0: 'Decline', ...d } }, ai: {} });
+  assert.match(C.doneBlock(dec({}), { editable: true }), /decision card/, 'unanswered: the answer closes it');
+  assert.match(C.doneBlock(dec({ answer: 1, answered_by: 'maksym' }), { editable: true }), /decision card/, 'answered, not applied: still answerable');
+  assert.equal(C.doneBlock(dec({ answer: 1, applied_at: '2026-11-08T12:22:57.291Z', applied_result: 'returned to Plan' }), { editable: true }), '',
+    'applied: the buttons are off, so Done must be on');
+});
+
 test('Project rules follows the project folder; the folder field checks an absolute path (db/034)', () => {
   assert.equal(C.AUTONOMY_INFO.project_rules.does, "Agents follow this project's own CLAUDE.md, rules, permissions and hooks.");
   assert.equal(C.AUTONOMY_INFO.project_rules.you, 'Where they say nothing, it comes to you.');
