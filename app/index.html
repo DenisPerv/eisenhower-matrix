@@ -1489,6 +1489,8 @@ function tsSet(k, other, add) {
   else TS.map.delete(lkKey(l));
 }
 function navIds(t) { return !isClosed(t) && inList(t) ? shownIn(t.q).filter(x => !x.ghost).map(x => x.t.id) : []; }
+/* the task after this one in the shown order, still open, or null (read before a save: a done task has no order) */
+function nextOf(id) { const t = task(id); if (!t) return null; const ids = navIds(t), i = ids.indexOf(id), n = i >= 0 && i < ids.length - 1 ? ids[i + 1] : null, x = n && task(n); return x && !isClosed(x) && !x.deleted ? n : null; }
 /* the sheet's previous / next follow the data (web: openTask here.refresh, 2026-11-07): on a change while the sheet is open the edges
    are computed again (C.deckNav), so a task closed or deleted elsewhere is never the target; the open task itself closed elsewhere gets
    a notice and keeps the person's edits */
@@ -1644,14 +1646,16 @@ function drawDq(focus) {
 }
 function dqReady() { const Q = TS && TS.dq, b = $('#t-dq [data-act="t-dq-send"]'), hn = $('#t-dq-hint'); if (!Q || !b) return; const ok = dqComplete(Q); b.disabled = !ok; if (hn) hn.textContent = C.decisionHint(Q.qs.length, ok); }
 /* an answer (1) or a decline (0): the text under ## Your answer with every other change of the sheet in one write; on a card with two answers
-   also the answer as the buttons give it (TDData.saveTask decision). Then the sheet closes with Undo */
+   also the answer as the buttons give it (TDData.saveTask decision). Then the sheet moves on to the next task (Max, 2026-11-14), or
+   stays open on this one when there is none */
 async function sendDq(v) {
   const Q = TS && TS.dq; if (!Q || TS.ro) return;
   if (v === 1 && !dqComplete(Q)) return;
   const st = TS;
   st.decAnswer = v === 0 ? C.decisionAnswerText(Q.qs, [], { reason: Q.reason }) : C.decisionAnswerText(Q.qs, Q.qs.map((x, i) => dqAnswer(Q, i)));
+  const nx = nextOf(st.id);
   if (!(await saveTask(Q.dec ? v : undefined))) { st.decAnswer = null; return; }
-  resetPicker('t'); TS = null; closeDlg('dlg-task'); renderAll();
+  openTask(nx || st.id, true); renderAll();
   if (st.decided) said(st.decided); else toast('Answer saved. Agents read it on the next scan.');
 }
 $('#task-body').addEventListener('change', e => { const x = e.target, Q = TS && TS.dq; if (!Q || !x.name || !x.name.startsWith('t-dq-')) return; const i = Number(x.name.slice(5)); if (x.value === "own") { Q.ownOpen[i] = true; drawDq("#t-dqo-" + i); return; } const was = Q.ownOpen[i]; Q.ownOpen[i] = false; Q.ans[i] = Q.qs[i].options[Number(x.value)]; if (was) drawDq(`[name="t-dq-${i}"][value="${x.value}"]`); else dqReady(); });
@@ -1781,17 +1785,17 @@ async function saveTask(decision, done) {
   } finally { saving = false; }
 }
 /* the done checkbox: the sheet's edits plus status done in one write, "Completed" with Undo, then the next task of the shown order
-   (navIds, read before the save: a done task has none), else the sheet closes */
+   (nextOf, read before the save: a done task has none), else the sheet stays open on this task (Max, 2026-11-14) */
 async function doneFromSheet() {
   if (!TS || TS.ro || askRes) return;
-  const st = TS, ids = navIds(task(st.id)), i = ids.indexOf(st.id), nextId = i >= 0 && i < ids.length - 1 ? ids[i + 1] : null;
+  const st = TS, nextId = nextOf(st.id);
   if (!(await saveTask(undefined, true))) { const dn = $('#t-done'); if (dn) dn.checked = false; return; }
-  const nx = nextId && task(nextId);
-  if (nx && !isClosed(nx) && !nx.deleted) openTask(nextId, true); else { resetPicker('t'); TS = null; closeDlg('dlg-task'); }
+  openTask(nextId || st.id, true);
   renderAll();
   if (st.completed) said(st.completed); else toast('Saved.');
 }
-$('#task-form').addEventListener('submit', async e => { e.preventDefault(); if (!TS || TS.ro) return; if (await saveTask()) { TS = null; closeDlg('dlg-task'); renderAll(); toast('Saved.'); } });
+/* Save keeps the sheet open on this task (Max, 2026-11-14), filled again from what was saved */
+$('#task-form').addEventListener('submit', async e => { e.preventDefault(); if (!TS || TS.ro) return; const id = TS.id; if (await saveTask()) { openTask(id, true); renderAll(); toast('Saved.'); } });
 /* unsaved changes: a bar, not a modal; "... and go" on a switch, "... and close" on X, swipe down, backdrop or Esc */
 let askRes = null;
 function hideAsk() { $('#task-ask').hidden = true; $('#task-foot').hidden = false; askRes = null; }
@@ -1805,7 +1809,12 @@ function askUnsaved(verb) {
 $('#task-ask').addEventListener('click', e => { const b = e.target.closest('[data-ask]'); if (!b || !askRes) return; const r = askRes; hideAsk(); r(b.dataset.ask); });
 async function leaveTask(verb, then) {
   if (askRes) return;
-  if (dirty() || (TS && TS.conflict)) { const a = await askUnsaved(verb); if (a === 'stay') { $('#t-title').focus(); return; } if (a === 'save') { if (!(await saveTask())) return; renderAll(); toast('Saved.'); } }
+  if (dirty() || (TS && TS.conflict)) {
+    const a = await askUnsaved(verb);
+    if (a === 'stay') { $('#t-title').focus(); return; }
+    // "Save and close" does not close either (Max, 2026-11-14): it goes on to the next task when there is one
+    if (a === 'save') { const nx = verb === 'close' ? nextOf(TS.id) : null; if (!(await saveTask())) return; renderAll(); toast('Saved.'); if (nx) return openTask(nx, true); }
+  }
   then();
 }
 function tryCloseTask() { if (askRes) { const r = askRes; hideAsk(); r('stay'); return; } leaveTask('close', () => { resetPicker('t'); TS = null; closeDlg('dlg-task'); }); }

@@ -5850,12 +5850,12 @@ function openTask(id, quad, opts) {
   const fdel = dlg.querySelector('#fdel');
   if (fdel) fdel.onclick = () => { deck.dlg.close(); removeTask(t); };
   const fs = dlg.querySelector('#fs');
-  let after = null, afterTo = null, saveBad = false; // after: where "Save and go / close" goes once the save is through
-  let decide = null; // the decision button clicked (1 or 0): Save sends the answer with the other changes, then the window closes
+  let after = null, afterTo = null, saveBad = false; // after: where the window goes once the save is through (never closed)
+  let decide = null; // the decision button clicked (1 or 0): Save sends the answer with the other changes, then the next task
   let doneTick = false; // the done checkbox was ticked: Save sends status done with the other changes, then the next task
   const fdone = dlg.querySelector('#fdone');
   if (fdone && !fdone.disabled) fdone.onchange = () => { if (!fdone.checked || !fs) return; doneTick = true; after = nav.next ? 'next' : null; fs.click(); if (saveBad) { doneTick = false; after = null; fdone.checked = false; } };
-  dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = nav.next ? 'next' : null; fs.click(); if (saveBad) { decide = null; after = null; } }; }); // an answer moves on to the next task; with none the window closes
+  dlg.querySelectorAll('[data-dec]').forEach(b => { b.onclick = () => { if (!fs || b.disabled) return; decide = Number(b.dataset.dec); after = nav.next ? 'next' : null; fs.click(); if (saveBad) { decide = null; after = null; } }; }); // an answer moves on to the next task; with none the window stays on this one
   // ---- T14: the Autonomy row ----
   const autoEl = dlg.querySelector('#fau');
   const drawAuto = () => {
@@ -6043,11 +6043,20 @@ function openTask(id, quad, opts) {
         toast('Added to ' + label(list) + ': ' + plain(title), canDo('delete', null, list) ? () => removeTask(nt, true) : null);
       }
     };
-    // "Save and go": the save, then the switch in place (the form must not submit, that would close the window)
-    const then = stay => { if (stay) return; if (after === 'prev' || after === 'next' || after === 'jump') leaveNow(after, afterTo); else deck.dlg.close(); };
-    if (!newNames.length) { const stay = save([]); if (stay || after === 'prev' || after === 'next' || after === 'jump') { e.preventDefault(); then(stay); } return; }
-    // new tag names: created in their tag lists first, then the save goes on (the window closes or moves on when they exist)
-    e.preventDefault(); fs.disabled = true; fs.textContent = 'Saving…';
+    // A save never closes the window (Max, 2026-11-14): Save stays on this task, filled again from what was saved; "Send answer",
+    // the done tick and "Save and go" move on to the next task, and stay here when there is none. A new task is the one exception:
+    // its window closes, as before. The form must never submit, that would close the window
+    const go = after === 'close' ? (nav.next ? 'next' : null) : after;
+    const then = stay => {
+      if (stay) return; // a conflict: openTask already filled the window again with my text and the notice
+      if (go === 'prev' || go === 'next' || go === 'jump') leaveNow(go, afterTo);
+      else if (!t) deck.dlg.close();
+      else deck.swap(() => openTask(t.id, null), 0);
+    };
+    e.preventDefault();
+    if (!newNames.length) { then(save([])); return; }
+    // new tag names: created in their tag lists first, then the save goes on (the window moves on or stays when they exist)
+    fs.disabled = true; fs.textContent = 'Saving…';
     ensureTags(newNames).then(ids => then(save(ids)));
   };
   // leaving this task (a side zone, a ghost or edge tab, Alt+arrows, a swipe: prev / next; a band, an end zone, Esc: close): what
