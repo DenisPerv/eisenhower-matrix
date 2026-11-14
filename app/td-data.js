@@ -1200,7 +1200,7 @@
     async function saveListSettings(id, ch) {
       const errs = [];
       if (ch.mode) { const r = await setAutonomy('list', id, ch.mode, ch.expected); if (!r.ok) errs.push(r.now ? 'Someone set the mode to ' + C.AUTONOMY_NAME[r.now] + ' meanwhile. Save again to replace it.' : r.err.message); }
-      if (ch.intake) { const i = ch.intake, r = await rpc('set_intake', { p_kind: 'list', p_id: id, p_e2e_self: i.e2e, p_deploy_target: null, p_notify_telegram: i.tg, p_stage_report: i.stage }); if (!r.ok) errs.push(r.err.message); }
+      if (ch.intake) { const i = ch.intake, r = await rpc('set_intake', { p_kind: 'list', p_id: id, p_e2e_self: i.e2e, p_notify_telegram: i.tg, p_stage_report: i.stage }); if (!r.ok) errs.push(r.err.message); }
       // db/033: a list cap above the overall cap is refused; the database's text comes back as capErr (and in errs)
       let capErr = null;
       if (ch.cap !== undefined) { const r = await rpc('set_budget', { p_list: id, p_period: 'month', p_cap: ch.cap }); if (!r.ok) { errs.push(r.err.message); capErr = r.err.message; } }

@@ -6877,7 +6877,7 @@ async function newListMoreSave(dlg, id) {
     if (a.ok) LIST[id] = Object.assign({}, LIST[id], { autonomy: mode }); else bad.push('Autonomy (' + a.err.message + ').');
   }
   if (e2e || tg) {
-    const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: e2e, p_deploy_target: null, p_notify_telegram: tg, p_stage_report: null });
+    const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: e2e, p_notify_telegram: tg, p_stage_report: null });
     if (!a.ok) bad.push('intake (' + a.err.message + ').');
   }
   const b = { decisions: C.briefLines(q('#nl-b-decisions').value).map(x => C.briefLine(x, day, me.display_name)).filter(Boolean).join('\n') };
@@ -7064,7 +7064,7 @@ async function openListSettings(id, opener) {
       } else errs.push(a.err.message);
     }
     if (hh && (c.e2e !== base.e2e || c.tg !== base.tg)) {
-      const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: c.e2e, p_deploy_target: null, p_notify_telegram: c.tg, p_stage_report: c.stage });
+      const a = await rest('POST', 'rpc/set_intake', { p_kind: 'list', p_id: id, p_e2e_self: c.e2e, p_notify_telegram: c.tg, p_stage_report: c.stage });
       if (a.ok) Object.assign(base, { e2e: c.e2e, tg: c.tg }); else errs.push(a.err.message);
     }
     if (hh && c.dir !== base.dir) {

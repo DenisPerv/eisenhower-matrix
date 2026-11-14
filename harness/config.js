@@ -201,7 +201,7 @@
     var out = [], it = l.intake || {}, bt = l.brief_texts || {};
     if (f.mode !== l.mode) out.push(['set_autonomy', { p_kind: 'list', p_id: l.id, p_mode: f.mode, p_expected: l.mode }]);
     if (!!f.e2e !== !!it.e2e_self || !!f.tg !== !!it.notify_telegram)
-      out.push(['set_intake', { p_kind: 'list', p_id: l.id, p_e2e_self: !!f.e2e, p_deploy_target: null, p_notify_telegram: !!f.tg, p_stage_report: null }]);
+      out.push(['set_intake', { p_kind: 'list', p_id: l.id, p_e2e_self: !!f.e2e, p_notify_telegram: !!f.tg, p_stage_report: null }]);
     var dir = String(f.dir || '').trim();
     if (dir !== (l.project_dir || '')) out.push(['set_project_dir', { p_list: l.id, p_dir: dir, p_expected: l.project_dir || null }]);
     if (LIST_BRIEF.some(function (k) { return (f.brief[k[0]] || '') !== (bt[k[0]] || ''); }))
