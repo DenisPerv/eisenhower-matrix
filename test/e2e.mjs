@@ -387,12 +387,16 @@ async function maksymPage() {
 // a list chip may sit behind +N (five chips show): open that menu first
 const pick = async (T, listId) => { if (!(await T.has(`.lists [data-list="${listId}"]`)) && await T.has('#more')) { await T.click('#more'); await T.wait(`!!document.querySelector('#pop [data-list="${listId}"]')`, 5000); } await T.click(`[data-list="${listId}"]`); await T.wait(`document.querySelector('[data-list="${listId}"]').getAttribute('aria-pressed')==="true"`); };
 const undo = T => T.click('.toast button');
+// 2026-11-14: a save no longer closes the task window (it stays on the task, or moves on to the next one),
+// so a test that goes on with the board behind closes the window itself
+const afterSave = async T => { await sleep(300); await closeDialogs(T); };
 const toastText = T => T.text('.toast span');
 async function dialogSave(T, fields) {
   if (!(await T.wait('!!document.querySelector("dialog[open] #fs")'))) throw new Error('the task window did not open; page errors: ' + (T.errors.slice(-2).join(' / ') || 'none'));
   await T.ev(`(()=>{const d=document.querySelector('dialog[open]');const f=${JSON.stringify(fields)};
     if(f.title!==undefined)d.querySelector('#ft').textContent=f.title; if(f.notes!==undefined)d.querySelector('#fn').textContent=f.notes;
     if(f.list)d.querySelector('#fl').value=f.list; d.querySelector('#fs').click();return true})()`);
+  await afterSave(T);
 }
 
 async function gData() {
@@ -427,6 +431,7 @@ async function gData() {
   check(G, 'quadrant buttons: a pick plus a new End in one save (quadrant C, pin set, version +1)', !!qm && qm.urgent_pin === true && qm.version > ed.version, qm && JSON.stringify({ q: qm.quadrant, pin: qm.urgent_pin, v: qm.version }));
   await undo(T);
   check(G, 'undo the pick: back to B, End and pin cleared', await until(async () => { const x = await item(e.id); return x.quadrant === 'B' && x.urgent_pin === null && !x.due_at; }));
+  await afterSave(T);
   await T.wait('!document.querySelector("dialog[open]")');
   await T.ev('dispatchEvent(new Event("focus")),true'); await sleep(800);
   await T.ev(`(()=>{const src=document.querySelector('[data-card="${e.id}"]'),dst=document.querySelector('section.q[data-q="A"]');const dt=new DataTransfer();const r=dst.getBoundingClientRect();
@@ -1448,6 +1453,7 @@ async function gCard() {
   await T.ev('(()=>{const f=document.querySelector("' + W + ' #fd");f.value="2030-01-02T10:00";f.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("' + W + ' #fs").click();return true})()');
   const kept = await until(async () => { const x = await item(rich.id); return x && x.due_at ? x : null; });
   check(G, 'a save that did not touch the description keeps it byte for byte', !!kept && kept.body_md === RICH, kept && kept.body_md.length + ' of ' + RICH.length);
+  await afterSave(T);
   await T.wait('!document.querySelector("' + W + '")', 4000);
   await T.wait('!!document.querySelector(\'[data-card="' + rich.id + '"]\')', 5000);
   await T.click('[data-card="' + rich.id + '"]'); await T.wait('!!document.querySelector("' + W + ' #fread[tabindex]")', 8000);
@@ -1462,6 +1468,7 @@ async function gCard() {
   await T.ev('(document.querySelector("' + W + ' #fs").click(),true)');
   const ed = await until(async () => { const x = await item(rich.id); return x && x.body_md.includes('changed') ? x : null; });
   check(G, 'a save through edit mode changes only what the person changed', !!ed && ed.body_md === RICH.replace('under a rule', 'under a rule, changed').replace(/\s+$/, ''), ed && ed.body_md.length + '');
+  await afterSave(T);
   await T.wait('!document.querySelector("' + W + '")', 4000);
   // the small card
   const sm = await T.ev('(()=>{const c=document.querySelector(\'[data-card="' + rich.id + '"]\');const m=c&&c.querySelector(".md");return m?{table:!!m.querySelector("table"),first:m.textContent.startsWith("First paragraph")}:null})()');
@@ -1685,12 +1692,13 @@ async function gDecision(G, T) {
   const back = await until(async () => { const x = await item(a.id); return x && x.status === 'open' && x.details.decision.answer === null ? x : null; });
   check(G, 'decision (web): Undo puts status open and answer null back, the other keys still there', !!back && back.details.e2e === RUN && JSON.stringify(back.details.notify) === '["maksym"]');
   await closeDialogs(T);
-  // the only task shown: an answer closes the window
+  // the only task shown: an answer keeps the window open on it (2026-11-14; with a next task it moves on)
   await T.ev(`(()=>{const q=document.getElementById('q');q.value=${JSON.stringify(a.title)};q.dispatchEvent(new Event('input'));return true})()`);
   const only = await openCard(T, a.id, W + ' .fdec');
   await T.ev(`(document.querySelector('${W} [data-dec="0"]').click(),true)`);
-  check(G, 'decision (web): an answer on the only task shown closes the window', only && await T.wait(`!document.querySelector('${W}')`, 5000) && /Answered “No”/.test(await toastText(T)));
+  check(G, 'decision (web): an answer on the only task shown keeps the window open on it', only && await T.wait(`!!document.querySelector('${W} .fdec')`, 5000) && /Answered “No”/.test(await toastText(T)));
   await undo(T);
+  await afterSave(T);
   await sleep(2500); // the answer and its undo are both written before the row is read
   await until(async () => { const x = await item(a.id); return x && x.status === 'open' && x.details.decision.answer === null; });
   await T.ev('(document.getElementById("clear")?.click(),true)');
@@ -2230,6 +2238,7 @@ async function gLinks() {
   await T.size(1440, 900);
   await T.ev(`(()=>{const e=document.getElementById('fsd');e.value='${day(1).slice(0, 10)}T09:00';e.dispatchEvent(new Event('input'));return true})()`);
   await T.click('dialog[open] #fs');
+  await afterSave(T);
   const kids = await until(async () => { const r = await MK.rest('GET', `item_links?select=from_item&kind=eq.parent&removed_at=is.null&to_item=eq.${par.id}`); return r.ok && r.json.length === 4 ? r.json : null; });
   check(G, 'Save sends the links: four subtasks stored (two old, the picked one, the created one)', !!kids, kids ? '' : 'not 4');
   const nk = await until(async () => { const r = await MK.rest('GET', `items?select=id,quadrant,list_id&title=eq.${encodeURIComponent(RUN + ' links child new')}`); return r.ok && r.json.length ? r.json[0] : null; });
@@ -2597,6 +2606,7 @@ async function gUiTags(G, T) {
     check(G, 'task window: dragging a list by its grip onto another moves it back above (U3)', !!(await until(async () => { const s = await sorts(); return s[tl.id] < s[bl.id]; })));
   } else skip(G, 'task window: moving tag lists (U3)', 'the second test tag list was not made');
   await T.click('dialog[open] #fs');
+  await afterSave(T);
   check(G, 'task window: Save writes the tag (item_tags)', !!(await until(async () => (await MK.rest('GET', `item_tags?select=tag_id&item_id=eq.${it.id}&tag_id=eq.${tag && tag.id}&removed_at=is.null`)).json[0])));
   // tags round: the next task opens both test lists closed again (the chevron is the window's own; neither is a favourite)
   const it2 = await mkItem('tags open');
